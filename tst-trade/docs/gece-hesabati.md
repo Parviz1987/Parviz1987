@@ -26,5 +26,37 @@ makro 50 %, RSI 42 %. Keçməli hədd «Həmişə yuxarı» üsulunun 53 %-dir.
 Bu o deməkdir ki, sadə alətlər təkbaşına qızılın gündəlik istiqamətini bazisdən yaxşı demir. Bu, dürüst nəticədir.
 Canlı yoxlama yığıldıqca rəqəmlər dəyişə bilər.
 
-## Qalanlar və təkliflər
-Səhər bu hissəyə son vəziyyət əlavə olunacaq.
+## Audit (ikinci təlimat): tapılan və düzəldilən
+
+**Kod rəyçisi (ayrıca agent) 8 xəta tapdı, hamısı düzəldildi və testlə qorunur:**
+1. Həftə sonu gündəlik proqnozlar eyni hədəf üçün 3 dəfə yazılırdı: Hakimin canlı sayı şişirdi.
+2. Makro üsul tarixçədə hələ dərc olunmamış FRED rəqəmlərini görürdü (real faiz 1 gün, dollar indeksi 9 günə qədər tez):
+   tarixçə nəticəsi süni yaxşı çıxırdı. İndi dərc olunma gecikməsi nəzərə alınır, köhnə nəticələr silinib yenidən hesablandı.
+3. Köhnə bazar günü "qırıq" gündəlik şamları silindi; mənbədən gələn həftə sonu şamları qəbul edilmir.
+4. Hakimin qrafik sorğusu hər 20 saniyədə yüz minlərlə sətri oxuyurdu: indi son dövr + 2 dəqiqəlik yaddaş.
+5. Saat effekti üsulu tarixçədə bəzən səhv saatı götürürdü.
+6. Gündəlik hədəfə 5–25 günlük artıq tolerantlıq var idi: indi dəqiq iş günü (+2 gün bayram üçün).
+7. Grok gözlənilməz cavab yazsa, dövrə dayanırdı: indi dözümlüdür.
+8. Capital.com tarixçə girişi uğursuz olsa, canlı axının girişini də dayandıra bilərdi: ayrıldı.
+
+**Hədəfə görə audit (öz yoxlamam):**
+- **Təsadüfi "sübut" riski:** hər kartda 9 üsul eyni anda yoxlanır; 20-dən biri təsadüfən p < 0.05 keçir.
+  İndi hədd üsulların sayına bölünür (Bonferroni). Qızılın 1 saatlıq Fibonacci "sübutu" (p = 0.04) bu səbəbdən götürüldü.
+- **Xərc nəzərə alınmırdı:** qızılın 1 dəqiqəlik "Qısa dönüş"ü 70 % düz çıxır, amma bu kotirovka səs-küyüdür:
+  orta hərəkət alış-satış fərqindən (spread) kiçikdir, pul qazandırmaz. İndi belə hallar «Spreaddən kiçik» göstərilir,
+  "sübut" sayılmır. Cədvəldə "Orta qazanc / spread" sütunu var.
+- **Aralıqlar düzgün deyildi:** "50 % aralıq" qızılın saatlığında 68 % tuturdu (çox geniş). Səbəb: metal hərəkətlərində
+  "qalın quyruq" var. İndi aralığın eni keçmiş hərəkətlərdən ölçülür (yalnız keçmiş məlumat). Sınaqda 49 % / 76 %.
+- **Alpaca açarı saxlanmışdı, amma işə qoşulmamışdı:** Benzinga xəbərləri (metal fondları və mədən şirkətləri) dəqiqədə bir.
+- **Konsensus üsulu:** bütün alətlərin birgə fikri, Hakim yoxlayır.
+- **Sürət:** Hakimin statistikası yaddaşda saxlanır, jurnal üçün indeks; serverin yaddaşı 100 MB civarı, 200+ MB boş.
+- **Telefon:** yuxarıda bölmə zolağı (Qrafik · Proqnoz · Fundamental · Hakim · Xəbər).
+
+## Qalanlar və sizin qərarınız lazım olanlar
+1. **Grok xərci:** bir axtarış ~0.9 $ (ehtiyatla hesablanır). 4 saatda bir → aylıq 20 $ limit təxminən 5–7 günə çatır.
+   Limit: Admin → Beyin yuvaları → Kəşfiyyatçı. Real xərci xAI konsolunda yoxlamaq olar.
+2. **Canlı sübut vaxt tələb edir:** 1 gün üçün 250, 1 saat üçün 200 canlı yoxlama lazımdır (həftələr, aylar).
+   O vaxta qədər kartlar tarixçəyə əsaslanır və "tarixçə" yazılır.
+3. **Twelve Data pulsuz planı:** gümüş, platin, palladium yoxdur — artıq Capital.com əvəz edir, alış lazım deyil.
+4. **Dürüst nəticə:** indiyə qədər heç bir üsul xərcdən sonra sübut almayıb. Növbəti addım üçün təklif: hadisə
+   (CPI, FOMC, NFP) sürprizinə əsaslanan üsul — FMP açarı (pullu) və ya Forex Factory-nin "fakt" sütunu ilə.
