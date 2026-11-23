@@ -159,7 +159,7 @@ let jh = "15m";
 try { jh = localStorage.getItem("tst_jh") || jh; if (jh === "1m") jh = "15m"; } catch (e) {}
 const MCOL = { momentum: "#4ea1ff", reversal: "#c77dff", trend: "#3fb27f", breakout: "#ff9f43", rsi: "#e0605a",
   fib: "#d4a73c", macro: "#2ec4b6", session: "#f78fb3", surprise: "#ffd166", dollar: "#06d6a0", oil: "#8d6e63",
-  news: "#ef476f", strateq: "#118ab2", consensus: "#9aa5b1" };
+  news: "#ef476f", strateq: "#118ab2", pullback: "#b5e48c", consensus: "#9aa5b1" };
 function renderJudge(fc) {
   const key = mode === "live" ? "stats_live" : "stats_history";
   const methods = Object.keys(fc.method_names).filter((m) => m !== "rw");
@@ -238,7 +238,7 @@ async function loadPassports() {
   const d = await api(`/api/passports?symbol=${sym}`);
   const short = { "sübut": "✓", "xərc": "spread", "yox": "✗", "az": "az" };
   $("passports").innerHTML = `<table><tr><th>Üsul</th><th>Niyə var</th><th>Nə gözləyirik</th><th>Hakim indi (üfüq: nəticə)</th><th>Nəticə verməsə</th></tr>` +
-    d.methods.map((m) => `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.why)}</td><td>${esc(m.expect)}</td>
+    d.methods.map((m) => `<tr><td><b>${esc(m.name)}</b>${m.family ? `<br><span class="note">ailə: ${esc(m.family)}</span>` : ""}</td><td>${esc(m.why)}</td><td>${esc(m.expect)}</td>
       <td><div class="res">${Object.entries(m.results).map(([h, r]) => { const x = r.live && r.live.nh >= 1 && r.live.status !== "az" ? r.live : r.history || r.live || {};
         return `<span class="${x.status || "az"}" title="${x.nh ?? x.n ?? 0} yoxlama">${esc(d.horizons[h])}: ${short[x.status] || x.status || "—"}${x.hit_rate != null && m.method !== "rw" ? " " + Math.round(x.hit_rate * 100) + "%" : ""}</span>`; }).join("")}</div></td>
       <td>${esc(m.else)}</td></tr>`).join("") + `</table><p class="note">✓ sübut · ✗ kifayət qədər yoxlama var, sübut yoxdur · spread: düzdür, amma spreaddən kiçik · az: hələ az yoxlama.</p>`;

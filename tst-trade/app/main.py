@@ -321,7 +321,9 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                     r = next((x for x in judge.stats(db, symbol, h, mode, ttl=300) if x["method"] == m), None)
                     if r:
                         res.setdefault(h, {})[mode] = {k: r[k] for k in ("status", "nh", "n", "hit_rate")}
-            rows.append({"method": m, "name": forecast.METHOD_NAMES[m], **forecast.PASSPORT.get(m, {}), "results": res})
+            fam = forecast.FAMILY.get(m)
+            rows.append({"method": m, "name": forecast.METHOD_NAMES[m], **forecast.PASSPORT.get(m, {}), "results": res,
+                         "family": forecast.FAMILY_NAMES.get(fam) if fam else None})
         return {"symbol": symbol, "horizons": forecast.HORIZON_NAMES, "methods": rows}
 
     def _where(symbol: str, horizon: str, mode: str) -> dict:

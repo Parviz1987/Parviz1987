@@ -20,8 +20,8 @@ this moment says P = 0.5: the Judge then counts no hit or miss for it (only fore
             (app/markets.py: the usual same-candle link is measured from the last 100 candles).
 - news, strateq the brains as forecasters: the Reader's headline labels summed over the last hours, and the
             Strategist's own lean (app/brainviews.py). Judged like the rest: a brain earns trust only by results.
-- consensus the plain average of every other method's lean (P - 0.5) among those that have a view right now; no
-            fitting to past results (so no hidden look-ahead). No view unless at least two methods agree in sum.
+- consensus selective: each family of methods (one idea) gets one voice; a direction only when two independent
+            families agree and none disagrees, outside high-impact releases and wild markets.
 - macro     (daily and longer) the last week's change of the real interest rate and the dollar: both falling is good
             for gold. Needs FRED data; without it no view.
 Every method gets the same range: an EWMA volatility (lambda 0.94) scaled to the horizon, with the width taken from
@@ -40,14 +40,23 @@ HORIZONS = {h: tf for h, (tf, _) in HORIZON_SPEC.items()}      # horizon -> cand
 HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h": "4 saat (gün içi)", "1d": "1 gün", "3d": "3 gün",
                  "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
-METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro", "session", "surprise",
-           "dollar", "oil", "news", "strateq", "consensus")
+METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback", "macro", "session",
+           "surprise", "dollar", "oil", "news", "strateq", "consensus")
+# Families: methods that carry the SAME idea (momentum and trend are both "the move continues"). The consensus gives
+# each family one voice, so one idea measured three ways cannot outvote two independent ideas.
+FAMILY = {"momentum": "trend", "trend": "trend", "breakout": "trend",
+          "reversal": "revert", "rsi": "revert", "fib": "revert", "pullback": "revert",
+          "dollar": "cross", "oil": "cross", "macro": "fund", "surprise": "fund",
+          "news": "brain", "strateq": "brain", "session": "time"}
+FAMILY_NAMES = {"trend": "trend", "revert": "geri dönüş", "cross": "bazarlar arası", "fund": "fundamental",
+                "brain": "beyinlər", "time": "vaxt"}
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
                 "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)",
-                "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "macro": "Makro (real faiz + dollar)",
+                "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "pullback": "Trend içində geri çəkilmə", "macro": "Makro (real faiz + dollar)",
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
                 "dollar": "Dollar impulsu", "oil": "Neft impulsu",
-                "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "consensus": "Konsensus (hamısı birlikdə)"}
+                "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri",
+                "consensus": "Seçici konsensus (müstəqil ailələr)"}
 BASELINES = ("rw", "up")
 LOOKBACK = {"15m": 16, "30m": 16, "1h": 24, "4h": 18, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
 TREND_WINDOWS = {"15m": (4, 16, 96), "30m": (4, 16, 96), "1h": (6, 24, 120), "4h": (6, 30, 120), "1d": (10, 50, 150),
@@ -201,6 +210,40 @@ def fib_view(cands: list[dict], sigma: float) -> tuple[float, str]:
     return 0.5, f"qiymət Fibonacci səviyyələrində deyil (swing {lo:.2f}–{hi:.2f})"
 
 
+def _ema(xs: list[float], n: int) -> list[float]:
+    k, e, out = 2 / (n + 1), sum(xs[:n]) / n, []
+    for i, x in enumerate(xs):
+        if i >= n:
+            e = x * k + e * (1 - k)
+        out.append(e if i >= n - 1 else float("nan"))
+    return out
+
+
+def pullback_view(cands: list[dict], sigma: float) -> tuple[float, str]:
+    """A pullback inside a trend: the trend is up (close above EMA 50 and EMA 20 clearly above EMA 50), within the last
+    5 candles the price dipped to the EMA 20 (the usual support in a trend), and the last candle closed up again
+    above it: the trend is expected to resume. The mirror image for a down trend. Elsewhere no view."""
+    if len(cands) < 60:
+        return 0.5, "trend üçün şam azdır"
+    closes = [c["c"] for c in cands]
+    e20, e50 = _ema(closes, 20), _ema(closes, 50)
+    px, last = closes[-1], cands[-1]
+    tol = px * sigma * 0.5
+    recent = cands[-5:]
+    gap = px * sigma            # a real trend: the averages at least one typical candle apart (not flat noise)
+    if px > e50[-1] and e20[-1] > e50[-1] + gap:
+        touched = any(c["l"] <= e20[-5 + i] + tol for i, c in enumerate(recent))
+        if touched and px > e20[-1] and last["c"] > last["o"]:
+            return SIGNAL_P, "yuxarı trenddə qiymət EMA 20-yə endi və yenidən qalxır: trendin davamı gözlənilir"
+        return 0.5, "yuxarı trend, amma geri çəkilmə və dönüş yoxdur"
+    if px < e50[-1] and e20[-1] < e50[-1] - gap:
+        touched = any(c["h"] >= e20[-5 + i] - tol for i, c in enumerate(recent))
+        if touched and px < e20[-1] and last["c"] < last["o"]:
+            return 1 - SIGNAL_P, "aşağı trenddə qiymət EMA 20-yə qalxdı və yenidən enir: trendin davamı gözlənilir"
+        return 0.5, "aşağı trend, amma geri çəkilmə və dönüş yoxdur"
+    return 0.5, "aydın trend yoxdur"
+
+
 def _as_candles(seq) -> list[dict]:
     if seq and not isinstance(seq[0], dict):
         return [{"o": c, "h": c, "l": c, "c": c} for c in seq]
@@ -211,9 +254,39 @@ def _clip(p: float) -> float:
     return min(max(p, P_CAP[0]), P_CAP[1])
 
 
+def selective_consensus(out: dict, rets: list[float], sigma: float, event_near: bool) -> dict:
+    """Quality over quantity. Each family (one idea) gets one voice: the average lean of its members that have a view.
+    A direction only when at least two independent families lean the same way and no family leans against them,
+    no high-impact US release is within the hour, and the market is not wild (volatility more than twice its usual).
+    Otherwise no view: fewer forecasts, each with more behind it."""
+    fam: dict[str, list[float]] = {}
+    for m, v in out.items():
+        if m in FAMILY and v["p_up"] != 0.5:
+            fam.setdefault(FAMILY[m], []).append(v["p_up"] - 0.5)
+    leans = {f: sum(x) / len(x) for f, x in fam.items()}
+    if event_near:
+        return {"p_up": 0.5, "basis": "yaxında mühüm ABŞ rəqəmi var: hadisədən əvvəl fikir bildirilmir"}
+    usual = sorted(abs(r) for r in rets[-200:])
+    usual = usual[len(usual) // 2] * 1.4826 if usual else 0.0      # a robust typical move (median-based)
+    if usual and sigma > 2 * usual:
+        return {"p_up": 0.5, "basis": "bazar həddindən artıq dalğalıdır: fikir bildirilmir"}
+    ups = [f for f, x in leans.items() if x > 0]
+    downs = [f for f, x in leans.items() if x < 0]
+    side = ups if len(ups) >= len(downs) else downs
+    other = downs if side is ups else ups
+    names = ", ".join(FAMILY_NAMES[f] for f in sorted(side))
+    if len(side) >= 2 and not other:
+        lean = sum(leans[f] for f in side) / len(side)
+        return {"p_up": round(_clip(0.5 + lean), 4),
+                "basis": f"{len(side)} müstəqil ailə razıdır ({names}): {'yuxarı' if lean > 0 else 'aşağı'}"}
+    if other and side:
+        return {"p_up": 0.5, "basis": f"ailələr razı deyil (yuxarı {len(ups)}, aşağı {len(downs)})"}
+    return {"p_up": 0.5, "basis": f"fikri olan müstəqil ailə azdır ({len(leans)})"}
+
+
 def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = None,
           releases: list[dict] | None = None, related: dict | None = None,
-          views: dict | None = None) -> dict | None:
+          views: dict | None = None, event_near: bool = False) -> dict | None:
     """All methods' forecasts for the close `steps_of(horizon)` candles ahead, from past candles (oldest first;
     plain closes are accepted too). macro: {"dfii10": weekly change, "dollar": weekly change in %} or None."""
     longer = _as_candles(seq)
@@ -280,6 +353,8 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
 
     p, basis = fib_view(cands, sigma)
     out["fib"] = {"p_up": p, "basis": basis}
+    p, basis = pullback_view(cands, sigma)
+    out["pullback"] = {"p_up": p, "basis": basis}
 
     if "session" in methods_for(horizon):
         last_t = cands[-1].get("t")
@@ -324,15 +399,7 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
         else:
             out["macro"] = {"p_up": 0.5, "basis": "FRED məlumatı yoxdur"}
 
-    views = {m: v["p_up"] - 0.5 for m, v in out.items() if m not in ("rw", "up") and v["p_up"] != 0.5}
-    if len(views) >= 2 and abs(sum(views.values()) / len(views)) >= 0.01:
-        lean = sum(views.values()) / len(views)
-        ups = sorted(m for m, d in views.items() if d > 0)
-        downs = sorted(m for m, d in views.items() if d < 0)
-        out["consensus"] = {"p_up": round(_clip(0.5 + lean), 4),
-                            "basis": f"{len(views)} üsulun ortası: yuxarı {len(ups)}, aşağı {len(downs)}"}
-    else:
-        out["consensus"] = {"p_up": 0.5, "basis": f"fikri olan üsul azdır və ya fikirlər bir-birini sıfırlayır ({len(views)})"}
+    out["consensus"] = selective_consensus(out, rets, sigma, event_near)
 
     for v in out.values():
         v.update(rng)
@@ -380,7 +447,12 @@ PASSPORT = {
     "strateq": {"why": "Claude bütün faktları (kartlar, makro, təqvim, xəbər) birləşdirib meyl deyir: beynin özünü ölçürük.",
                 "expect": "4 saat və 1 gün.",
                 "else": "Strateq yalnız izahçı qalır, istiqamət soruşulmur (xərc azalır)."},
-    "consensus": {"why": "Bütün alətlərin birgə fikri: tək alətin səhvini azaldır.",
-                  "expect": "Ən çox sübut olunan üsulların birləşməsi kimi.",
-                  "else": "Faydasız üsullar konsensusdan çıxarılır."},
+    "pullback": {"why": "Treyderlərin ən çox işlətdiyi qurulum: trend içində qiymət dəstəyə (EMA 20) enir və trend "
+                        "davam edir. Trend və dönüşün ayrı-ayrılıqda ~50 % verdiyi yerdə birləşmə daha dəqiq ola bilər.",
+                 "expect": "1 saat – 1 gün; nadir siqnal.",
+                 "else": "Konsensusdan çıxarılır; dözüm və EMA uzunluğu yalnız yeni sınaqla dəyişdirilir."},
+    "consensus": {"why": "Az, amma keyfiyyətli proqnoz: yalnız müstəqil fikir ailələri razı olanda, hadisə ərəfəsi və "
+                         "həddən artıq dalğalı bazar xaricində. Eyni fikrin iki dəfə sayılmasının qarşısını alır.",
+                  "expect": "Az proqnoz, amma tək üsullardan yüksək düz çıxma faizi.",
+                  "else": "Ailələr və şərtlər yalnız Hakimin rəqəmi ilə dəyişdirilir; yenə yoxdursa, kart istiqamət göstərmir."},
 }

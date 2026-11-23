@@ -143,12 +143,32 @@ def test_weekend_history_bars_are_not_daily_candles():
     assert [c["t"] for c in candles.get(db, "XAU", "1d")] == [fri]
 
 
-def test_consensus_averages_views_only():
-    up = [{"o": 100 + i, "h": 100.5 + i, "l": 99.5 + i, "c": 100 + i} for i in range(200)]
-    m = forecast.build(up, "1d")["methods"]
-    leans = [v["p_up"] - 0.5 for k, v in m.items() if k not in ("rw", "up", "consensus") and v["p_up"] != 0.5]
-    assert abs(m["consensus"]["p_up"] - (0.5 + sum(leans) / len(leans))) < 1e-3
+def test_selective_consensus_counts_families_not_methods():
+    def m(**kw):
+        return {k: {"p_up": v} for k, v in kw.items()}
+    calm = [0.001 * (1 if i % 2 else -1) for i in range(200)]
+    # three trend-family methods up, one revert method down: one idea against another -> no view
+    out = forecast.selective_consensus(m(momentum=0.6, trend=0.6, breakout=0.6, rsi=0.4), calm, 0.001, False)
+    assert out["p_up"] == 0.5 and "razı deyil" in out["basis"]
+    # two independent families up, nobody against -> a direction
+    out = forecast.selective_consensus(m(trend=0.6, dollar=0.58), calm, 0.001, False)
+    assert out["p_up"] > 0.5 and "2 müstəqil ailə" in out["basis"]
+    # one family only (however many methods) -> no view
+    assert forecast.selective_consensus(m(momentum=0.6, trend=0.65), calm, 0.001, False)["p_up"] == 0.5
+    # near a high-impact release, or in a wild market -> no view
+    assert forecast.selective_consensus(m(trend=0.6, dollar=0.58), calm, 0.001, True)["p_up"] == 0.5
+    assert forecast.selective_consensus(m(trend=0.6, dollar=0.58), calm, 0.01, False)["p_up"] == 0.5
 
+
+def test_pullback_in_an_up_trend():
+    cands = [{"o": 100 + i * 0.5, "h": 100.6 + i * 0.5, "l": 99.8 + i * 0.5, "c": 100.5 + i * 0.5} for i in range(80)]
+    top = cands[-1]["c"]
+    # a dip to around the EMA 20 (about 5 points below the top) and a green candle back up
+    cands += [{"o": top, "h": top, "l": top - 6, "c": top - 5}, {"o": top - 5, "h": top - 2, "l": top - 5.5, "c": top - 2}]
+    p, basis = forecast.pullback_view(cands, 0.002)
+    assert p == forecast.SIGNAL_P and "EMA 20" in basis
+    flat = [{"o": 100, "h": 100.5, "l": 99.5, "c": 100 + (0.2 if i % 2 else -0.2)} for i in range(80)]
+    assert forecast.pullback_view(flat, 0.002)[0] == 0.5
 
 def test_every_method_has_a_passport():
     for m in forecast.METHODS:

@@ -75,6 +75,23 @@ class MacroLookup:
         return None if r is None or d is None else {"dfii10": r, "dollar": d}
 
 
+class EventLookup:
+    """Times of high-impact US releases (Forex Factory schedule). A forecast issued from 30 minutes after a release
+    back to 60 minutes before one is "near an event": the selective consensus stays silent there."""
+    def __init__(self, db: DB):
+        import bisect as _b
+        self._b = _b
+        try:
+            self.ts = [r["ts"] for r in db.execute("SELECT ts FROM events WHERE country='USD' AND impact='High' "
+                                                    "ORDER BY ts").fetchall()]
+        except Exception:
+            self.ts = []
+
+    def near(self, t: float) -> bool:
+        i = self._b.bisect_left(self.ts, t - 1800)
+        return i < len(self.ts) and self.ts[i] <= t + 3600
+
+
 class Engine:
     def __init__(self, db: DB, keys: KeyStore, default_provider: str, poll_seconds: int, feeds=None, jobs=None):
         self.db = db
@@ -204,6 +221,11 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:selective_v1"):
+            # The consensus became selective (families, event and volatility gates): its history is replayed once.
+            self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='consensus'")
+            self.history_state["ts"] = 0
+            self.db.put("migr:selective_v1", "1")
         if not self.db.get("migr:dollar_pick_v1"):
             # The dollar impulse now picks the dollar market most linked to the metal: replayed once.
             self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='dollar'")
@@ -241,6 +263,7 @@ class Engine:
         macro = self._macro(now)
         rel = self._releases(now)
         bv = brainviews.Lookup(self.db)
+        ev = EventLookup(self.db)
         for h, tf in forecast.HORIZONS.items():
             issued_t = candles.bucket(now, tf)
             step = candles.TF[tf]
@@ -260,7 +283,7 @@ class Engine:
                     continue
                 fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
                                     rel.window(issued_t, h), self.related_closes(past, tf, now),
-                                    bv.views(sym, issued_t, h))
+                                    bv.views(sym, issued_t, h), ev.near(issued_t))
                 if fc is None:
                     continue
                 n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
@@ -345,6 +368,7 @@ class Engine:
         macro = MacroLookup(self.db)
         rel = surprise.Lookup(self.db)
         bv = brainviews.Lookup(self.db)
+        ev = EventLookup(self.db)
         first = macro.first_day()
         if first:
             # Replayed before FRED data arrived: those macro forecasts said "no data". Now that the data covers
@@ -371,7 +395,8 @@ class Engine:
                         continue   # a gap (weekend): the candle after it is not "the next one"
                     window = rows[max(0, i - forecast.history_need(h)):i]
                     fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
-                                        self.related_closes(window, tf, now, linked), bv.views(sym, t, h))
+                                        self.related_closes(window, tf, now, linked), bv.views(sym, t, h),
+                                        ev.near(t))
                     if fc is None:
                         continue
                     target = rows[i + k - 1]["t"] + step if i + k - 1 < len(rows) else target_time(t, h)
