@@ -23,7 +23,7 @@ async function api(path) {
 
 function metals() {
   $("metals").innerHTML = Object.entries(NAMES).map(([k, n]) => `<button data-s="${k}" class="${k === sym ? "on" : ""}">${n}</button>`).join("");
-  document.querySelectorAll("#metals button").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); metals(); load(); });
+  document.querySelectorAll("#metals button").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); metals(); load(); loadSim().catch(() => {}); });
 }
 function save() { try { localStorage.setItem("tst_sym", sym); localStorage.setItem("tst_res_h", hz); } catch (e) {} }
 
@@ -115,10 +115,39 @@ function drawCorridor(cv, d) {
     g.setLineDash([]); g.fillStyle = css("--muted"); g.fillText("indi", nx + 3, padT + 10); }
 }
 
+let smode = "history";
+const SKIP = ["rw"];
+function usd(x) { return x == null ? "—" : (x >= 0 ? "+" : "−") + Math.abs(x * 1000).toFixed(2) + " $"; }
+async function loadSim() {
+  $("smode").innerHTML = [["history", "Tarixçə"], ["live", "Canlı"]].map(([k, n]) => `<button data-m="${k}" class="${k === smode ? "on" : ""}">${n}</button>`).join("");
+  document.querySelectorAll("#smode button").forEach((b) => b.onclick = () => { smode = b.dataset.m; loadSim(); });
+  $("simmap").innerHTML = "<p class='note'>Hesablanır… (bir neçə saniyə)</p>";
+  const d = await api(`/api/simulate?symbol=${sym}&mode=${smode}`);
+  const methods = Object.keys(d.method_names).filter((m) => !SKIP.includes(m) && d.horizons.some((h) => h.methods[m]));
+  if (!methods.length) { $("simmap").innerHTML = "<p class='note'>Hələ oynanılacaq proqnoz yoxdur.</p>"; $("simbest").innerHTML = ""; return; }
+  const short = (m) => d.method_names[m].replace(/\s*\(.*\)/, "");
+  $("simmap").innerHTML = `<table class="sc"><tr><th>Üfüq</th><th>Almaq və saxlamaq</th>${methods.map((m) => `<th>${esc(short(m))}</th>`).join("")}</tr>` +
+    d.horizons.map((h) => `<tr><td>${esc(h.name)}</td><td class="c mut">${usd(h.buy_hold && h.buy_hold.avg)}</td>` + methods.map((m) => {
+      const r = h.methods[m];
+      if (!r || !r.n) return `<td class="c mut">·</td>`;
+      const cls = r.status === "sübut" ? "sübut" : r.status === "az" ? "az" : r.avg > 0 ? "" : "yox";
+      return `<td class="cell ${cls}" title="${r.n} sövdələşmə · uduş ${pc(r.win)} · stop ${pc(r.stops)} · hədəf ${pc(r.targets)}">${usd(r.avg)}${r.status === "sübut" ? " ✓" : ""}<br><span class="note">${r.n}</span></td>`;
+    }).join("") + "</tr>").join("") + `</table><p class="note">Xanadakı kiçik rəqəm: sövdələşmə sayı. Qırmızı = zərər, sarı = hələ az sövdələşmə (100-dən az),
+      ✓ = qazanc sübut olunub. «Almaq və saxlamaq»: heç bir proqnoz olmadan sadəcə almaq — müqayisə üçün.</p>`;
+  const proven = [];
+  d.horizons.forEach((h) => Object.entries(h.methods).forEach(([m, r]) => { if (r.status === "sübut") proven.push({ h, m, r }); }));
+  $("simbest").innerHTML = proven.length
+    ? "<h3 class='sub'>Pul qazandırdığı sübut olunanlar</h3>" + proven.map(({ h, m, r }) =>
+        `<div class="prow"><span class="ic">✅</span><span><b>${esc(d.method_names[m])}</b> · ${esc(h.name)} · ${r.n} sövdələşmə<br>
+        1000 $-lıq sövdələşmədə orta ${usd(r.avg)} · uduş ${pc(r.win)} · ən böyük düşüş ${usd(r.max_dd)}</span></div>`).join("")
+    : `<p class="note"><b>Hələ heç bir üsul pul qazandırdığını sübut etməyib.</b> Bu o deməkdir ki, indi ticarət açmaq üçün əsas yoxdur.
+       Sübut gələndə burada yaşıl ✓ ilə görünəcək.</p>`;
+}
+
 async function load() {
   const d = await api(`/api/results?symbol=${sym}&horizon=${hz}`);
   renderExpect(d); renderScore(d); renderHz(d); renderPast(d);
 }
 setInterval(() => { $("clock").textContent = "Nyu-York " + new Date().toLocaleTimeString("az", { ...NY, hour: "2-digit", minute: "2-digit" }); }, 1000);
-metals(); load(); setInterval(() => load().catch(() => {}), 30000);
+metals(); load(); loadSim().catch(() => {}); setInterval(() => load().catch(() => {}), 30000);
 window.addEventListener("resize", () => load().catch(() => {}));

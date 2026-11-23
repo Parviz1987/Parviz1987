@@ -174,3 +174,13 @@ def test_every_method_has_a_passport():
     for m in forecast.METHODS:
         p = forecast.PASSPORT[m]
         assert p["why"] and p["expect"] and p["else"], m
+
+
+def test_tsmom_needs_a_year_and_a_bond_agreement():
+    up = [{"o": 100 + i * 0.1, "h": 100 + i * 0.1, "l": 100 + i * 0.1, "c": 100 + i * 0.1} for i in range(300)]
+    assert forecast.tsmom_view(up[:200], "1d", 0.01)[0] == 0.5            # less than a year: no view
+    assert forecast.tsmom_view(up, "1d", 0.02)[0] == 0.6                   # gold up, bonds up
+    assert forecast.tsmom_view(up, "1d", -0.02)[0] == 0.5                  # disagree: no view
+    assert forecast.tsmom_view(up, "1d", None)[0] == 0.56                  # no bond data: softer
+    m = forecast.build(up, "1mo", related={"bond": 0.02})["methods"]
+    assert m["tsmom"]["p_up"] == 0.6 and "tsmom" not in forecast.build(up, "1h")["methods"]

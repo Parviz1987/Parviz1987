@@ -40,18 +40,18 @@ HORIZONS = {h: tf for h, (tf, _) in HORIZON_SPEC.items()}      # horizon -> cand
 HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h": "4 saat (gün içi)", "1d": "1 gün", "3d": "3 gün",
                  "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
-METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback", "macro", "session",
-           "surprise", "dollar", "oil", "news", "strateq", "consensus")
+METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "tsmom", "rsi", "fib", "pullback", "macro",
+           "session", "surprise", "dollar", "oil", "news", "strateq", "consensus")
 # Families: methods that carry the SAME idea (momentum and trend are both "the move continues"). The consensus gives
 # each family one voice, so one idea measured three ways cannot outvote two independent ideas.
-FAMILY = {"momentum": "trend", "trend": "trend", "breakout": "trend",
+FAMILY = {"momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
           "reversal": "revert", "rsi": "revert", "fib": "revert", "pullback": "revert",
           "dollar": "cross", "oil": "cross", "macro": "fund", "surprise": "fund",
           "news": "brain", "strateq": "brain", "session": "time"}
 FAMILY_NAMES = {"trend": "trend", "revert": "geri dönüş", "cross": "bazarlar arası", "fund": "fundamental",
                 "brain": "beyinlər", "time": "vaxt"}
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
-                "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)",
+                "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)", "tsmom": "12 aylıq trend + istiqraz",
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "pullback": "Trend içində geri çəkilmə", "macro": "Makro (real faiz + dollar)",
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
                 "dollar": "Dollar impulsu", "oil": "Neft impulsu",
@@ -63,7 +63,8 @@ TREND_WINDOWS = {"15m": (4, 16, 96), "30m": (4, 16, 96), "1h": (6, 24, 120), "4h
                  "1w": (4, 13, 26)}
 MIN_CANDLES = 30                                       # fewer finished candles: no forecast
 HISTORY_NEED = 200                                     # candles a desk is given (oldest first)
-SESSION_NEED = 1200                                    # the hour-of-day method looks back ~7 weeks of hourly candles
+SESSION_NEED = 1200
+TSMOM_DAYS, TSMOM_WEEKS = 252, 52                                    # the hour-of-day method looks back ~7 weeks of hourly candles
 Z50, Z80 = 0.6745, 1.2816
 SHRINK = 0.25                                          # momentum and reversal move P(up) gently: P = Phi(SHRINK * z)
 P_CAP = (0.35, 0.65)
@@ -92,7 +93,9 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("oil")
         out.remove("news")       # headlines move prices for hours, not weeks
     if h not in ("4h", "1d"):
-        out.remove("strateq")    # the Strategist leans for the next hours to a day   # a release moves the next minutes to a day; longer horizons drown it
+        out.remove("strateq")
+    if h not in ("1w", "10d", "1mo"):
+        out.remove("tsmom")      # the 12-month trend is a weeks-to-months effect    # the Strategist leans for the next hours to a day   # a release moves the next minutes to a day; longer horizons drown it
     return tuple(out)
 
 
@@ -113,7 +116,11 @@ def target_time(issued_t: int, h: str) -> int:
 
 
 def history_need(h: str) -> int:
-    return SESSION_NEED if h == "1h" else HISTORY_NEED
+    if h == "1h":
+        return SESSION_NEED
+    if h in ("10d", "1mo"):
+        return TSMOM_DAYS + 10          # the 12-month trend needs a year of daily candles
+    return HISTORY_NEED
 
 
 def session_view(cands: list[dict], next_t: int | None) -> tuple[float, str]:
@@ -244,6 +251,25 @@ def pullback_view(cands: list[dict], sigma: float) -> tuple[float, str]:
     return 0.5, "aydın trend yoxdur"
 
 
+def tsmom_view(longer: list[dict], tf: str, bond: float | None) -> tuple[float, str]:
+    """Time-series momentum (Moskowitz, Ooi, Pedersen 2012): the sign of the last 12 months' return predicts the next
+    month, in commodities too; for gold, the Treasury trend adds information (a falling bond market is bad for gold).
+    Up when gold's 12 months are up and bonds are not falling; down when both point down; disagreement: no view.
+    Without bond data the gold trend alone speaks, more softly."""
+    back = TSMOM_DAYS if tf == "1d" else TSMOM_WEEKS
+    if len(longer) <= back:
+        return 0.5, "12 aylıq tarixçə yoxdur"
+    g = longer[-1]["c"] / longer[-1 - back]["c"] - 1
+    if bond is None:
+        p = 0.56 if g > 0 else 0.44
+        return p, f"qızıl 12 ayda {g * 100:+.1f} %; istiqraz məlumatı yoxdur"
+    if g > 0 and bond >= 0:
+        return 0.6, f"qızıl 12 ayda {g * 100:+.1f} %, istiqraz {bond * 100:+.1f} %: ikisi də dəstəkləyir"
+    if g < 0 and bond < 0:
+        return 0.4, f"qızıl 12 ayda {g * 100:+.1f} %, istiqraz {bond * 100:+.1f} %: ikisi də aşağı"
+    return 0.5, f"qızıl 12 ayda {g * 100:+.1f} %, istiqraz {bond * 100:+.1f} %: razı deyil"
+
+
 def _as_candles(seq) -> list[dict]:
     if seq and not isinstance(seq[0], dict):
         return [{"o": c, "h": c, "l": c, "c": c} for c in seq]
@@ -355,6 +381,9 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
     out["fib"] = {"p_up": p, "basis": basis}
     p, basis = pullback_view(cands, sigma)
     out["pullback"] = {"p_up": p, "basis": basis}
+    if "tsmom" in methods_for(horizon):
+        p, basis = tsmom_view(longer, tf, (related or {}).get("bond"))
+        out["tsmom"] = {"p_up": p, "basis": basis}
 
     if "session" in methods_for(horizon):
         last_t = cands[-1].get("t")
@@ -423,6 +452,10 @@ PASSPORT = {
               "expect": "1 gündən 1 aya qədər.", "else": "Pəncərələr dəyişdirilir və ya çıxarılır."},
     "breakout": {"why": "20 şamın ən yüksəyi və ya ən aşağısı qırılanda hərəkət sürətlənir.",
                  "expect": "4 saat və 1 gün; nadir, amma güclü siqnal.", "else": "Yalnız dalğalı bazarda saxlanılır."},
+    "tsmom": {"why": "Elmi sübutu ən güclü fikir: son 12 ayın istiqaməti növbəti ayı qabaqcadan deyir (Moskowitz, Ooi, "
+                     "Pedersen 2012, 58 bazar, qızıl daxil). İstiqraz trendi qızıl üçün əlavə məlumat verir.",
+              "expect": "1 həftə, 10 gün, 1 ay; qazancı əsasən böyük düşüşlərdən qaçmaqdan gəlir.",
+              "else": "Bazar trendsiz dövrdədirsə zəifləyir; sübut olmasa konsensusdan çıxarılır."},
     "rsi": {"why": "Çox alınmış və ya çox satılmış bazar geri dönməyə meyllidir.",
             "expect": "Sakit bazarda daha yaxşı.", "else": "Şərtli (sakit/dalğalı) yoxlamaya keçir."},
     "fib": {"why": "Treyderlər Fibonacci səviyyələrində alıb-satır, buna görə qiymət orada dayanır.",

@@ -65,6 +65,23 @@ def _pipeline(db: DB, keys, engine, feeds, jobs) -> list:
         return [{"stage": "Axın xəritəsi", "into": "", "status": "bad", "msg": f"yoxlama xətası: {e}", "n": None}]
 
 
+def _shadow(db: DB) -> dict:
+    """Success map in brief, for the monitor: per metal and horizon, each method's average result per trade after
+    cost (fraction of the price), trades and proof status (history mode, cached 15 minutes)."""
+    from . import simulator
+    out = {}
+    try:
+        for sym in ("XAU", "XAG"):
+            for h in ("1h", "4h", "1d", "1mo"):
+                r = simulator.cached(db, sym, h)
+                out[f"{sym}/{h}"] = {"buy_hold": r.get("buy_hold", {}).get("avg"),
+                                     **{m: {"n": v["n"], "avg": round(v["avg"], 6), "status": v["status"]}
+                                        for m, v in r["methods"].items() if v.get("n")}}
+    except Exception as e:
+        out["error"] = str(e)[:200]
+    return out
+
+
 def _security(db: DB) -> dict:
     from .security import Guard
     return Guard(db).summary()
@@ -139,6 +156,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "hunter": jobs.hunter.recent(5),
         "history": engine.history_state,
         "memory_mb": _memory(),
+        "shadow_trading": _shadow(db),
         "pipeline": _pipeline(db, keys, engine, feeds, jobs),
         "security": _security(db),
         "related": {**json.loads(db.get("related:epics") or "{}"),

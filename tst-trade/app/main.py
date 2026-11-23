@@ -174,7 +174,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     @app.get("/api/admin/status")
     async def status_data():
-        return {**diag.report(db, store, engine, feeds, jobs, _commit()), "security_events": sec.recent(30)}
+        rep = await asyncio.to_thread(diag.report, db, store, engine, feeds, jobs, _commit())
+        return {**rep, "security_events": sec.recent(30)}
 
     @app.get("/api/diag")
     async def diagnostics(request: Request):
@@ -188,7 +189,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             if given:
                 sec.failed(ip, "diag")
             return JSONResponse({"error": "diaqnostika açarı lazımdır"}, status_code=401)
-        return diag.report(db, store, engine, feeds, jobs, _commit())
+        # off the event loop: the report includes the shadow-trading summary (seconds of work when not cached)
+        return await asyncio.to_thread(diag.report, db, store, engine, feeds, jobs, _commit())
 
     @app.post("/api/admin/diag-token")
     async def new_diag_token():
@@ -323,6 +325,26 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return {"symbol": symbol, "name": candles.NAMES[symbol], "horizon": horizon, "now": now,
                 "price_now": (engine.quotes.get(symbol) or {}).get("price"), "expect": expect, "score": score,
                 "past": past, "price": price, "tf_seconds": candles.TF[tf]}
+
+    @app.get("/api/simulate")
+    async def simulate_view(symbol: str = "XAU", mode: str = "history"):
+        """Success map: every method's shadow trades (stop, target, time, spread) per horizon, in money.
+        Heavy: computed off the event loop and kept 15 minutes."""
+        from . import simulator
+        if symbol not in candles.METALS or mode not in ("live", "history"):
+            raise HTTPException(400, "naməlum metal və ya rejim")
+        key = ("sim", symbol, mode)
+        hit = _series_cache.get(key)
+        if hit and time.time() - hit[0] < 900:
+            return hit[1]
+
+        def run():
+            return {"symbol": symbol, "mode": mode, "method_names": forecast.METHOD_NAMES,
+                    "horizons": [{"horizon": h, "name": forecast.HORIZON_NAMES[h],
+                                  **simulator.cached(db, symbol, h, mode)} for h in forecast.HORIZONS]}
+        out = await asyncio.to_thread(run)
+        _series_cache[key] = (time.time(), out)
+        return out
 
     _series_cache: dict = {}
 

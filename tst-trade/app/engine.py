@@ -75,6 +75,22 @@ class MacroLookup:
         return None if r is None or d is None else {"dfii10": r, "dollar": d}
 
 
+class BondLookup:
+    """The 10-year Treasury note's 12-month price change as known before a time (daily candles, past only)."""
+    def __init__(self, db: DB):
+        import bisect as _b
+        self._b = _b
+        rows = db.execute("SELECT t, c FROM candles WHERE symbol='US10Y' AND tf='1d' ORDER BY t").fetchall()
+        self.ts = [r["t"] for r in rows]
+        self.cs = [r["c"] for r in rows]
+
+    def at(self, t: float) -> float | None:
+        i = self._b.bisect_left(self.ts, t - 86400) - 1      # the last daily candle that had closed by t
+        if i < forecast.TSMOM_DAYS:
+            return None
+        return self.cs[i] / self.cs[i - forecast.TSMOM_DAYS] - 1
+
+
 class EventLookup:
     """Times of high-impact US releases (Forex Factory schedule). A forecast issued from 30 minutes after a release
     back to 60 minutes before one is "near an event": the selective consensus stays silent there."""
@@ -264,6 +280,7 @@ class Engine:
         rel = self._releases(now)
         bv = brainviews.Lookup(self.db)
         ev = EventLookup(self.db)
+        bonds = BondLookup(self.db)
         for h, tf in forecast.HORIZONS.items():
             issued_t = candles.bucket(now, tf)
             step = candles.TF[tf]
@@ -281,8 +298,9 @@ class Engine:
                 monday = tf == "1d" and datetime.fromtimestamp(issued_t, timezone.utc).weekday() == 0
                 if gap != step and not (monday and gap == 3 * step):
                     continue
+                linked_now = {**self.related_closes(past, tf, now), "bond": bonds.at(issued_t)}
                 fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
-                                    rel.window(issued_t, h), self.related_closes(past, tf, now),
+                                    rel.window(issued_t, h), linked_now,
                                     bv.views(sym, issued_t, h), ev.near(issued_t))
                 if fc is None:
                     continue
@@ -369,6 +387,7 @@ class Engine:
         rel = surprise.Lookup(self.db)
         bv = brainviews.Lookup(self.db)
         ev = EventLookup(self.db)
+        bonds = BondLookup(self.db)
         first = macro.first_day()
         if first:
             # Replayed before FRED data arrived: those macro forecasts said "no data". Now that the data covers
@@ -395,7 +414,8 @@ class Engine:
                         continue   # a gap (weekend): the candle after it is not "the next one"
                     window = rows[max(0, i - forecast.history_need(h)):i]
                     fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
-                                        self.related_closes(window, tf, now, linked), bv.views(sym, t, h),
+                                        {**self.related_closes(window, tf, now, linked), "bond": bonds.at(t)},
+                                        bv.views(sym, t, h),
                                         ev.near(t))
                     if fc is None:
                         continue
