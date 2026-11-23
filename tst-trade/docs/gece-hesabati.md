@@ -46,7 +46,11 @@ Canlı yoxlama yığıldıqca rəqəmlər dəyişə bilər.
   orta hərəkət alış-satış fərqindən (spread) kiçikdir, pul qazandırmaz. İndi belə hallar «Spreaddən kiçik» göstərilir,
   "sübut" sayılmır. Cədvəldə "Orta qazanc / spread" sütunu var.
 - **Aralıqlar düzgün deyildi:** "50 % aralıq" qızılın saatlığında 68 % tuturdu (çox geniş). Səbəb: metal hərəkətlərində
-  "qalın quyruq" var. İndi aralığın eni keçmiş hərəkətlərdən ölçülür (yalnız keçmiş məlumat). Sınaqda 49 % / 76 %.
+  "qalın quyruq" var. İndi aralığın eni keçmiş hərəkətlərdən ölçülür (yalnız keçmiş məlumat).
+  **Serverdə real nəticə (28 kart, tarixçə):** 50 % aralıq 46–56 %, 80 % aralıq 76–86 % tutur (hədəf 50 / 80).
+  Qızılın saatlığı: əvvəl 68 % / 86 %, indi 54 % / 82 %. Ən çox kənara çıxan: palladium 10 gün və 1 ay (86 %).
+- **Serverin son vəziyyəti (versiya 0d2b9b9):** xəta jurnalı boşdur, bütün mənbələr işləyir, yaddaş 102 MB
+  (209 MB boş), baza 100 MB. Qızılın 1 dəqiqəlik dönüşü düzgün olaraq «Spreaddən kiçik» göstərilir, başqa "sübut" yoxdur.
 - **Alpaca açarı saxlanmışdı, amma işə qoşulmamışdı:** Benzinga xəbərləri (metal fondları və mədən şirkətləri) dəqiqədə bir.
 - **Konsensus üsulu:** bütün alətlərin birgə fikri, Hakim yoxlayır.
 - **Sürət:** Hakimin statistikası yaddaşda saxlanır, jurnal üçün indeks; serverin yaddaşı 100 MB civarı, 200+ MB boş.
