@@ -64,3 +64,15 @@ Canlı yoxlama yığıldıqca rəqəmlər dəyişə bilər.
 3. **Twelve Data pulsuz planı:** gümüş, platin, palladium yoxdur — artıq Capital.com əvəz edir, alış lazım deyil.
 4. **Dürüst nəticə:** indiyə qədər heç bir üsul xərcdən sonra sübut almayıb. Növbəti addım üçün təklif: hadisə
    (CPI, FOMC, NFP) sürprizinə əsaslanan üsul — FMP açarı (pullu) və ya Forex Factory-nin "fakt" sütunu ilə.
+
+## Əlavə (23.11, gündüz): 3 addım
+1. **4 saat (gün içi) üfüqü** — ✅ işləyir; Capital.com-dan hər metal üçün ~800 dörd saatlıq şam tarixçəsi.
+2. **Hadisə sürprizi üsulu** — kod hazırdır və testlidir, amma **məlumat yoxdur**: FMP planınız iqtisadi təqvimi
+   vermir (HTTP 402), Forex Factory isə faktiki rəqəmi vermir (yoxlandı: 18 keçmiş hadisə, 0 fakt).
+   Üsul uydurmur: "təqvim məlumatı yoxdur" yazır. İşə düşməsi üçün faktiki rəqəmi verən mənbə lazımdır (sizin qərarınız).
+3. **Canlı yoxlamaların yığılması** — gedir; növbətçi hər 3 saatdan bir baxır, gündə bir dəfə
+   `docs/monitor/teklifler.md` faylına səbəb və təklif yazır.
+
+**Səhv analizinin ilk tapıntısı (tarixçə, qızıl, 4 saat, Konsensus):** Nyu-York seansında 55.5 % düz (741 yoxlama),
+Asiya seansında 47 % (570), London 48 % (398). Yəni üsul gecə saatlarında səhv edir, Nyu-York saatlarında daha yaxşıdır.
+Təklif: konsensusu yalnız Nyu-York seansında işə salan ayrıca üsul (Hakim yenə sərt qaydalarla yoxlayacaq).
