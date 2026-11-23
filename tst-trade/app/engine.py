@@ -178,6 +178,11 @@ class Engine:
         self.db.execute("DELETE FROM candles WHERE tf='1d' AND strftime('%w', t, 'unixepoch') IN ('0', '6')")
         self.db.execute("DELETE FROM forecasts WHERE horizon IN ('1d', '3d', '10d', '1mo') "
                         "AND strftime('%w', issued_t, 'unixepoch') IN ('0', '6')")
+        if not self.db.get("migr:macro_lag_v1"):
+            # Replayed before the publication lags were respected: dropped once and replayed at once.
+            self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='macro'")
+            self.history_state["ts"] = 0
+            self.db.put("migr:macro_lag_v1", "1")
 
     # ---------- forecasts ----------
     def issue_due(self, now: float | None = None, mode: str = "live") -> int:
