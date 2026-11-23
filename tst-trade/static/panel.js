@@ -6,7 +6,22 @@ const STATUS_AZ = { LIVE: "Canlı", DELAYED: "Gecikir", OFFLINE: "Əlaqə yoxdur
 const VERDICT_AZ = { "sübut": "Sübut olunub", "yox": "Sübut yoxdur", "az": "Məlumat azdır", "bazis": "Bazis" };
 const PROVIDER_AZ = { goldapi: "gold-api.com", capital: "Capital.com (axın)", twelvedata: "Twelve Data", demo: "DEMO" };
 let sym = "XAU", tf = "1m", mode = "live", lastState = null, lastFc = null;
-try { sym = localStorage.getItem("tst_sym") || sym; tf = localStorage.getItem("tst_tf") || tf; } catch (e) {}
+// Chart tools (display only; the Judge tests the same ideas as forecast methods).
+let ta = { ema: true, bb: false, fib: false, piv: false, sr: true, round: false, sub: "rsi", show: 120 };
+try { sym = localStorage.getItem("tst_sym") || sym; tf = localStorage.getItem("tst_tf") || tf;
+  ta = { ...ta, ...JSON.parse(localStorage.getItem("tst_ta") || "{}") }; } catch (e) {}
+const TA_TOGGLES = [["ema", "EMA 20/50/200"], ["bb", "Bollinger"], ["fib", "Fibonacci"], ["piv", "Pivot"],
+  ["sr", "Dəstək / müqavimət"], ["round", "Dəyirmi səviyyələr"]];
+function renderTa() {
+  $("ta").innerHTML = TA_TOGGLES.map(([k, n]) => `<button class="chip ${ta[k] ? "on" : ""}" data-k="${k}">${n}</button>`).join("") +
+    `<span class="seg">${[["none", "Alt panel yox"], ["rsi", "RSI"], ["macd", "MACD"]].map(([k, n]) =>
+      `<button data-sub="${k}" class="${ta.sub === k ? "on" : ""}">${n}</button>`).join("")}</span>` +
+    `<span class="seg">${[60, 120, 240].map((k) => `<button data-show="${k}" class="${ta.show === k ? "on" : ""}">${k} şam</button>`).join("")}</span>`;
+  const set = () => { try { localStorage.setItem("tst_ta", JSON.stringify(ta)); } catch (e) {} renderTa(); loadChart().catch(() => {}); };
+  document.querySelectorAll("#ta [data-k]").forEach((b) => b.onclick = () => { ta[b.dataset.k] = !ta[b.dataset.k]; set(); });
+  document.querySelectorAll("#ta [data-sub]").forEach((b) => b.onclick = () => { ta.sub = b.dataset.sub; set(); });
+  document.querySelectorAll("#ta [data-show]").forEach((b) => b.onclick = () => { ta.show = +b.dataset.show; set(); });
+}
 
 async function api(path) {
   const r = await fetch(path, { credentials: "same-origin" });
@@ -60,12 +75,49 @@ function overlayFor(fc) {
 }
 
 async function loadChart() {
-  const d = await api(`/api/candles?symbol=${sym}&tf=${tf}&limit=160`);
+  // Extra candles before the visible ones, so EMA 200 and RSI start correctly.
+  const d = await api(`/api/candles?symbol=${sym}&tf=${tf}&limit=${Math.min(1000, ta.show + 220)}`);
+  let day = null;
+  if (ta.piv) { const dd = await api(`/api/candles?symbol=${sym}&tf=1d&limit=2`); day = dd.candles.length > 1 ? dd.candles[dd.candles.length - 2] : null; }
   const ov = overlayFor(lastFc);
   const name = (lastState?.metals.find((m) => m.symbol === sym) || {}).name || sym;
   $("ctitle").textContent = `${name} · ${TF_NAMES[tf]} şamlar`;
   $("ovnote").textContent = ov ? `Aralıq: ${ov.name} proqnozu` : "Bu zaman çərçivəsi üçün növbəti şam aralığı yoxdur (1 dəq, 1 saat, 1 gün, 1 həftə seçin)";
-  drawChart($("cv"), $("tip"), d.candles, ov, tf);
+  drawChart($("cv"), $("tip"), d.candles, ov, tf, { ...ta, day });
+  renderTaSummary(d.candles);
+}
+
+// The chart tools in words, and what the Judge says about the same idea as a forecast method on this horizon.
+function judgeSays(method) {
+  const card = lastFc && lastFc.cards.find((c) => c.horizon === tf);
+  if (!card) return "";
+  const live = card.stats_live.find((r) => r.method === method), hist = card.stats_history.find((r) => r.method === method);
+  const r = live && live.nh >= live.min_n ? live : hist;
+  if (!r) return "";
+  const hr = r.hit_rate == null ? "—" : (r.hit_rate * 100).toFixed(0) + " %";
+  return ` · Hakim: ${VERDICT_AZ[r.status]} (${hr}, ${r.nh} yoxlama)`;
+}
+function renderTaSummary(all) {
+  if (all.length < 30) { $("tasum").innerHTML = ""; return; }
+  const c = all.map((x) => x.c), last = c[c.length - 1];
+  const e50 = TA.ema(c, 50).pop(), e200 = TA.ema(c, 200).pop(), r = TA.rsi(c).pop(), m = TA.macd(c), a = TA.atr(all);
+  const mh = m.hist[m.hist.length - 1], mh0 = m.hist[m.hist.length - 2];
+  const lv = TA.levels(all.slice(-Math.max(ta.show, 120)));
+  const sup = lv.filter((l) => l.v < last).pop(), res = lv.find((l) => l.v > last);
+  const f = TA.fib(all.slice(-ta.show));
+  const nf = f ? f.lv.reduce((b, l) => Math.abs(l.v - last) < Math.abs(b.v - last) ? l : b) : null;
+  const trend = e200 == null ? (e50 == null ? "—" : last > e50 ? "yuxarı (EMA 50 üstü)" : "aşağı (EMA 50 altı)")
+    : last > e50 && e50 > e200 ? "yuxarı (qiymət > EMA 50 > EMA 200)" : last < e50 && e50 < e200 ? "aşağı (qiymət < EMA 50 < EMA 200)" : "qarışıq";
+  const row = (k, v, cls = "") => `<div><span>${k}</span><span class="v ${cls}">${v}</span></div>`;
+  $("tasum").innerHTML =
+    row("Trend", trend, trend.startsWith("yuxarı") ? "up" : trend.startsWith("aşağı") ? "down" : "") +
+    row("RSI 14", r == null ? "—" : r.toFixed(0) + (r > 70 ? " · çox alınıb" : r < 30 ? " · çox satılıb" : " · neytral"), r > 70 ? "down" : r < 30 ? "up" : "") +
+    row("MACD", mh == null ? "—" : (mh >= 0 ? "müsbət" : "mənfi") + (mh0 != null && Math.sign(mh) !== Math.sign(mh0) ? " · yeni kəsişmə" : ""), mh >= 0 ? "up" : "down") +
+    row("ATR 14 (orta şam)", a == null ? "—" : fmt(a) + " · " + (a / last * 100).toFixed(2) + " %") +
+    row("Yaxın dəstək", sup ? fmt(sup.v) : "—", "up") + row("Yaxın müqavimət", res ? fmt(res.v) : "—", "down") +
+    row("Yaxın Fibonacci", nf ? (nf.f * 100).toFixed(1) + " % · " + fmt(nf.v) : "—") +
+    `<p class="note">Bu xətlər yalnız göstəricidir. Eyni fikirlər proqnoz üsulu kimi Hakimdə yoxlanır${judgeSays("trend") ? ":" : "."}
+      Trend${judgeSays("trend")}; RSI${judgeSays("rsi")}; Fibonacci${judgeSays("fib")}; Sıçrayış${judgeSays("breakout")}.</p>`;
 }
 
 function cardHtml(c, names) {
@@ -116,8 +168,8 @@ function renderJudge(fc) {
         <td><span class="pill ${r.status}">${st}</span></td></tr>`;
     }
   }
-  $("judge").innerHTML = html + "</table><p class='note'>«Yoxlama»: üsulun istiqamət göstərdiyi proqnozların sayı (RSI, Fibonacci, sıçrayış yalnız siqnal olanda istiqamət göstərir).
-    3 gün, 10 gün və 1 ay proqnozları hər gün verilir və üst-üstə düşür: p bunu nəzərə alır (say üfüqün gün sayına bölünür). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı. 50 % və 80 % aralıq düzgün qurulubsa, uyğun olaraq təxminən 50 % və 80 % tutmalıdır.</p>";
+  $("judge").innerHTML = html + "</table><p class='note'>«Yoxlama»: üsulun istiqamət göstərdiyi proqnozların sayı (RSI, Fibonacci, sıçrayış yalnız siqnal olanda istiqamət göstərir). " +
+    "3 gün, 10 gün və 1 ay proqnozları hər gün verilir və üst-üstə düşür: p bunu nəzərə alır (say üfüqün gün sayına bölünür). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı. 50 % və 80 % aralıq düzgün qurulubsa, uyğun olaraq təxminən 50 % və 80 % tutmalıdır.</p>";
 }
 
 async function loadJournal() {
@@ -220,6 +272,7 @@ setInterval(() => {
     d.toLocaleTimeString("az", { timeZone: "Asia/Baku", hour: "2-digit", minute: "2-digit" });
 }, 1000);
 renderTfs();
+renderTa();
 refreshAll();
 // A guest has no admin page: the link is hidden for them.
 api("/api/me").then((m) => { if (m.role === "guest") document.querySelectorAll('a[href="/admin"]').forEach((a) => a.hidden = true); }).catch(() => {});

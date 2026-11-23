@@ -115,3 +115,13 @@ section.adm>h2{font-size:1rem;margin:6px 0 0;color:var(--gold)}
 .nitem a:hover{color:var(--gold)}
 .nitem .m{font-size:.72rem;color:var(--muted)}
 .hi{color:var(--down);font-weight:700}.me{color:var(--warn);font-weight:700}
+.tatool{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.tatool .seg button{padding:3px 8px}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:2px 10px;font-size:.76rem;color:var(--muted)}
+.chip.on{border-color:var(--gold);color:var(--gold);background:var(--gold-soft)}
+.tasum{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 14px;margin-top:10px;font-size:.8rem}
+.tasum div{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dashed var(--line);padding:3px 0}
+.tasum div span:first-child{color:var(--muted)}
+.tasum .v{font-family:var(--mono);text-align:right}
+.tasum p{grid-column:1/-1;margin:4px 0 0}
+@media (min-width:1101px){.cards{max-height:760px;overflow:auto;padding-right:4px}}
