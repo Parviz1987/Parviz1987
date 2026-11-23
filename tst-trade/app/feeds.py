@@ -223,7 +223,9 @@ class Feeds:
             try:
                 rows += parse_ff(await self._get(client, url))
             except Exception as e:
-                errors.append(str(e))
+                # Next week's file is published late in the week: until then 404 is normal, not an error.
+                if not (url.endswith("nextweek.json") and "404" in str(e)):
+                    errors.append(str(e))
         if rows:
             self.db.executemany(
                 "INSERT INTO events(uid, title, country, ts, impact, forecast, previous, actual) "
@@ -243,7 +245,7 @@ class Feeds:
             try:
                 data = await self._get(client, "https://api.stlouisfed.org/fred/series/observations",
                                        params={"series_id": sid, "api_key": key, "file_type": "json",
-                                               "sort_order": "desc", "limit": 400})
+                                               "sort_order": "desc", "limit": 3000})
                 obs = parse_fred(data)
                 self.db.executemany("INSERT OR REPLACE INTO macro(series, d, v) VALUES(?,?,?)",
                                     [(sid, d, v) for d, v in obs])

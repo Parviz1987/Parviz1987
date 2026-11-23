@@ -56,6 +56,11 @@ class ErrorJournal(logging.Handler):
             pass   # the journal must never break the app
 
 
+def _bid_ask(engine, sym: str):
+    q = getattr(engine.provider, "latest", {}).get(sym)
+    return [q.bid, q.ask] if q is not None and q.bid is not None else None
+
+
 def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
     now = time.time()
     db.conn.executescript(SCHEMA)
@@ -64,6 +69,11 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         q = engine.quotes.get(sym)
         metals[sym] = {"status": engine.status(sym, now), "price": q["price"] if q else None,
                        "age_s": round(now - q["recv_ts"], 1) if q else None,
+                       "recent": [round(r[0], 5) for r in db.execute(
+                           "SELECT price FROM ticks WHERE symbol=? ORDER BY ts DESC LIMIT 8", (sym,)).fetchall()],
+                       "ticks_hour": db.execute("SELECT COUNT(*) FROM ticks WHERE symbol=? AND ts>?",
+                                                (sym, now - 3600)).fetchone()[0],
+                       "bid_ask": _bid_ask(engine, sym),
                        "candles": {tf: db.execute("SELECT COUNT(*) FROM candles WHERE symbol=? AND tf=?",
                                                   (sym, tf)).fetchone()[0] for tf in candles.TF}}
     judging = {}

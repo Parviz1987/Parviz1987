@@ -8,10 +8,17 @@ METALS = ("XAU", "XAG", "XPT", "XPD")
 NAMES = {"XAU": "Qızıl", "XAG": "Gümüş", "XPT": "Platin", "XPD": "Palladium"}
 
 
+SESSION_SHIFT = 7200   # the metals' trading day ends at 22:00 UTC (17:00 New York): Sunday-evening trading is Monday's
+
+
 def bucket(ts: float, tf: str) -> int:
+    """Start of the candle that holds ts. Daily and weekly candles follow the trading session: a tick at 22:00-24:00
+    UTC belongs to the next day's candle (labelled at 00:00 UTC of that day), so Sunday evening is no stub day."""
     step = TF[tf]
     if tf == "1w":   # weeks start on Monday 00:00 UTC (epoch 0 was a Thursday)
-        return int((ts - 345600) // step * step + 345600)
+        return int((ts + SESSION_SHIFT - 345600) // step * step + 345600)
+    if tf == "1d":
+        return int((ts + SESSION_SHIFT) // step * step)
     return int(ts // step * step)
 
 
@@ -25,11 +32,15 @@ def add_tick(db: DB, symbol: str, ts: float, price: float) -> None:
             (symbol, tf, t, price, price, price, price))
 
 
-def store_history(db: DB, symbol: str, tf: str, rows: list[tuple[int, float, float, float, float]]) -> int:
-    """History from a provider. A live candle already there is kept (it holds the newest prices)."""
+def store_history(db: DB, symbol: str, tf: str, rows: list[tuple[int, float, float, float, float]],
+                  replace: bool = False) -> int:
+    """History from a provider. A live candle already there is kept (it holds the newest prices).
+    replace=True: this source is the main one (the live feed's own broker) and overwrites older history rows."""
+    conflict = ("DO UPDATE SET o=excluded.o, h=excluded.h, l=excluded.l, c=excluded.c WHERE candles.origin='history'"
+                if replace else "DO NOTHING")
     db.executemany(
         "INSERT INTO candles(symbol, tf, t, o, h, l, c, origin) VALUES(?,?,?,?,?,?,?,'history') "
-        "ON CONFLICT(symbol, tf, t) DO NOTHING",
+        f"ON CONFLICT(symbol, tf, t) {conflict}",
         [(symbol, tf, int(t), o, h, l, c) for t, o, h, l, c in rows])
     return len(rows)
 

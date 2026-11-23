@@ -1,26 +1,60 @@
-"""Forecast desks. Each horizon is forecast from the finished candles of its own size (1m from 1m candles, 1h from
-1h candles, 1d from daily, 1w from weekly), so a forecast never uses data from after its issue time.
+"""Forecast desks. Each horizon is forecast from the finished candles of its own size, and a forecast never uses data
+from after its issue time. A horizon is (candle size, number of candles ahead): 3 days = 3 daily candles ahead.
 
-Methods (only ones with a reason to exist; the Judge decides which one, if any, may be trusted):
-- rw       «Dəyişməz»: no view of direction (P = 0.5). The honest baseline every method must beat.
-- up       «Həmişə yuxarı»: the up-share of the past candles. The second baseline.
-- momentum «Momentum»: the trend of the last L candles (time-series momentum: strong evidence at weeks-months).
-- reversal «Qısa dönüş»: the opposite of the last candle (short-term reversal: mixed evidence, costs eat it).
-Every method gets the same range: an EWMA volatility (lambda 0.94) scaled to one candle, normal quantiles."""
+Methods. Each has a reason to exist; the Judge decides which one, if any, may be trusted. A method with no view at
+this moment says P = 0.5: the Judge then counts no hit or miss for it (only forecasts with a direction are judged).
+- rw        «Dəyişməz»: no view of direction (P = 0.5). The honest baseline every method must beat.
+- up        «Həmişə yuxarı»: the past share of up moves over the same distance. The second baseline.
+- momentum  the trend of the last L candles (time-series momentum: strong evidence at weeks to months).
+- reversal  the opposite of the last candle (short-term reversal; only for one-candle horizons).
+- trend     three windows (short, middle, long) vote up or down: a multi-window trend filter.
+- breakout  the close broke the highest high / lowest low of the last 20 candles (Donchian channel).
+- rsi       RSI(14) below 30 = oversold, expect up; above 70 = overbought, expect down; else no view.
+- fib       the price came back to a Fibonacci level (38.2 / 50 / 61.8 %) of the last swing: expect a bounce in the
+            swing's direction; elsewhere no view.
+- macro     (daily and longer) the last week's change of the real interest rate and the dollar: both falling is good
+            for gold. Needs FRED data; without it no view.
+Every method gets the same range: an EWMA volatility (lambda 0.94) scaled to the horizon, normal quantiles."""
 from __future__ import annotations
 
 import math
 
-HORIZONS = {"1m": "1m", "1h": "1h", "1d": "1d", "1w": "1w"}      # horizon -> candle size it is built from
-HORIZON_NAMES = {"1m": "1 dəqiqə", "1h": "1 saat", "1d": "1 gün", "1w": "1 həftə"}
-METHODS = ("rw", "up", "momentum", "reversal")
-METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum", "reversal": "Qısa dönüş"}
+# horizon -> (candle size, candles ahead)
+HORIZON_SPEC = {"1m": ("1m", 1), "1h": ("1h", 1), "1d": ("1d", 1), "3d": ("1d", 3), "1w": ("1w", 1),
+                "10d": ("1d", 10), "1mo": ("1d", 21)}
+HORIZONS = {h: tf for h, (tf, _) in HORIZON_SPEC.items()}      # horizon -> candle size it is built from
+HORIZON_NAMES = {"1m": "1 dəqiqə", "1h": "1 saat", "1d": "1 gün", "3d": "3 gün", "1w": "1 həftə", "10d": "10 gün",
+                 "1mo": "1 ay"}
+METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro")
+METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
+                "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)",
+                "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "macro": "Makro (real faiz + dollar)"}
 BASELINES = ("rw", "up")
-LOOKBACK = {"1m": 15, "1h": 24, "1d": 20, "1w": 12}   # momentum window in candles
+LOOKBACK = {"1m": 15, "1h": 24, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
+TREND_WINDOWS = {"1m": (5, 15, 60), "1h": (6, 24, 120), "1d": (10, 50, 150), "1w": (4, 13, 26)}
 MIN_CANDLES = 30                                       # fewer finished candles: no forecast
+HISTORY_NEED = 200                                     # candles a desk is given (oldest first)
 Z50, Z80 = 0.6745, 1.2816
 SHRINK = 0.25                                          # momentum and reversal move P(up) gently: P = Phi(SHRINK * z)
 P_CAP = (0.35, 0.65)
+SIGNAL_P = 0.6                                         # rule-based signals (breakout, rsi, fib): P = 0.6 or 0.4
+FIB_LEVELS = (0.382, 0.5, 0.618)
+FIB_SWING = 60
+
+
+def tf_of(h: str) -> str:
+    return HORIZON_SPEC[h][0]
+
+
+def steps_of(h: str) -> int:
+    return HORIZON_SPEC[h][1]
+
+
+def methods_for(h: str) -> tuple[str, ...]:
+    out = [m for m in METHODS if not (m == "reversal" and steps_of(h) > 1)]
+    if tf_of(h) != "1d":
+        out.remove("macro")      # FRED is daily: the macro view only for daily candles
+    return tuple(out)
 
 
 def phi(x: float) -> float:
@@ -40,37 +74,130 @@ def ewma_sigma(rets: list[float], lam: float = 0.94) -> float:
     return math.sqrt(var)
 
 
+def rsi(closes: list[float], n: int = 14) -> float | None:
+    """Wilder's RSI of the last close."""
+    if len(closes) <= n:
+        return None
+    gains = losses = 0.0
+    for a, b in zip(closes[:n], closes[1:n + 1]):
+        gains += max(b - a, 0)
+        losses += max(a - b, 0)
+    ag, al = gains / n, losses / n
+    for a, b in zip(closes[n:], closes[n + 1:]):
+        ag = (ag * (n - 1) + max(b - a, 0)) / n
+        al = (al * (n - 1) + max(a - b, 0)) / n
+    if al == 0:
+        return 100.0
+    return 100 - 100 / (1 + ag / al)
+
+
+def fib_view(cands: list[dict], sigma: float) -> tuple[float, str]:
+    """Bounce from a Fibonacci retracement of the last swing (FIB_SWING candles). Returns (P(up), basis)."""
+    win = cands[-FIB_SWING:]
+    if len(win) < 20:
+        return 0.5, "swing üçün şam azdır"
+    hi_i = max(range(len(win)), key=lambda i: win[i]["h"])
+    lo_i = min(range(len(win)), key=lambda i: win[i]["l"])
+    hi, lo, px = win[hi_i]["h"], win[lo_i]["l"], win[-1]["c"]
+    span = hi - lo
+    if span <= 0:
+        return 0.5, "swing yoxdur"
+    tol = max(px * sigma * 0.5, span * 0.02)
+    up_swing = lo_i < hi_i                       # low came first: an up swing, levels measured down from the high
+    for f in FIB_LEVELS:
+        level = hi - f * span if up_swing else lo + f * span
+        if abs(px - level) <= tol and min(hi_i, lo_i) < len(win) - 3 and max(hi_i, lo_i) < len(win) - 2:
+            p = SIGNAL_P if up_swing else 1 - SIGNAL_P
+            return p, f"qiymət {f * 100:.1f} % Fibonacci səviyyəsində ({level:.2f}); {'yuxarı' if up_swing else 'aşağı'} swing davamı gözlənilir"
+    return 0.5, f"qiymət Fibonacci səviyyələrində deyil (swing {lo:.2f}–{hi:.2f})"
+
+
+def _as_candles(seq) -> list[dict]:
+    if seq and not isinstance(seq[0], dict):
+        return [{"o": c, "h": c, "l": c, "c": c} for c in seq]
+    return list(seq)
+
+
 def _clip(p: float) -> float:
     return min(max(p, P_CAP[0]), P_CAP[1])
 
 
-def build(closes: list[float], horizon: str) -> dict | None:
-    """All methods' forecasts for the next candle, from past closes (oldest first). None: not enough data."""
-    if len(closes) < MIN_CANDLES:
+def build(seq, horizon: str, macro: dict | None = None) -> dict | None:
+    """All methods' forecasts for the close `steps_of(horizon)` candles ahead, from past candles (oldest first;
+    plain closes are accepted too). macro: {"dfii10": weekly change, "dollar": weekly change in %} or None."""
+    cands = _as_candles(seq)
+    if len(cands) < MIN_CANDLES:
         return None
+    closes = [c["c"] for c in cands]
     rets = log_returns(closes)
     if len(rets) < MIN_CANDLES - 1:
         return None
-    sigma = ewma_sigma(rets)
+    k = steps_of(horizon)
+    tf = tf_of(horizon)
+    sigma = ewma_sigma(rets) or 1e-6
+    sk = sigma * math.sqrt(k)
     price = closes[-1]
-    if sigma <= 0:
-        sigma = 1e-6
-    span50, span80 = price * (math.exp(Z50 * sigma) - 1), price * (math.exp(Z80 * sigma) - 1)
+    span50, span80 = price * (math.exp(Z50 * sk) - 1), price * (math.exp(Z80 * sk) - 1)
     rng = {"lo50": price - span50, "hi50": price + span50, "lo80": price - span80, "hi80": price + span80}
-    moved = [r for r in rets if r != 0]
-    up_share = sum(1 for r in moved if r > 0) / len(moved) if moved else 0.5
+
+    # «always up» over the same distance (k candles), from the past
+    moves = [closes[i + k] - closes[i] for i in range(len(closes) - k)]
+    moved = [m for m in moves if m != 0]
+    up_share = sum(1 for m in moved if m > 0) / len(moved) if moved else 0.5
+
     lb = LOOKBACK[horizon]
     window = rets[-lb:]
     z_mom = sum(window) / (sigma * math.sqrt(len(window))) if window else 0.0
-    z_rev = rets[-1] / sigma
     out = {
         "rw": {"p_up": 0.5, "basis": f"istiqamət yoxdur; aralıq: volatillik {sigma * 100:.3f} % bir şamda"},
-        "up": {"p_up": round(up_share, 4), "basis": f"son {len(moved)} şamın {up_share * 100:.0f} %-i yuxarı bağlanıb"},
+        "up": {"p_up": round(up_share, 4), "basis": f"keçmişdə {k} şamlıq hərəkətlərin {up_share * 100:.0f} %-i yuxarı"},
         "momentum": {"p_up": round(_clip(phi(SHRINK * z_mom)), 4),
                      "basis": f"son {len(window)} şamın hərəkəti {z_mom:+.2f}σ"},
-        "reversal": {"p_up": round(_clip(phi(-SHRINK * z_rev)), 4),
-                     "basis": f"son şam {z_rev:+.2f}σ; əksinə gözlənilir"},
     }
+    if k == 1:
+        z_rev = rets[-1] / sigma
+        out["reversal"] = {"p_up": round(_clip(phi(-SHRINK * z_rev)), 4),
+                           "basis": f"son şam {z_rev:+.2f}σ; əksinə gözlənilir"}
+
+    wins = [w for w in TREND_WINDOWS[tf] if w < len(closes)]
+    votes = [1 if closes[-1] > closes[-1 - w] else -1 if closes[-1] < closes[-1 - w] else 0 for w in wins]
+    vs = sum(votes)
+    out["trend"] = {"p_up": round(0.5 + 0.05 * vs, 4) if len(wins) == 3 else 0.5,
+                    "basis": f"pəncərələr {', '.join(map(str, wins))}: səslər {'+'.join(map(str, votes)) if votes else '—'}"
+                    if len(wins) == 3 else "uzun pəncərə üçün şam azdır"}
+
+    prev = cands[-21:-1]
+    hh, ll = max(c["h"] for c in prev), min(c["l"] for c in prev)
+    if price > hh:
+        out["breakout"] = {"p_up": SIGNAL_P, "basis": f"bağlanış 20 şamın ən yüksəyini ({hh:.2f}) keçdi"}
+    elif price < ll:
+        out["breakout"] = {"p_up": 1 - SIGNAL_P, "basis": f"bağlanış 20 şamın ən aşağısını ({ll:.2f}) qırdı"}
+    else:
+        out["breakout"] = {"p_up": 0.5, "basis": f"kanal içində ({ll:.2f}–{hh:.2f}): siqnal yoxdur"}
+
+    r = rsi(closes)
+    if r is None:
+        out["rsi"] = {"p_up": 0.5, "basis": "RSI üçün şam azdır"}
+    elif r < 30:
+        out["rsi"] = {"p_up": SIGNAL_P, "basis": f"RSI {r:.0f}: həddən artıq satılıb, yuxarı dönüş gözlənilir"}
+    elif r > 70:
+        out["rsi"] = {"p_up": 1 - SIGNAL_P, "basis": f"RSI {r:.0f}: həddən artıq alınıb, aşağı dönüş gözlənilir"}
+    else:
+        out["rsi"] = {"p_up": 0.5, "basis": f"RSI {r:.0f}: neytral zona"}
+
+    p, basis = fib_view(cands, sigma)
+    out["fib"] = {"p_up": p, "basis": basis}
+
+    if "macro" in methods_for(horizon):
+        if macro and macro.get("dfii10") is not None and macro.get("dollar") is not None:
+            # A falling real rate (-0.10 pp) and a falling dollar (-1 %) are each worth about +0.05 of P(up).
+            score = -macro["dfii10"] / 0.10 - macro["dollar"] / 1.0
+            pm = round(_clip(0.5 + 0.05 * max(min(score, 3), -3)), 4)
+            out["macro"] = {"p_up": pm if abs(score) >= 0.5 else 0.5,
+                            "basis": f"həftədə real faiz {macro['dfii10']:+.2f} pp, dollar {macro['dollar']:+.2f} %"}
+        else:
+            out["macro"] = {"p_up": 0.5, "basis": "FRED məlumatı yoxdur"}
+
     for v in out.values():
         v.update(rng)
     return {"price": price, "sigma": sigma, "methods": out}

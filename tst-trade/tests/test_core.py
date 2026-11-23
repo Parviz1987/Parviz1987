@@ -137,11 +137,11 @@ def test_live_issue_and_score():
         candles.add_tick(db, "XAU", t + i * 60 + 1, 100 + (i % 3))
     now = t + 40 * 60 + 2
     n = eng.issue_due(now)
-    assert n == len(forecast.METHODS)          # only XAU has candles; only the 1m desk has enough
+    assert n == len(forecast.methods_for("1m"))   # only XAU has candles; only the 1m desk has enough
     candles.add_tick(db, "XAU", now + 5, 105)
     judge.score_due(db, now + 61)
     r = db.execute("SELECT COUNT(*) FROM forecasts WHERE scored_ts IS NOT NULL").fetchone()[0]
-    assert r == len(forecast.METHODS)
+    assert r == len(forecast.methods_for("1m"))
 
 
 def test_market_open_weekend():
@@ -195,7 +195,7 @@ def test_api_requires_login_and_admin_never_leaks_key(tmp_path):
     assert c.post("/api/admin/provider", json={"provider": "goldapi"}).json()["price_provider"] == "goldapi"
     assert c.post("/api/admin/keys/fred", json={"key": "x"}, headers={"origin": "https://evil.example"}).status_code == 403
     fc = c.get("/api/forecasts?symbol=XAU").json()
-    assert [card["horizon"] for card in fc["cards"]] == ["1m", "1h", "1d", "1w"]
+    assert [card["horizon"] for card in fc["cards"]] == list(forecast.HORIZONS)
 
 
 def test_demo_poll_builds_candles(tmp_path):

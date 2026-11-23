@@ -53,7 +53,7 @@ function renderTfs() {
 
 function overlayFor(fc) {
   if (!fc) return null;
-  const card = fc.cards.find((c) => c.tf === tf);
+  const card = fc.cards.find((c) => c.horizon === tf);
   if (!card || !card.methods.length) return null;
   const m = card.methods.find((x) => x.method === (card.verdict.method || "rw")) || card.methods[0];
   return { ...m, name: card.name };
@@ -64,7 +64,7 @@ async function loadChart() {
   const ov = overlayFor(lastFc);
   const name = (lastState?.metals.find((m) => m.symbol === sym) || {}).name || sym;
   $("ctitle").textContent = `${name} · ${TF_NAMES[tf]} şamlar`;
-  $("ovnote").textContent = ov ? `Aralıq: ${ov.name} proqnozu` : "Bu zaman çərçivəsi üçün proqnoz aralığı yoxdur (1 dəq, 1 saat, 1 gün, 1 həftə seçin)";
+  $("ovnote").textContent = ov ? `Aralıq: ${ov.name} proqnozu` : "Bu zaman çərçivəsi üçün növbəti şam aralığı yoxdur (1 dəq, 1 saat, 1 gün, 1 həftə seçin)";
   drawChart($("cv"), $("tip"), d.candles, ov, tf);
 }
 
@@ -74,7 +74,7 @@ function cardHtml(c, names) {
   let head;
   if (!c.methods.length) {
     head = `<p class="note">Proqnoz hələ yoxdur: ${c.candles_have} bitmiş şam var, ${c.candles_need} lazımdır.
-      ${c.tf === "1d" || c.tf === "1w" ? "Bu üfüq üçün tarixçə lazımdır (admin: Twelve Data açarı)." : ""}</p>`;
+      ${c.tf === "1d" || c.tf === "1w" ? "Bu üfüq üçün tarixçə lazımdır (admin: Capital.com və ya Twelve Data açarı)." : ""}</p>`;
   } else if (v.status === "sübut") {
     const p = off.p_up, dir = p > 0.5 ? "yuxarı" : "aşağı";
     head = `<div class="big ${p > 0.5 ? "up" : "down"}">${dir} · ${(Math.max(p, 1 - p) * 100).toFixed(0)} %</div>
@@ -106,8 +106,9 @@ function renderJudge(fc) {
     <th>Brier bal</th><th>50 % aralıq tutdu</th><th>80 % aralıq tutdu</th><th>Status</th></tr>`;
   for (const c of fc.cards) {
     for (const r of c[key]) {
-      const st = r.status === "az" ? `az (${r.n}/${r.min_n})` : VERDICT_AZ[r.status];
-      html += `<tr><td>${c.name}</td><td>${esc(fc.method_names[r.method])}</td><td class="n">${r.n}</td>
+      const cnt = r.method === "rw" || r.method === "up" ? r.n : r.nh;
+      const st = r.status === "az" ? `az (${cnt}/${r.min_n})` : VERDICT_AZ[r.status];
+      html += `<tr><td>${c.name}</td><td>${esc(fc.method_names[r.method])}</td><td class="n">${cnt}</td>
         <td class="n">${r.method === "rw" ? "—" : pct(r.hit_rate)}</td><td class="n">${r.method === "rw" ? "—" : pct(r.bar)}</td>
         <td class="n">${r.p == null || r.method === "rw" ? "—" : r.p.toFixed(3)}</td>
         <td class="n">${r.bss == null ? "—" : (r.bss * 100).toFixed(1)}</td>
@@ -115,13 +116,14 @@ function renderJudge(fc) {
         <td><span class="pill ${r.status}">${st}</span></td></tr>`;
     }
   }
-  $("judge").innerHTML = html + "</table><p class='note'>Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı. 50 % və 80 % aralıq düzgün qurulubsa, uyğun olaraq təxminən 50 % və 80 % tutmalıdır.</p>";
+  $("judge").innerHTML = html + "</table><p class='note'>«Yoxlama»: üsulun istiqamət göstərdiyi proqnozların sayı (RSI, Fibonacci, sıçrayış yalnız siqnal olanda istiqamət göstərir).
+    3 gün, 10 gün və 1 ay proqnozları hər gün verilir və üst-üstə düşür: p bunu nəzərə alır (say üfüqün gün sayına bölünür). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı. 50 % və 80 % aralıq düzgün qurulubsa, uyğun olaraq təxminən 50 % və 80 % tutmalıdır.</p>";
 }
 
 async function loadJournal() {
   const d = await api(`/api/journal?symbol=${sym}`);
   const names = lastFc ? lastFc.method_names : {};
-  const hn = { "1m": "1 dəq", "1h": "1 saat", "1d": "1 gün", "1w": "1 həftə" };
+  const hn = Object.fromEntries((lastFc ? lastFc.cards : []).map((c) => [c.horizon, c.name]));
   if (!d.rows.length) { $("journal").innerHTML = "<p class='note'>Hələ yoxlanmış proqnoz yoxdur. 1 dəqiqəlik proqnozlar bazar açıq olanda hər dəqiqə yoxlanır.</p>"; return; }
   $("journal").innerHTML = `<table><tr><th>Vaxt</th><th>Üfüq</th><th>Üsul</th><th>Başlanğıc</th><th>Nəticə</th><th>Yuxarı ehtimalı</th><th>İstiqamət</th><th>80 % aralıq</th></tr>` +
     d.rows.map((r) => `<tr><td>${hhmm(r.target_t)}</td><td>${hn[r.horizon]}</td><td>${esc(names[r.method] || r.method)}</td>

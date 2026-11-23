@@ -12,7 +12,7 @@ from . import candles, forecast, judge
 from .db import DB
 from .keys import KeyStore
 from .providers.base import NotServed, ProviderError, Quote
-from .providers.capital import CapitalStream
+from .providers.capital import CapitalHistory, CapitalStream
 from .providers.demo import DemoHistory, DemoPrices
 from .providers.goldapi import GoldApiProvider
 from .providers.twelvedata import TwelveDataHistory, TwelveDataPrices
@@ -22,6 +22,7 @@ HISTORY_EVERY = 6 * 3600
 HISTORY_LIMIT = {"1m": 1500, "1h": 1500, "1d": 2000, "1w": 600}
 BACKTEST_MAX = 2000
 TICK_KEEP = 3 * 86400
+MINUTE_KEEP = 30 * 86400
 
 
 def market_open(ts: float) -> bool:
@@ -35,6 +36,47 @@ def market_open(ts: float) -> bool:
     if wd == 6 and h < 22:
         return False
     return True
+
+
+def target_time(issued_t: int, h: str) -> int:
+    """When the forecast's target candle closes: k candles on; daily candles skip Saturday and Sunday."""
+    tf, k = forecast.HORIZON_SPEC[h]
+    step = candles.TF[tf]
+    if tf != "1d":
+        return issued_t + k * step
+    t, left = issued_t, k
+    while True:
+        if datetime.fromtimestamp(t, timezone.utc).weekday() < 5:
+            left -= 1
+            if left == 0:
+                return t + step
+        t += step
+
+
+class MacroLookup:
+    """FRED values as they were known on a date (published the next day, so the day before is used)."""
+    def __init__(self, db: DB):
+        self.series = {}
+        for sid in ("DFII10", "DTWEXBGS"):
+            try:
+                rows = db.execute("SELECT d, v FROM macro WHERE series=? ORDER BY d", (sid,)).fetchall()
+            except Exception:
+                rows = []
+            self.series[sid] = ([r["d"] for r in rows], [r["v"] for r in rows])
+
+    def _change(self, sid: str, day: str, pct: bool) -> float | None:
+        import bisect
+        ds, vs = self.series[sid]
+        i = bisect.bisect_left(ds, day) - 1        # last value strictly before the day
+        if i < 5:
+            return None
+        a, b = vs[i - 5], vs[i]
+        return (b / a - 1) * 100 if pct else b - a
+
+    def at(self, t: int) -> dict | None:
+        day = datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%d")
+        r, d = self._change("DFII10", day, False), self._change("DTWEXBGS", day, True)
+        return None if r is None or d is None else {"dfii10": r, "dollar": d}
 
 
 class Engine:
@@ -129,56 +171,77 @@ class Engine:
 
     # ---------- forecasts ----------
     def issue_due(self, now: float | None = None, mode: str = "live") -> int:
-        """At each candle close: one forecast per horizon, metal and method, for the next candle."""
+        """At each candle close: one forecast per horizon, metal and method, for the close k candles ahead."""
         now = time.time() if now is None else now
         n = 0
+        macro = MacroLookup(self.db)
         for h, tf in forecast.HORIZONS.items():
             issued_t = candles.bucket(now, tf)
             step = candles.TF[tf]
             for sym in candles.METALS:
-                past = candles.closed(self.db, sym, tf, now, limit=200)
-                # Only right after a real candle: a closed market or a feed gap issues nothing.
-                if not past or past[-1]["t"] != issued_t - step:
+                past = candles.closed(self.db, sym, tf, now, limit=forecast.HISTORY_NEED)
+                if not past:
                     continue
-                fc = forecast.build([c["c"] for c in past], h)
+                # Only right after a real candle: a closed market or a feed gap issues nothing. A daily or weekly
+                # candle may follow a weekend.
+                gap = issued_t - past[-1]["t"]
+                if gap != step and not (tf == "1d" and step < gap <= 3 * step):
+                    continue
+                fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None)
                 if fc is None:
                     continue
-                n += judge.issue(self.db, sym, h, issued_t, issued_t + step, fc, mode)
+                n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
         return n
 
     # ---------- history and backtest ----------
-    async def backfill(self, force: bool = False) -> dict:
+    def _history_sources(self) -> list:
+        """Capital.com first (same broker as the live stream, all four metals, overwrites older history), then
+        Twelve Data (free plan: gold only, but deeper daily history) only fills what is still missing."""
+        if self.chosen_provider() == "demo":
+            return [(DemoHistory(), False)]
+        out = []
+        creds = self.keys.get("capital")
+        if creds:
+            out.append((CapitalHistory(creds), True))
         key = self.keys.first("twelvedata")
+        if key:
+            out.append((TwelveDataHistory(key), False))
+        return out
+
+    async def backfill(self, force: bool = False) -> dict:
         now = time.time()
         if not force and now - self.history_state.get("ts", 0) < HISTORY_EVERY:
             return self.history_state
-        if self.chosen_provider() == "demo":
-            src = DemoHistory()
-        elif key:
-            src = TwelveDataHistory(key)
-        else:
-            self.history_state = {"ts": now, "result": {}, "note": "Twelve Data açarı yoxdur: tarixçə yüklənmir"}
+        sources = self._history_sources()
+        if not sources:
+            self.history_state = {"ts": now, "result": {}, "note": "Capital.com və ya Twelve Data açarı yoxdur: "
+                                  "tarixçə yüklənmir"}
             self.db.put("history_state", json.dumps(self.history_state))
             return self.history_state
         result: dict[str, dict[str, str]] = {}
-        try:
-            for sym in candles.METALS:
-                result[sym] = {}
-                for tf, limit in HISTORY_LIMIT.items():
-                    try:
-                        rows = await src.candles(sym, tf, limit)
-                        candles.store_history(self.db, sym, tf, rows)
-                        result[sym][tf] = f"{len(rows)} şam"
-                    except NotServed as e:
-                        result[sym][tf] = f"planda yoxdur: {e}"
-                        break
-                    except ProviderError as e:
-                        result[sym][tf] = f"xəta: {e}"
-                    if src.request_gap:
-                        await asyncio.sleep(src.request_gap)
-        finally:
-            await src.aclose()
-        self.history_state = {"ts": now, "result": result, "source": src.name}
+        for src, replace in sources:
+            try:
+                for sym in candles.METALS:
+                    for tf, limit in HISTORY_LIMIT.items():
+                        line = result.setdefault(sym, {})
+                        try:
+                            rows = await src.candles(sym, tf, limit)
+                            candles.store_history(self.db, sym, tf, rows, replace=replace)
+                            line[tf] = (line.get(tf, "") + f" {src.name}: {len(rows)} şam").strip()
+                        except NotServed as e:
+                            line[tf] = (line.get(tf, "") + f" {src.name}: planda yoxdur ({str(e)[:60]})").strip()
+                            if src.name == "twelvedata":
+                                break
+                        except ProviderError as e:
+                            line[tf] = (line.get(tf, "") + f" {src.name}: xəta ({str(e)[:80]})").strip()
+                        if src.request_gap:
+                            await asyncio.sleep(src.request_gap)
+            except Exception as e:   # one source failing (login refused...) must not stop the next one
+                log.warning("history %s: %s", src.name, e)
+                result.setdefault("*", {})[src.name] = f"xəta: {str(e)[:120]}"
+            finally:
+                await src.aclose()
+        self.history_state = {"ts": now, "result": result, "source": ", ".join(s.name for s, _ in sources)}
         self.db.put("history_state", json.dumps(self.history_state))
         # The walk-forward replay is CPU work: off the event loop, so prices keep coming in meanwhile.
         await asyncio.to_thread(self.backtest, now)
@@ -188,25 +251,38 @@ class Engine:
         """Walk forward over stored candles: each forecast sees only the candles before it (mode 'history')."""
         now = time.time() if now is None else now
         n = 0
+        macro = MacroLookup(self.db)
         for h, tf in forecast.HORIZONS.items():
             step = candles.TF[tf]
             for sym in candles.METALS:
                 rows = candles.closed(self.db, sym, tf, now, limit=BACKTEST_MAX + forecast.MIN_CANDLES)
-                closes = [c["c"] for c in rows]
+                k = forecast.steps_of(h)
+                done = {r["issued_t"] for r in self.db.execute(
+                    "SELECT issued_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='history' "
+                    "GROUP BY issued_t HAVING COUNT(*) >= ?", (sym, h, len(forecast.methods_for(h)))).fetchall()}
                 for i in range(forecast.MIN_CANDLES, len(rows)):
+                    t = rows[i]["t"]
+                    if t in done:
+                        continue   # replayed before: forecasts never change once issued
                     if rows[i]["t"] - rows[i - 1]["t"] > 3 * step and tf not in ("1d", "1w"):
                         continue   # a gap (weekend): the candle after it is not "the next one"
-                    fc = forecast.build(closes[max(0, i - 200):i], h)
+                    fc = forecast.build(rows[max(0, i - forecast.HISTORY_NEED):i], h,
+                                        macro.at(t) if tf == "1d" else None)
                     if fc is None:
                         continue
-                    t = rows[i]["t"]
-                    n += judge.issue(self.db, sym, h, t, t + step, fc, "history")
+                    target = rows[i + k - 1]["t"] + step if i + k - 1 < len(rows) else target_time(t, h)
+                    n += judge.issue(self.db, sym, h, t, target, fc, "history")
         judge.score_due(self.db, now)
         return n
 
     # ---------- loop ----------
     def prune(self, now: float) -> None:
+        """Ticks live 3 days; one-minute candles and their scored forecasts 30 days (the Judge's one-minute verdict
+        covers the last month, which is also the most relevant one). Everything longer is kept."""
         self.db.execute("DELETE FROM ticks WHERE ts < ?", (now - TICK_KEEP,))
+        self.db.execute("DELETE FROM candles WHERE tf IN ('1m', '5m') AND t < ?", (now - MINUTE_KEEP,))
+        self.db.execute("DELETE FROM forecasts WHERE horizon='1m' AND scored_ts IS NOT NULL AND target_t < ?",
+                        (now - MINUTE_KEEP,))
 
     async def step(self) -> None:
         now = time.time()

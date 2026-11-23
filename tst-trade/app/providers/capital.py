@@ -17,7 +17,7 @@ from typing import Callable
 
 import httpx
 
-from .base import PriceProvider, ProviderError, Quote
+from .base import HistoryProvider, NotServed, PriceProvider, ProviderError, Quote
 
 log = logging.getLogger("tst.capital")
 BASES = {"real": "https://api-capital.backend-capital.com/api/v1",
@@ -164,3 +164,73 @@ class CapitalStream(PriceProvider):
 def _weekday_open(ts: float) -> bool:
     from ..engine import market_open
     return market_open(ts)
+
+
+# ---------- history ----------
+RESOLUTION = {"1m": "MINUTE", "5m": "MINUTE_5", "15m": "MINUTE_15", "1h": "HOUR", "4h": "HOUR_4", "1d": "DAY",
+              "1w": "WEEK"}
+MAX_ROWS = 1000             # the broker returns at most 1000 candles per request
+
+
+def _mid(p: dict | None) -> float | None:
+    if not isinstance(p, dict):
+        return None
+    bid, ask = p.get("bid"), p.get("ask")
+    try:
+        if bid is not None and ask is not None:
+            return (float(bid) + float(ask)) / 2
+        return float(bid if bid is not None else ask)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_prices(data: object, tf: str) -> list[tuple[int, float, float, float, float]]:
+    """GET /prices/{epic} -> (t, o, h, l, c) by the mid of bid and ask, oldest first.
+    The broker starts its day and week on Sunday 22:00 UTC; those candles are moved to the trading day they belong to
+    (Monday), so they line up with the panel's own UTC day and Monday-week candles."""
+    from datetime import datetime, timezone
+    from ..candles import bucket
+    if not isinstance(data, dict) or not isinstance(data.get("prices"), list):
+        raise ProviderError("Capital.com: gözlənilməyən tarixçə cavabı")
+    out = {}
+    for p in data["prices"]:
+        raw = p.get("snapshotTimeUTC") or p.get("snapshotTime")
+        o, h, l, c = (_mid(p.get(k)) for k in ("openPrice", "highPrice", "lowPrice", "closePrice"))
+        if not raw or None in (o, h, l, c):
+            continue
+        try:
+            ts = datetime.fromisoformat(str(raw).replace("Z", "")).replace(tzinfo=timezone.utc).timestamp()
+        except ValueError:
+            continue
+        t = bucket(ts + (2 * 3600 if tf in ("1d", "1w") else 0), tf)
+        out[t] = (t, o, h, l, c)
+    return [out[t] for t in sorted(out)]
+
+
+class CapitalHistory(HistoryProvider):
+    """OHLC history from the same broker as the live stream (all four metals, no extra plan needed)."""
+    name = "capital"
+    request_gap = 0.25
+
+    def __init__(self, creds: dict):
+        self.login_helper = CapitalStream(creds)
+        self.tokens: dict | None = None
+        self.client = httpx.AsyncClient(timeout=20.0)
+
+    async def candles(self, symbol: str, tf: str, limit: int) -> list[tuple[int, float, float, float, float]]:
+        if tf not in RESOLUTION or symbol not in EPIC:
+            raise NotServed(f"{symbol} {tf}: Capital.com bu çərçivəni vermir")
+        if self.tokens is None:
+            self.tokens = await self.login_helper._session()
+        base = BASES[self.login_helper.env or "real"]
+        r = await self.client.get(f"{base}/prices/{EPIC[symbol]}",
+                                  params={"resolution": RESOLUTION[tf], "max": min(limit, MAX_ROWS)},
+                                  headers=self.tokens)
+        if r.status_code in (400, 404):
+            raise NotServed(f"HTTP {r.status_code}")
+        if r.status_code != 200:
+            raise ProviderError(f"Capital.com tarixçə: HTTP {r.status_code}")
+        return parse_prices(r.json(), tf)
+
+    async def aclose(self) -> None:
+        await self.client.aclose()

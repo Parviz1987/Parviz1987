@@ -189,7 +189,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                          (sym, h)).fetchone()
         live = judge.stats(db, sym, h, "live")
         hist = judge.stats(db, sym, h, "history")
-        live_n = max((r["n"] for r in live if r["method"] == "momentum"), default=0)
+        live_n = max((r["n"] for r in live if r["method"] == "momentum"), default=0)   # momentum always has a view
         basis_stats, basis_mode = (live, "live") if live_n >= judge.MIN_N[h] else (hist, "history")
         verdict = judge.official(basis_stats)
         verdict["by"] = basis_mode
@@ -231,8 +231,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.get("/api/journal")
     async def journal(symbol: str, limit: int = 40):
         rows = db.execute("SELECT horizon, method, issued_t, target_t, price0, price1, p_up, lo80, hi80, outcome, "
-                          "hit, in80 FROM forecasts WHERE symbol=? AND mode='live' AND scored_ts IS NOT NULL "
-                          "AND method IN ('momentum', 'reversal') ORDER BY target_t DESC LIMIT ?",
+                          "hit, in80, basis FROM forecasts WHERE symbol=? AND mode='live' AND scored_ts IS NOT NULL "
+                          "AND method NOT IN ('rw', 'up') AND hit IS NOT NULL ORDER BY target_t DESC LIMIT ?",
                           (symbol, min(max(limit, 1), 200))).fetchall()
         return {"rows": [dict(r) for r in rows]}
 

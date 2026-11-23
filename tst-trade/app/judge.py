@@ -12,9 +12,10 @@ import math
 import time
 
 from .db import DB
-from .forecast import BASELINES, METHODS
+from . import candles
+from .forecast import BASELINES, HORIZON_SPEC, methods_for, steps_of
 
-MIN_N = {"1m": 300, "1h": 200, "1d": 250, "1w": 100}
+MIN_N = {"1m": 300, "1h": 200, "1d": 250, "3d": 250, "1w": 100, "10d": 250, "1mo": 250}
 P_MAX = 0.05
 
 
@@ -38,22 +39,32 @@ def score_row(price0: float, price1: float, p_up: float, lo50: float, hi50: floa
 
 
 def score_due(db: DB, now: float | None = None) -> int:
-    """Score every open forecast whose target candle has closed (one query joins each forecast to its candle)."""
+    """Score every open forecast whose target candle has closed. The target is the k-th candle from the issue candle
+    on (k = candles ahead of the horizon): one query per horizon finds it through the candles' primary key."""
     now = time.time() if now is None else now
-    rows = db.execute(
-        "SELECT f.id, f.target_t, f.price0, f.p_up, f.lo50, f.hi50, f.lo80, f.hi80, c.c AS close1 "
-        # A horizon is named after the candle it is built from (forecast.HORIZONS: 1m->1m ...), so tf = horizon.
-        "FROM forecasts f LEFT JOIN candles c ON c.symbol=f.symbol AND c.tf=f.horizon AND c.t=f.issued_t "
-        "WHERE f.scored_ts IS NULL AND f.target_t <= ?", (now,)).fetchall()
     updates, dropped = [], []
-    for r in rows:
-        if r["close1"] is None:
-            # No candle for the target (market closed, feed gap): dropped after a day, never guessed.
-            if now - r["target_t"] > 86400:
-                dropped.append((now, r["id"]))
-            continue
-        s = score_row(r["price0"], r["close1"], r["p_up"], r["lo50"], r["hi50"], r["lo80"], r["hi80"])
-        updates.append((r["close1"], now, s["outcome"], s["hit"], s["brier"], s["in50"], s["in80"], r["id"]))
+    for h, (tf, k) in HORIZON_SPEC.items():
+        step = candles.TF[tf]
+        sub = ("(SELECT {col} FROM candles c WHERE c.symbol=f.symbol AND c.tf=? AND c.t>=f.issued_t "
+               "ORDER BY c.t LIMIT 1 OFFSET ?)")
+        rows = db.execute(
+            "SELECT f.id, f.issued_t, f.target_t, f.price0, f.p_up, f.lo50, f.hi50, f.lo80, f.hi80, "
+            f"{sub.format(col='c.c')} AS close1, {sub.format(col='c.t')} AS t1 "
+            "FROM forecasts f WHERE f.horizon=? AND f.scored_ts IS NULL AND f.target_t <= ?",
+            (tf, k - 1, tf, k - 1, h, now)).fetchall()
+        # Intraday candles must be exactly the expected ones; daily and weekly may skip a weekend or a holiday.
+        slack = 0 if tf not in ("1d", "1w") else (5 * 86400 if tf == "1d" else 0)
+        for r in rows:
+            t1 = r["t1"]
+            ok = (t1 is not None and t1 + step <= now
+                  and t1 <= r["issued_t"] + (k - 1) * step + slack * max(1, (k + 4) // 5))
+            if not ok:
+                # No candle for the target (market closed, feed gap): dropped after a while, never guessed.
+                if now - r["target_t"] > (86400 if tf not in ("1d", "1w") else 10 * 86400):
+                    dropped.append((now, r["id"]))
+                continue
+            s = score_row(r["price0"], r["close1"], r["p_up"], r["lo50"], r["hi50"], r["lo80"], r["hi80"])
+            updates.append((r["close1"], now, s["outcome"], s["hit"], s["brier"], s["in50"], s["in80"], r["id"]))
     if updates:
         db.executemany("UPDATE forecasts SET price1=?, scored_ts=?, outcome=?, hit=?, brier=?, in50=?, in80=? "
                        "WHERE id=?", updates)
@@ -78,24 +89,27 @@ def stats(db: DB, symbol: str, horizon: str, mode: str = "live") -> list[dict]:
     base_up = rows.get("up", {})
     up_rate = (base_up.get("ups") or 0) / base_up["n"] if base_up.get("n") else None
     out = []
-    for m in METHODS:
+    k = steps_of(horizon)
+    for m in methods_for(horizon):
         r = rows.get(m) or {"n": 0, "nh": 0, "hits": 0, "brier": None, "c50": None, "c80": None}
         n, nh, hits = r["n"] or 0, r["nh"] or 0, r["hits"] or 0
         hit_rate = hits / nh if nh else None
         bss = 1 - r["brier"] / 0.25 if r["brier"] is not None else None
         # Beat the better of a coin (0.5) and «always up» on the same forecasts.
         bar = max(0.5, up_rate if up_rate is not None else 0.5, 1 - (up_rate or 0.5))
-        p = _p_one_sided(hits, nh, bar) if nh else None
+        # Forecasts k candles ahead, issued every candle, overlap: k neighbours share most of their path, so they
+        # count as about one independent test. The p-value uses that effective number, not the raw count.
+        p = _p_one_sided(round(hits / k), round(nh / k), bar) if nh >= k else None
         if m in BASELINES:
             status = "bazis"
-        elif n < MIN_N[horizon]:
+        elif nh < MIN_N[horizon]:
             status = "az"
         elif p is not None and p < P_MAX and bss is not None and bss > 0:
             status = "sübut"
         else:
             status = "yox"
         out.append({"method": m, "n": n, "hit_rate": hit_rate, "bar": bar, "p": p, "brier": r["brier"],
-                    "bss": bss, "cover50": r["c50"], "cover80": r["c80"], "status": status,
+                    "bss": bss, "cover50": r["c50"], "cover80": r["c80"], "status": status, "nh": nh,
                     "min_n": MIN_N[horizon]})
     return out
 
