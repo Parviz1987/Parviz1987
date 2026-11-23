@@ -10,7 +10,7 @@ from .db import DB
 from .keys import KeyStore
 
 EDITABLE = ("provider", "model", "fallback", "fallback_model", "month_usd")
-IN_USE = ("reader", "strategist")   # slots that already do their job; the others are configured and checked only
+IN_USE = ("scout", "reader", "strategist")   # slots that already do their job; the others are configured and checked only
 
 
 def config(db: DB, slot: str) -> dict:
@@ -105,7 +105,7 @@ def last_call(db: DB, slot: str) -> dict | None:
 
 
 async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema: dict,
-              max_tokens: int = 2000) -> tuple[dict | None, str]:
+              max_tokens: int = 2000, search: bool = False) -> tuple[dict | None, str]:
     """Ask the slot's brain, then its fallback. Returns (answer or None, a line for the panel). Never raises."""
     db.conn.executescript(CALLS_SCHEMA)
     cfg = config(db, slot)
@@ -120,9 +120,14 @@ async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema:
             errors.append(f"{provider}: açar yoxdur")
             continue
         try:
-            data, tin, tout = await llm.ask(provider, key, model, system, user, schema, max_tokens)
+            calls = 0
+            if search:
+                data, tin, tout, calls = await llm.search(provider, key, model, system, user, max_tokens)
+            else:
+                data, tin, tout = await llm.ask(provider, key, model, system, user, schema, max_tokens)
             db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,1,?,?,?,NULL)",
-                       (_time.time(), slot, provider, model, tin, tout, llm.cost(model, tin, tout)))
+                       (_time.time(), slot, provider, model, tin, tout,
+                        llm.cost(model, tin, tout) + calls * llm.SEARCH_CALL_USD))
             return data, f"{provider} · {model}"
         except Exception as e:   # a broken brain must never stop the system
             msg = str(e).replace(key, "***")[:200]

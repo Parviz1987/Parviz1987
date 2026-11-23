@@ -256,7 +256,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         if now - _rs_cache[0] > 300:           # many small lookups: recomputed at most every 5 minutes
             _rs_cache[:] = [now, reader_score(db, now)]
         return {"strategist": jobs.last_explanation(), "reader": jobs.state("reader"),
-                "strategist_state": jobs.state("strategist"), "reader_score": _rs_cache[1]}
+                "strategist_state": jobs.state("strategist"), "reader_score": _rs_cache[1],
+                "scout": jobs.last_scout(), "scout_state": jobs.state("scout")}
 
     @app.get("/api/journal")
     async def journal(symbol: str, limit: int = 40):

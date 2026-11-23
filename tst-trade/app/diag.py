@@ -103,7 +103,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "keys": key_state,
         "brains": [{**{k: b[k] for k in ("id", "name", "state", "in_use", "spent", "last_call")},
                     "config": {k: v for k, v in b["config"].items()}} for b in brains.view(db, keys)],
-        "brain_jobs": {"reader": jobs.state("reader"), "strategist": jobs.state("strategist")},
+        "brain_jobs": {k: jobs.state(k) for k in ("scout", "reader", "strategist")},
         "history": engine.history_state,
         "forecasts_open": open_fc,
         "judge": judging,

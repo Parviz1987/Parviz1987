@@ -29,6 +29,8 @@ def _json(text: str) -> dict:
     if t.startswith("```"):
         t = t.strip("`")
         t = t[t.find("{"):]
+    if not t.startswith("{") and "{" in t and "}" in t:
+        t = t[t.find("{"): t.rfind("}") + 1]      # a model with search tools may write a line before the JSON
     try:
         data = json.loads(t)
     except ValueError as e:
@@ -116,3 +118,39 @@ async def ask(provider: str, key: str, model: str, system: str, user: str, schem
     if provider == "gemini":
         return await _gemini(key, model, system, user, schema, max_tokens)
     raise LLMError(f"naməlum provayder: {provider}")
+
+
+SEARCH_CALL_USD = 0.01      # counted per server-side search call, on top of tokens (kept high on purpose for the cap)
+
+
+async def search(provider: str, key: str, model: str, system: str, user: str,
+                 max_tokens: int = 3000) -> tuple[dict, int, int, int]:
+    """Live search on X and the web by xAI's server-side tools (Responses API, tools x_search + web_search).
+    Returns (json answer, input tokens, output tokens, number of search calls). Only xAI has it here."""
+    if provider != "xai":
+        raise LLMError(f"{provider}: canlı X axtarışı yalnız xAI (Grok) ilə işləyir")
+    body = {"model": model, "input": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "tools": [{"type": "x_search"}, {"type": "web_search"}], "max_output_tokens": max_tokens}
+    async with httpx.AsyncClient(timeout=180.0) as c:
+        r = await c.post("https://api.x.ai/v1/responses", headers={"Authorization": f"Bearer {key}"}, json=body)
+    if r.status_code in (401, 403):
+        raise LLMError("açar qəbul olunmadı")
+    if r.status_code != 200:
+        raise LLMError(f"HTTP {r.status_code}: {r.text[:160]}")
+    j = r.json()
+    texts, calls = [], 0
+    if isinstance(j.get("output_text"), str):
+        texts.append(j["output_text"])
+    for item in j.get("output") or []:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("type", "")).endswith("_call"):
+            calls += 1
+        if item.get("type") == "message" and not texts:
+            for part in item.get("content") or []:
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    texts.append(part["text"])
+    if not texts:
+        raise LLMError("boş cavab")
+    u = j.get("usage") or {}
+    return _json("\n".join(texts)), int(u.get("input_tokens") or 0), int(u.get("output_tokens") or 0), calls

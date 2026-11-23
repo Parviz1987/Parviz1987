@@ -236,9 +236,22 @@ function renderReaderScore(rs) {
     `<tr><td><b>Cəmi</b></td><td class="n">${rs.n}</td><td class="n"><b>${pct(rs.hit_rate)}</b></td><td></td></tr></table>
     <p class="note">Eyni hadisə haqqında bir neçə başlıq bir-birindən asılıdır: bu ilk baxışdır, sübut deyil. Müqayisə üçün: bu saatlarda qiymət ${pct(rs.up_rate, 0)} hallarda qalxıb.</p>`;
 }
+function renderScout(d) {
+  const x = d.scout;
+  if (!x) { $("scout").innerHTML = `<p class="note">${esc((d.scout_state && d.scout_state.message) || "Kəşfiyyatçı (Grok) hələ axtarmayıb: bazar açıq olanda 2 saatda bir, mühüm ABŞ rəqəmi ətrafında 20 dəqiqədə bir axtarır. xAI açarı lazımdır.")}</p>`; $("scmeta").textContent = ""; return; }
+  $("scmeta").textContent = `${x.brain} · ${new Date(x.ts * 1000).toLocaleString("az")}`;
+  const items = x.items.filter((i) => nfilter === "all" || !i.metals.length || i.metals.includes(sym));
+  $("scout").innerHTML = (x.mood ? `<p>${esc(x.mood)}</p>` : "") + (items.length ? items.map((i) => `<div class="nitem">
+      ${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a>` : `<span>${esc(i.title)}</span>`}
+      <span class="m">${esc(i.source)} · ${esc(i.metals.join(", ") || "ümumi")} ${i.direction === "up" ? "<span class='up'>↑</span>" : i.direction === "down" ? "<span class='down'>↓</span>" : "→"} ${STR_AZ[i.strength] || ""}${i.why ? " · " + esc(i.why) : ""}</span></div>`).join("")
+    : "<p class='note'>Seçilmiş metal üçün tapılan yoxdur.</p>") +
+    `<p class="note">Grok X və vebdə axtarır. Mənbəyə klikləyib yoxlayın: süni intellekt səhv edə bilər. Rəqəm olan cümlələr avtomatik silinir.</p>` +
+    (d.scout_state && d.scout_state.message && d.scout_state.ts > x.ts ? `<p class="note">Son cəhd: ${esc(d.scout_state.message)}</p>` : "");
+}
 async function loadBrains() {
   const d = await api("/api/brains");
   renderReaderScore(d.reader_score);
+  renderScout(d);
   const x = d.strategist;
   if (!x) {
     $("strat").innerHTML = `<p class="note">${esc((d.strategist_state && d.strategist_state.message) || "Strateq hələ izah yazmayıb (saatda bir yazır).")}</p>`;

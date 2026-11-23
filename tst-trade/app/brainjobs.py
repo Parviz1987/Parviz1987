@@ -5,6 +5,7 @@ Strategist (Strateq): once an hour, the forecast cards, macro, calendar and labe
 Azerbaijani. A sentence with a number that is not in the facts is dropped (a brain never writes a price)."""
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import time
@@ -55,6 +56,26 @@ STRATEGIST_SCHEMA = {
 NUM = re.compile(r"\d+(?:[.,]\d+)?")
 
 
+SCOUT_EVERY, SCOUT_EVENT_EVERY = 2 * 3600, 20 * 60
+SCOUT_SYSTEM = (
+    "You are the Scout of a precious-metals forecasting desk. Use X search and web search to find what moved or may "
+    "move gold, silver, platinum and palladium in the LAST 3 HOURS: central banks and Fed speakers, US data surprises, "
+    "geopolitics, tariffs and sanctions, ETF and central-bank buying, China and India demand, mine supply, big trader "
+    "or analyst posts on X. Prefer primary sources and well-known accounts; skip rumours you cannot source. Do not "
+    "state prices or price levels. Answer ONLY with one JSON object: {\"mood\": \"one short sentence in "
+    "Azerbaijani about the overall picture\", \"items\": [{\"title\": \"short English headline\", \"url\": "
+    "\"source link\", \"source\": \"account or site\", \"metals\": [\"XAU\"|\"XAG\"|\"XPT\"|\"XPD\"], "
+    "\"direction\": \"up\"|\"down\"|\"neutral\", \"strength\": 0-3, \"why\": \"one sentence in "
+    "Azerbaijani\"}]} with at most 8 items, most important first.")
+SCOUT_USER = "Find the most market-moving metals news and posts of the last 3 hours now."
+
+
+def strip_numbers(text: str) -> str:
+    """Drop every sentence that holds a digit: a language model must not be the source of a price or a figure."""
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return " ".join(p for p in parts if not re.search(r"\d", p)).strip()
+
+
 def guard_numbers(text: str, facts: str) -> str:
     """Drop every sentence holding a number that does not appear in the facts."""
     known = {n.replace(",", ".") for n in NUM.findall(facts)}
@@ -74,6 +95,9 @@ class BrainJobs:
         db.conn.executescript(SCHEMA)
         self.next_reader = 0.0
         self.next_strategist = 0.0
+        # A restart (every update) must not buy an extra search: the next one follows the last one's time.
+        last = json.loads(db.get("scout:last") or "{}")
+        self.next_scout = float(last.get("ts", 0)) + SCOUT_EVERY
 
     def _state(self, slot: str, msg: str) -> None:
         self.db.put(f"brainjob:{slot}", json.dumps({"ts": time.time(), "message": msg[:300]}))
@@ -145,8 +169,48 @@ class BrainJobs:
         raw = self.db.get("strategist:last")
         return json.loads(raw) if raw else None
 
+    # ---------- Scout: live X and web search (Grok) ----------
+    async def scout(self, now: float) -> int:
+        data, how = await brains.run(self.db, self.keys, "scout", SCOUT_SYSTEM, SCOUT_USER, {}, max_tokens=3000,
+                                     search=True)
+        if data is None:
+            self._state("scout", "alınmadı: " + how)
+            return 0
+        items = []
+        for it in (data.get("items") or [])[:12]:
+            if not isinstance(it, dict) or not str(it.get("title", "")).strip():
+                continue
+            url = str(it.get("url", ""))
+            metals = [m for m in (it.get("metals") or []) if m in ("XAU", "XAG", "XPT", "XPD")]
+            items.append({"title": str(it["title"])[:240], "url": url if url.startswith(("https://", "http://")) else "",
+                          "source": str(it.get("source", ""))[:60], "metals": metals,
+                          "direction": it.get("direction") if it.get("direction") in ("up", "down", "neutral") else "neutral",
+                          "strength": max(0, min(3, int(it.get("strength") or 0))),
+                          # No prices from a language model: a sentence with a number is dropped.
+                          "why": strip_numbers(str(it.get("why", ""))[:300])})
+        rows = [{"uid": "grok:" + hashlib.sha1(i["title"].lower().encode()).hexdigest()[:16], "source": "Grok: X / veb",
+                 "url": i["url"], "title": i["title"], "ts": now, "metals": ",".join(i["metals"])} for i in items]
+        if rows:
+            self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals) "
+                                "VALUES(:uid, :source, :url, :title, :ts, :metals)", rows)
+        self.db.put("scout:last", json.dumps({"ts": now, "brain": how, "items": items,
+                                              "mood": strip_numbers(str(data.get("mood", ""))[:400])}))
+        self._state("scout", f"{len(items)} xəbər tapıldı · {how}")
+        return len(items)
+
+    def last_scout(self) -> dict | None:
+        raw = self.db.get("scout:last")
+        return json.loads(raw) if raw else None
+
     async def tick(self, now: float | None = None) -> None:
         now = time.time() if now is None else now
+        if now >= self.next_scout and self.feeds is not None:
+            # Every 2 hours while the market is open; every 20 minutes around a high-impact US release.
+            from .engine import market_open
+            hot = self.feeds.event_mode(now) is not None
+            self.next_scout = now + (SCOUT_EVENT_EVERY if hot else SCOUT_EVERY)
+            if market_open(now) and self.keys.first("xai"):
+                await self.scout(now)
         if now >= self.next_reader:
             self.next_reader = now + READER_EVERY
             await self.reader(now)

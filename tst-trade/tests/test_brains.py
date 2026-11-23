@@ -83,3 +83,46 @@ def test_reader_score_checks_direction_one_hour_later():
     rs = reader_score(db, t0 + 130 * 60 + 200)
     assert rs["n"] == 2 and rs["hit_rate"] == 0.5
     assert {r["strength"]: r["hit_rate"] for r in rs["rows"]} == {1: 0.0, 2: 1.0}
+
+
+def test_scout_search_parses_responses_output_and_strips_numbers(monkeypatch):
+    import asyncio
+    import json as _j
+    from app import llm
+    from app.brainjobs import BrainJobs, strip_numbers
+    from app.db import DB
+    from app.feeds import Feeds
+    from app.keys import KeyStore
+
+    assert strip_numbers("Gold rose. It hit 4000 dollars! Fed is calm.") == "Gold rose. Fed is calm."
+    answer = {"mood": "Fed sakitdir. Qızıl 4000-ə çatdı.",
+              "items": [{"title": "Fed hints at cut", "url": "https://x.com/a/1", "source": "@fed", "metals": ["XAU", "ZZZ"],
+                         "direction": "up", "strength": 5, "why": "Faiz enə bilər."}]}
+
+    class R:
+        status_code = 200
+        def json(self):
+            return {"output": [{"type": "x_search_call"}, {"type": "web_search_call"},
+                               {"type": "message", "content": [{"type": "output_text", "text": "Here:\n" + _j.dumps(answer)}]}],
+                    "usage": {"input_tokens": 100, "output_tokens": 50}}
+
+    class C:
+        def __init__(self, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): pass
+        async def post(self, url, headers=None, json=None):
+            assert url.endswith("/v1/responses") and {"type": "x_search"} in json["tools"]
+            return R()
+
+    monkeypatch.setattr(llm.httpx, "AsyncClient", C)
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    ks.set("xai", {"key": "xai-test-123456"})
+    jobs = BrainJobs(db, ks, Feeds(db, ks))
+    assert asyncio.run(jobs.scout(1_800_000_000)) == 1
+    last = jobs.last_scout()
+    it = last["items"][0]
+    assert it["metals"] == ["XAU"] and it["strength"] == 3 and last["mood"] == "Fed sakitdir."
+    assert db.execute("SELECT COUNT(*) FROM news WHERE source LIKE 'Grok%'").fetchone()[0] == 1
+    spent = db.execute("SELECT usd FROM brain_calls").fetchone()[0]
+    assert spent > 2 * llm.SEARCH_CALL_USD - 1e-9
