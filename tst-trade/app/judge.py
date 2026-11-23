@@ -93,7 +93,22 @@ def _p_one_sided(hits: int, n: int, p0: float) -> float:
     return 1 - 0.5 * (1 + math.erf(z / math.sqrt(2)))
 
 
-def stats(db: DB, symbol: str, horizon: str, mode: str = "live") -> list[dict]:
+_STATS_CACHE: dict = {}
+
+
+def stats(db: DB, symbol: str, horizon: str, mode: str = "live", ttl: float = 0) -> list[dict]:
+    """ttl > 0: an answer up to ttl seconds old is reused (the panel asks every 20 s; a month of one-minute
+    forecasts is ~400 000 rows per metal, too much to count again on every request)."""
+    key = (id(db), symbol, horizon, mode)
+    hit = _STATS_CACHE.get(key)
+    if ttl and hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    out = _stats(db, symbol, horizon, mode)
+    _STATS_CACHE[key] = (time.time(), out)
+    return out
+
+
+def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
     q = ("SELECT method, COUNT(outcome) n, SUM(outcome) ups, COUNT(hit) nh, SUM(hit) hits, AVG(brier) brier, "
          "AVG(in50) c50, AVG(in80) c80, COUNT(price1) ncov FROM forecasts "
          "WHERE symbol=? AND horizon=? AND mode=? AND scored_ts IS NOT NULL GROUP BY method")

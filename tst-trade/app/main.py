@@ -204,8 +204,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         tf = forecast.HORIZONS[h]
         row = db.execute("SELECT MAX(issued_t) t FROM forecasts WHERE symbol=? AND horizon=? AND mode='live'",
                          (sym, h)).fetchone()
-        live = judge.stats(db, sym, h, "live")
-        hist = judge.stats(db, sym, h, "history")
+        live = judge.stats(db, sym, h, "live", ttl=60)
+        hist = judge.stats(db, sym, h, "history", ttl=300)
         live_n = max((r["n"] for r in live if r["method"] == "momentum"), default=0)   # momentum always has a view
         basis_stats, basis_mode = (live, "live") if live_n >= judge.MIN_N[h] else (hist, "history")
         verdict = judge.official(basis_stats)

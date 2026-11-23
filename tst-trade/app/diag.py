@@ -95,7 +95,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
     for sym in candles.METALS:
         for h in forecast.HORIZONS:
             for mode in ("live", "history"):
-                for r in judge.stats(db, sym, h, mode):
+                for r in judge.stats(db, sym, h, mode, ttl=60):
                     if r["method"] in forecast.BASELINES and r["method"] != "up":
                         continue
                     judging.setdefault(f"{sym}/{h}/{mode}", []).append(

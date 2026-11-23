@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS forecasts (
 );
 CREATE INDEX IF NOT EXISTS fc_open ON forecasts(scored_ts, target_t);
 CREATE INDEX IF NOT EXISTS fc_stats ON forecasts(symbol, horizon, mode, method);
+CREATE INDEX IF NOT EXISTS fc_recent ON forecasts(symbol, mode, target_t);
 CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 """
 
