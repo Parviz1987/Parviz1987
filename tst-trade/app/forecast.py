@@ -369,7 +369,8 @@ PASSPORT = {
                  "else": "Fakt mənbəyi: FMP və ya beyin agenti (Rəqəm ovçusu)."},
     "dollar": {"why": "Qızıl dollarla qiymətlənir; dollar sıçrayanda qızıl çox vaxt bir neçə dəqiqə gec reaksiya verir.",
                "expect": "15 dəqiqə – 1 saat: ən real qısa siqnal namizədi.",
-               "else": "Gecikmə yoxdursa (qızıl eyni anda reaksiya verirsə), çıxarılır; əlaqə yalnız ölçü kimi qalır."},
+               "else": "Gecikmə yoxdursa (qızıl eyni anda reaksiya verirsə), çıxarılır; əlaqə yalnız ölçü kimi qalır. "
+                       "Dolların üç ölçüsündən (indeks, EUR/USD, USD/JPY) son dövrdə qızılla ən bağlı olanı götürülür."},
     "oil": {"why": "Neft inflyasiya gözləntisini və geosiyasi qorxunu daşıyır; qızıl ona gec qoşula bilər.",
             "expect": "1 saat – 1 gün, xüsusən Yaxın Şərq xəbərlərində.",
             "else": "Çıxarılır; neft «Bazarlar» bölməsində ölçü kimi qalır."},

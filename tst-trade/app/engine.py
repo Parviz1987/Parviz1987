@@ -204,6 +204,11 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:dollar_pick_v1"):
+            # The dollar impulse now picks the dollar market most linked to the metal: replayed once.
+            self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='dollar'")
+            self.history_state["ts"] = 0
+            self.db.put("migr:dollar_pick_v1", "1")
         if not self.db.get("migr:linked_v1"):
             self._drop_unlinked()
             self.history_state["ts"] = 0
@@ -414,10 +419,11 @@ class Engine:
         only when the linked market has the metal's last candle too (else no view)."""
         epics = markets.saved(self.db).get("epics", {})
         out = {}
-        for key, codes in (("dollar", ("DXY", "EURUSD")), ("oil", ("OIL", "BRENT"))):
-            # the first linked market that has the metal's last candle (the dollar index may be quiet or closed
-            # while EUR/USD trades): an input that does not arrive must not silence the method
-            code, bymap = None, {}
+        for key, codes in (("dollar", ("DXY", "EURUSD", "USDJPY")), ("oil", ("OIL", "BRENT"))):
+            # Of the markets that carry this driver and have the metal's last candle, the one most linked to the
+            # metal over the last 100 candles (past only): the dollar index can drift apart from gold for weeks
+            # while EUR/USD still moves with it. A quiet market never silences the method.
+            best = None
             for c in codes:
                 if c not in epics or not past:
                     continue
@@ -425,13 +431,15 @@ class Engine:
                     m = rows_by_code[c]
                 else:
                     m = {r["t"]: r["c"] for r in candles.closed(self.db, c, tf, now, limit=150)}
-                if past[-1]["t"] in m:
-                    code, bymap = c, m
-                    break
-            if code is None:
-                continue
-            pairs = [(c["c"], bymap[c["t"]]) for c in past[-101:] if c["t"] in bymap]
-            out[key] = ([p[0] for p in pairs], [p[1] for p in pairs], markets.RELATED[code]["name"])
+                if past[-1]["t"] not in m:
+                    continue
+                pairs = [(x["c"], m[x["t"]]) for x in past[-101:] if x["t"] in m]
+                g, o = [p[0] for p in pairs], [p[1] for p in pairs]
+                strength = abs(markets.link(g, o) or 0)
+                if best is None or strength > best[0]:
+                    best = (strength, g, o, markets.RELATED[c]["name"])
+            if best is not None:
+                out[key] = best[1:]
         return out
 
     async def step(self) -> None:

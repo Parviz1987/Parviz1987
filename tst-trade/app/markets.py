@@ -103,6 +103,14 @@ def links(db: DB, code: str, metal: str = "XAU", now: float | None = None) -> di
     return out
 
 
+def link(gold: list[float], other: list[float]) -> float | None:
+    """Same-candle correlation of returns over the last 100 aligned candles (past only)."""
+    g = [math.log(b / a) for a, b in zip(gold, gold[1:]) if a > 0 and b > 0][-100:]
+    x = [math.log(b / a) for a, b in zip(other, other[1:]) if a > 0 and b > 0][-100:]
+    n = min(len(g), len(x))
+    return _corr(x[-n:], g[-n:]) if n >= 40 else None
+
+
 def impulse_view(gold: list[float], other: list[float], name: str) -> tuple[float, str]:
     """Catch-up after a move in a linked market. From the last 100 aligned candles: how much the metal usually moves
     with this market in the same candle (beta). If the market just moved and the metal has not followed yet, the

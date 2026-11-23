@@ -55,3 +55,22 @@ def test_dollar_falls_back_to_eurusd_when_the_index_is_quiet():
     now = t0 + 130 * 900 + 5
     rel = eng.related_closes(candles.closed(db, "XAU", "15m", now, limit=200), "15m", now)
     assert rel["dollar"][2] == "EUR/USD"
+
+
+def test_dollar_takes_the_market_most_linked_to_the_metal():
+    rng = random.Random(4)
+    db = DB(":memory:")
+    eng = Engine(db, KeyStore(db, "s" * 64), "demo", 15)
+    db.put("related:epics", json.dumps({"ts": 1, "epics": {"DXY": "DXY", "EURUSD": "EURUSD"}}))
+    t0 = 1_700_000_000 // 900 * 900
+    g = e = d = 100.0
+    for i in range(130):
+        r = rng.gauss(0, 0.001)
+        g *= math.exp(r)
+        e *= math.exp(r + rng.gauss(0, 0.0002))           # EUR/USD moves with gold
+        d *= math.exp(rng.gauss(0, 0.001))                # the index wanders on its own
+        for sym, px in (("XAU", g), ("EURUSD", e), ("DXY", d)):
+            candles.store_history(db, sym, "15m", [(t0 + i * 900, px, px, px, px)])
+    now = t0 + 130 * 900 + 5
+    rel = eng.related_closes(candles.closed(db, "XAU", "15m", now, limit=200), "15m", now)
+    assert rel["dollar"][2] == "EUR/USD"
