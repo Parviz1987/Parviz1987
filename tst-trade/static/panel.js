@@ -256,11 +256,47 @@ const ago = (ts) => { const m = Math.round((Date.now() / 1000 - ts) / 60);
 const until = (ts) => { const m = Math.round((ts - Date.now() / 1000) / 60);
   if (m < 0) return "çıxıb";
   return m < 60 ? m + " dəq sonra" : m < 1440 ? Math.floor(m / 60) + " saat " + (m % 60) + " dəq sonra" : Math.round(m / 1440) + " gün sonra"; };
-const SER = { DFII10: 2, DGS10: 2, T10YIE: 2, DTWEXBGS: 2 };
+const SER = { DFII10: 2, DGS10: 2, T10YIE: 2, DTWEXBGS: 2, VIXCLS: 1, SP500: 0 };
+const MNAME = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
+// Fundamentals in words: each factor, which way it points for gold, and why. Display only: the macro method in the
+// Judge is the test of whether this view actually forecasts anything.
+function renderFund(d) {
+  const m = Object.fromEntries(d.macro.map((x) => [x.series, x]));
+  const sig = [];
+  const add = (dir, title, text) => sig.push(`<div class="fsig"><span class="ar ${dir > 0 ? "up" : dir < 0 ? "down" : "mut"}">${dir > 0 ? "↑" : dir < 0 ? "↓" : "→"}</span>
+    <span><b>${title}</b><br><span class="note">${text}</span></span></div>`);
+  const r = m.DFII10, usd = m.DTWEXBGS, vix = m.VIXCLS, sp = m.SP500;
+  if (r && r.value != null) add(r.change_week < -0.03 ? 1 : r.change_week > 0.03 ? -1 : 0, `Real faiz ${r.value.toFixed(2)} % (həftədə ${r.change_week >= 0 ? "+" : ""}${r.change_week.toFixed(2)})`,
+    "Real faiz enəndə qızıl saxlamağın «itirilmiş gəliri» azalır: adətən qızıl üçün müsbət. 2022-dən bu əlaqə zəifləyib.");
+  if (usd && usd.value != null) { const p = usd.change_week / (usd.value - usd.change_week) * 100;
+    add(p < -0.3 ? 1 : p > 0.3 ? -1 : 0, `Dollar indeksi ${usd.value.toFixed(1)} (həftədə ${p >= 0 ? "+" : ""}${p.toFixed(2)} %)`,
+      "Dollar zəifləyəndə qızıl başqa valyutalarda ucuzlaşır, tələb artır: qızıl üçün müsbət."); }
+  if (vix && vix.value != null) add(vix.value > 25 ? 1 : 0, `VIX ${vix.value.toFixed(1)}`,
+    vix.value > 25 ? "Bazarda qorxu yüksəkdir: sığınacaq kimi qızıla tələb arta bilər (amma ilk panikada qızıl da satıla bilər)."
+      : vix.value < 15 ? "Bazar sakitdir: sığınacaq tələbi zəifdir." : "Qorxu səviyyəsi normaldır.");
+  if (sp && sp.value != null) { const p = sp.change_week / (sp.value - sp.change_week) * 100;
+    add(p < -3 ? 1 : 0, `S&P 500 həftədə ${p >= 0 ? "+" : ""}${p.toFixed(1)} %`, p < -3 ? "Səhmlərdə kəskin düşüş: risk-off, qızıla axın ola bilər." : "Səhm bazarında risk-off yoxdur."); }
+  const c = (d.cot || []).find((x) => x.symbol === sym);
+  if (c && c.date) add(c.rank > 85 ? -1 : c.rank < 15 ? 1 : 0, `Böyük fondlar (${MNAME[sym]}): xalis ${Math.round(c.net).toLocaleString("az")} müqavilə, 3 ilin ${c.rank == null ? "—" : c.rank.toFixed(0) + " %"}-i`,
+    c.rank > 85 ? "Fondlar 3 ilin ən yüklü mövqeyinə yaxındır: alan az qalıb, geri çəkilmə riski artır."
+      : c.rank < 15 ? "Fondlar 3 ilin ən zəif mövqeyinə yaxındır: satan az qalıb, dönüş potensialı var." : "Fondların mövqeyi ifrat deyil.");
+  $("fsig").innerHTML = sig.length ? sig.join("") + `<p class="note">Bunlar izahdır. Makro (real faiz + dollar) üsulu Hakimdə yoxlanır${judgeSays("macro")
+    .replace(" · ", ": ")}. COT məlumatı çərşənbə axşamının vəziyyətidir, cümə günü dərc olunur.</p>`
+    : `<p class="note">Fundamental məlumat hələ yoxdur (admin: FRED açarı).</p>`;
+  const h = (d.health || {}).cot || {};
+  $("cot").innerHTML = (d.cot || []).some((x) => x.date) ? `<table><tr><th>Metal</th><th>Hesabat</th><th>Fondların xalis mövqeyi</th><th>Açıq mövqelərin %-i</th><th>Həftəlik dəyişmə</th><th>3 illik diapazonda</th></tr>` +
+    d.cot.map((x) => x.date ? `<tr><td>${MNAME[x.symbol]}</td><td>${x.date}</td><td class="n">${Math.round(x.net).toLocaleString("az")}</td>
+      <td class="n">${x.net_pct_oi == null ? "—" : x.net_pct_oi.toFixed(1) + " %"}</td>
+      <td class="n ${x.change > 0 ? "up" : x.change < 0 ? "down" : ""}">${x.change == null ? "—" : (x.change > 0 ? "+" : "") + Math.round(x.change).toLocaleString("az")}</td>
+      <td class="n">${x.rank == null ? "—" : x.rank.toFixed(0) + " %"}</td></tr>` : "").join("") + "</table>" +
+    `<p class="note">CFTC COT: «managed money» (hedc fondları, CTA) fyuçers mövqeyi. 100 % = son 3 ilin ən böyük alış mövqeyi.</p>`
+    : `<p class="note">CFTC COT: ${esc(h.message || "hələ yüklənməyib")}</p>`;
+}
 
 async function loadFeeds() {
   const d = await api(`/api/feeds${nfilter === "metal" ? "?metal=" + sym : ""}`);
   const h = d.health || {};
+  try { renderFund(d); } catch (e) {}
   $("macro").innerHTML = d.macro.map((m) => m.value == null
     ? `<div class="mrow"><span>${esc(m.name)}</span><span class="mut">—</span><span></span></div>`
     : `<div class="mrow"><span>${esc(m.name)}<br><span class="note">${esc(m.date)}</span></span>

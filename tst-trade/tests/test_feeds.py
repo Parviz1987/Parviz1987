@@ -61,3 +61,19 @@ def test_macro_without_key_reports_it():
     assert f.health("fred")["ok"] is False and "açar" in f.health("fred")["message"]
     assert f.macro_view()[0]["value"] is None
     assert time.time() - f.health("fred")["checked"] < 5
+
+
+def test_parse_cot_rows_and_field_change():
+    from app.feeds import parse_cot
+    rows = [{"cftc_contract_market_code": "088691", "report_date_as_yyyy_mm_dd": "2026-11-17T00:00:00.000",
+             "open_interest_all": "500000", "m_money_positions_long_all": "200000",
+             "m_money_positions_short_all": "50000", "prod_merc_positions_long": "10",
+             "prod_merc_positions_short": "20"},
+            {"cftc_contract_market_code": "999999", "report_date_as_yyyy_mm_dd": "2026-11-17"}]
+    out = parse_cot(rows)
+    assert out == [("XAU", "2026-11-17", 500000.0, 200000.0, 50000.0, 10.0, 20.0)]
+    try:
+        parse_cot([{"cftc_contract_market_code": "088691", "other": 1}])
+        raise AssertionError("must fail loudly")
+    except ValueError as e:
+        assert "sahə" in str(e)

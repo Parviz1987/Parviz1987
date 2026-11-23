@@ -309,9 +309,10 @@ class Engine:
                 if time.time() - last_prune > 3600:
                     self.prune(time.time())
                     last_prune = time.time()
-                await self.backfill()
+                # Feeds first: the history replay's macro method needs FRED data already loaded.
                 if self.feeds is not None:
                     await self.feeds.tick()
+                await self.backfill()
                 if self.jobs is not None:
                     await self.jobs.tick()
             except Exception:   # the loop must survive one bad poll

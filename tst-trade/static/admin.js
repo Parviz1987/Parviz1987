@@ -58,7 +58,8 @@ function freeSlot(f) {
     <div class="meta"><span>Nə üçün</span><span>${esc(f.purpose)}</span><span>Qiymət</span><span>${esc(f.cost)}</span>
     <span>Mərhələ</span><span><span class="pill ${stage[0]}">${stage[1]}</span></span>${healthLine(f.health)}</div>
     ${f.id === "rss" ? `<div class="btns"><button class="btn" data-feed="news">İndi yenilə</button></div>` : ""}
-    ${f.id === "forexfactory" ? `<div class="btns"><button class="btn" data-feed="calendar">İndi yenilə</button></div>` : ""}</div>`;
+    ${f.id === "forexfactory" ? `<div class="btns"><button class="btn" data-feed="calendar">İndi yenilə</button></div>` : ""}
+    ${f.id === "cot" ? `<div class="btns"><button class="btn" data-feed="cot">İndi yüklə</button></div>` : ""}</div>`;
 }
 
 function brainSlot(b) {

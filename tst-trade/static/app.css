@@ -139,3 +139,7 @@ td.cell.az{color:var(--warn)}
 @media (max-width:420px){.sgrid{grid-template-columns:minmax(0,1fr)}}
 pre.trace{white-space:pre-wrap;font-size:.72rem;color:var(--muted);max-height:220px;overflow:auto;margin:4px 0 0}
 .evbanner.okbar{background:var(--up-soft);color:var(--up)}
+.fund{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px}
+@media (max-width:900px){.fund{grid-template-columns:minmax(0,1fr)}}
+.fsig{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:.84rem}
+.fsig .ar{font-family:var(--mono);font-weight:700;width:1.6em;text-align:center}

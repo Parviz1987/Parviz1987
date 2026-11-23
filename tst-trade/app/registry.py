@@ -68,6 +68,9 @@ FREE_SOURCES: list[dict] = [
      "purpose": "Qızıl, gümüş, Fed, geosiyasət başlıqları; 2 dəqiqədə bir.", "cost": "Pulsuz", "stage": LIVE},
     {"id": "forexfactory", "category": "calendar", "name": "Forex Factory təqvimi",
      "purpose": "ABŞ rəqəmlərinin vaxtı, gözlənti, əvvəlki və fakt; saatda bir.", "cost": "Pulsuz", "stage": LIVE},
+    {"id": "cot", "category": "macro", "name": "CFTC COT hesabatı",
+     "purpose": "Böyük fondların (managed money) qızıl, gümüş, platin, palladium fyuçerslərində mövqeyi; həftədə bir "
+                "(cümə axşamı çərşənbə axşamının vəziyyəti dərc olunur).", "cost": "Pulsuz", "stage": LIVE},
 ]
 
 # Brain slots: the job comes first, the brain second. requirements = what the job needs and its weight (sum 100).

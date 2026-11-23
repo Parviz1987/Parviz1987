@@ -51,7 +51,13 @@ MACRO_SERIES = {
     "DGS10": "10 illik nominal faiz, %",
     "T10YIE": "10 illik inflyasiya gözləntisi, %",
     "DTWEXBGS": "Dollar indeksi (geniş)",
+    "VIXCLS": "VIX qorxu indeksi",
+    "SP500": "S&P 500 səhm indeksi",
 }
+# CFTC Commitments of Traders (disaggregated, futures only; public, no key): weekly positions on COMEX / NYMEX.
+COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
+COT_CODES = {"088691": "XAU", "084691": "XAG", "076651": "XPT", "075651": "XPD"}
+COT_EVERY = 12 * 3600
 METAL_WORDS = {"XAU": r"\bgold\b|bullion", "XAG": r"\bsilver\b", "XPT": r"\bplatinum\b", "XPD": r"\bpalladium\b"}
 
 SCHEMA = """
@@ -62,6 +68,8 @@ CREATE TABLE IF NOT EXISTS events (uid TEXT PRIMARY KEY, title TEXT, country TEX
   forecast TEXT, previous TEXT, actual TEXT);
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE TABLE IF NOT EXISTS macro (series TEXT NOT NULL, d TEXT NOT NULL, v REAL NOT NULL, PRIMARY KEY (series, d));
+CREATE TABLE IF NOT EXISTS cot (symbol TEXT NOT NULL, d TEXT NOT NULL, oi REAL, mm_long REAL, mm_short REAL,
+  pm_long REAL, pm_short REAL, PRIMARY KEY (symbol, d));
 """
 
 
@@ -173,13 +181,35 @@ def parse_fred(data) -> list[tuple[str, float]]:
     return out
 
 
+def parse_cot(data) -> list[tuple]:
+    """Socrata rows -> (symbol, date, open interest, managed money long, short, producer long, short)."""
+    rows = json.loads(data) if isinstance(data, (bytes, str)) else data
+    if not isinstance(rows, list):
+        raise ValueError("COT: gözlənilməyən cavab")
+    out = []
+    for r in rows:
+        sym = COT_CODES.get(str(r.get("cftc_contract_market_code", "")).strip())
+        d = str(r.get("report_date_as_yyyy_mm_dd", ""))[:10]
+        try:
+            vals = [float(r[k]) for k in ("open_interest_all", "m_money_positions_long_all",
+                                           "m_money_positions_short_all", "prod_merc_positions_long",
+                                           "prod_merc_positions_short")]
+        except (KeyError, TypeError, ValueError):
+            continue
+        if sym and len(d) == 10:
+            out.append((sym, d, *vals))
+    if rows and not out:
+        raise ValueError("COT: sahə adları gözləniləndən fərqlidir: " + ", ".join(sorted(rows[0])[:12]))
+    return out
+
+
 # ---------- the hub ----------
 class Feeds:
     def __init__(self, db: DB, keys: KeyStore):
         self.db = db
         self.keys = keys
         db.conn.executescript(SCHEMA)
-        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0}
+        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0}
 
     def _health(self, sid: str, ok: bool, msg: str, rows: int = 0) -> None:
         prev = json.loads(self.db.get(f"src:{sid}") or "{}")
@@ -254,10 +284,21 @@ class Feeds:
                 errors.append(f"{sid}: {str(e).replace(key, '***')}")
         self._health("fred", n > 0, f"{n} müşahidə" + (f"; xəta: {'; '.join(errors)}" if errors else ""), n)
 
+    async def cot(self, client) -> None:
+        codes = ",".join(f"'{c}'" for c in COT_CODES)
+        data = await self._get(client, COT_URL, params={
+            "$where": f"cftc_contract_market_code in({codes})", "$order": "report_date_as_yyyy_mm_dd DESC",
+            "$limit": str(len(COT_CODES) * 160)})
+        rows = parse_cot(data)
+        self.db.executemany("INSERT OR REPLACE INTO cot(symbol, d, oi, mm_long, mm_short, pm_long, pm_short) "
+                            "VALUES(?,?,?,?,?,?,?)", rows)
+        last = max((r[1] for r in rows), default="—")
+        self._health("cot", bool(rows), f"{len(rows)} həftəlik hesabat, sonuncu {last}", len(rows))
+
     async def tick(self, now: float | None = None, force: str | None = None) -> None:
         now = time.time() if now is None else now
         jobs = {"news": (self.news, NEWS_EVERY), "calendar": (self.calendar, CAL_EVERY),
-                "macro": (self.macro, MACRO_EVERY)}
+                "macro": (self.macro, MACRO_EVERY), "cot": (self._cot_safe, COT_EVERY)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
@@ -267,7 +308,31 @@ class Feeds:
                     except Exception:
                         log.exception("feed %s failed", name)
 
+    async def _cot_safe(self, client) -> None:
+        try:
+            await self.cot(client)
+        except Exception as e:
+            self._health("cot", False, f"COT: {e}"[:300])
+
     # ---------- views ----------
+    def cot_view(self) -> list[dict]:
+        """Per metal: big funds' (managed money) net position, its share of open interest, the weekly change and
+        where it stands in its 3-year range (0 % = most bearish in 3 years, 100 % = most bullish: crowded)."""
+        out = []
+        for sym in COT_CODES.values():
+            rows = self.db.execute("SELECT d, oi, mm_long, mm_short FROM cot WHERE symbol=? ORDER BY d DESC LIMIT 156",
+                                   (sym,)).fetchall()
+            if not rows:
+                out.append({"symbol": sym, "date": None})
+                continue
+            nets = [r["mm_long"] - r["mm_short"] for r in rows]
+            lo, hi = min(nets), max(nets)
+            out.append({"symbol": sym, "date": rows[0]["d"], "net": nets[0],
+                        "net_pct_oi": nets[0] / rows[0]["oi"] * 100 if rows[0]["oi"] else None,
+                        "change": nets[0] - nets[1] if len(nets) > 1 else None,
+                        "rank": (nets[0] - lo) / (hi - lo) * 100 if hi > lo else None, "weeks": len(nets)})
+        return out
+
     def latest_news(self, limit: int = 30, metal: str | None = None) -> list[dict]:
         sql, args = "SELECT uid, source, url, title, ts, metals FROM news", []
         if metal:
