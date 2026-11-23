@@ -87,6 +87,7 @@ function brainSlot(b) {
 
 function render() {
   $("secretwarn").hidden = data.secret_fixed;
+  $("d-state").textContent = data.diag ? "Diaqnostika açarı var (yenisini yaratsanız köhnəsi işləməz)." : "Diaqnostika açarı yoxdur.";
   $("g-state").textContent = data.guest ? "Qonaq girişi açıqdır." : "Qonaq girişi bağlıdır.";
   $("provider").innerHTML = data.providers.map((p) =>
     `<button class="btn ${p === data.price_provider ? "pri" : ""}" data-prov="${p}">${PROV[p]}</button>`).join("");
@@ -158,6 +159,19 @@ $("hist").onclick = async () => {
   load();
 };
 
+$("d-new").onclick = async () => {
+  try {
+    const r = await call("POST", "/api/admin/diag-token");
+    $("d-tok").hidden = false; $("d-tok").value = r.token; $("d-tok").select();
+    try { await navigator.clipboard.writeText(r.token); $("d-msg").textContent = "Açar yaradıldı və kopyalandı. Claude-un formasına yapışdırın."; }
+    catch (e) { $("d-msg").textContent = "Açar yaradıldı: xanadan kopyalayın (Ctrl+C)."; }
+    load();
+  } catch (e) { $("d-msg").textContent = "Xəta: " + e.message; }
+};
+$("d-off").onclick = async () => {
+  try { await call("DELETE", "/api/admin/diag-token"); $("d-tok").hidden = true; $("d-msg").textContent = "Diaqnostika açarı ləğv edildi."; load(); }
+  catch (e) { $("d-msg").textContent = "Xəta: " + e.message; }
+};
 $("g-save").onclick = async () => {
   try { await call("POST", "/api/admin/guest", { password: $("g-pw").value }); $("g-msg").textContent = "Qonaq parolu saxlanıldı."; $("g-pw").value = ""; load(); }
   catch (e) { $("g-msg").textContent = "Xəta: " + e.message; }

@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import auth, brains, candles, forecast, judge, keys, registry
+from . import diag
 from .brainjobs import BrainJobs
 from .feeds import Feeds
 from .config import BASE_DIR, PROVIDERS, Settings, load_settings
@@ -20,7 +21,7 @@ from .engine import Engine, market_open
 from .keys import KeyStore
 
 STATIC = BASE_DIR / "static"
-PUBLIC = ("/login", "/healthz", "/version", "/static/")
+PUBLIC = ("/login", "/healthz", "/version", "/api/diag", "/static/")
 
 
 def create_app(settings: Settings | None = None, start_engine: bool = True) -> FastAPI:
@@ -39,6 +40,17 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         yield
         if start_engine:
             await engine.stop()
+
+    def _secrets() -> list[str]:
+        out = [s.app_password, s.session_secret]
+        for slot in registry.KEY_SLOTS:
+            v = store.get(slot["id"])
+            if v:
+                out += [x for x in v.values() if x]
+        return out
+
+    journal = diag.ErrorJournal(db, _secrets)
+    logging.getLogger().addHandler(journal)
 
     app = FastAPI(title="TST Trade", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.db, app.state.keys, app.state.engine, app.state.settings = db, store, engine, s
@@ -108,16 +120,40 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     async def admin():
         return FileResponse(STATIC / "admin.html")
 
+    def _commit() -> str | None:
+        import subprocess
+        try:
+            return subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "--short", "HEAD"], capture_output=True,
+                                  text=True, timeout=5).stdout.strip() or None
+        except Exception:
+            return None
+
     @app.get("/version")
     async def version():
         """The commit the server runs (public: shows that the auto-update reached the server)."""
-        import subprocess
-        try:
-            sha = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "--short", "HEAD"], capture_output=True,
-                                 text=True, timeout=5).stdout.strip()
-        except Exception:
-            sha = ""
-        return {"commit": sha or None}
+        return {"commit": _commit()}
+
+    @app.get("/api/diag")
+    async def diagnostics(request: Request):
+        """Read-only report for the outside reviewer. Needs the diagnostics token (Authorization: Bearer ...)."""
+        stored = db.get("auth:diag_hash")
+        given = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
+        if not stored or not given or not auth.verify_hash(given, stored):
+            return JSONResponse({"error": "diaqnostika açarı lazımdır"}, status_code=401)
+        return diag.report(db, store, engine, feeds, jobs, _commit())
+
+    @app.post("/api/admin/diag-token")
+    async def new_diag_token():
+        """A new diagnostics token, shown once. Only its hash is stored; it can read /api/diag and nothing else."""
+        import secrets as _secrets_mod
+        tok = "tstdiag_" + _secrets_mod.token_urlsafe(32)
+        db.put("auth:diag_hash", auth.hash_password(tok))
+        return {"token": tok}
+
+    @app.delete("/api/admin/diag-token")
+    async def drop_diag_token():
+        db.delete("auth:diag_hash")
+        return {"ok": True}
 
     @app.get("/healthz")
     async def healthz():
@@ -211,7 +247,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 "brain_providers": list(registry.BRAIN_PROVIDERS),
                 "price_provider": engine.chosen_provider(), "active_provider": engine.provider_name,
                 "history": engine.history_state, "secret_fixed": s.secret_is_fixed,
-                "guest": db.get("auth:guest_hash") is not None}
+                "guest": db.get("auth:guest_hash") is not None, "diag": db.get("auth:diag_hash") is not None}
 
     @app.post("/api/admin/keys/{slot}")
     async def save_key(slot: str, request: Request):
