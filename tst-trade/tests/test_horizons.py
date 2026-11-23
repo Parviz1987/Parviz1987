@@ -98,3 +98,19 @@ def test_capital_history_parse_moves_sunday_session_to_monday():
     (t, o, h, l, c), = parse_prices(data, "1d")
     assert dt.datetime.fromtimestamp(t, dt.timezone.utc).date() == dt.date(2026, 11, 23)
     assert (o, h, l, c) == (2, 5, 1, 3)
+
+
+def test_session_method_uses_same_hour_only():
+    t0 = int(dt.datetime(2026, 1, 5, tzinfo=dt.timezone.utc).timestamp())
+    cands = []
+    for i in range(24 * 40):
+        t = t0 + i * 3600
+        up = (t // 3600) % 24 == 3               # 03:00 UTC candles always rise, the others fall
+        cands.append({"t": t, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.5 if up else 99.5})
+    # next candle 03:00 -> up view; next 04:00 -> down view
+    at3 = [c for c in cands if c["t"] < t0 + 30 * 86400 + 3 * 3600]
+    p3 = forecast.build(at3, "1h")["methods"]["session"]["p_up"]
+    at4 = [c for c in cands if c["t"] < t0 + 30 * 86400 + 4 * 3600]
+    p4 = forecast.build(at4, "1h")["methods"]["session"]["p_up"]
+    assert p3 > 0.6 and p4 < 0.4
+    assert "session" not in forecast.build(at3, "1d")["methods"]

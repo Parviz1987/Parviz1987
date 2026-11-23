@@ -183,7 +183,7 @@ class Engine:
             issued_t = candles.bucket(now, tf)
             step = candles.TF[tf]
             for sym in candles.METALS:
-                past = candles.closed(self.db, sym, tf, now, limit=forecast.HISTORY_NEED)
+                past = candles.closed(self.db, sym, tf, now, limit=forecast.history_need(h))
                 if not past:
                     continue
                 # Only right after a real candle: a closed market or a feed gap issues nothing. A daily or weekly
@@ -288,7 +288,7 @@ class Engine:
                         continue   # replayed before: forecasts never change once issued
                     if rows[i]["t"] - rows[i - 1]["t"] > 3 * step and tf not in ("1d", "1w"):
                         continue   # a gap (weekend): the candle after it is not "the next one"
-                    fc = forecast.build(rows[max(0, i - forecast.HISTORY_NEED):i], h,
+                    fc = forecast.build(rows[max(0, i - forecast.history_need(h)):i], h,
                                         macro.at(t) if tf == "1d" else None)
                     if fc is None:
                         continue

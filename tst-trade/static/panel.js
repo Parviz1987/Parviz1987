@@ -155,7 +155,7 @@ function renderCards(fc) {
 let jh = "1m";
 try { jh = localStorage.getItem("tst_jh") || jh; } catch (e) {}
 const MCOL = { momentum: "#4ea1ff", reversal: "#c77dff", trend: "#3fb27f", breakout: "#ff9f43", rsi: "#e0605a",
-  fib: "#d4a73c", macro: "#2ec4b6" };
+  fib: "#d4a73c", macro: "#2ec4b6", session: "#f78fb3" };
 function renderJudge(fc) {
   const key = mode === "live" ? "stats_live" : "stats_history";
   const methods = Object.keys(fc.method_names).filter((m) => m !== "rw");

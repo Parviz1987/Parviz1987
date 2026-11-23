@@ -12,6 +12,8 @@ this moment says P = 0.5: the Judge then counts no hit or miss for it (only fore
 - rsi       RSI(14) below 30 = oversold, expect up; above 70 = overbought, expect down; else no view.
 - fib       the price came back to a Fibonacci level (38.2 / 50 / 61.8 %) of the last swing: expect a bounce in the
             swing's direction; elsewhere no view.
+- session   (one hour) the same UTC hour's past up-share: metals are known to drift differently in Asian, London
+            and New York hours. Shrunk toward 0.5 by its sample size.
 - macro     (daily and longer) the last week's change of the real interest rate and the dollar: both falling is good
             for gold. Needs FRED data; without it no view.
 Every method gets the same range: an EWMA volatility (lambda 0.94) scaled to the horizon, normal quantiles."""
@@ -25,15 +27,17 @@ HORIZON_SPEC = {"1m": ("1m", 1), "1h": ("1h", 1), "1d": ("1d", 1), "3d": ("1d", 
 HORIZONS = {h: tf for h, (tf, _) in HORIZON_SPEC.items()}      # horizon -> candle size it is built from
 HORIZON_NAMES = {"1m": "1 dəqiqə", "1h": "1 saat", "1d": "1 gün", "3d": "3 gün", "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
-METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro")
+METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro", "session")
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
                 "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)",
-                "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "macro": "Makro (real faiz + dollar)"}
+                "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "macro": "Makro (real faiz + dollar)",
+                "session": "Saat effekti"}
 BASELINES = ("rw", "up")
 LOOKBACK = {"1m": 15, "1h": 24, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
 TREND_WINDOWS = {"1m": (5, 15, 60), "1h": (6, 24, 120), "1d": (10, 50, 150), "1w": (4, 13, 26)}
 MIN_CANDLES = 30                                       # fewer finished candles: no forecast
 HISTORY_NEED = 200                                     # candles a desk is given (oldest first)
+SESSION_NEED = 1200                                    # the hour-of-day method looks back ~7 weeks of hourly candles
 Z50, Z80 = 0.6745, 1.2816
 SHRINK = 0.25                                          # momentum and reversal move P(up) gently: P = Phi(SHRINK * z)
 P_CAP = (0.35, 0.65)
@@ -54,7 +58,29 @@ def methods_for(h: str) -> tuple[str, ...]:
     out = [m for m in METHODS if not (m == "reversal" and steps_of(h) > 1)]
     if tf_of(h) != "1d":
         out.remove("macro")      # FRED is daily: the macro view only for daily candles
+    if h != "1h":
+        out.remove("session")    # hour-of-day only for the one-hour desk
     return tuple(out)
+
+
+def history_need(h: str) -> int:
+    return SESSION_NEED if h == "1h" else HISTORY_NEED
+
+
+def session_view(cands: list[dict], next_t: int | None) -> tuple[float, str]:
+    """Up-share of past hourly candles that started at the same UTC hour as the next one."""
+    if next_t is None or not cands or "t" not in cands[0]:
+        return 0.5, "vaxt məlumatı yoxdur"
+    hour = (next_t // 3600) % 24
+    same = [c for c in cands if (c["t"] // 3600) % 24 == hour and c["c"] != c["o"]]
+    n = len(same)
+    if n < 15:
+        return 0.5, f"{hour:02d}:00 UTC üçün keçmiş şam azdır ({n})"
+    share = sum(1 for c in same if c["c"] > c["o"]) / n
+    p = 0.5 + (share - 0.5) * n / (n + 40)
+    if abs(p - 0.5) < 0.02:
+        return 0.5, f"{hour:02d}:00 UTC: keçmişdə {share * 100:.0f} % yuxarı ({n} şam) — meyl yoxdur"
+    return round(_clip(p), 4), f"{hour:02d}:00 UTC saatında keçmiş {n} şamın {share * 100:.0f} %-i yuxarı bağlanıb"
 
 
 def phi(x: float) -> float:
@@ -125,7 +151,8 @@ def _clip(p: float) -> float:
 def build(seq, horizon: str, macro: dict | None = None) -> dict | None:
     """All methods' forecasts for the close `steps_of(horizon)` candles ahead, from past candles (oldest first;
     plain closes are accepted too). macro: {"dfii10": weekly change, "dollar": weekly change in %} or None."""
-    cands = _as_candles(seq)
+    longer = _as_candles(seq)
+    cands = longer[-HISTORY_NEED:]                     # every method but the hour-of-day one sees 200 candles
     if len(cands) < MIN_CANDLES:
         return None
     closes = [c["c"] for c in cands]
@@ -187,6 +214,11 @@ def build(seq, horizon: str, macro: dict | None = None) -> dict | None:
 
     p, basis = fib_view(cands, sigma)
     out["fib"] = {"p_up": p, "basis": basis}
+
+    if "session" in methods_for(horizon):
+        last_t = cands[-1].get("t")
+        p, basis = session_view(longer, last_t + 3600 if last_t is not None else None)
+        out["session"] = {"p_up": p, "basis": basis}
 
     if "macro" in methods_for(horizon):
         if macro and macro.get("dfii10") is not None and macro.get("dollar") is not None:
