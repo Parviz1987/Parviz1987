@@ -267,6 +267,63 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return {"symbol": symbol, "method_names": forecast.METHOD_NAMES,
                 "cards": [_card(symbol, h) for h in forecast.HORIZONS]}
 
+    @app.get("/results")
+    async def results_page():
+        return FileResponse(STATIC / "results.html")
+
+    @app.get("/api/results")
+    async def results(symbol: str = "XAU", horizon: str = "1h"):
+        """The results board: what the system expects now (every horizon, in plain terms), what it said before and
+        what happened, the score, and the corridor-versus-price chart. Range = the «Dəyişməz» forecast's 50 % / 80 %
+        ranges (the same for every method); direction = the selective consensus (the system's one combined view)."""
+        if symbol not in candles.METALS or horizon not in forecast.HORIZONS:
+            raise HTTPException(400, "naməlum metal və ya üfüq")
+        now = time.time()
+        expect = []
+        for h in forecast.HORIZONS:
+            c = _card(symbol, h)
+            rw = next((m for m in c["methods"] if m["method"] == "rw"), None)
+            v = c["verdict"]
+            off = next((m for m in c["methods"] if m["method"] == v.get("method")), None)
+            direction = None
+            if v["status"] == "sübut" and off and off["p_up"] != 0.5:
+                direction = {"up": off["p_up"] > 0.5, "p": max(off["p_up"], 1 - off["p_up"]),
+                             "method": forecast.METHOD_NAMES.get(v["method"]), "condition": v.get("condition")}
+            cons = next((m for m in c["methods"] if m["method"] == "consensus"), None)
+            expect.append({"horizon": h, "name": forecast.HORIZON_NAMES[h], "issued_t": c["issued_t"],
+                           "target_t": rw["target_t"] if rw else None, "price0": rw["price0"] if rw else None,
+                           "lo50": rw["lo50"] if rw else None, "hi50": rw["hi50"] if rw else None,
+                           "lo80": rw["lo80"] if rw else None, "hi80": rw["hi80"] if rw else None,
+                           "direction": direction,
+                           "consensus": ({"p": cons["p_up"], "basis": cons["basis"]} if cons else None),
+                           "need": c["candles_need"] if not c["methods"] else None})
+        # score: the last 7 days of live forecasts per horizon
+        score = []
+        for h in forecast.HORIZONS:
+            r = db.execute("SELECT COUNT(*) n, AVG(in80) c80, AVG(in50) c50 FROM forecasts WHERE symbol=? AND horizon=? "
+                           "AND mode='live' AND method='rw' AND price1 IS NOT NULL AND target_t > ?",
+                           (symbol, h, now - 7 * 86400)).fetchone()
+            d = db.execute("SELECT COUNT(hit) n, AVG(hit) hr FROM forecasts WHERE symbol=? AND horizon=? AND mode='live' "
+                           "AND method='consensus' AND hit IS NOT NULL AND target_t > ?",
+                           (symbol, h, now - 7 * 86400)).fetchone()
+            bar = next((x["bar"] for x in judge.stats(db, symbol, h, "live", ttl=60) if x["method"] == "up"), 0.5)
+            score.append({"horizon": h, "name": forecast.HORIZON_NAMES[h], "n": r["n"], "cover80": r["c80"],
+                          "cover50": r["c50"], "dir_n": d["n"], "dir_hit": d["hr"], "bar": bar})
+        # what it said and what happened (the chosen horizon)
+        rows = db.execute(
+            "SELECT r.issued_t, r.target_t, r.price0, r.price1, r.lo80, r.hi80, r.lo50, r.hi50, r.in80, r.in50, "
+            "c.p_up AS cp, c.hit AS chit, c.basis AS cbasis FROM forecasts r LEFT JOIN forecasts c ON c.symbol=r.symbol "
+            "AND c.horizon=r.horizon AND c.mode=r.mode AND c.issued_t=r.issued_t AND c.method='consensus' "
+            "WHERE r.symbol=? AND r.horizon=? AND r.mode='live' AND r.method='rw' ORDER BY r.issued_t DESC LIMIT 60",
+            (symbol, horizon)).fetchall()
+        past = [dict(x) for x in rows]
+        tf = forecast.HORIZONS[horizon]
+        t0 = min((x["issued_t"] for x in past), default=now - 86400)
+        price = [[c["t"], c["c"]] for c in candles.get(db, symbol, tf, limit=200) if c["t"] >= t0 - candles.TF[tf]]
+        return {"symbol": symbol, "name": candles.NAMES[symbol], "horizon": horizon, "now": now,
+                "price_now": (engine.quotes.get(symbol) or {}).get("price"), "expect": expect, "score": score,
+                "past": past, "price": price, "tf_seconds": candles.TF[tf]}
+
     _series_cache: dict = {}
 
     # FRED's daily value stands in for a related market the broker does not have (shown as daily, never as live)

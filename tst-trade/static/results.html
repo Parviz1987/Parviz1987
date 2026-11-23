@@ -1,0 +1,45 @@
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TST Trade · Nəticələr</title><link rel="stylesheet" href="/static/app.css">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0f1317">
+<link rel="icon" href="/static/icons/fav-64.png"><link rel="apple-touch-icon" href="/static/icons/apple-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="TST Trade">
+</head><body>
+<header class="top">
+  <div class="brand">TST <b>Trade</b> · Nəticələr</div><span class="sp"></span>
+  <span class="clock" id="clock"></span>
+  <a href="/">Panel</a>
+</header>
+<main class="wrap res">
+  <div class="seg big" id="metals"></div>
+
+  <section class="box">
+    <h2>1. İndi nə gözləyirik <span class="sp"></span><span class="note" id="pnow"></span></h2>
+    <p class="note">«Koridor»: qiymətin bu müddətin sonunda olacağı aralıq. Geniş koridor 80 % ehtimalla, dar koridor 50 % ehtimalla.
+      İstiqamət yalnız Hakim sübut verəndə göstərilir.</p>
+    <div id="expect"></div>
+  </section>
+
+  <section class="box">
+    <h2>2. Hesab: son 7 gün <span class="sp"></span><span class="note">canlı proqnozlar</span></h2>
+    <p class="note">Koridor 80 % hallarda tutmalıdır (az tutursa, sistem riski kiçik göstərir; çox tutursa, koridor lazımsız genişdir).
+      İstiqamət «keçməli hədd»dən yuxarı olmalıdır — yoxsa sadə «həmişə yuxarı» qaydasından yaxşı deyil.</p>
+    <div class="tbl" id="score"></div>
+  </section>
+
+  <section class="box">
+    <h2>3. Nə dedik və nə oldu <span class="sp"></span><span class="seg" id="hz"></span></h2>
+    <div class="lc big"><canvas id="cv"></canvas></div>
+    <div class="legend">
+      <span><i style="background:var(--gold);opacity:.25"></i>80 % koridor</span>
+      <span><i style="background:var(--gold);opacity:.55"></i>50 % koridor</span>
+      <span><i style="background:var(--fg)"></i>real qiymət</span>
+      <span><i style="background:var(--up)"></i>koridora düşdü</span>
+      <span><i style="background:var(--down)"></i>koridordan çıxdı</span>
+    </div>
+    <div id="past"></div>
+  </section>
+</main>
+<script src="/static/results.js"></script>
+<script src="/static/pwa.js"></script>
+</body></html>

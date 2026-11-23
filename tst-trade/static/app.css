@@ -164,3 +164,14 @@ details.pass{margin:12px 0}details.pass summary{cursor:pointer}
 .mkt svg{width:100%;height:34px;display:block}
 .mkt .why{font-size:.72rem;color:var(--muted)}
 .mkt .lk{display:flex;gap:10px;font-size:.74rem;font-family:var(--mono)}
+.res .seg.big button{font-size:.9rem;padding:6px 14px}
+.exp{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.exp:last-child{border-bottom:0}
+.exp .h{font-weight:700}
+.exp .big{font-family:var(--mono);font-size:1.05rem}
+.exp .dir{font-weight:700}
+.lc.big{height:300px}
+.prow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:.88rem}
+.prow .ic{font-size:1.1rem}
+.sc td.c{text-align:center;font-family:var(--mono)}
+@media (max-width:640px){.exp{grid-template-columns:minmax(0,1fr)}.lc.big{height:240px}}

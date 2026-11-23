@@ -325,3 +325,14 @@ def test_conditional_proof_only_in_its_session():
     assert w["methods"]["trend"]["asia"]["status"] != "sübut"
     assert judge.conditional(w, "ny", None)["method"] == "trend"
     assert judge.conditional(w, "asia", None) is None
+
+
+def test_results_board_api(tmp_path):
+    c = TestClient(_app(tmp_path))
+    r = c.post("/login", data={"password": "pw"}, follow_redirects=False)
+    c.cookies.set(auth.COOKIE, r.cookies[auth.COOKIE])
+    d = c.get("/api/results?symbol=XAU&horizon=1h").json()
+    assert [e["horizon"] for e in d["expect"]] == list(forecast.HORIZONS)
+    assert {"cover80", "dir_hit", "bar"} <= set(d["score"][0])
+    assert c.get("/results").status_code == 200
+    assert c.get("/api/results?symbol=XXX").status_code == 400

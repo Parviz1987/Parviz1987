@@ -1,0 +1,124 @@
+/* Results board: what we expect now, the score, and what we said versus what happened. Plain words, New York time. */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const NAMES = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
+let sym = "XAU", hz = "1h";
+try { sym = localStorage.getItem("tst_sym") || sym; hz = localStorage.getItem("tst_res_h") || hz; } catch (e) {}
+
+const f = (x) => x == null ? "—" : (x >= 100 ? x.toFixed(2) : x.toFixed(3));
+const pc = (x) => x == null ? "—" : Math.round(x * 100) + " %";
+const NY = { timeZone: "America/New_York" };
+const tm = (ts) => new Date(ts * 1000).toLocaleTimeString("az", { ...NY, hour: "2-digit", minute: "2-digit" });
+const dt = (ts) => new Date(ts * 1000).toLocaleString("az", { ...NY, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const day = (h) => ["1d", "3d", "1w", "10d", "1mo"].includes(h);
+const when = (ts, h) => day(h) ? dt(ts) : tm(ts);
+const left = (ts) => { const m = Math.round((ts - Date.now() / 1000) / 60);
+  return m <= 0 ? "yoxlanır" : m < 60 ? m + " dəq sonra" : m < 1440 ? Math.floor(m / 60) + " saat " + (m % 60) + " dəq sonra" : Math.round(m / 1440) + " gün sonra"; };
+
+async function api(path) {
+  const r = await fetch(path, { credentials: "same-origin" });
+  if (r.status === 401) { location.href = "/login"; throw new Error("login"); }
+  return r.json();
+}
+
+function metals() {
+  $("metals").innerHTML = Object.entries(NAMES).map(([k, n]) => `<button data-s="${k}" class="${k === sym ? "on" : ""}">${n}</button>`).join("");
+  document.querySelectorAll("#metals button").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); metals(); load(); });
+}
+function save() { try { localStorage.setItem("tst_sym", sym); localStorage.setItem("tst_res_h", hz); } catch (e) {} }
+
+function renderExpect(d) {
+  $("pnow").textContent = d.price_now ? `${d.name} indi ${f(d.price_now)} $` : "";
+  $("expect").innerHTML = d.expect.map((e) => {
+    if (e.lo80 == null) return `<div class="exp"><span class="h">${esc(e.name)}</span><span class="note">Hələ proqnoz yoxdur: tarixçə yığılır.</span></div>`;
+    const dir = e.direction
+      ? `<span class="dir ${e.direction.up ? "up" : "down"}">${e.direction.up ? "↑ yuxarı" : "↓ aşağı"} · ${pc(e.direction.p)}</span>
+         <span class="note">${esc(e.direction.method)}${e.direction.condition ? " (yalnız bu şəraitdə sübut olunub)" : ""}</span>`
+      : `<span class="note">İstiqamət: göstərilmir — Hakimin sübutu yoxdur.</span>`;
+    return `<div class="exp"><span class="h">${esc(e.name)}</span>
+      <span>${esc(d.name)} <b>${when(e.target_t, e.horizon)}</b>-də (NY) 80 % ehtimalla
+        <span class="big">${f(e.lo80)} – ${f(e.hi80)}</span> arasında olacaq
+        <span class="note">· 50 % ehtimalla ${f(e.lo50)} – ${f(e.hi50)} · yoxlanma ${left(e.target_t)}</span><br>${dir}</span></div>`;
+  }).join("");
+}
+
+function light(v, good, ok) { return v == null ? "⚪" : v >= good ? "🟢" : v >= ok ? "🟡" : "🔴"; }
+function renderScore(d) {
+  $("score").innerHTML = `<table class="sc"><tr><th>Üfüq</th><th>Koridor tutdu<br><span class="note">hədəf 80 %</span></th>
+    <th>İstiqamət düz çıxdı<br><span class="note">seçici konsensus</span></th><th>Keçməli hədd</th><th>Yoxlama</th></tr>` +
+    d.score.map((s) => {
+      const c = s.cover80 == null ? "—" : `${s.cover80 >= 0.74 && s.cover80 <= 0.88 ? "🟢" : s.cover80 >= 0.65 ? "🟡" : "🔴"} ${pc(s.cover80)}`;
+      const dir = !s.dir_n ? "⚪ fikir bildirməyib" : `${light(s.dir_hit, s.bar + 0.02, s.bar - 0.02)} ${pc(s.dir_hit)}`;
+      return `<tr><td>${esc(s.name)}</td><td class="c">${c}</td><td class="c">${dir}</td><td class="c">${pc(s.bar)}</td>
+        <td class="c">${s.n || 0}${s.dir_n ? " / " + s.dir_n : ""}</td></tr>`;
+    }).join("") + `</table><p class="note">«Yoxlama»: koridor üçün yoxlanan proqnoz sayı / istiqamət göstərilən proqnoz sayı.
+      Az yoxlamada faiz təsadüfi ola bilər: 100-dən az olanda hələ nəticə çıxarmayın.</p>`;
+}
+
+function renderHz(d) {
+  $("hz").innerHTML = d.expect.map((e) => `<button data-h="${e.horizon}" class="${e.horizon === hz ? "on" : ""}">${esc(e.name)}</button>`).join("");
+  document.querySelectorAll("#hz button").forEach((b) => b.onclick = () => { hz = b.dataset.h; save(); load(); });
+}
+
+function renderPast(d) {
+  const done = d.past.filter((p) => p.price1 != null);
+  $("past").innerHTML = (done.length ? done.slice(0, 15).map((p) => {
+    const inR = p.in80 === 1;
+    const dirTxt = p.cp == null || p.cp === 0.5 ? "<span class='note'>istiqamət: fikir yox</span>"
+      : `istiqamət: dedik <b>${p.cp > 0.5 ? "yuxarı" : "aşağı"}</b> → ${p.price1 > p.price0 ? "qalxdı" : p.price1 < p.price0 ? "endi" : "dəyişmədi"} ${p.chit === 1 ? "✅" : p.chit === 0 ? "❌" : ""}`;
+    return `<div class="prow"><span class="ic">${inR ? "✅" : "❌"}</span>
+      <span><b>${when(p.issued_t, d.horizon)} → ${when(p.target_t, d.horizon)}</b> NY · başlanğıc ${f(p.price0)}<br>
+      dedik <b>${f(p.lo80)} – ${f(p.hi80)}</b> → oldu <b>${f(p.price1)}</b> ${inR ? "<span class='up'>koridora düşdü</span>" : "<span class='down'>koridordan çıxdı</span>"}<br>${dirTxt}</span></div>`;
+  }).join("") : "<p class='note'>Bu üfüqdə hələ yoxlanmış canlı proqnoz yoxdur. Yoxlanma vaxtı çatanda burada görünəcək.</p>");
+  drawCorridor($("cv"), d);
+}
+
+function drawCorridor(cv, d) {
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  g.font = "11px " + css("--mono");
+  const past = d.past.slice().reverse(), price = d.price;
+  if (!past.length && !price.length) { g.fillStyle = css("--muted"); g.fillText("Hələ məlumat yoxdur.", 12, 24); return; }
+  const ts = [...past.map((p) => p.issued_t), ...past.map((p) => p.target_t), ...price.map((p) => p[0])];
+  const vs = [...past.flatMap((p) => [p.lo80, p.hi80]), ...price.map((p) => p[1])].filter((v) => v != null);
+  const t0 = Math.min(...ts), t1 = Math.max(...ts);
+  let lo = Math.min(...vs), hi = Math.max(...vs); const pad = (hi - lo) * 0.06 || 1; lo -= pad; hi += pad;
+  const padL = 8, padR = 62, padT = 8, padB = 22;
+  const x = (t) => padL + (t - t0) / Math.max(1, t1 - t0) * (W - padL - padR);
+  const y = (v) => padT + (hi - v) / (hi - lo) * (H - padT - padB);
+  g.strokeStyle = css("--line"); g.fillStyle = css("--muted");
+  for (let i = 0; i <= 4; i++) { const v = lo + (hi - lo) * i / 4, yy = Math.round(y(v)) + .5;
+    g.beginPath(); g.moveTo(padL, yy); g.lineTo(W - padR, yy); g.stroke(); g.fillText(f(v), W - padR + 4, yy + 4); }
+  g.fillText(when(t0, d.horizon), padL, H - 6);
+  const l1 = when(t1, d.horizon); g.fillText(l1, W - padR - g.measureText(l1).width, H - 6);
+  const gold = css("--gold");
+  // each forecast's corridor: drawn over the time it covered (the target candle), 80 % light and 50 % darker
+  const step = d.tf_seconds;
+  past.forEach((p) => {
+    const a = x(p.target_t - step), b = Math.max(a + 2, x(p.target_t));
+    g.fillStyle = gold; g.globalAlpha = .18; g.fillRect(a, y(p.hi80), b - a, y(p.lo80) - y(p.hi80));
+    g.globalAlpha = .38; g.fillRect(a, y(p.hi50), b - a, y(p.lo50) - y(p.hi50)); g.globalAlpha = 1;
+  });
+  // the real price
+  g.strokeStyle = css("--fg"); g.lineWidth = 1.6; g.beginPath();
+  price.forEach((p, i) => { const X = x(p[0] + step), Y = y(p[1]); i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); g.stroke(); g.lineWidth = 1;
+  // result of each checked forecast: green inside the 80 % corridor, red outside
+  past.filter((p) => p.price1 != null).forEach((p) => {
+    g.fillStyle = p.in80 === 1 ? css("--up") : css("--down");
+    g.beginPath(); g.arc(x(p.target_t), y(p.price1), 3.5, 0, 7); g.fill();
+  });
+  // "now" line
+  const nx = x(Date.now() / 1000);
+  if (nx > padL && nx < W - padR) { g.strokeStyle = css("--muted"); g.setLineDash([4, 4]); g.beginPath(); g.moveTo(nx, padT); g.lineTo(nx, H - padB); g.stroke();
+    g.setLineDash([]); g.fillStyle = css("--muted"); g.fillText("indi", nx + 3, padT + 10); }
+}
+
+async function load() {
+  const d = await api(`/api/results?symbol=${sym}&horizon=${hz}`);
+  renderExpect(d); renderScore(d); renderHz(d); renderPast(d);
+}
+setInterval(() => { $("clock").textContent = "Nyu-York " + new Date().toLocaleTimeString("az", { ...NY, hour: "2-digit", minute: "2-digit" }); }, 1000);
+metals(); load(); setInterval(() => load().catch(() => {}), 30000);
+window.addEventListener("resize", () => load().catch(() => {}));
