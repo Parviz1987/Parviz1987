@@ -38,9 +38,10 @@ def market_open(ts: float) -> bool:
 
 
 class Engine:
-    def __init__(self, db: DB, keys: KeyStore, default_provider: str, poll_seconds: int, feeds=None):
+    def __init__(self, db: DB, keys: KeyStore, default_provider: str, poll_seconds: int, feeds=None, jobs=None):
         self.db = db
         self.feeds = feeds
+        self.jobs = jobs
         self.keys = keys
         self.default_provider = default_provider
         self.poll = poll_seconds
@@ -224,6 +225,8 @@ class Engine:
                 await self.backfill()
                 if self.feeds is not None:
                     await self.feeds.tick()
+                if self.jobs is not None:
+                    await self.jobs.tick()
             except Exception:   # the loop must survive one bad poll
                 log.exception("engine step failed")
             try:

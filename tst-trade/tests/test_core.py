@@ -240,3 +240,10 @@ def test_key_without_a_check_is_saved_not_an_error():
     # A slot with no check left: none now (every key has one); a missing key reports it instead of an error.
     res = asyncio.run(keysmod.check(ks, "fmp"))
     assert res["ok"] is False and "saxlanmayıb" in res["message"]
+
+
+def test_session_renewal():
+    tok = auth.make_token(SECRET, now=0)
+    assert not auth.needs_renewal(tok, SECRET, now=3600)
+    assert auth.needs_renewal(tok, SECRET, now=2 * 86400)
+    assert not auth.needs_renewal("bad", SECRET, now=10)

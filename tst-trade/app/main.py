@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import auth, brains, candles, forecast, judge, keys, registry
+from .brainjobs import BrainJobs
 from .feeds import Feeds
 from .config import BASE_DIR, PROVIDERS, Settings, load_settings
 from .db import DB
@@ -28,7 +29,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     db = DB(s.db_path)
     store = KeyStore(db, s.session_secret)
     feeds = Feeds(db, store)
-    engine = Engine(db, store, s.price_provider, s.poll_seconds, feeds)
+    jobs = BrainJobs(db, store, feeds)
+    engine = Engine(db, store, s.price_provider, s.poll_seconds, feeds, jobs)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -55,6 +57,11 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             if origin and origin.split("://", 1)[-1] != request.headers.get("host"):
                 return JSONResponse({"error": "başqa saytdan sorğu"}, status_code=403)
         response = await call_next(request)
+        tok = request.cookies.get(auth.COOKIE)
+        if auth.needs_renewal(tok, s.session_secret):
+            # Every visit pushes the 30 days forward: the owner logs in once and stays in.
+            response.set_cookie(auth.COOKIE, auth.make_token(s.session_secret), max_age=auth.DAYS * 86400,
+                                httponly=True, secure=s.cookie_secure, samesite="lax")
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"
@@ -159,9 +166,20 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.get("/api/feeds")
     async def feeds_view(metal: str | None = None):
         now = time.time()
-        return {"news": feeds.latest_news(30, metal if metal in candles.METALS else None),
+        news = feeds.latest_news(30, metal if metal in candles.METALS else None)
+        labels = {r["uid"]: dict(r) for r in db.execute(
+            "SELECT n.uid, a.direction, a.strength, a.metals AS ai_metals, a.event FROM news n JOIN news_ai a "
+            "ON a.uid=n.uid WHERE n.ts > ?", (now - 7 * 86400,)).fetchall()} if news else {}
+        for n in news:
+            n["ai"] = labels.get(n.get("uid"))
+        return {"news": news,
                 "events": feeds.upcoming(now), "macro": feeds.macro_view(), "event_mode": feeds.event_mode(now),
                 "health": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred")}}
+
+    @app.get("/api/brains")
+    async def brains_view():
+        return {"strategist": jobs.last_explanation(), "reader": jobs.state("reader"),
+                "strategist_state": jobs.state("strategist")}
 
     @app.get("/api/journal")
     async def journal(symbol: str, limit: int = 40):

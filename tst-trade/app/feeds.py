@@ -267,7 +267,7 @@ class Feeds:
 
     # ---------- views ----------
     def latest_news(self, limit: int = 30, metal: str | None = None) -> list[dict]:
-        sql, args = "SELECT source, url, title, ts, metals FROM news", []
+        sql, args = "SELECT uid, source, url, title, ts, metals FROM news", []
         if metal:
             sql += " WHERE metals LIKE ?"
             args.append(f"%{metal}%")

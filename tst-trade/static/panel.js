@@ -131,6 +131,35 @@ async function loadJournal() {
 }
 
 let nfilter = "metal";
+const STR_AZ = ["təsirsiz", "zəif", "orta", "güclü"];
+function aiTag(a) {
+  if (!a) return "";
+  const arrow = a.direction === "up" ? "<span class='up'>↑</span>" : a.direction === "down" ? "<span class='down'>↓</span>" : "→";
+  return ` · <b>Oxuyucu:</b> ${esc(a.ai_metals || "—")} ${arrow} ${STR_AZ[a.strength] || ""}${a.event ? " (" + esc(a.event) + ")" : ""}`;
+}
+async function loadBrains() {
+  const d = await api("/api/brains");
+  const x = d.strategist;
+  if (!x) {
+    $("strat").innerHTML = `<p class="note">${esc((d.strategist_state && d.strategist_state.message) || "Strateq hələ izah yazmayıb (saatda bir yazır).")}</p>`;
+    $("stmeta").textContent = "";
+    return;
+  }
+  $("stmeta").textContent = `${esc(x.brain)} · ${new Date(x.ts * 1000).toLocaleString("az")}`;
+  const m = x.metals.find((v) => v.symbol === sym);
+  $("strat").innerHTML = `<p>${esc(x.summary)}</p>${m && m.text ? `<p><b>${esc(sym)}:</b> ${esc(m.text)}</p>` : ""}` +
+    (x.watch.length ? `<p class="note">Diqqət: ${x.watch.map(esc).join(" · ")}</p>` : "") +
+    `<p class="note">Bu, süni intellektin izahıdır, alış-satış məsləhəti deyil. Faktlarda olmayan rəqəmli cümlələr avtomatik silinir.</p>`;
+}
+// The page reloads itself when the server runs a new version (no manual refresh after an update).
+let seenVersion = null;
+async function checkVersion() {
+  try {
+    const v = (await (await fetch("/version", { cache: "no-store" })).json()).commit;
+    if (seenVersion && v && v !== seenVersion) location.reload();
+    seenVersion = seenVersion || v;
+  } catch (e) {}
+}
 const ago = (ts) => { const m = Math.round((Date.now() / 1000 - ts) / 60);
   return m < 60 ? m + " dəq əvvəl" : m < 1440 ? Math.round(m / 60) + " saat əvvəl" : Math.round(m / 1440) + " gün əvvəl"; };
 const until = (ts) => { const m = Math.round((ts - Date.now() / 1000) / 60);
@@ -155,7 +184,7 @@ async function loadFeeds() {
     : `<p class="note">${h.forexfactory && h.forexfactory.ok === false ? "Təqvim: " + esc(h.forexfactory.message) : "Yaxın 7 gündə mühüm ABŞ hadisəsi yoxdur və ya təqvim hələ yüklənməyib."}</p>`;
   $("news").innerHTML = d.news.length ? d.news.slice(0, 20).map((n) => `<div class="nitem">
       ${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a>` : `<span>${esc(n.title)}</span>`}
-      <span class="m">${esc(n.source)} · ${ago(n.ts)}${n.metals ? " · " + esc(n.metals) : ""}</span></div>`).join("")
+      <span class="m">${esc(n.source)} · ${ago(n.ts)}${n.metals ? " · " + esc(n.metals) : ""}${aiTag(n.ai)}</span></div>`).join("")
     : `<p class="note">${h.rss && h.rss.ok === false ? "Xəbər: " + esc(h.rss.message) : "Hələ başlıq yoxdur."}</p>`;
 }
 document.querySelectorAll("#nfilter button").forEach((b) => b.onclick = () => {
@@ -177,7 +206,7 @@ async function refreshFc() {
   }
   renderCards(lastFc); renderJudge(lastFc);
 }
-async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadJournal(); await loadFeeds(); }
+async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadJournal(); await loadFeeds(); await loadBrains(); }
 
 document.querySelectorAll("#modes button").forEach((b) => b.onclick = () => {
   mode = b.dataset.m; modeTouched = true; document.querySelectorAll("#modes button").forEach((x) => x.classList.toggle("on", x === b));
@@ -193,4 +222,5 @@ refreshAll();
 setInterval(() => refreshState().catch(() => {}), 5000);
 setInterval(() => loadChart().catch(() => {}), 10000);
 setInterval(() => { refreshFc().catch(() => {}); loadJournal().catch(() => {}); }, 20000);
-setInterval(() => loadFeeds().catch(() => {}), 60000);
+setInterval(() => { loadFeeds().catch(() => {}); loadBrains().catch(() => {}); }, 60000);
+checkVersion(); setInterval(checkVersion, 60000);

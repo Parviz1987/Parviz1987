@@ -10,6 +10,7 @@ from .db import DB
 from .keys import KeyStore
 
 EDITABLE = ("provider", "model", "fallback", "fallback_model", "month_usd")
+IN_USE = ("reader", "strategist")   # slots that already do their job; the others are configured and checked only
 
 
 def config(db: DB, slot: str) -> dict:
@@ -64,6 +65,67 @@ def view(db: DB, keys: KeyStore) -> list[dict]:
             state = "yoxlanmayıb"
         out.append({**{k: b[k] for k in ("id", "name", "job", "may_not", "why")},
                     "requirements": [{"name": n, "weight": w} for n, w in b["requirements"]],
-                    "config": cfg, "state": state, "in_use": False,
+                    "config": cfg, "state": state, "in_use": b["id"] in IN_USE,
+                    "spent": round(spent(db, b["id"]), 4), "last_call": last_call(db, b["id"]),
                     "default": {k: b[k] for k in ("provider", "model", "fallback", "fallback_model")}})
     return out
+
+
+# ---------- running a slot ----------
+import time as _time  # noqa: E402
+
+from . import llm  # noqa: E402
+
+CALLS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS brain_calls (ts REAL NOT NULL, slot TEXT NOT NULL, provider TEXT, model TEXT, ok INTEGER,
+  tin INTEGER, tout INTEGER, usd REAL, error TEXT);
+CREATE INDEX IF NOT EXISTS brain_calls_ts ON brain_calls(slot, ts);
+"""
+
+
+def _month_start(now: float) -> float:
+    import calendar
+    t = _time.gmtime(now)
+    return float(calendar.timegm((t.tm_year, t.tm_mon, 1, 0, 0, 0)))
+
+
+def spent(db: DB, slot: str, now: float | None = None) -> float:
+    now = _time.time() if now is None else now
+    db.conn.executescript(CALLS_SCHEMA)
+    r = db.execute("SELECT COALESCE(SUM(usd), 0) s FROM brain_calls WHERE slot=? AND ts>=?",
+                   (slot, _month_start(now))).fetchone()
+    return float(r["s"])
+
+
+def last_call(db: DB, slot: str) -> dict | None:
+    db.conn.executescript(CALLS_SCHEMA)
+    r = db.execute("SELECT ts, provider, model, ok, error FROM brain_calls WHERE slot=? ORDER BY ts DESC LIMIT 1",
+                   (slot,)).fetchone()
+    return dict(r) if r else None
+
+
+async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema: dict,
+              max_tokens: int = 2000) -> tuple[dict | None, str]:
+    """Ask the slot's brain, then its fallback. Returns (answer or None, a line for the panel). Never raises."""
+    db.conn.executescript(CALLS_SCHEMA)
+    cfg = config(db, slot)
+    if spent(db, slot) >= float(cfg["month_usd"]):
+        return None, f"aylıq limit doldu ({cfg['month_usd']} $)"
+    errors = []
+    for provider, model in ((cfg["provider"], cfg["model"]), (cfg.get("fallback"), cfg.get("fallback_model"))):
+        if not provider or not model:
+            continue
+        key = keys.first(provider)
+        if not key:
+            errors.append(f"{provider}: açar yoxdur")
+            continue
+        try:
+            data, tin, tout = await llm.ask(provider, key, model, system, user, schema, max_tokens)
+            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,1,?,?,?,NULL)",
+                       (_time.time(), slot, provider, model, tin, tout, llm.cost(model, tin, tout)))
+            return data, f"{provider} · {model}"
+        except Exception as e:   # a broken brain must never stop the system
+            msg = str(e).replace(key, "***")[:200]
+            errors.append(f"{provider}: {msg}")
+            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)", (_time.time(), slot, provider, model, msg))
+    return None, "; ".join(errors) or "beyin seçilməyib"

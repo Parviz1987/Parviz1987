@@ -56,3 +56,12 @@ def password_ok(given: str, *, db_hash: str | None, env_hash: str, env_plain: st
 
 
 MIN_LEN = 8
+
+
+def needs_renewal(token: str | None, secret: str, now: float | None = None) -> bool:
+    """A valid session issued more than a day ago is renewed (sliding 30 days)."""
+    now = time.time() if now is None else now
+    if not valid(token, secret, now):
+        return False
+    exp = int(token.split(".", 1)[0])
+    return exp - now < (DAYS - 1) * 86400

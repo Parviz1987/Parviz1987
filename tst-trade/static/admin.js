@@ -71,7 +71,9 @@ function brainSlot(b) {
   return `<div class="slot"><div class="hd"><b>${esc(b.name)}</b><span class="pill ${stCls}">${esc(b.state)}</span></div>
     <div class="meta"><span>İşi</span><span>${esc(b.job)}</span><span>Edə bilməz</span><span>${esc(b.may_not)}</span>
       <span>Niyə bu beyin</span><span>${esc(b.why)}</span>
-      <span>Proqnozda</span><span>${b.in_use ? "istifadə olunur" : "hələ qoşulmayıb (növbəti addım)"}</span></div>
+      <span>İşdə</span><span>${b.in_use ? "<span class='up'>işləyir</span>" : "hələ qoşulmayıb (növbəti addım)"}</span>
+      <span>Bu ay xərc</span><span class="num">${b.spent.toFixed(2)} $ / ${b.config.month_usd} $</span>
+      ${b.last_call ? `<span>Son çağırış</span><span>${b.last_call.ok ? "<span class='up'>uğurlu</span>" : "<span class='down'>alınmadı</span>"} · ${esc(b.last_call.provider)} · ${when(b.last_call.ts)}${b.last_call.error ? " · " + esc(b.last_call.error) : ""}</span>` : ""}</div>
     <div class="note">Tələblər və çəkisi</div><div class="req">${req}</div>
     <label class="note" for="bp-${b.id}">Beyin (provayder)</label><select id="bp-${b.id}">${opts(c.provider)}</select>
     <label class="note" for="bm-${b.id}">Model</label><input id="bm-${b.id}" value="${esc(c.model)}">
@@ -165,3 +167,11 @@ $("pw-save").onclick = async () => {
 
 async function load() { data = await call("GET", "/api/admin/overview"); render(); }
 load();
+let seenVersion = null;
+setInterval(async () => {
+  try {
+    const v = (await (await fetch("/version", { cache: "no-store" })).json()).commit;
+    if (seenVersion && v && v !== seenVersion) location.reload();
+    seenVersion = seenVersion || v;
+  } catch (e) {}
+}, 60000);
