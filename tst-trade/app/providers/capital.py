@@ -80,6 +80,7 @@ class CapitalStream(PriceProvider):
         self.error: str | None = None
         self.failed_logins = 0
         self.paused_until = 0.0
+        self.tokens: dict | None = None      # the stream's current session (history requests reuse it)
         self._task: asyncio.Task | None = None
 
     async def _session(self) -> dict:
@@ -107,6 +108,7 @@ class CapitalStream(PriceProvider):
             try:
                 self.state = "connecting"
                 tokens = await self._session()
+                self.tokens = tokens
                 async with connect(STREAM_URL) as ws:
                     await ws.send(_msg("marketData.subscribe", tokens, {"epics": list(EPIC.values())}))
                     self.state, self.error = "live", None
@@ -212,8 +214,9 @@ class CapitalHistory(HistoryProvider):
     name = "capital"
     request_gap = 0.25
 
-    def __init__(self, creds: dict):
-        self.login_helper = CapitalStream(creds)
+    def __init__(self, creds: dict, stream: "CapitalStream | None" = None):
+        self.stream = stream
+        self.login_helper = stream or CapitalStream(creds)
         self.tokens: dict | None = None
         self.client = httpx.AsyncClient(timeout=20.0)
 
@@ -221,13 +224,17 @@ class CapitalHistory(HistoryProvider):
         if tf not in RESOLUTION or symbol not in EPIC:
             raise NotServed(f"{symbol} {tf}: Capital.com bu çərçivəni vermir")
         if self.tokens is None:
-            self.tokens = await self.login_helper._session()
+            live = self.stream.tokens if self.stream is not None else None
+            self.tokens = live or await self.login_helper._session()
         base = BASES[self.login_helper.env or "real"]
         r = await self.client.get(f"{base}/prices/{EPIC[symbol]}",
                                   params={"resolution": RESOLUTION[tf], "max": min(limit, MAX_ROWS)},
                                   headers=self.tokens)
         if r.status_code in (400, 404):
             raise NotServed(f"HTTP {r.status_code}")
+        if r.status_code == 401 and self.stream is not None:
+            self.tokens = None     # the stream's session expired between requests: next request logs in afresh
+            self.stream = None
         if r.status_code != 200:
             raise ProviderError(f"Capital.com tarixçə: HTTP {r.status_code}")
         return parse_prices(r.json(), tf)

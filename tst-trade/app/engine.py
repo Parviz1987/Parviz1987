@@ -194,23 +194,34 @@ class Engine:
         return n
 
     # ---------- history and backtest ----------
+    def _history_names(self) -> list[str]:
+        if self.chosen_provider() == "demo":
+            return ["demo"]
+        return [n for n, ok in (("capital", bool(self.keys.get("capital"))),
+                                ("twelvedata", bool(self.keys.first("twelvedata")))) if ok]
+
     def _history_sources(self) -> list:
         """Capital.com first (same broker as the live stream, all four metals, overwrites older history), then
         Twelve Data (free plan: gold only, but deeper daily history) only fills what is still missing."""
-        if self.chosen_provider() == "demo":
-            return [(DemoHistory(), False)]
         out = []
-        creds = self.keys.get("capital")
-        if creds:
-            out.append((CapitalHistory(creds), True))
-        key = self.keys.first("twelvedata")
-        if key:
-            out.append((TwelveDataHistory(key), False))
+        for name in self._history_names():
+            if name == "demo":
+                out.append((DemoHistory(), False))
+            elif name == "capital":
+                # The live stream's own session is reused: no second login to the broker.
+                stream = self.provider if self.provider_name == "capital" else None
+                out.append((CapitalHistory(self.keys.get("capital"), stream), True))
+            else:
+                out.append((TwelveDataHistory(self.keys.first("twelvedata")), False))
         return out
 
     async def backfill(self, force: bool = False) -> dict:
         now = time.time()
-        if not force and now - self.history_state.get("ts", 0) < HISTORY_EVERY:
+        # A new source (a key just saved, a new version that reads another broker) loads at once, not in 6 hours;
+        # at most one such unplanned reload per 5 minutes.
+        changed = ", ".join(self._history_names()) != self.history_state.get("source", "")
+        age = now - self.history_state.get("ts", 0)
+        if not force and (age < 300 or (not changed and age < HISTORY_EVERY)):
             return self.history_state
         sources = self._history_sources()
         if not sources:
