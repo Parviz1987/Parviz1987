@@ -15,6 +15,7 @@ PROVIDERS = ("goldapi", "twelvedata", "demo")
 @dataclass(frozen=True)
 class Settings:
     app_password: str
+    app_password_hash: str
     session_secret: str
     secret_is_fixed: bool          # False: a random secret, saved keys cannot be read after a restart
     price_provider: str            # goldapi | twelvedata | demo (from .env; the admin page can override it)
@@ -38,6 +39,7 @@ def load_settings() -> Settings:
         db = BASE_DIR / db
     return Settings(
         app_password=os.getenv("APP_PASSWORD", ""),
+        app_password_hash=os.getenv("APP_PASSWORD_HASH", "").strip(),
         session_secret=secret or secrets.token_hex(32),
         secret_is_fixed=bool(secret),
         price_provider=provider,

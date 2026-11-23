@@ -66,7 +66,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.post("/login")
     async def login(request: Request):
         form = await request.form()
-        if not auth.password_ok(str(form.get("password", "")), s.app_password):
+        if not auth.password_ok(str(form.get("password", "")), db_hash=db.get("auth:password_hash"),
+                                env_hash=s.app_password_hash, env_plain=s.app_password):
             return RedirectResponse("/login?e=1", status_code=303)
         r = RedirectResponse("/", status_code=303)
         r.set_cookie(auth.COOKIE, auth.make_token(s.session_secret), max_age=auth.DAYS * 86400, httponly=True,
@@ -202,6 +203,20 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         db.put("setting:price_provider", name)
         engine.reset_provider()
         return {"price_provider": name}
+
+    @app.post("/api/admin/password")
+    async def change_password(request: Request):
+        body = await request.json()
+        old, new, again = (str(body.get(k, "")) for k in ("old", "new", "again"))
+        if not auth.password_ok(old, db_hash=db.get("auth:password_hash"), env_hash=s.app_password_hash,
+                                env_plain=s.app_password):
+            raise HTTPException(400, "köhnə parol səhvdir")
+        if len(new) < auth.MIN_LEN:
+            raise HTTPException(400, f"yeni parol ən azı {auth.MIN_LEN} simvol olmalıdır")
+        if new != again:
+            raise HTTPException(400, "yeni parol iki dəfə eyni yazılmayıb")
+        db.put("auth:password_hash", auth.hash_password(new))
+        return {"ok": True}
 
     @app.post("/api/admin/history")
     async def history():

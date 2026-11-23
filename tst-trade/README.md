@@ -58,7 +58,7 @@ curl -fsSLO https://raw.githubusercontent.com/Parviz1987/Parviz1987/HEAD/tst-tra
 bash setup.sh panel.sizin-domen.com
 ```
 
-Skript parolu soruşur, `SESSION_SECRET`-i özü yaradır, xidməti (`tst-trade`) və HTTPS-i (Caddy) qurur.
+Skript parolu iki dəfə soruşur (serverdə yalnız şifrələnmiş hash saxlanır), `SESSION_SECRET`-i özü yaradır, xidməti (`tst-trade`) və HTTPS-i (Caddy) qurur.
 Skript repozitoriyanın əsas budağını götürür; başqa budaq üçün `BRANCH=<budaq adı> bash setup.sh ...` yazın.
 
 ## Dürüst qeydlər
@@ -72,3 +72,16 @@ Skript repozitoriyanın əsas budağını götürür; başqa budaq üçün `BRAN
 
 `app/providers/base.py`, `goldapi.py`, `twelvedata.py`, `app/netutil.py` və açar şifrələməsi (`app/seal.py`)
 pj-trade-gold layihəsindən köçürülüb; orada heç nə dəyişdirilməyib.
+
+## Parolu dəyişmək
+
+- **Saytdan:** Admin → «Parol» bölməsi: köhnə parol, yeni parol iki dəfə, «Parolu dəyiş».
+- **Parol unudulubsa** (yalnız DigitalOcean konsolundan, çünki sahibliyi ancaq server girişi sübut edir):
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/Parviz1987/Parviz1987/HEAD/tst-trade/deploy/set-password.sh
+```
+
+```bash
+bash set-password.sh
+```

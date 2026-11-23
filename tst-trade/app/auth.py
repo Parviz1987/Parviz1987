@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import os
 import time
 
 COOKIE = "tst_session"
@@ -28,5 +29,30 @@ def valid(token: str | None, secret: str, now: float | None = None) -> bool:
         return False
 
 
-def password_ok(given: str, expected: str) -> bool:
-    return bool(expected) and hmac.compare_digest(given.encode(), expected.encode())
+def hash_password(pw: str, salt: bytes | None = None) -> str:
+    """scrypt (standard library). Stored as scrypt$<salt hex>$<hash hex>."""
+    salt = salt or os.urandom(16)
+    h = hashlib.scrypt(pw.encode(), salt=salt, n=2 ** 14, r=8, p=1, dklen=32)
+    return f"scrypt${salt.hex()}${h.hex()}"
+
+
+def verify_hash(pw: str, stored: str) -> bool:
+    try:
+        kind, salt, h = stored.split("$")
+        if kind != "scrypt":
+            return False
+        return hmac.compare_digest(hash_password(pw, bytes.fromhex(salt)), stored)
+    except ValueError:
+        return False
+
+
+def password_ok(given: str, *, db_hash: str | None, env_hash: str, env_plain: str) -> bool:
+    """The password set on the admin page (DB) wins; then APP_PASSWORD_HASH; then APP_PASSWORD."""
+    if db_hash:
+        return verify_hash(given, db_hash)
+    if env_hash:
+        return verify_hash(given, env_hash)
+    return bool(env_plain) and hmac.compare_digest(given.encode(), env_plain.encode())
+
+
+MIN_LEN = 8

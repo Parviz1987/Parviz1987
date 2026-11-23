@@ -35,11 +35,19 @@ sudo -u $APP_USER python3 -m venv $APP_DIR/.venv
 sudo -u $APP_USER $APP_DIR/.venv/bin/pip install -q -r $APP_DIR/requirements.txt
 
 if [[ ! -f $APP_DIR/.env ]]; then
-  read -rsp "Panel üçün parol yazın: " PW; echo
+  while true; do
+    read -rsp "Panel üçün parol yazın (ən azı 8 simvol): " PW; echo
+    read -rsp "Parolu bir daha yazın: " PW2; echo
+    [[ ${#PW} -ge 8 && "$PW" == "$PW2" ]] && break
+    echo "Parollar eyni deyil və ya 8 simvoldan qısadır, yenidən yazın."
+  done
+  # Only a scrypt hash goes into .env (read from stdin: the password never appears in a command line).
+  HASH=$(printf '%s' "$PW" | python3 -c "import sys,os,hashlib;p=sys.stdin.read().encode();s=os.urandom(16);print('scrypt\$'+s.hex()+'\$'+hashlib.scrypt(p,salt=s,n=2**14,r=8,p=1,dklen=32).hex())")
+  unset PW PW2
   SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
   SECURE=1; [[ -z $DOMAIN ]] && SECURE=0
   cat > $APP_DIR/.env <<ENV
-APP_PASSWORD=$PW
+APP_PASSWORD_HASH='$HASH'
 SESSION_SECRET=$SECRET
 PRICE_PROVIDER=goldapi
 PRICE_POLL_SECONDS=15

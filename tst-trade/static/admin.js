@@ -139,5 +139,13 @@ $("hist").onclick = async () => {
   load();
 };
 
+$("pw-save").onclick = async () => {
+  try {
+    await call("POST", "/api/admin/password", { old: $("pw-old").value, new: $("pw-new").value, again: $("pw-again").value });
+    $("pw-msg").textContent = "Parol dəyişdi. Növbəti girişdə yeni paroldan istifadə edin.";
+    ["pw-old", "pw-new", "pw-again"].forEach((i) => $(i).value = "");
+  } catch (e) { $("pw-msg").textContent = "Xəta: " + e.message; }
+};
+
 async function load() { data = await call("GET", "/api/admin/overview"); render(); }
 load();

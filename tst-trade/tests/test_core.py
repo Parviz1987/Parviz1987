@@ -173,7 +173,7 @@ def test_auth_token():
 
 
 def _app(tmp_path: Path):
-    s = Settings(app_password="pw", session_secret=SECRET, secret_is_fixed=True, price_provider="demo",
+    s = Settings(app_password="pw", app_password_hash="", session_secret=SECRET, secret_is_fixed=True, price_provider="demo",
                  poll_seconds=15, cookie_secure=False, db_path=tmp_path / "t.sqlite3")
     return create_app(s, start_engine=False)
 
@@ -204,3 +204,26 @@ def test_demo_poll_builds_candles(tmp_path):
     asyncio.run(eng.poll_once(1_700_000_000.0))
     assert eng.status("XAU", 1_700_000_001.0) == "DEMO"
     assert candles.get(db, "XAG", "1m")
+
+
+def test_password_hash_and_precedence():
+    h = auth.hash_password("a#b$c d'e")
+    assert auth.verify_hash("a#b$c d'e", h) and not auth.verify_hash("x", h)
+    assert auth.password_ok("a#b$c d'e", db_hash=None, env_hash=h, env_plain="ignored")
+    assert not auth.password_ok("ignored", db_hash=None, env_hash=h, env_plain="ignored")
+    db_h = auth.hash_password("from-admin-page")
+    assert auth.password_ok("from-admin-page", db_hash=db_h, env_hash=h, env_plain="")
+    assert not auth.password_ok("a#b$c d'e", db_hash=db_h, env_hash=h, env_plain="")
+
+
+def test_change_password_on_admin_page(tmp_path):
+    c = TestClient(_app(tmp_path))
+    r = c.post("/login", data={"password": "pw"}, follow_redirects=False)
+    c.cookies.set(auth.COOKIE, r.cookies[auth.COOKIE])
+    assert c.post("/api/admin/password", json={"old": "bad", "new": "newpass123", "again": "newpass123"}).status_code == 400
+    assert c.post("/api/admin/password", json={"old": "pw", "new": "short", "again": "short"}).status_code == 400
+    assert c.post("/api/admin/password", json={"old": "pw", "new": "newpass123", "again": "other1234"}).status_code == 400
+    assert c.post("/api/admin/password", json={"old": "pw", "new": "newpass123", "again": "newpass123"}).json()["ok"]
+    c2 = TestClient(c.app)
+    assert c2.post("/login", data={"password": "pw"}, follow_redirects=False).headers["location"] == "/login?e=1"
+    assert c2.post("/login", data={"password": "newpass123"}, follow_redirects=False).headers["location"] == "/"

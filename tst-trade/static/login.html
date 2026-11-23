@@ -4,8 +4,10 @@
   <div class="brand">TST <b>Trade</b></div>
   <label for="pw">Parol</label>
   <input id="pw" name="password" type="password" autocomplete="current-password" required autofocus>
-  <p class="note" id="err" hidden>Parol səhvdir.</p>
+  <label class="note"><input type="checkbox" id="show"> Parolu göstər</label>
+  <p class="note" id="err" hidden>Parol səhvdir. Klaviaturanın dilini yoxlayın (AZ / RU / EN) və «Parolu göstər» ilə baxın.</p>
   <button class="btn pri" type="submit">Daxil ol</button>
 </form>
-<script>if(location.search.includes("e=1"))document.getElementById("err").hidden=false;</script>
+<script>if(location.search.includes("e=1"))document.getElementById("err").hidden=false;
+document.getElementById("show").onchange=(e)=>{document.getElementById("pw").type=e.target.checked?"text":"password";};</script>
 </body></html>
