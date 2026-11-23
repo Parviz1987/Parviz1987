@@ -233,7 +233,10 @@ def test_key_without_a_check_is_saved_not_an_error():
     db = mem()
     ks = KeyStore(db, SECRET)
     ks.set("fmp", {"key": "fmp-test-5678"})
+    db.put("dummy", "x")
     from app import keys as keysmod
+    ks.delete("fmp")
+    ks.db.put("key:gemini_unused", "x")
+    # A slot with no check left: none now (every key has one); a missing key reports it instead of an error.
     res = asyncio.run(keysmod.check(ks, "fmp"))
-    assert res["ok"] is None and "saxlanıb" in res["message"]
-    assert ks.status("fmp")["check"]["ok"] is None
+    assert res["ok"] is False and "saxlanmayıb" in res["message"]

@@ -141,6 +141,9 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
             ok, msg = await _http_check("https://data.alpaca.markets/v1beta1/news", params={"limit": 1},
                                         headers={"APCA-API-KEY-ID": v.get("key_id", ""),
                                                  "APCA-API-SECRET-KEY": v.get("secret", "")})
+        elif slot == "fmp":
+            ok, msg = await _http_check("https://financialmodelingprep.com/stable/search-symbol",
+                                        params={"query": "AAPL", "apikey": key})
         elif slot == "fred":
             ok, msg = await _http_check("https://api.stlouisfed.org/fred/series",
                                         params={"series_id": "DFII10", "api_key": key, "file_type": "json"})
