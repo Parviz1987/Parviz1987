@@ -240,6 +240,7 @@ class Feeds:
         self.keys = keys
         db.conn.executescript(SCHEMA)
         self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0}
+        self.activity = None      # app.activity.Hub: where each collector reports its status
         db.conn.executescript(surprise.SCHEMA)
 
     def _health(self, sid: str, ok: bool, msg: str, rows: int = 0) -> None:
@@ -340,10 +341,21 @@ class Feeds:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
                     self.next_run[name] = now + every
+                    task = {"news": "news", "alpaca": "news", "calendar": "calendar", "fmp": "calendar",
+                            "macro": "macro", "cot": "macro"}[name]
+                    if self.activity:
+                        self.activity.report(task, "working", note=name)
                     try:
                         await fn(client)
-                    except Exception:
+                        if self.activity:
+                            h = self.health({"news": "rss"}.get(name, {"calendar": "forexfactory", "macro": "fred"}
+                                                                 .get(name, name)))
+                            ok = h.get("ok") is not False
+                            self.activity.report(task, "done" if ok else "error", note=f"{name}: {h.get('message', '')}"[:150])
+                    except Exception as e:
                         log.exception("feed %s failed", name)
+                        if self.activity:
+                            self.activity.report(task, "error", note=f"{name}: {type(e).__name__}")
 
     async def alpaca(self, client) -> None:
         creds = self.keys.get("alpaca")

@@ -4,11 +4,12 @@ Run:  uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8100"""
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -33,9 +34,13 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     feeds = Feeds(db, store)
     jobs = BrainJobs(db, store, feeds)
     engine = Engine(db, store, s.price_provider, s.poll_seconds, feeds, jobs)
+    from .activity import Hub
+    hub = Hub(db)                       # the one place every agent reports to; the agents panel reads only this
+    engine.activity = feeds.activity = jobs.activity = hub
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        hub.attach_loop(asyncio.get_running_loop())
         if start_engine:
             engine.start()
         yield
@@ -73,7 +78,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 if path.startswith("/api/"):
                     return JSONResponse({"error": "giriş lazımdır"}, status_code=401)
                 return RedirectResponse("/login", status_code=303)
-            if who == "guest" and (path.startswith(("/admin", "/api/admin", "/status"))):
+            if who == "guest" and (path.startswith(("/admin", "/api/admin", "/status", "/agents", "/api/agents"))):
                 # A guest sees the panel only: no keys, no settings, no password page.
                 if path.startswith("/api/"):
                     return JSONResponse({"error": "qonaq üçün bağlıdır"}, status_code=403)
@@ -100,9 +105,10 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         response.headers["Referrer-Policy"] = "same-origin"
         # HTTPS only from now on (1 year), and only this site's own scripts may run on its pages
         response.headers["Strict-Transport-Security"] = "max-age=31536000"
+        host = request.headers.get("host", "")
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
-            "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+            f"connect-src 'self' wss://{host}; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         return response
 
     # ---------- pages ----------
@@ -268,6 +274,55 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             raise HTTPException(400, "naməlum metal")
         return {"symbol": symbol, "method_names": forecast.METHOD_NAMES,
                 "cards": [_card(symbol, h) for h in forecast.HORIZONS]}
+
+    # ---------- agents panel ----------
+    @app.get("/agents")
+    async def agents_page():
+        return FileResponse(STATIC / "agents.html")
+
+    @app.get("/api/agents/events")
+    async def agent_events(hours: float = 24):
+        """The timeline: every agent event of the last hours (at most 7 days), oldest first, for replay."""
+        hours = min(max(hours, 0.1), 168)
+        snap = hub.snapshot()
+        return {"nodes": snap["nodes"], "events": hub.events(time.time() - hours * 3600), "now": time.time()}
+
+    @app.get("/api/agents/top")
+    async def agents_top():
+        """The bar on top: last sync times and the brains' monthly spend against their limits."""
+        now = time.time()
+        sync = {"Qiymət": engine.last_ok}
+        for sid, name in (("rss", "Xəbər"), ("forexfactory", "Təqvim"), ("fred", "FRED"), ("cot", "COT"),
+                          ("alpaca", "Benzinga")):
+            sync[name] = feeds.health(sid).get("ok_ts")
+        limits = [{"name": b["name"], "spent": b["spent"], "cap": float(b["config"]["month_usd"])}
+                  for b in brains.view(db, store) if b["in_use"]]
+        return {"now": now, "sync": sync, "limits": limits}
+
+    @app.websocket("/ws/agents")
+    async def agents_ws(ws: WebSocket):
+        """Live stream for the panel: the current state at once, then every event as it happens. Owner only; the
+        page must come from this site (a foreign page cannot open the owner's stream)."""
+        origin = ws.headers.get("origin", "")
+        if auth.role(ws.cookies.get(auth.COOKIE), s.session_secret) != "owner" or \
+                (origin and origin.split("://", 1)[-1] != ws.headers.get("host")):
+            await ws.close(code=4403)
+            return
+        await ws.accept()
+        q: asyncio.Queue = asyncio.Queue()
+        hub.subscribers.add(q)
+        try:
+            await ws.send_text(json.dumps(hub.snapshot()))
+            while True:
+                try:
+                    msg = await asyncio.wait_for(q.get(), timeout=25)
+                except asyncio.TimeoutError:
+                    msg = json.dumps({"type": "ping", "now": time.time()})   # keeps proxies from closing the line
+                await ws.send_text(msg)
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+        finally:
+            hub.subscribers.discard(q)
 
     @app.get("/results")
     async def results_page():

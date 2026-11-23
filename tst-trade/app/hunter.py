@@ -43,6 +43,7 @@ class Hunter:
         self.keys = keys
         db.conn.executescript(SCHEMA)
         surprise.ensure(db)
+        self.activity = None
         if not db.get("hunter:since"):
             db.put("hunter:since", str(time.time()))
 
@@ -66,11 +67,18 @@ class Hunter:
         if not (self.keys.first("openai") or self.keys.first("anthropic")):
             return 0
         found = 0
-        for ev in self.due(now)[:3]:
+        due = self.due(now)[:3]
+        rep = self.activity.report if self.activity else (lambda *a, **k: None)
+        if not due:
+            return 0
+        for ev in due:
+            rep("hunter", "working", "W1 Rəqəm çıxdı", 0.1, ev["title"])
             when = datetime.fromtimestamp(ev["ts"], timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
             user = (f"US release: \"{ev['title']}\" scheduled {when}. Consensus forecast was {ev['forecast']}. "
                     "What is the actual figure that was released?")
+            rep("hunter", "working", "W2 İki beyin axtarır", 0.3, ev["title"])
             answers = await brains.run_both(self.db, self.keys, "hunter", SYSTEM, user, max_tokens=1500)
+            rep("hunter", "working", "W3 Müqayisə", 0.85, ev["title"])
             vals = []
             for data, how in answers:
                 ok = isinstance(data, dict) and data.get("found") is True and \
@@ -91,6 +99,7 @@ class Hunter:
                     "raw_date": datetime.fromtimestamp(ev["ts"], timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
                     "known_ts": now}])
                 found += 1
+        rep("hunter", "done", note=f"{found} rəqəm təsdiqləndi" if found else "rəqəmlər təsdiqlənmədi")
         return found
 
     def recent(self, limit: int = 10) -> list[dict]:

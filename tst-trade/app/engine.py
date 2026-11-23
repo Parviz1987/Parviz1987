@@ -124,6 +124,7 @@ class Engine:
         self.last_ok: float | None = None
         self.history_state: dict = json.loads(db.get("history_state") or "{}")
         self._macro_cache = None
+        self.activity = None      # app.activity.Hub, set by the app: where this agent reports its status
         self._rel_written: dict[str, float] = {}
         self._rel_cache = None
         self._task: asyncio.Task | None = None
@@ -346,13 +347,18 @@ class Engine:
             return self.history_state
         result: dict[str, dict[str, str]] = {}
         related = list(markets.saved(self.db).get("epics", {}))
+        self._rep("history", "working", note="tarixçə yüklənir")
+        stage_of = {"capital": "W1 Capital", "twelvedata": "W2 Twelve Data", "demo": "W1 Capital"}
         for src, replace in sources:
             try:
                 jobs = [(s, tf, lim) for s in candles.METALS for tf, lim in HISTORY_LIMIT.items()]
                 if src.name == "capital":   # related markets: only the broker has them
                     jobs += [(s, tf, lim) for s in related for tf, lim in markets.HISTORY_TF.items()]
                 refused: set[str] = set()
-                for sym, tf, limit in jobs:
+                for i_job, (sym, tf, limit) in enumerate(jobs):
+                    if i_job % 5 == 0:
+                        self._rep("history", "working", stage_of.get(src.name, src.name), i_job / max(1, len(jobs)),
+                                  f"{sym} {tf}")
                     if sym in refused:
                         continue
                     line = result.setdefault(sym, {})
@@ -376,13 +382,19 @@ class Engine:
         self.history_state = {"ts": now, "result": result, "source": ", ".join(s.name for s, _ in sources)}
         self.db.put("history_state", json.dumps(self.history_state))
         # The walk-forward replay is CPU work: off the event loop, so prices keep coming in meanwhile.
-        await asyncio.to_thread(self.backtest, now)
+        try:
+            await asyncio.to_thread(self.backtest, now)
+            self._rep("history", "done", note="tarixçə və yenidən hesab bitdi")
+        except Exception as e:
+            self._rep("history", "error", note=f"{type(e).__name__}: {str(e)[:100]}")
+            raise
         return self.history_state
 
     def backtest(self, now: float | None = None) -> int:
         """Walk forward over stored candles: each forecast sees only the candles before it (mode 'history')."""
         now = time.time() if now is None else now
         n = 0
+        self._rep("history", "working", "W3 Yenidən hesab", 0.0, "keçmiş üzərində proqnozlar")
         macro = MacroLookup(self.db)
         rel = surprise.Lookup(self.db)
         bv = brainviews.Lookup(self.db)
@@ -395,8 +407,9 @@ class Engine:
             start = int(datetime.strptime(first, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()) + 14 * 86400
             self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='macro' AND basis=? AND issued_t>?",
                             ("FRED məlumatı yoxdur", start))
-        for h, tf in forecast.HORIZONS.items():
+        for i_h, (h, tf) in enumerate(forecast.HORIZONS.items()):
             step = candles.TF[tf]
+            self._rep("history", "working", "W3 Yenidən hesab", i_h / len(forecast.HORIZONS), forecast.HORIZON_NAMES[h])
             for sym in candles.METALS:
                 rows = candles.closed(self.db, sym, tf, now, limit=BACKTEST_MAX + forecast.MIN_CANDLES)
                 k = forecast.steps_of(h)
@@ -424,6 +437,7 @@ class Engine:
                 # one transaction per metal and horizon (thousands of small commits are slow on a small disk)
                 judge.insert(self.db, batch)
                 n += len(batch)
+        self._rep("history", "working", "W4 Hakim", 0.0, "tarixçə proqnozları yoxlanır")
         judge.score_due(self.db, now)
         return n
 
@@ -487,11 +501,21 @@ class Engine:
                 out[key] = best[1:]
         return out
 
+    def _rep(self, task: str, status: str, *a, **k) -> None:
+        if self.activity is not None:
+            self.activity.report(task, status, *a, **k)
+
     async def step(self) -> None:
         now = time.time()
         await self.poll_once(now)
-        self.issue_due(now)
-        judge.score_due(self.db, now)
+        live = sum(self.status(s, now) in ("LIVE", "DEMO") for s in candles.METALS)
+        self._rep("prices", "done" if live else "error", note=f"{live}/4 metal canlı")
+        n = self.issue_due(now)
+        if n:
+            self._rep("forecast", "done", note=f"{n} proqnoz verildi")
+        scored = judge.score_due(self.db, now)
+        if scored:
+            self._rep("judge", "done", note=f"{scored} proqnoz yoxlandı")
 
     async def run(self) -> None:
         last_prune = 0.0
@@ -501,6 +525,8 @@ class Engine:
         except Exception:
             log.exception("migration failed")
         while not self._stop.is_set():
+            self._rep("orch", "working", note="dövr başladı")
+            t_start = time.time()
             try:
                 await self.step()
                 if time.time() - last_prune > 3600:
@@ -513,8 +539,10 @@ class Engine:
                 await self.backfill()
                 if self.jobs is not None:
                     await self.jobs.tick()
-            except Exception:   # the loop must survive one bad poll
+                self._rep("orch", "done", note=f"dövr {time.time() - t_start:.1f} san")
+            except Exception as e:   # the loop must survive one bad poll
                 log.exception("engine step failed")
+                self._rep("orch", "error", note=f"{type(e).__name__}: {str(e)[:100]}")
             try:
                 await asyncio.wait_for(self._stop.wait(), self.poll)
             except asyncio.TimeoutError:

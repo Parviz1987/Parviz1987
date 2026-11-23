@@ -103,6 +103,7 @@ class BrainJobs:
         self.next_strategist = 0.0
         from .hunter import Hunter
         self.hunter = Hunter(db, keys)
+        self.activity = None      # app.activity.Hub, set by the app
         from .brainviews import SCHEMA as BV
         db.conn.executescript(BV)
         # A restart (every update) must not buy an extra search: the next one follows the last one's time.
@@ -160,10 +161,17 @@ class BrainJobs:
                                         for e in self.feeds.upcoming(now)[:8]],
                            "news": news}, ensure_ascii=False)
 
+    def _rep(self, task: str, status: str, *a, **k) -> None:
+        if self.activity is not None:
+            self.activity.report(task, status, *a, **k)
+
     async def strategist(self, now: float) -> bool:
+        self._rep("strateq", "working", "W1 Faktlar", 0.1)
         facts = self.facts(now)
+        self._rep("strateq", "working", "W2 Beyin", 0.35)
         data, how = await brains.run(self.db, self.keys, "strategist", STRATEGIST_SYSTEM,
                                      "Faktlar (JSON):\n" + facts, STRATEGIST_SCHEMA, max_tokens=3000)
+        self._rep("strateq", "working", "W3 Rəqəm yoxlaması", 0.75)
         if data is None:
             self._state("strategist", "alınmadı: " + how)
             return False
@@ -171,6 +179,7 @@ class BrainJobs:
                "metals": [{"symbol": m.get("symbol"), "text": guard_numbers(str(m.get("text", "")), facts)}
                           for m in data.get("metals", []) if m.get("symbol") in ("XAU", "XAG", "XPT", "XPD")],
                "watch": [guard_numbers(str(w), facts) for w in data.get("watch", [])][:6]}
+        self._rep("strateq", "working", "W4 Yaddaş", 0.9)
         self.db.put("strategist:last", json.dumps(out, ensure_ascii=False))
         leans = {"up": 1, "down": -1, "neutral": 0}
         self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note) VALUES(?,?,?,?,?)",
@@ -225,6 +234,7 @@ class BrainJobs:
 
     async def tick(self, now: float | None = None) -> None:
         now = time.time() if now is None else now
+        self.hunter.activity = self.activity
         try:
             n = await self.hunter.tick(now)
             if n:
@@ -237,13 +247,18 @@ class BrainJobs:
             hot = self.feeds.event_mode(now) is not None
             self.next_scout = now + (SCOUT_EVENT_EVERY if hot else SCOUT_EVERY)
             if market_open(now) and self.keys.first("xai"):
-                await self.scout(now)
+                self._rep("scout", "working", note="X-də axtarır")
+                n = await self.scout(now)
+                self._rep("scout", "done" if n else "error", note=self.state("scout").get("message", ""))
         if now >= self.next_reader:
             self.next_reader = now + READER_EVERY
-            await self.reader(now)
+            self._rep("reader", "working", note="başlıqlar qiymətləndirilir")
+            n = await self.reader(now)
+            self._rep("reader", "done", note=f"{n} başlıq" if n else self.state("reader").get("message", "yeni başlıq yoxdur"))
         if now >= self.next_strategist:
             self.next_strategist = now + STRATEGIST_EVERY
-            await self.strategist(now)
+            ok = await self.strategist(now)
+            self._rep("strateq", "done" if ok else "error", note=self.state("strategist").get("message", ""))
 
 
 def reader_score(db: DB, now: float | None = None, horizon: int = 3600) -> dict:
