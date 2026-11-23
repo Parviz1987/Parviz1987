@@ -152,3 +152,5 @@ pre.trace{white-space:pre-wrap;font-size:.72rem;color:var(--muted);max-height:22
   [id^="sec-"],#cards,#news{scroll-margin-top:52px}
   #tfs button{padding:4px 7px}
 }
+.pill.xərc{background:var(--warn-soft);color:var(--warn)}
+td.cell.xərc{color:var(--warn);text-decoration:underline dotted}

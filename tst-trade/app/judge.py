@@ -4,7 +4,9 @@ Per forecast: outcome (1 up / 0 down; an unchanged close is not scored), hit (di
 direction and gets no hit), Brier score, and whether the close fell inside the 50 % and 80 % ranges.
 Per method: hit rate against «Həmişə yuxarı», Brier skill against a coin (0.25), range coverage, and a status:
 - "az"      fewer scored forecasts than MIN_N: no verdict yet
-- "sübut"   beats the better baseline on hit rate with one-sided p < 0.05 AND Brier skill > 0
+- "sübut"   beats the better baseline on hit rate with one-sided p < 0.05 / (number of methods) AND Brier skill > 0
+            AND its average move in the forecast's direction is larger than the bid/ask spread
+- "xərc"    statistically real but smaller than the spread: no use for trading
 - "yox"     enough forecasts, no proof of skill"""
 from __future__ import annotations
 
@@ -15,6 +17,10 @@ from .db import DB
 from . import candles
 from .forecast import BASELINES, HORIZON_SPEC, methods_for, steps_of, target_time
 
+# A round trip costs about one bid/ask spread (Capital.com, seen in diagnostics 2026-11-23: gold 0.50 $ on 3600 $,
+# silver 0.05 on 42, platinum 6 on 1318, palladium 5 on 904). A direction is worth something only if the average
+# move in the forecast's direction is larger than this.
+COST = {"XAU": 0.00014, "XAG": 0.0012, "XPT": 0.0046, "XPD": 0.0055}
 MIN_N = {"1m": 300, "1h": 200, "1d": 250, "3d": 250, "1w": 100, "10d": 250, "1mo": 250}
 P_MAX = 0.05
 
@@ -110,13 +116,21 @@ def stats(db: DB, symbol: str, horizon: str, mode: str = "live", ttl: float = 0)
 
 def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
     q = ("SELECT method, COUNT(outcome) n, SUM(outcome) ups, COUNT(hit) nh, SUM(hit) hits, AVG(brier) brier, "
-         "AVG(in50) c50, AVG(in80) c80, COUNT(price1) ncov FROM forecasts "
+         "AVG(in50) c50, AVG(in80) c80, COUNT(price1) ncov, "
+         # average move in the forecast's direction (only forecasts with a view), as a fraction of the price
+         "AVG(CASE WHEN p_up > 0.5 THEN price1 / price0 - 1 WHEN p_up < 0.5 THEN 1 - price1 / price0 END) edge "
+         "FROM forecasts "
          "WHERE symbol=? AND horizon=? AND mode=? AND scored_ts IS NOT NULL GROUP BY method")
     rows = {r["method"]: dict(r) for r in db.execute(q, (symbol, horizon, mode)).fetchall()}
     base_up = rows.get("up", {})
     up_rate = (base_up.get("ups") or 0) / base_up["n"] if base_up.get("n") else None
     out = []
     k = steps_of(horizon)
+    # Many methods are tried on the same data: by chance one in twenty passes p < 0.05. Bonferroni: the bar is
+    # divided by the number of methods competing on this card.
+    tested = [m for m in methods_for(horizon) if m not in BASELINES]
+    p_bar = P_MAX / max(1, len(tested))
+    cost = COST.get(symbol, 0.0)
     for m in methods_for(horizon):
         r = rows.get(m) or {"n": 0, "nh": 0, "hits": 0, "brier": None, "c50": None, "c80": None}
         n, nh, hits = r["n"] or 0, r["nh"] or 0, r["hits"] or 0
@@ -131,13 +145,14 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
             status = "bazis"
         elif nh < MIN_N[horizon]:
             status = "az"
-        elif p is not None and p < P_MAX and bss is not None and bss > 0:
-            status = "sübut"
+        elif p is not None and p < p_bar and bss is not None and bss > 0:
+            # Real statistically, but is the average move bigger than the spread? If not, it cannot pay.
+            status = "sübut" if (r.get("edge") or 0) > cost else "xərc"
         else:
             status = "yox"
         out.append({"method": m, "n": n, "hit_rate": hit_rate, "bar": bar, "p": p, "brier": r["brier"],
                     "bss": bss, "cover50": r["c50"], "cover80": r["c80"], "status": status, "nh": nh,
-                    "min_n": MIN_N[horizon]})
+                    "min_n": MIN_N[horizon], "p_bar": p_bar, "edge": r.get("edge"), "cost": cost})
     return out
 
 

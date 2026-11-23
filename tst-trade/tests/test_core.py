@@ -266,3 +266,28 @@ def test_guest_sees_panel_not_admin(tmp_path):
     tok = r.cookies[auth.COOKIE]
     exp, mark, sig = tok.split(".")
     assert auth.role(f"{exp}.{sig}", SECRET) is None
+
+
+def _fake_scored(db, method, n, hits, move):
+    rows = []
+    for i in range(n):
+        hit = i < hits
+        p1 = 100 * (1 + move) if hit else 100 * (1 - move)
+        rows.append(("XAU", "1h", method, "history", i * 3600, i * 3600 + 3600, 100.0, 0.6, 99, 101, 98, 102, "",
+                     p1, 1.0, int(p1 > 100), int(hit), (0.6 - int(p1 > 100)) ** 2, 1, 1))
+    db.executemany("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50, "
+                   "lo80, hi80, basis, price1, scored_ts, outcome, hit, brier, in50, in80) "
+                   "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+
+
+def test_judge_needs_bonferroni_and_a_move_bigger_than_the_spread():
+    db = mem()
+    _fake_scored(db, "up", 1000, 500, 0.001)          # baseline: half up
+    _fake_scored(db, "momentum", 1000, 700, 0.00001)  # 70 % right but moves far smaller than the spread
+    _fake_scored(db, "trend", 1000, 700, 0.01)        # 70 % right, big moves
+    _fake_scored(db, "fib", 400, 222, 0.01)           # p ~ 0.015: passes 0.05, fails 0.05 / 9
+    st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
+    assert st["momentum"]["status"] == "xərc"
+    assert st["trend"]["status"] == "sübut"
+    assert st["fib"]["p"] < 0.05 and st["fib"]["status"] == "yox"
+    assert judge.official(list(st.values()))["method"] == "trend"

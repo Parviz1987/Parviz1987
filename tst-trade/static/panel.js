@@ -3,7 +3,8 @@ const $ = (id) => document.getElementById(id);
 const TFS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"];
 const TF_NAMES = { "1m": "1 dəq", "5m": "5 dəq", "15m": "15 dəq", "1h": "1 saat", "4h": "4 saat", "1d": "1 gün", "1w": "1 həftə" };
 const STATUS_AZ = { LIVE: "Canlı", DELAYED: "Gecikir", OFFLINE: "Əlaqə yoxdur", DEMO: "DEMO" };
-const VERDICT_AZ = { "sübut": "Sübut olunub", "yox": "Sübut yoxdur", "az": "Məlumat azdır", "bazis": "Bazis" };
+const VERDICT_AZ = { "sübut": "Sübut olunub", "yox": "Sübut yoxdur", "az": "Məlumat azdır", "bazis": "Bazis",
+  "xərc": "Spreaddən kiçik" };
 const PROVIDER_AZ = { goldapi: "gold-api.com", capital: "Capital.com (axın)", twelvedata: "Twelve Data", demo: "DEMO" };
 let sym = "XAU", tf = "1m", mode = "live", lastState = null, lastFc = null;
 // Chart tools (display only; the Judge tests the same ideas as forecast methods).
@@ -173,27 +174,30 @@ function renderJudge(fc) {
     }).join("") + `<td class="cell">${rw.n ? pct(rw.cover50, 0) : "—"}</td><td class="cell">${rw.n ? pct(rw.cover80, 0) : "—"}</td></tr>`;
   }
   $("jmatrix").innerHTML = mx + `</table><p class="note">Xanada: üsul istiqamət göstərəndə neçə faiz düz çıxıb. Yaşıl = sübut olunub,
-    qırmızı = kifayət qədər yoxlama var, amma sübut yoxdur, sarı = hələ az yoxlama. Bazis «Həmişə yuxarı» sütunu: qiymət neçə faiz hallarda qalxıb.
+    qırmızı = kifayət qədər yoxlama var, amma sübut yoxdur, sarı = hələ az yoxlama, altdan nöqtəli sarı = statistik düzdür, amma hərəkət spreaddən kiçikdir. Bazis «Həmişə yuxarı» sütunu: qiymət neçə faiz hallarda qalxıb.
     Aralıq sütunları: qiymət 50 % və 80 % aralığa neçə faiz düşüb (düzgün aralıq ≈ 50 % və ≈ 80 %).</p>`;
 
   $("jh").innerHTML = fc.cards.map((c) => `<button data-h="${c.horizon}" class="${c.horizon === jh ? "on" : ""}">${c.name}</button>`).join("");
   document.querySelectorAll("#jh button").forEach((b) => b.onclick = () => { jh = b.dataset.h; try { localStorage.setItem("tst_jh", jh); } catch (e) {} renderJudge(fc); });
   const card = fc.cards.find((c) => c.horizon === jh) || fc.cards[0];
   let html = `<table><tr><th>Üsul</th><th>Yoxlama</th><th>Düz çıxıb</th><th>Keçməli hədd</th><th>p</th>
-    <th>Brier bal</th><th>50 % aralıq tutdu</th><th>80 % aralıq tutdu</th><th>Status</th></tr>`;
+    <th>Orta qazanc / spread</th><th>Brier bal</th><th>50 % aralıq tutdu</th><th>80 % aralıq tutdu</th><th>Status</th></tr>`;
   for (const r of card[key]) {
     const cnt = r.method === "rw" || r.method === "up" ? r.n : r.nh;
     const st = r.status === "az" ? `az (${cnt}/${r.min_n})` : VERDICT_AZ[r.status];
     html += `<tr><td>${esc(fc.method_names[r.method])}</td><td class="n">${cnt}</td>
       <td class="n">${r.method === "rw" ? "—" : pct(r.hit_rate)}</td><td class="n">${r.method === "rw" ? "—" : pct(r.bar)}</td>
       <td class="n">${r.p == null || r.method === "rw" ? "—" : r.p.toFixed(3)}</td>
+      <td class="n ${r.edge > r.cost ? "up" : ""}">${r.edge == null || r.method === "rw" ? "—" : (r.edge * 100).toFixed(3) + " / " + (r.cost * 100).toFixed(3) + " %"}</td>
       <td class="n">${r.bss == null ? "—" : (r.bss * 100).toFixed(1)}</td>
       <td class="n">${pct(r.cover50, 0)}</td><td class="n">${pct(r.cover80, 0)}</td>
       <td><span class="pill ${r.status}">${st}</span></td></tr>`;
   }
   $("judge").innerHTML = html + `</table><p class='note'>«Yoxlama»: üsulun istiqamət göstərdiyi proqnozların sayı (RSI, Fibonacci, sıçrayış
     yalnız siqnal olanda istiqamət göstərir). 3 gün, 10 gün və 1 ay proqnozları hər gün verilir və üst-üstə düşür: p bunu nəzərə alır
-    (say üfüqün gün sayına bölünür). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı.</p>`;
+    (say üfüqün gün sayına bölünür). Eyni məlumatda çox üsul yoxlandığı üçün p həddi üsulların sayına bölünür
+    (indi ${card[key][2] ? card[key][2].p_bar.toFixed(4) : "—"}): təsadüfi «sübut» olmasın. «Orta qazanc»: proqnoz istiqamətində orta hərəkət;
+    alış-satış fərqindən (spread) kiçikdirsə, statistik düz olsa da pul qazandırmaz («Spreaddən kiçik»). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı.</p>`;
   loadJudgeCharts(card).catch(() => {});
 }
 async function loadJudgeCharts(card) {
