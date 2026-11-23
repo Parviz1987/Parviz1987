@@ -1,0 +1,25 @@
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TST Trade · Admin</title><link rel="stylesheet" href="/static/app.css"></head><body>
+<header class="top">
+  <div class="brand">TST <b>Trade</b> · Admin</div><span class="sp"></span>
+  <a href="/">Panel</a>
+  <form method="post" action="/logout" style="margin:0"><button class="link" type="submit">Çıxış</button></form>
+</header>
+<main class="wrap">
+  <p class="note" id="secretwarn" hidden>Diqqət: serverdə SESSION_SECRET təyin olunmayıb. Saxlanan açarlar server yenidən başlayanda oxunmayacaq.</p>
+  <section class="adm"><h2>Canlı qiymət mənbəyi</h2>
+    <div class="box"><div class="btns" id="provider"></div><p class="note" id="provnote"></p></div></section>
+  <section class="adm"><h2>Məlumat mənbələri və açar yerləri</h2>
+    <p class="note">Hər açar öz yerinə qoyulur. Açar serverdə şifrələnmiş saxlanılır və bir daha göstərilmir, ancaq son 4 simvolu görünür.
+      «Yoxla» provayderə pulsuz bir sorğu göndərir (model və ya hesab yoxlaması, token xərclənmir).</p>
+    <div id="cats"></div></section>
+  <section class="adm"><h2>Beyin yuvaları</h2>
+    <p class="note">Əvvəl iş, sonra beyin: yuvanın işi və tələbləri dəyişmir, beyni dəyişmək bir seçimdir.
+      Bu mərhələdə heç bir beyin proqnoza qatılmır: proqnozları kod verir, beyinlər növbəti addımda ayrı-ayrılıqda qoşulub Hakim tərəfindən ölçüləcək.</p>
+    <div class="grid" id="brains"></div></section>
+  <section class="adm"><h2>Tarixçə</h2>
+    <div class="box"><p class="note">Tarixçə 1 gün və 1 həftəlik proqnozları keçmiş üzərində yoxlamaq üçündür. Twelve Data açarı ilə yüklənir (6 saatda bir özü də yenilənir).</p>
+      <div class="btns"><button class="btn" id="hist">İndi yüklə və yoxla</button></div><div class="tbl" id="histres"></div></div></section>
+</main>
+<script src="/static/admin.js"></script>
+</body></html>

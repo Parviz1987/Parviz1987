@@ -1,0 +1,139 @@
+"""Key places: save, read, mask, delete, and check that a key works. Keys are sealed with SESSION_SECRET in SQLite;
+a key never goes back to the browser, only its last four characters."""
+from __future__ import annotations
+
+import json
+import time
+
+import httpx
+
+from . import registry
+from .db import DB
+from .seal import mask, seal, unseal
+
+CHECK_TIMEOUT = 15.0
+
+
+class KeyStore:
+    def __init__(self, db: DB, secret: str):
+        self.db = db
+        self.secret = secret
+
+    def set(self, slot: str, values: dict[str, str]) -> None:
+        if slot not in registry.KEY_IDS:
+            raise ValueError("naməlum açar yeri")
+        fields = registry.FIELDS[slot]
+        clean = {f: str(values.get(f, "")).strip() for f in fields}
+        if not all(clean.values()):
+            raise ValueError("bütün sahələr doldurulmalıdır: " + ", ".join(fields))
+        self.db.put(f"key:{slot}", seal(json.dumps(clean), self.secret))
+        self.db.put(f"keyset:{slot}", str(time.time()))
+        self.db.delete(f"check:{slot}")
+
+    def get(self, slot: str) -> dict[str, str] | None:
+        raw = self.db.get(f"key:{slot}")
+        if raw is None:
+            return None
+        text = unseal(raw, self.secret)
+        if text is None:
+            return None
+        try:
+            return json.loads(text)
+        except ValueError:
+            return None
+
+    def first(self, slot: str) -> str | None:
+        v = self.get(slot)
+        return next(iter(v.values()), None) if v else None
+
+    def delete(self, slot: str) -> None:
+        for k in (f"key:{slot}", f"keyset:{slot}", f"check:{slot}"):
+            self.db.delete(k)
+
+    def status(self, slot: str) -> dict:
+        raw = self.db.get(f"key:{slot}")
+        v = self.get(slot)
+        check = self.db.get(f"check:{slot}")
+        return {
+            "saved": raw is not None,
+            "unreadable": raw is not None and v is None,   # SESSION_SECRET changed: enter the key again
+            "hint": mask(next(iter(v.values()), None)) if v else None,
+            "saved_ts": float(self.db.get(f"keyset:{slot}") or 0) or None,
+            "check": json.loads(check) if check else None,
+        }
+
+    def record_check(self, slot: str, ok: bool, message: str) -> dict:
+        res = {"ok": ok, "message": message[:300], "ts": time.time()}
+        self.db.put(f"check:{slot}", json.dumps(res))
+        return res
+
+
+def _scrub(text: str, secrets: list[str]) -> str:
+    for s in secrets:
+        if s:
+            text = text.replace(s, "***")
+    return text
+
+
+async def _http_check(url: str, headers: dict | None = None, params: dict | None = None) -> tuple[bool, str]:
+    async with httpx.AsyncClient(timeout=CHECK_TIMEOUT) as c:
+        r = await c.get(url, headers=headers, params=params)
+    if r.status_code == 200:
+        return True, "işləyir"
+    if r.status_code in (401, 403):
+        return False, f"açar qəbul olunmadı (HTTP {r.status_code})"
+    if r.status_code == 404:
+        return False, "model və ya ünvan tapılmadı (HTTP 404): model adını yoxlayın"
+    return False, f"HTTP {r.status_code}"
+
+
+async def _anthropic_check(key: str, model: str) -> tuple[bool, str]:
+    import anthropic
+    client = anthropic.AsyncAnthropic(api_key=key, timeout=CHECK_TIMEOUT, max_retries=0)
+    try:
+        await client.models.retrieve(model)
+        return True, "işləyir"
+    except anthropic.AuthenticationError:
+        return False, "açar qəbul olunmadı"
+    except anthropic.PermissionDeniedError:
+        return False, "açarın bu modelə icazəsi yoxdur"
+    except anthropic.NotFoundError:
+        return False, f"model tapılmadı: {model}"
+    except anthropic.APIConnectionError:
+        return False, "Anthropic-ə qoşulmaq alınmadı"
+    except anthropic.APIStatusError as e:
+        return False, f"HTTP {e.status_code}"
+    finally:
+        await client.close()
+
+
+async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
+    """Ask the provider one cheap question (a model or account lookup: no tokens are spent)."""
+    v = store.get(slot)
+    if v is None:
+        return store.record_check(slot, False, "açar saxlanmayıb")
+    key = next(iter(v.values()))
+    try:
+        if slot == "twelvedata":
+            ok, msg = await _http_check("https://api.twelvedata.com/api_usage",
+                                        headers={"Authorization": f"apikey {key}"})
+        elif slot == "anthropic":
+            ok, msg = await _anthropic_check(key, model or "claude-haiku-5-5")
+        elif slot == "openai":
+            ok, msg = await _http_check(f"https://api.openai.com/v1/models/{model or 'gpt-5.4-nano'}",
+                                        headers={"Authorization": f"Bearer {key}"})
+        elif slot == "xai":
+            ok, msg = await _http_check(f"https://api.x.ai/v1/models/{model or 'grok-4.7'}",
+                                        headers={"Authorization": f"Bearer {key}"})
+        elif slot == "gemini":
+            ok, msg = await _http_check(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model or 'gemini-2.5-flash-lite'}",
+                headers={"x-goog-api-key": key})
+        elif slot == "fred":
+            ok, msg = await _http_check("https://api.stlouisfed.org/fred/series",
+                                        params={"series_id": "DFII10", "api_key": key, "file_type": "json"})
+        else:
+            ok, msg = False, "bu açarın yoxlaması növbəti mərhələdə qoşulacaq (açar saxlanıb)"
+    except httpx.HTTPError as e:
+        ok, msg = False, f"qoşulmaq alınmadı: {type(e).__name__}"
+    return store.record_check(slot, ok, _scrub(msg, list(v.values())))

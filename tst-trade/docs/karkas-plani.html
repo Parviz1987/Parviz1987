@@ -1,0 +1,582 @@
+<title>PJ Trade Gold karkası</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column; schema first, then decisions, then blocks; wide tables scroll inside their own box */
+:root{
+  --bg:#f6f5f1; --surface:#ffffff; --fg:#1d2228; --muted:#5d6670; --line:#dcd9d0;
+  --accent:#9a7410; --accent-soft:#f3ead2;
+  --ok:#2f7d4f; --ok-soft:#e2f1e7; --warn:#a3620b; --warn-soft:#f8ecd8; --bad:#b0362b; --bad-soft:#f8e3e0;
+  --new:#2f5fa8; --new-soft:#e1eaf7;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#14171b; --surface:#1c2026; --fg:#e8e6e1; --muted:#9aa3ad; --line:#2f353d;
+  --accent:#d9ae45; --accent-soft:#2c2614;
+  --ok:#6cc58f; --ok-soft:#18291f; --warn:#e3a54c; --warn-soft:#2e2414; --bad:#ec7d72; --bad-soft:#321a18;
+  --new:#86aef0; --new-soft:#18233a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14171b; --surface:#1c2026; --fg:#e8e6e1; --muted:#9aa3ad; --line:#2f353d;
+  --accent:#d9ae45; --accent-soft:#2c2614;
+  --ok:#6cc58f; --ok-soft:#18291f; --warn:#e3a54c; --warn-soft:#2e2414; --bad:#ec7d72; --bad-soft:#321a18;
+  --new:#86aef0; --new-soft:#18233a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.6}
+.wrap{max-width:1080px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{text-wrap:balance;line-height:1.25;margin:0}
+h1{font-size:2rem;font-weight:800;letter-spacing:-.01em}
+h2{font-size:1.35rem;font-weight:700;display:flex;gap:10px;align-items:baseline}
+h2 .n{font-family:var(--mono);font-size:.8rem;color:var(--accent);letter-spacing:.06em}
+h3{font-size:1.02rem;font-weight:700}
+p{margin:0;max-width:74ch}
+section{display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.lead{font-size:1.06rem;color:var(--muted);max-width:72ch}
+.legend{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;padding:2px 10px;border-radius:999px;white-space:nowrap}
+.ok{background:var(--ok-soft);color:var(--ok)} .warn{background:var(--warn-soft);color:var(--warn)}
+.bad{background:var(--bad-soft);color:var(--bad)} .new{background:var(--new-soft);color:var(--new)}
+.gold{background:var(--accent-soft);color:var(--accent)}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:8px}
+.diagram{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px}
+.diagram pre{margin:0;min-width:960px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:760px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--bg)}
+tr:last-child td{border-bottom:none}
+td.k{font-weight:600}
+tr.grp td{background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase}
+.num{font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:.85rem}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.grid2>*{min-width:0}
+ol,ul{margin:0;padding-left:1.25em;display:flex;flex-direction:column;gap:6px;max-width:82ch}
+.dec{border-left:4px solid var(--accent);padding:4px 0 4px 14px;display:flex;flex-direction:column;gap:4px}
+.dec b.t{font-size:1.02rem}
+.note{font-size:.86rem;color:var(--muted)}
+.callout{background:var(--warn-soft);border-radius:10px;padding:14px 16px}
+.callout b{color:var(--warn)}
+details.block{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+details.block>summary{cursor:pointer;padding:14px 18px;font-weight:700;display:flex;gap:10px;align-items:baseline;list-style:none}
+details.block>summary::-webkit-details-marker{display:none}
+details.block>summary .n{font-family:var(--mono);color:var(--accent);font-size:.82rem}
+details.block>summary .s{font-weight:500;color:var(--muted);font-size:.9rem}
+details.block .in{padding:0 18px 18px;display:flex;flex-direction:column;gap:12px}
+.qa{display:flex;flex-direction:column;gap:8px}
+.qa div{display:grid;grid-template-columns:28px 1fr;gap:4px 8px}
+.qa .q{font-weight:600}
+.qa span.m{font-family:var(--mono);font-size:.8rem;color:var(--accent);padding-top:2px}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+
+<div class="wrap">
+
+<header style="display:flex;flex-direction:column;gap:12px">
+  <div class="eyebrow">Yekun plan · versiya 2 · 23.11.2026 · saytda heç nə dəyişdirilməyib</div>
+  <h1>PJ Trade Gold karkası</h1>
+  <p class="lead">Sahib bir dəfə pul zərfini verir, məsələn 1000 $. Bundan sonra nə vaxt almaq, nə vaxt satmaq, nə qədər almaq qərarını sistem özü verir. Beyinlər (süni intellekt) ayrı yuvalara qoyulur və istənilən vaxt Anthropic, OpenAI, Grok və ya Gemini ilə əvəzlənir, sistem dəyişmir.</p>
+  <div class="legend">
+    <span class="pill ok">Var, saxlanılır</span>
+    <span class="pill warn">Var, dəyişdirilir</span>
+    <span class="pill bad">Çıxarılır və ya əlavə edilmir</span>
+    <span class="pill new">Yeni qurulur</span>
+  </div>
+  <p class="note">Mənbələr: repozitoriyanın kodu (fayl adları cədvəllərdədir), sizin bütün mesajlarınız, elmi və peşəkar mənbələr (siyahı sonda). Serverin canlı vəziyyəti yoxlanmayıb. 1-ci versiyada iki səhv vardı: GLD ETF və GVZ "pulsuz əlavə et" kimi yazılmışdı. Əslində kod onları lisenziya şərtlərinə görə bilərəkdən götürmür. Bu versiyada düzəldilib.</p>
+</header>
+
+<section id="decisions">
+  <h2><span class="n">01</span>Yekun qərarlar</h2>
+  <div class="grid2">
+    <div class="dec"><b class="t">1. Sahibin yeganə qərarı: Kapital Zərfi</b><p>Bir dəfə verilir: ümumi məbləğ, ümumi itki həddi, gündəlik itki həddi, hansı brokerlər. Heç bir beyin və heç bir mərkəz bu rəqəmləri dəyişə bilməz. Hazırda belə tək zərf yoxdur, üstəlik Grok "budget_usd" ayarını özü qaldıra bilirdi.</p></div>
+    <div class="dec"><b class="t">2. Skelet dörd mərkəzdir, beyinlər yuvalara qoyulur</b><p>Proqnoz Mərkəzi, Hakim, Ticarət Mərkəzi və Risk Mühafizəçisi koddan və statistikadan ibarətdir, süni intellektdən deyil. Üç beyin yuvası var: Oxuyucu, Strateq və Ticarət Nəzarətçisi. Beyin olmasa da sistem işləyir, sadəcə daha az məlumatla.</p></div>
+    <div class="dec"><b class="t">3. Son ticarət qərarını beyin vermir</b><p>Qərarı sübut olunmuş qayda verir. Beyin yalnız ləğv edə və ya ölçünü azalda bilər. Səbəb sübutdur: Grok-un öz girişləri −49.73 $ itirib. Real pulla yarışmada (Alpha Arena 2025) 6 modeldən 4-ü itirib. Elmi sınaqlarda (StockBench, FINSABER, LiveTradeBench) heç bir model davamlı üstünlük göstərməyib.</p></div>
+    <div class="dec"><b class="t">4. Əsas ticarət üslubu: günlərlə saxlanan trend sövdələşməsi</b><p>Ən güclü elmi sübut trend və momentum üçündür, həftələr və aylar üfüqündə. Dəqiqəlik və saatlıq ticarət yalnız kölgədə işləyir, öz statistik sübutunu qazananda real pula keçir.</p></div>
+    <div class="dec"><b class="t">5. Folklor üsulları siqnal olmur</b><p>Fibonacci, pivotlar, Elliott dalğaları, şam fiqurları, Ichimoku, divergensiyalar istifadə olunmur. Fibonacci və pivot qrafikdə ancaq göstərmək üçün qalır. Elmi testlər bu üsullarda proqnoz gücü tapmayıb.</p></div>
+    <div class="dec"><b class="t">6. Hakim beyinləri də ölçür</b><p>Hər beynin cavabı jurnala yazılır və reallıqla müqayisə olunur. Hansı model hansı yuvada daha yaxşı işləyir, bunu reklam yox, bizim öz rəqəmlərimiz göstərəcək. Beyin dəyişmək bir ayar sətridir.</p></div>
+  </div>
+</section>
+
+<section id="schema">
+  <h2><span class="n">02</span>Vahid sxem</h2>
+  <p>Yuxarıdan aşağı: məlumat, alətlər, üfüq masaları, proqnoz kartı, ticarət. Beyin yuvaları (qızılı) yalnız öz qapısından girir. Hakim hər şeyi ölçür və status verir. Zərf hamısının üstündədir.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  classDef ok fill:#d7ecdf,stroke:#2f7d4f,color:#14321f
+  classDef warn fill:#f6e4c4,stroke:#a3620b,color:#3d2604
+  classDef bad fill:#f6d6d2,stroke:#b0362b,color:#45120d
+  classDef new fill:#d6e2f6,stroke:#2f5fa8,color:#10264a
+  classDef slot fill:#f1e3b8,stroke:#9a7410,color:#33270a,stroke-width:2px
+
+  Z["SAHİB · KAPİTAL ZƏRFİ<br/>məbləğ, ümumi itki, gündəlik itki, brokerlər<br/>bir dəfə verilir, heç kim dəyişə bilməz"]:::new
+
+  subgraph L1["1 · MƏLUMAT QATI"]
+    D1["Qiymət və şamlar<br/>Capital.com axını + gold-api"]:::warn
+    D2["Xəbər<br/>RSS + sürətli lent"]:::warn
+    D3["Təqvim, gözlənti, fakt"]:::warn
+    D4["Faiz, real faiz, dollar"]:::ok
+    D5["COT, mərkəzi banklar"]:::ok
+    D6["Risk-off: səhm indeksləri"]:::new
+    D7["Öz jurnalımız"]:::ok
+  end
+
+  subgraph L2["2 · MƏLUMAT MƏRKƏZİ"]
+    H1["Vahid vaxt və format"]:::new
+    H2["Keyfiyyət №19"]:::ok
+    H3["Hadisə xətti"]:::new
+  end
+
+  SA["BEYİN YUVASI A · OXUYUCU<br/>xəbər → strukturlu hadisə<br/>(tez, ucuz model)"]:::slot
+
+  subgraph L3["3 · ALƏTLƏR"]
+    T1["SİQNAL: trend və momentum, breakout"]:::warn
+    T2["SİQNAL: hadisə sürprizi, risk-off sonrası"]:::new
+    T3["FİLTR: rejim, üst zaman çərçivəsi, təqvim, COT həddi, faiz əlaqəsi"]:::ok
+    T4["SƏVİYYƏ: dəstək və müqavimət, ATR, yuvarlaq rəqəmlər"]:::warn
+    T5["ARALIQ: Model Lab, vsq-1"]:::ok
+  end
+
+  subgraph L4["4 · ÜFÜQ MASALARI"]
+    K1["Anlıq 1–60 dəq<br/>yalnız aralıq + xəbərdarlıq"]:::new
+    K2["Gündaxili 1–8 saat<br/>kölgədə"]:::new
+    K3["1–3 gün"]:::warn
+    K4["10 gün"]:::warn
+    K5["1 ay +"]:::warn
+  end
+
+  P["PROQNOZ MƏRKƏZİ<br/>hər üfüqdə 1 rəsmi kart"]:::warn
+  SB["BEYİN YUVASI B · STRATEQ<br/>izah, ssenari, yeni fərziyyə<br/>(güclü model)"]:::slot
+  J["HAKİM<br/>kartları, qaydaları, beyinləri ölçür<br/>status: sübut / sınaq / yox"]:::ok
+  W["SAYT VİTRİNİ"]:::ok
+
+  subgraph L6["6 · TİCARƏT MƏRKƏZİ"]
+    Q1["Strategiya kitabçası<br/>yalnız sübut olunmuş qaydalar"]:::new
+    Q2["Ölçü: volatilliyə görə, zərf daxilində"]:::new
+    SC["BEYİN YUVASI C · NƏZARƏTÇİ<br/>yalnız ləğv və ya azaltma"]:::slot
+    Q3["RİSK MÜHAFİZƏÇİSİ · veto"]:::ok
+    Q4["İcra: Capital.com, Bybit, Coinbase"]:::ok
+  end
+
+  L1 --> L2
+  D2 --> SA --> H3
+  L2 --> L3 --> L4 --> P
+  P --> W
+  SB -. "mətn" .-> W
+  P --> SB
+  P -- "uyğun üfüq + sübut" --> Q1 --> Q2 --> SC --> Q3 --> Q4
+  Q4 -. "nəticə" .-> D7
+  J -. "status və çəki" .-> L4
+  J -. "status" .-> P
+  J -. "icazə" .-> Q1
+  SB -. "fərziyyə sınağa" .-> J
+  Z --> Q2
+  Z --> Q3
+</pre>
+  </div>
+</section>
+
+<section id="methods">
+  <h2><span class="n">03</span>Analiz üsulları: saytda nə var, elm nə deyir, qərar nədir</h2>
+  <p>Hər üsulun rolu üç növdən biridir. <b>Siqnal</b> istiqamət verir. <b>Filtr</b> girişi bağlayır və ya açır. <b>Səviyyə</b> stopun və hədəfin yerini göstərir. Elmi sübutu olmayan üsul siqnal ola bilməz.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Üsul</th><th>Saytda</th><th>Elmi sübut</th><th>Qərar və rol</th></tr></thead>
+    <tbody>
+      <tr class="grp"><td colspan="4">Texniki analiz</td></tr>
+      <tr><td class="k">Trend, momentum (1–12 ay)</td><td><span class="pill ok">var</span> confident.py (20/120/250 sessiya)</td><td>Güclü: 58 fyuçersdə, qızıl daxil, 100 ildən çox (Moskowitz və b. 2012, AQR)</td><td><span class="pill warn">əsas siqnal</span> 10 gün və 1 ay+ masalarının nüvəsi, ölçü volatilliyə görə</td></tr>
+      <tr><td class="k">Breakout (Donchian kanalı)</td><td><span class="pill warn">var, ancaq tədqiqatda</span> p5lab.py</td><td>Qarışıq–güclü, klassik trend qaydası (Park və Irwin 2007)</td><td><span class="pill warn">siqnal</span> kitabçaya keçir, kanal ucları stop üçün</td></tr>
+      <tr><td class="k">Hərəkətli ortalamalar, MACD</td><td><span class="pill ok">var</span> technical.py (EMA20/50, MACD)</td><td>Trendin səs-küylü forması</td><td><span class="pill ok">filtr</span> ayrıca səs sayılmır, momentumu təkrarlamasın</td></tr>
+      <tr><td class="k">Bazar quruluşu (HH/HL), ADX</td><td><span class="pill ok">var</span> technical.py</td><td>Trend filtri kimi məntiqlidir</td><td><span class="pill ok">filtr</span> üst zaman çərçivəsinə uyğunluq</td></tr>
+      <tr><td class="k">RSI, Bollinger</td><td><span class="pill ok">var</span> technical.py, intraday.py</td><td>Zəif</td><td><span class="pill ok">filtr</span> "uzanmış hərəkəti qovma", siqnal deyil</td></tr>
+      <tr><td class="k">ATR</td><td><span class="pill ok">var</span></td><td>Proqnoz üçün deyil, risk ölçüsüdür</td><td><span class="pill ok">səviyyə və ölçü</span> stop məsafəsi və mövqe ölçüsü</td></tr>
+      <tr><td class="k">Dəstək və müqavimət</td><td><span class="pill ok">var</span> technical.py (≥2 toxunma)</td><td>Qarışıq: stop əmrləri bu səviyyələrdə yığılır (Osler, NY Fed)</td><td><span class="pill ok">səviyyə</span> stop aydın səviyyənin arxasına</td></tr>
+      <tr><td class="k">Yuvarlaq rəqəmlər (4000, 4050)</td><td><span class="pill bad">yox</span></td><td>Qarışıq: əmrlər yuvarlaq rəqəmlərdə yığılır (Osler)</td><td><span class="pill new">səviyyə, əlavə olunur</span> ucuz, sadə</td></tr>
+      <tr><td class="k">Fibonacci</td><td><span class="pill warn">var</span> levels.py, radar.py</td><td>Yoxdur: böyük testlərdə 38/50/62 % səviyyələri digərlərindən fərqlənmir</td><td><span class="pill bad">siqnal deyil</span> qrafikdə qalır, ticarət çəkisi sıfır</td></tr>
+      <tr><td class="k">Pivot nöqtələri</td><td><span class="pill warn">var</span> levels.py</td><td>Zəif</td><td><span class="pill bad">siqnal deyil</span> yalnız göstərmək üçün</td></tr>
+      <tr><td class="k">Sessiyalar (Asiya, London, NY, LBMA auksionu)</td><td><span class="pill warn">qismən</span> prosession.py, 13–21 UTC qaydası</td><td>Qarışıq: həcm və volatillik dəyişir, istiqamət sübut olunmayıb</td><td><span class="pill ok">filtr</span> auksion və rəqəm anında yeni giriş yoxdur</td></tr>
+      <tr><td class="k">Açılış diapazonu breakout</td><td><span class="pill bad">yox</span></td><td>Qarışıq: xərclərdən sonra təxminən sıfır</td><td><span class="pill new">yalnız kölgədə sınaq</span></td></tr>
+      <tr><td class="k">VWAP, həcm profili</td><td><span class="pill bad">yox</span></td><td>Proqnoz üçün deyil; spot qızılın mərkəzi həcmi yoxdur</td><td><span class="pill bad">əlavə edilmir</span> COMEX həcmi olmadan mənasızdır</td></tr>
+      <tr><td class="k">Şam fiqurları, Elliott, Ichimoku, divergensiya</td><td><span class="pill bad">yox</span></td><td>Yoxdur və ya zəif (Marshall və b. 2006; təkrar testlər)</td><td><span class="pill bad">əlavə edilmir</span></td></tr>
+      <tr class="grp"><td colspan="4">Fundamental analiz</td></tr>
+      <tr><td class="k">Real faizlər (10 illik TIPS)</td><td><span class="pill ok">var</span> macrodata.py, marketlinks.py</td><td>2001–2021 güclü, 2022-dən zəifləyib (Chicago Fed, RBC)</td><td><span class="pill ok">filtr</span> əlaqə "normal" olanda çəki alır, "qırıq" olanda yox; artıq belə işləyir</td></tr>
+      <tr><td class="k">Dollar</td><td><span class="pill ok">var</span> Fed geniş indeksi</td><td>Mənfi əlaqə var, amma qeyri-sabitdir</td><td><span class="pill ok">filtr</span> eyni əlaqə yoxlaması ilə</td></tr>
+      <tr><td class="k">ABŞ rəqəm sürprizi (NFP, CPI, FOMC)</td><td><span class="pill warn">var, gecikir</span> historical.py, eventprep.py</td><td>Güclü, amma reaksiya dəqiqələr içində bitir (Elder və b. 2012)</td><td><span class="pill new">filtr + qısa siqnal</span> standart sürpriz ölçüsü; rəqəm anında kənarda dur</td></tr>
+      <tr><td class="k">Risk-off, sığınacaq effekti</td><td><span class="pill bad">yox</span></td><td>Güclü, amma qısa: böyük səhm şokundan sonra təxminən 15 gün (Baur və Lucey 2010)</td><td><span class="pill new">şərti siqnal, əlavə olunur</span> səhm indeksləri broker qiymətindən</td></tr>
+      <tr><td class="k">Mərkəzi bank alışı</td><td><span class="pill ok">var</span> cbreserves.py (IMF)</td><td>2022-dən əsas struktur səbəb</td><td><span class="pill ok">fon</span> 1 ay+ masasında rejim</td></tr>
+      <tr><td class="k">COT mövqeyi</td><td><span class="pill ok">var</span> localmarket.py</td><td>Zəif, ancaq ucqar hallarda</td><td><span class="pill ok">filtr</span> kütlə ucqar yığılanda ölçü azalır</td></tr>
+      <tr><td class="k">ETF axını (GLD, IAU)</td><td><span class="pill bad">bilərəkdən yox</span></td><td>Qarışıq, əsasən qiymətlə eyni anda hərəkət edir</td><td><span class="pill bad">əlavə edilmir</span> şərtlər avtomatik istifadəyə icazə vermir</td></tr>
+      <tr><td class="k">Opsion volatilliyi (GVZ)</td><td><span class="pill bad">bilərəkdən yox</span></td><td>Gözlənilən aralıq üçün faydalıdır</td><td><span class="pill bad">indi yox</span> Cboe lisenziyası; öz volatilliyimiz (Model Lab) əvəz edir</td></tr>
+      <tr><td class="k">Fiziki premium (Çin, Hindistan)</td><td><span class="pill bad">yox</span></td><td>Zəif: LBMA testi "məyusedici"</td><td><span class="pill bad">əlavə edilmir</span></td></tr>
+      <tr><td class="k">Mövsümilik</td><td><span class="pill ok">var</span> seasonality.py</td><td>Qarışıq və zəifləyir</td><td><span class="pill warn">çəki azalır</span> yalnız etiket</td></tr>
+      <tr><td class="k">Qızıl/gümüş nisbəti</td><td><span class="pill ok">var</span> radar.py, Pult</td><td>Zəif</td><td><span class="pill ok">göstərmək üçün</span></td></tr>
+      <tr class="grp"><td colspan="4">Xəbər və statistik modellər</td></tr>
+      <tr><td class="k">Xəbər qiymətləndirməsi</td><td><span class="pill ok">var</span> №31, intel.py, news_features</td><td>Səhmlərdə müsbət (Lopez-Lira və Tang); qızılda sübut yoxdur</td><td><span class="pill warn">kölgədə əlamət</span> Hakim sübut edənə qədər çəkisi yoxdur</td></tr>
+      <tr><td class="k">Statistik modellər (GARCH, HAR, ARIMA və s.)</td><td><span class="pill ok">var</span> modellab.py (9 model)</td><td>Volatillik və aralıq üçün güclüdür, istiqamət üçün yox</td><td><span class="pill ok">aralıq</span> hər kartın aralığı buradan gəlir</td></tr>
+      <tr><td class="k">Proqnozların birləşdirilməsi</td><td><span class="pill warn">dağınıq</span> 7 proqnozçu</td><td>Bir neçə zəif siqnalın sadə birləşməsi tək siqnaldan yaxşıdır (Rapach və b. 2010)</td><td><span class="pill warn">bir xəttə yığılır</span> bərabərə yaxın çəkilər, mürəkkəb uyğunlaşdırma yox</td></tr>
+      <tr><td class="k">Volatilliyə görə ölçü</td><td><span class="pill bad">yox</span> (sabit faiz var)</td><td>Gəlir artırmır, amma ucqar itkiləri azaldır (Harvey və b. 2018)</td><td><span class="pill new">məcburi ölçü qatı</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="horizons">
+  <h2><span class="n">04</span>Üfüq masaları: hər masa nə ilə işləyir</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Masa</th><th>Kartda nə göstərir</th><th>Siqnallar</th><th>Filtrlər</th><th>Ticarət</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Anlıq · 1–60 dəq</td><td>Gözlənilən hərəkət aralığı, "rəqəm 12 dəqiqəyə çıxır", "spred genişdir"</td><td>İstiqamət yoxdur</td><td>Təqvim, spred, sessiya</td><td><span class="pill bad">yox</span></td></tr>
+      <tr><td class="k">Gündaxili · 1–8 saat</td><td>Aralıq + ehtimal, status "sınaq"</td><td>intraday.py rejim seçimi, sürprizdən sonrakı hərəkət</td><td>Gündəlik trend, sessiya, təqvim</td><td><span class="pill warn">kölgə</span> sübutdan sonra kiçik ölçü</td></tr>
+      <tr><td class="k">1–3 gün</td><td>Aralıq, ehtimal, risk-off xəbərdarlığı</td><td>1 günlük dönüş qaydası (confident.py), risk-off sonrası</td><td>Rejim, faiz əlaqəsi, COT</td><td><span class="pill warn">sübutdan asılı</span></td></tr>
+      <tr><td class="k">10 gün</td><td>İstiqamət ehtimalı + aralıq</td><td>Momentum 20 sessiya, breakout</td><td>Üst çərçivə trendi, COT ucqar halı</td><td><span class="pill ok">əsas üslub</span></td></tr>
+      <tr><td class="k">1 ay +</td><td>Fon istiqaməti, rejim</td><td>Momentum 120/250 sessiya</td><td>Mərkəzi bank rejimi, real faiz əlaqəsi</td><td><span class="pill ok">əsas üslub</span> ölçü əmsalı verir</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Bir dəqiqəlik istiqaməti göstərməmək saytın zəifliyi deyil. Bu, dürüstlükdür: o üfüqdə elmi sübut yoxdur, peşəkar xəbər lentləri də millisaniyələrlə işləyir. Saytda kartın yanında həmişə statusu göstərilir.</p>
+</section>
+
+<section id="brains-final">
+  <h2><span class="n">05</span>Beyinlər: hər yuva üçün müqayisə və seçim</h2>
+  <p>Seçim koddakı keçmiş vəziyyətə görə yox, hər işin tələbinə və müstəqil ölçmələrə görə edilib. [M] müstəqil ölçmə, [V] provayderin öz iddiasıdır. Qiymətlər 1 milyon token üçündür (giriş / çıxış).</p>
+
+  <h3>Yuva 1 · Kəşfiyyatçı: ilk xəbəri tez tapmaq</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>Grok (xAI)</th><th>OpenAI</th><th>Anthropic</th><th>Gemini</th></tr></thead>
+    <tbody>
+      <tr><td class="k">X-də axtarış</td><td><span class="pill ok">var, daxili</span> [V]</td><td><span class="pill bad">yox</span></td><td><span class="pill bad">yox</span></td><td><span class="pill bad">yox</span></td></tr>
+      <tr><td class="k">Veb axtarış, 1000 sorğu</td><td class="num">5 $</td><td class="num">10 $</td><td class="num">10 $</td><td class="num">14 $</td></tr>
+      <tr><td class="k">Ölçülmüş sürət</td><td>veb ~12 san, X ~45 san (bir test) [M]</td><td colspan="3">ölçmə tapılmadı</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Seçim: Grok.</b> X-i daxildən axtaran yeganə provayderdir, veb axtarışı da ən ucuzudur. <b>Məhdudiyyət:</b> 45 saniyə ən sürətli xəbərdarlıq deyil. Ona görə əsas sürəti xəbər lenti verir, Grok isə X-də ikinci yoxlama və şayiə tutucusudur. Tapdığı hər şey "yoxlanmamış" kimi gəlir.</p>
+
+  <h3>Yuva 2 · Oxuyucu: xəbəri sərt formaya salmaq, uydurmamaq</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>OpenAI nano</th><th>Gemini Flash-Lite</th><th>Anthropic Haiku 5.5</th><th>Grok Fast</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Uydurma faizi (Vectara, oktyabr 2026)</td><td class="num">3.1 % · 2-ci yer [M]</td><td class="num">3.3 % · 3-cü yer [M]</td><td>ölçülməyib</td><td class="num">17.8 % [M]</td></tr>
+      <tr><td class="k">Sərt cavab forması</td><td>var</td><td>var</td><td>var</td><td>var</td></tr>
+      <tr><td class="k">Qiymət</td><td class="num">təsdiqlənməyib</td><td class="num">0.10 / 0.40 $</td><td class="num">0.10 / 0.50 $</td><td class="num">0.20 / 0.50 $</td></tr>
+      <tr><td class="k">Toplu endirim</td><td>təsdiqlənməyib</td><td>~50 %</td><td>50 %</td><td>20 %, məhdud</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Seçim: OpenAI nano, ehtiyat Gemini Flash-Lite.</b> İkisinin də müstəqil ölçülmüş uydurma faizi ən aşağıdır. <b>Grok bu yuvaya qoyulmur:</b> uydurma faizi 5 dəfə yüksəkdir. Haiku ölçülməyib, ona görə ilk iki həftə Hakim 200 qızıl başlığı üzərində üçünü yarışdırır. Qalib yuvada qalır.</p>
+
+  <h3>Yuva 3 · Strateq: izah, ssenari, yeni qayda fikri</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>Anthropic Opus 5.5</th><th>Gemini 4 Argon</th><th>OpenAI</th><th>Grok</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Vals maliyyə agenti testi</td><td class="num">67.85 % · 1-ci [M]</td><td class="num">67.66 % · praktik bərabər [M]</td><td>görünmədi</td><td>təsdiqlənməyib</td></tr>
+      <tr><td class="k">Vals maliyyə indeksi</td><td class="num">65.59 % · 1-ci [M]</td><td colspan="3">—</td></tr>
+      <tr><td class="k">Qiymət</td><td class="num">4 / 20 $</td><td class="num">4 / 20 $ (1 dekabrdan)</td><td class="num">2 / 10 $ (sol)</td><td>təsdiqlənməyib</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Seçim: Claude Opus 5.5, ehtiyat Gemini 4.</b> Maliyyə testlərində birinci yerdədir. Bu yuvada sorğu azdır, ona görə yüksək qiymət ümumi xərcə az təsir edir. Opus-un uydurma faizi (9.9 %) aşağı deyil. Ona görə Strateqə yalnız kodun hesabladığı rəqəmlər verilir, faktlarda olmayan rəqəm isə cavabdan atılır.</p>
+
+  <h3>Yuva 4 · Ticarət Nəzarətçisi: təsdiq, azalt və ya ləğv et</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>Anthropic</th><th>OpenAI</th><th>Gemini</th><th>Grok</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Özünə həddən artıq güvən (KalshiBench, xəta, az olan yaxşıdır)</td><td class="num">0.120 · ən yaxşı, yeganə müsbət nəticə [M]</td><td class="num">0.395 · ən pis [M]</td><td>təsdiqlənməyib</td><td>təsdiqlənməyib</td></tr>
+      <tr><td class="k">Real pul yarışması</td><td>1-ci mövsümdə iştirak etməyib</td><td class="num">GPT-5: −62.66 %</td><td>1.5-ci mövsümdə 3-cü</td><td>1-ci mövsüm itki, 1.5-ci qalib</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Seçim: Claude Sonnet 5.5, ikinci rəy Gemini.</b> Nəzarətçinin əsas işi özünə həddən artıq güvənməməkdir, mövcud yeganə ölçmə də Claude ailəsinin xeyrinədir. Eyni test göstərir ki, uzun düşünmə özünə güvəni pisləşdirir. Ona görə orta düşünmə səviyyəsi seçilir. İki model razılaşmasa, sövdələşmə azaldılır və ya ləğv olunur, heç vaxt böyüdülmür.</p>
+  <p class="note">Bu, 2-ci versiyadakı səhvimi düzəldir. Orada Nəzarətçi üçün OpenAI yazmışdım. Ölçmə isə OpenAI-ın bu xüsusiyyətdə ən pis nəticə göstərdiyini deyir.</p>
+
+  <h3>Son ticarət qərarı: heç bir beyin</h3>
+  <p>Alpha Arena-nın 1-ci mövsümündə Qwen +22 % qazanıb, GPT-5 −62.66 % itirib. 1.5-ci mövsümdə isə Grok qalib olub. Qaliblər hər dəfə dəyişib, təşkilatçılar özləri də "bəxt ola bilər" deyiblər. LiveTradeBench göstərib ki, ümumi reytinq ticarət nəticəsini proqnozlaşdırmır. KalshiBench-ə görə modellər "90 %-dən çox əminəm" deyəndə 27 % hallarda səhv çıxıblar. Ona görə qərarı sübut olunmuş qayda verir, beyin onu yalnız azalda və ya ləğv edə bilər.</p>
+
+  <h3>Bir xəbər gələndə beyinlər birlikdə necə işləyir</h3>
+  <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant L as Xəbər lenti · kod
+  participant G as Kəşfiyyatçı · Grok
+  participant H as Oxuyucu · OpenAI nano
+  participant P as Proqnoz Mərkəzi · kod
+  participant S as Strateq · Claude Opus
+  participant T as Ticarət Mərkəzi · kod
+  participant N as Nəzarətçi · Claude Sonnet + Gemini
+  participant R as Risk və Zərf · kod
+  participant J as Hakim · statistika
+  L->>H: yeni başlıq
+  G->>H: X-də tapıntı, «yoxlanmamış»
+  H->>H: iki mənbəni tutuşdurur
+  H->>P: təsdiqlənmiş hadisə, sərt formada
+  P->>P: masalar kartları yeniləyir
+  P->>S: yeni kartlar
+  S-->>P: saytda izah
+  P->>T: uyğun üfüq + «sübut» statuslu kart
+  T->>T: kitabça qaydası işə düşür, ölçü hesablanır
+  T->>N: sövdələşmə təklifi
+  N-->>T: təsdiq / azalt / ləğv + səbəb
+  T->>R: son təklif
+  R-->>T: zərf daxilindədir, broker icra edir
+  J-->>H: başlıq dəqiqliyini ölçür
+  J-->>N: ləğvlərin düzlüyünü ölçür
+</pre>
+  </div>
+
+  <h3>Təxmini aylıq xərc</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Yuva</th><th>Fərziyyə</th><th>Ayda</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Oxuyucu</td><td>gündə 1000 başlıq × 500 token</td><td class="num">~2 $</td></tr>
+      <tr><td class="k">Strateq</td><td>gündə 40 sorğu × 5000 giriş + 1000 çıxış token, Opus 5.5</td><td class="num">~50 $</td></tr>
+      <tr><td class="k">Nəzarətçi</td><td>gündə 10 təklif × 2 model</td><td class="num">~5 $</td></tr>
+      <tr><td class="k">Kəşfiyyatçı</td><td>saatda bir X axtarışı; X postlarına görə ödəniş qaydası dəyişib</td><td class="num">dəqiq deyil, ~5–20 $</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Bu, hesablamadır, ölçmə deyil. Real rəqəmi ilk ayın jurnalı göstərəcək. Hər yuvanın öz xərc limiti olacaq.</p>
+
+  <h3>10 API qoşsaq nə olar</h3>
+  <p>Hər əlavə beyin yalnız öz yuvasında Hakimin ölçdüyü rəqəmi yaxşılaşdırırsa saxlanılır. Eyni işə üç beyin qoymaq xərci və gecikməni üç dəfə artırır, nəticə isə avtomatik yaxşılaşmır. İki beyin yalnız bir yerdə məntiqlidir: Nəzarətçidə. Orada fikir ayrılığı ehtiyatlılığa çevrilir.</p>
+</section>
+
+<section id="passport">
+  <h2><span class="n">05ə</span>Beyinlərin sayı və seçimi necə müəyyən olunur</h2>
+  <p>Qayda: <b>əvvəl iş, sonra beyin.</b> Sistemdəki hər iş bu sınadan keçir. Beyin yalnız kodun edə bilmədiyi işə verilir.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  A["Sistemdəki bir iş"] --> B{"İnsan dilini oxumaq, yazmaq<br/>və ya internetdə axtarmaq lazımdır?"}
+  B -- "Xeyr" --> C["KOD edir<br/>qiymət, proqnoz riyaziyyatı, ölçü, risk, əmr"]
+  B -- "Bəli" --> D{"Qaydayla, açar sözlə həll olunur?"}
+  D -- "Bəli" --> C
+  D -- "Xeyr" --> E["BEYİN YUVASI açılır<br/>pasportu yazılır"]
+  E --> F["Pasportdakı tələblərə görə<br/>provayderlər müqayisə olunur"]
+  F --> G["İlk seçim: müstəqil ölçmələr"]
+  G --> H["Hakim bizim məlumatda ölçür"]
+  H --> I{"Başqa provayder 30 gündə<br/>açıq-aydın daha yaxşıdır?"}
+  I -- "Bəli" --> J["Admin səhifəsində tövsiyə:<br/>bu yuvada beyni dəyiş"]
+  I -- "Xeyr" --> H
+</pre>
+  </div>
+  <div class="tbl"><table>
+    <thead><tr><th>İş</th><th>Dil və ya axtarış lazımdır?</th><th>Kim edir</th></tr></thead>
+    <tbody>
+      <tr><td>Qiyməti almaq, şamlar</td><td>Xeyr</td><td>Kod</td></tr>
+      <tr><td>Trend, ATR, aralıq, proqnoz kartı</td><td>Xeyr</td><td>Kod</td></tr>
+      <tr><td>Sövdələşmənin ölçüsü, risk, zərf, əmr</td><td>Xeyr</td><td>Kod</td></tr>
+      <tr><td>Qaydanın sınağı, statuslar</td><td>Xeyr</td><td>Kod (Hakim)</td></tr>
+      <tr><td>X-də və vebdə ilk xəbəri tapmaq</td><td>Bəli, axtarış</td><td><span class="pill gold">Yuva 1 · Kəşfiyyatçı</span></td></tr>
+      <tr><td>Xəbəri başa düşüb sərt formaya salmaq</td><td>Bəli, oxumaq</td><td><span class="pill gold">Yuva 2 · Oxuyucu</span></td></tr>
+      <tr><td>Kartları izah etmək, ssenari, yeni qayda fikri</td><td>Bəli, yazmaq və düşünmək</td><td><span class="pill gold">Yuva 3 · Strateq</span></td></tr>
+      <tr><td>Təklifi kontekstlə yoxlamaq (“bu gün Fed iclası var, xəbər ziddir”)</td><td>Bəli, oxumaq və mühakimə</td><td><span class="pill gold">Yuva 4 · Nəzarətçi</span></td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Nəticə: 4 yuva.</b> Bu, ixtiyari rəqəm deyil. Sınadan keçən işlərin sayı bu qədərdir. Yeni iş əlavə olunsa, o da eyni sınadan keçir.</p>
+  <h3>Yuva pasportu: nümunə, Oxuyucu</h3>
+  <div class="tbl"><table>
+    <tbody>
+      <tr><td class="k">İşi</td><td>Başlığı oxuyur: nə oldu, hansı metal, hansı istiqamət, nə qədər güclü, mənbə</td></tr>
+      <tr><td class="k">Giriş / çıxış</td><td>Başlıq mətni / sərt JSON forma</td></tr>
+      <tr><td class="k">Tələblər və çəkisi</td><td>Uydurmamaq 40 % · sərt forma 20 % · qiymət 20 % · sürət 20 %</td></tr>
+      <tr><td class="k">Hakimin ölçüsü</td><td>200 işarələnmiş qızıl başlığında düzgün cavab faizi, uydurma faizi, 1000 başlığın qiyməti, orta gecikmə</td></tr>
+      <tr><td class="k">İlk seçim və səbəbi</td><td>OpenAI nano: Vectara-da uydurma 3.1 %, ən aşağılardan biri</td></tr>
+      <tr><td class="k">Dəyişmə qaydası</td><td>Başqa provayder 30 gün ərzində ümumi balda 5 xalı keçərsə, admin səhifəsində tövsiyə çıxır</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Hər yuvanın belə pasportu admin səhifəsində görünür. Ona görə “bu beyin niyə buradadır” sualının cavabı həmişə göz önündədir: hansı tələblər var, onların çəkisi nədir və bu ay hansı provayder nə qədər bal toplayıb.</p>
+</section>
+
+<section id="why">
+  <h2><span class="n">05a</span>Yeni plan köhnədən niyə güclüdür</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Köhnə plan</th><th>Yeni plan</th><th>Əsas</th></tr></thead>
+    <tbody>
+      <tr><td>Bir süni intellekt həm proqnoz verirdi, həm ölçünü seçirdi, həm də 55 ayarı dəyişirdi</td><td>Proqnoz, qərar, nəzarət və risk ayrı yerlərdədir</td><td>Grok-un öz girişləri −49.73 $. Alpha Arena-da itkilər çox ticarət, komissiya və leverajdan gəlib</td></tr>
+      <tr><td>Qaydalar elə həmin itirilmiş sövdələşmələr üzərində qurulurdu</td><td>Qayda real pula yalnız görmədiyi məlumatda sınaqdan keçəndən sonra çıxır</td><td>Həddən artıq uyğunlaşdırma riski (Bailey və López de Prado)</td></tr>
+      <tr><td>1 günlük proqnoz 30–120 dəqiqəlik sövdələşməni idarə edirdi</td><td>Sövdələşmə öz müddətinə uyğun kartla açılır</td><td>Kodun öz qeydləri</td></tr>
+      <tr><td>Fibonacci və pivotlar giriş qaydasında idi</td><td>Siqnal ancaq elmi sübutu olan üsuldan gəlir</td><td>Trend: 100 ildən çox sübut. Fibonacci: sübut yoxdur</td></tr>
+      <tr><td>Grok pul limitini qaldıra bilirdi</td><td>Zərfi heç bir beyin dəyişə bilməz</td><td>"budget_usd" ayarı Grok-un dəyişə bildiyi siyahıda idi</td></tr>
+      <tr><td>Beyin bir provayderə bağlı idi, "grok" adı 41 fayla yayılmışdı</td><td>Yuva provayderdən asılı deyil, beyni seçən ölçmədir</td><td>Vectara, Vals, KalshiBench göstəriciləri işə görə fərqlidir</td></tr>
+      <tr><td>Beyin işləməyəndə ticarət qaydaları qarışırdı</td><td>Beyin olmasa da sistem işləyir</td><td>Grok söndürüləndə hesab başqa rejimlə ticarətə davam etdi</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><b>Nə vəd edilmir:</b> mənfəət. Yeni plan itkinin məlum səbəblərini aradan qaldırır və hər qaydanın real pula keçməzdən əvvəl qazandırdığını sübut etməsini tələb edir.</div>
+</section>
+
+<section id="slots">
+  <h2><span class="n">05b</span>Beyin yuvalarının qaydası</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Yuva</th><th>İşi</th><th>Edə bilməz</th><th>Tövsiyə olunan beyin</th><th>Əvəzi</th></tr></thead>
+    <tbody>
+      <tr><td class="k">A · Oxuyucu</td><td>Xəbəri oxuyur, strukturlu hadisəyə çevirir: nə oldu, hansı metal, hansı istiqamət, nə qədər güclü, mənbə</td><td>Qiymət yazmaq, proqnoz vermək</td><td>OpenAI nano</td><td>Gemini Flash-Lite, Claude Haiku (Hakimin testindən sonra)</td></tr>
+      <tr><td class="k">A+ · Kəşfiyyatçı (seçimlik)</td><td>X və veb axtarışı ilə şayiəni tez tutur, "yoxlanmamış" etiketi ilə</td><td>Tək mənbə kimi qərara təsir etmək</td><td>Grok: X axtarışı yalnız onda var</td><td>Yoxdur, söndürülə bilər</td></tr>
+      <tr><td class="k">B · Strateq</td><td>Kartları sözlə izah edir, ssenari yazır, yeni qayda fərziyyəsi təklif edir və Hakimə göndərir</td><td>Fərziyyəni özü işə salmaq</td><td>Claude Opus 5.5</td><td>Gemini 4</td></tr>
+      <tr><td class="k">C · Ticarət Nəzarətçisi</td><td>Hər təklif olunan sövdələşməni oxuyur, ləğv edir və ya ölçünü azaldır, səbəbini yazır. Gün sonunda yoxlama aparır</td><td>Sövdələşmə açmaq, ölçünü artırmaq, ayar dəyişmək</td><td>Claude Sonnet 5.5 + ikinci rəy Gemini</td><td>Claude Opus 5.5</td></tr>
+    </tbody>
+  </table></div>
+  <div class="grid2">
+    <div class="box">
+      <h3>Yuvanın qaydası (hamısı üçün eyni)</h3>
+      <ul>
+        <li>Girişdə faktlar sabit formada (JSON) verilir.</li>
+        <li>Çıxışda cavab sabit formada qaytarılır, hər sahə yoxlanılır.</li>
+        <li>Faktlarda olmayan rəqəm atılır. Bu yoxlama kodda artıq var: number guard.</li>
+        <li>Hər yuvanın xərc limiti və vaxt limiti var.</li>
+        <li>Beyin cavab verməsə, sistem beyinsiz davam edir.</li>
+        <li>Hər cavab Hakimin jurnalına yazılır və ölçülür.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <h3>Kodda bu nə qədər hazırdır</h3>
+      <ul>
+        <li>llm.py-də ortaq interfeys artıq var, Anthropic və OpenAI-ı dəstəkləyir.</li>
+        <li>Grok ayrıca yazılıb (grok.py) və "grok" adı 41 fayla yayılıb. Onu interfeysə adapter kimi qoşmaq lazımdır.</li>
+        <li>OpenAI cavab formasını sərt yoxlamır, bu əlavə olunmalıdır.</li>
+        <li>Gemini adapteri yoxdur.</li>
+        <li>Çətinlik: orta. Yeni sistem yazmaq lazım deyil, mövcud interfeys genişlənir.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="blocks">
+  <h2><span class="n">06</span>Bloklar, hissələr, suallarım və cavablarım</h2>
+  <p>Səkkiz blok bu ardıcıllıqla qurulur. Hər blok öz hazırlıq meyarını keçmədən növbəti blokun real pul hissəsinə keçilmir.</p>
+
+  <details class="block" open><summary><span class="n">B1</span>Kapital Zərfi <span class="s">sahibin yeganə qərarı</span></summary><div class="in">
+    <p><b>Hissələr:</b> zərf cədvəli; bütün hesablar üzrə ümumi açıq risk sayğacı; zərfin pozulmasında hər şeyi bağlayan dayandırıcı; zərfi yalnız sahibin parolu ilə dəyişən səhifə.</p>
+    <p><b>Var:</b> riskguard.py (5 % açıq risk, 15 % ümumi itki), sahibin 50 $ gündəlik limiti, Coinbase və Bybit üçün cblive.py limitləri (1000 $ hesab üçün nəzərdə tutulub). <b>Yoxdur:</b> bütün hesablar üçün bir zərf. "budget_usd" ayarını Grok dəyişə bilirdi.</p>
+    <div class="qa">
+      <div><span class="m">S</span><span class="q">Zərfin standart rəqəmləri nə olmalıdır?</span><span class="m">C</span><span>1000 $ zərf üçün: ümumi itki həddi 10 % (100 $). Gündəlik itki 3 % (30 $). Bir sövdələşmənin riski 0.5 % (5 $). Bütün açıq risk 3 %. Sahib istəsə rəqəmi dəyişir, sistem dəyişə bilməz.</span></div>
+      <div><span class="m">S</span><span class="q">Zərf pozulanda nə olur?</span><span class="m">C</span><span>Bütün sövdələşmələr bağlanır, ticarət dayanır, sahibə xəbər gedir. Yenidən başlamaq üçün sahib bir dəfə "Davam et" basır. Bu, sahibin ikinci və sonuncu qərarıdır.</span></div>
+    </div>
+    <p class="note">Hazırlıq meyarı: heç bir beyin və heç bir avtomatik mexanizm zərf rəqəmlərinə yaza bilmir; bunu testlər sübut edir.</p>
+  </div></details>
+
+  <details class="block"><summary><span class="n">B2</span>Məlumat qatı və mərkəzi <span class="s">tez, təmiz, eyni formada</span></summary><div class="in">
+    <p><b>Hissələr:</b> Capital.com canlı qiymət axını (kodda var, söndürülüb); hadisə xətti; standart sürpriz ölçüsü; risk-off üçün səhm indeksləri; sürətli xəbər lenti; gözləntili təqvim.</p>
+    <div class="qa">
+      <div><span class="m">S</span><span class="q">Pul ödəmədən nə qədər sürət qazanmaq olar?</span><span class="m">C</span><span>Qiymət gecikməsi 15 saniyədən 1 saniyəyə düşür: Capital.com axını pulsuzdur və kodda artıq var. Səhm indeksləri də eyni brokerdən pulsuz gəlir.</span></div>
+      <div><span class="m">S</span><span class="q">Pullu xidmətdən nə alınmalıdır?</span><span class="m">C</span><span>İki şey. Birincisi, gözləntili iqtisadi təqvim: FMP, ayda 49–69 $. Sürprizi düz ölçmək üçün lazımdır. İkincisi, sürətli xəbər: Alpaca, əvvəl pulsuz plan, lazım olsa 99 $. COMEX fyuçersləri (179 $) alınmır, çünki həcmin bizim üfüqlərdə fayda verdiyinə sübut yoxdur.</span></div>
+      <div><span class="m">S</span><span class="q">ETF axını və GVZ niyə yoxdur?</span><span class="m">C</span><span>Onların şərtləri avtomatik istifadəyə icazə vermir, kod da bunu bilərəkdən nəzərə alıb. Əvəzinə COT axını və öz volatillik modellərimiz işləyir.</span></div>
+    </div>
+    <p class="note">Hazırlıq meyarı: hər məlumatın vaxt damğası və gecikməsi saytda görünür; rəqəm çıxandan sonra 10 saniyə ərzində hadisə xəttində olur.</p>
+  </div></details>
+
+  <details class="block"><summary><span class="n">B3</span>Alətlər <span class="s">siqnal, filtr, səviyyə, aralıq</span></summary><div class="in">
+    <p><b>Hissələr:</b> 03-cü bölmədəki cədvəl üzrə. Momentum və breakout siqnal olur; risk-off siqnalı və yuvarlaq rəqəmlər əlavə olunur; Fibonacci və pivotun ticarət çəkisi sıfıra endirilir.</p>
+    <div class="qa">
+      <div><span class="m">S</span><span class="q">Fibonacci-ni sevən treyderlər var, niyə çıxarırıq?</span><span class="m">C</span><span>Çıxarmırıq, qrafikdə qalır. Ancaq ona görə pul riskə atılmır, çünki 600 səhm, 16 fyuçers və 6 valyuta üzrə testlər bu səviyyələrdə xüsusi heç nə tapmayıb.</span></div>
+      <div><span class="m">S</span><span class="q">Bir neçə alət eyni şeyi deyəndə necə olur?</span><span class="m">C</span><span>Eyni ailədən olan alətlər bir səs sayılır: MA, MACD və momentum bir ailədir. Bu qayda kodda artıq var (GROUP_OF), genişləndirilir.</span></div>
+    </div>
+    <p class="note">Hazırlıq meyarı: hər alətin rolu (siqnal, filtr və ya səviyyə) koda yazılıb; Hakim hər siqnal alətini ayrıca ölçür.</p>
+  </div></details>
+
+  <details class="block"><summary><span class="n">B4</span>Üfüq masaları və Proqnoz Kartı <span class="s">7 proqnozçu əvəzinə 1 kart</span></summary><div class="in">
+    <p><b>Hissələr:</b> kartın forması (üfüq, ehtimal, 50/80 % aralıq, status, etibarlılıq müddəti, mənbələr); beş masa; №18 kartları yığır; sayt kartı göstərir.</p>
+    <div class="qa">
+      <div><span class="m">S</span><span class="q">Uzun və qısa masa ziddiyyət təşkil edəndə nə olur?</span><span class="m">C</span><span>Heç biri o birini silmir, ikisi də saytda görünür. Ticarət sövdələşmənin müddətinə uyğun kartı götürür. Uzun karta qarşı açılan qısa sövdələşmənin ölçüsü yarı olur.</span></div>
+      <div><span class="m">S</span><span class="q">Hansı proqnozçular qalır?</span><span class="m">C</span><span>Model Lab aralıq verir. confident.py momentum siqnalı verir. №18 kartı yığır. vsq-1, adaptml, ayrıca debat və Qərar Mərkəzinin sayımı kartın içinə alət kimi girir və ya çıxır.</span></div>
+    </div>
+    <p class="note">Hazırlıq meyarı: sayt da, ticarət də yalnız kartı oxuyur; 80 % aralıq 10 haldan 8-də düz çıxır (indi 96 yoxlamada 74 %).</p>
+  </div></details>
+
+  <details class="block"><summary><span class="n">B5</span>Hakim <span class="s">kim nə qədər düz çıxır</span></summary><div class="in">
+    <p><b>Var və güclüdür:</b> Model Lab walk-forward, №21, backtest.py, overfit.py, dəyişdirilə bilməyən jurnallar. <b>Əlavə olunur:</b> ticarət qaydalarının yeni məlumatda sınağı, beyin yuvalarının ölçülməsi, statusların karta və kitabçaya ötürülməsi.</p>
+    <div class="qa">
+      <div><span class="m">S</span><span class="q">"Sübut" statusu nə deməkdir?</span><span class="m">C</span><span>Qayda görmədiyi dövrdə xərclər çıxılandan sonra "həmişə yuxarı" və "heç nə etmə" qaydalarını üstələyib. Statistik testdən keçib (kodda olan t ≥ 2, DSR). Ən azı 100 kölgə sövdələşməsi olub.</span></div>
+      <div><span class="m">S</span><span class="q">Statusu kim geri alır?</span><span class="m">C</span><span>Yenə Hakim. Hər həftə yoxlayır. Qayda 30 sövdələşmə ərzində gözləniləndən pis işləsə, "sınaq" statusuna qayıdır və real pulla işləməyi dayandırır.</span></div>
+    </div>
+    <p class="note">Hazırlıq meyarı: ayarları yalnız Hakim dəyişir; autopilot və automanager onun içinə yığılır.</p>
+  </div></details>
+
+  <details class="block"><summary><span class="n">B6</span>Ticarət Mərkəzi və Risk <span class="s">kitabça, ölçü, nəzarət, veto, icra</span></summary><div class="in">
+    <p><b>Kitabçanın qaydaları:</b> P1, günlərlə trend (10 gün və 1 ay+ kartları); P2, risk-off sonrası qızıl (1–3 gün); P3, gündaxili trend geri çəkilməsi sessiya pəncərəsində (kölgədə); F1, hadisə anında kənarda durma (filtr).</p>
+    <p><b>Çıxarılır:</b> Grok rejimi, "lean", "agents", "intraday" və "confident" rejimləri (kodun özü onları LOSING_MODES adlandırır), Claude vetosu (C yuvası əvəz edir), söndürülmüş hakim qapısı, Coinbase spot alışları (1.8 % komissiya, 13-dən 13 itki).</p>
+    <div class="qa">
+      <div><span class="m">S</span><span class="q">Günlərlə saxlanan sövdələşmədə gizli xərc varmı?</span><span class="m">C</span><span>Var. CFD-də gecəlik swap haqqı tutulur. Hakim hər qaydanı swap daxil olmaqla ölçməlidir. Bunu Capital.com hesabının real swap rəqəmləri ilə yoxlamaq lazımdır.</span></div>
+      <div><span class="m">S</span><span class="q">Ölçü necə hesablanır?</span><span class="m">C</span><span>Risk = zərfin 0.5 %-i. Stop məsafəsi ATR-dən gəlir. Bazar qızğın olanda mövqe kiçilir, sakit olanda böyüyür. Dörd metal eyni istiqamətdə açılırsa, onlar bir mərc sayılır və ümumi limitə düşür.</span></div>
+      <div><span class="m">S</span><span class="q">Grok söndürüləndən sonra indi nə ticarət edir?</span><span class="m">C</span><span>Koda görə: Grok rejimi standart olaraq "tam idarə"də qalır. Capital.com-da metallar "direction" rejimi ilə açılır, BTC və ETH şam girişi də işləyir. Bu, plan qurulana qədər dayandırılmalıdır, ya da kölgəyə keçirilməlidir.</span></div>
+    </div>
+    <p class="note">Hazırlıq meyarı: real pulla yalnız "sübut" statuslu qayda işləyir; hər sövdələşmədə hansı kartın, hansı qaydanın və hansı ölçü hesabının istifadə olunduğu jurnalda görünür.</p>
+  </div></details>
+
+  <details class="block"><summary><span class="n">B7</span>Beyin yuvaları <span class="s">dəyişdirilə bilən, ölçülən</span></summary><div class="in">
+    <p><b>Hissələr:</b> ortaq interfeys (llm.py əsasında); adapterlər: Anthropic, OpenAI (sərt forma ilə), xAI, Gemini; hər yuva üçün giriş və çıxış forması, xərc limiti, vaxt limiti; yuvanın jurnalı və Hakimin ölçməsi; admin səhifəsində yuvaya model seçimi.</p>
+    <div class="qa">
+      <div><span class="m">S</span><span class="q">Beyni dəyişəndə nə dəyişir?</span><span class="m">C</span><span>Admin səhifəsində bir seçim, məsələn "Yuva C: Anthropic Sonnet → OpenAI". Qaydalar, forma və limitlər eyni qalır. Hakim iki həftə ərzində köhnə və yeni beyni müqayisə edir.</span></div>
+      <div><span class="m">S</span><span class="q">Ticarət üçün ən yaxşı model hansıdır?</span><span class="m">C</span><span>Sübut olunmuş ən yaxşı model yoxdur. Alpha Arena-da qaliblər hər mövsüm dəyişib, sınaqlarda ümumi reytinq ticarət nəticəsini proqnozlaşdırmayıb. Ona görə C yuvasına yalnız ləğv və azaltma hüququ verilir, seçimi isə bizim öz ölçməmiz edir.</span></div>
+    </div>
+    <p class="note">Hazırlıq meyarı: üç yuvanın hər birində ən azı iki provayder sınaqdan keçib; beyin söndürüləndə sistemin işlədiyini testlər sübut edir.</p>
+  </div></details>
+
+  <details class="block"><summary><span class="n">B8</span>Sayt vitrini və hesabat <span class="s">baxan hər kəs etibar dərəcəsini görür</span></summary><div class="in">
+    <p><b>Hissələr:</b> beş kart yan-yana, status etiketləri ilə; hər kartın keçmiş dəqiqliyi; ticarət hesabatı (xərclərdən sonra, "heç nə etmə" ilə müqayisədə); zərfin vəziyyəti.</p>
+    <div class="qa">
+      <div><span class="m">S</span><span class="q">Saytda proqnozun "doğru" olduğunu necə göstəririk?</span><span class="m">C</span><span>Söz ilə yox, rəqəmlə: "son 60 kartda 80 % aralıq 49 dəfə tutub", "1 aylıq istiqamət 58 %, həmişə yuxarı 57 %". Rəqəm zəifdirsə, zəif görünür.</span></div>
+    </div>
+  </div></details>
+</section>
+
+<section id="buy">
+  <h2><span class="n">07</span>Nə almalı, nə etməli</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Nə</th><th>Kim</th><th>Xərc, aylıq</th><th>Nə vaxt</th></tr></thead>
+    <tbody>
+      <tr><td class="k">Yeni Anthropic açarı serverə</td><td>Siz və dostunuz</td><td class="num">mövcud limit 60 $</td><td>Sabah</td></tr>
+      <tr><td class="k">Grok-un tam söndürülməsi, avtomatik ticarətin kölgəyə keçirilməsi</td><td>Dostunuz (admin səhifəsi)</td><td class="num">0 $</td><td>Sabah</td></tr>
+      <tr><td class="k">Zərf rəqəmləri (standart: 1000 $, 10 %, 3 %, 0.5 %)</td><td>Siz</td><td class="num">0 $</td><td>B1</td></tr>
+      <tr><td class="k">Gözləntili iqtisadi təqvim (FMP)</td><td>Siz</td><td class="num">49–69 $</td><td>B2</td></tr>
+      <tr><td class="k">Sürətli xəbər lenti (Alpaca)</td><td>Siz</td><td class="num">0 $, lazım olsa 99 $</td><td>B2</td></tr>
+      <tr><td class="k">OpenAI və ya Gemini açarı (yuvaları müqayisə üçün)</td><td>Siz, seçimlik</td><td class="num">istifadəyə görə</td><td>B7</td></tr>
+      <tr><td class="k">Grok açarı (yalnız Kəşfiyyatçı yuvası üçün)</td><td>Siz, seçimlik</td><td class="num">istifadəyə görə</td><td>B7</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">Qiymətlər provayderlərin səhifələrindən axtarışla götürülüb, səhifələr birbaşa açıla bilmədi. Ödəmədən əvvəl yoxlanmalıdır. Alınmayanlar: COMEX fyuçers məlumatı (179 $), Trading Economics, ORATS, NewsAPI, ayda 999–2500 $ olan korporativ paketlər.</p>
+</section>
+
+<section id="result">
+  <h2><span class="n">08</span>Gözlənilən nəticə və ölçü</h2>
+  <div class="callout"><b>Vəd etmədiyim:</b> hər dəqiqə dəqiq al-sat siqnalı və zəmanətli mənfəət. Pərakəndə CFD hesablarının 74–89 %-i pul itirir (ESMA). Real pul yalnız Hakim "sübut" deyəndən sonra işləyir.</div>
+  <div class="grid2">
+    <div class="box"><h3>Proqnoz</h3><ul>
+      <li>Beş üfüqdə beş aydın kart, status etiketi ilə.</li>
+      <li>80 % aralıq həqiqətən 80 % tutur.</li>
+      <li>İstiqamət yalnız "həmişə yuxarı"nı üstələyən yerdə göstərilir. Tarixdə bu, ən çox 10 gün və 1 ay üfüqüdür.</li>
+    </ul></div>
+    <div class="box"><h3>Ticarət</h3><ul>
+      <li>Az, amma qaydası sübut olunmuş sövdələşmələr.</li>
+      <li>Sahib zərfdən başqa heç nəyə qarışmır.</li>
+      <li>Heç bir beyin təkbaşına sövdələşmə aça bilmir.</li>
+      <li>Ölçü: xərclərdən və swapdan sonra xalis nəticə, "heç nə etmə" ilə müqayisədə, ən azı 100 sövdələşmə üzərində.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="answers">
+  <h2><span class="n">09</span>Sizin tələbləriniz: cavab harada</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Tələb</th><th>Cavab</th></tr></thead>
+    <tbody>
+      <tr><td>Sahib qərar verməsin, yalnız ilk icazəni versin</td><td>01-ci bölmə, 1-ci qərar; B1 blokunda zərf və onun iki düyməsi</td></tr>
+      <tr><td>Beyin yerləri ayrı olsun, istənilən beyin qoyulsun</td><td>05 və B7: üç yuva, ortaq qayda, adapterlər</td></tr>
+      <tr><td>Hansı beyin harada daha yaxşı işləyir</td><td>05: tövsiyə və əvəzi; Hakim öz rəqəmlərimizlə yoxlayır</td></tr>
+      <tr><td>Texniki analiz, Fibonacci, fundamental və bilmədiyim üsullar</td><td>03: hər üsul ayrıca, saytda var ya yox, elmi sübut, qərar</td></tr>
+      <tr><td>Uzun, qısa, anlıq treyderlər</td><td>04: beş masa və hər birinin alətləri</td></tr>
+      <tr><td>Ticarət hissəsindəki hazır agentlər dərindən</td><td>B6: nə qalır, nə çıxır, indi nə ticarət edir</td></tr>
+      <tr><td>Bloklara bölmək, öz suallarını vermək</td><td>06: səkkiz blok, hər birində suallar və cavablar</td></tr>
+      <tr><td>Münasib pullu xidmətlər, şişirtmə olmadan</td><td>07</td></tr>
+      <tr><td>Yekun qərar, "haradan başlayaq" sualı olmadan</td><td>01 və 06-dakı sabit ardıcıllıq B1 → B8</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="sources">
+  <h2><span class="n">10</span>Mənbələr</h2>
+  <ul class="note">
+    <li>Trend: Moskowitz, Ooi, Pedersen (JFE 2012); Hurst, Ooi, Pedersen, AQR "A Century of Evidence on Trend-Following"; Park və Irwin (2007).</li>
+    <li>Volatilliyə görə ölçü: Harvey və b. (JPM 2018). Proqnozların birləşdirilməsi: Rapach, Strauss, Zhou (RFS 2010).</li>
+    <li>Fibonacci və şam fiqurları: Marshall, Young, Rose (JBF 2006); investing.com Fibonacci testi; QuantConnect Ichimoku təkrarı.</li>
+    <li>Dəstək və müqavimət: Osler (NY Fed 2000, 2003). London fix: Caminschi və Heaney (JFM 2014).</li>
+    <li>Makro: Elder, Miao, Ramchander (JBF 2012); Baur və Lucey (2010); Chicago Fed Letter 464; RBC "Gold's regime change"; Erb və Harvey (2013).</li>
+    <li>Mövsümilik: Baur (2013) və 2024 təkrarı. Şanxay premiumu: LBMA Alchemist 83.</li>
+    <li>Süni intellekt ticarətdə: Nof1 Alpha Arena 1 və 1.5-ci mövsüm; StockBench (arXiv 2510.02209); LiveTradeBench (2511.03628); FINSABER (2505.07078); Lopez-Lira və Tang (2304.07619).</li>
+    <li>Pərakəndə itkilər: ESMA. Qiymətlər: Twelve Data, FMP, Alpaca, Databento səhifələri (axtarış vasitəsilə).</li>
+  </ul>
+</section>
+
+</div>

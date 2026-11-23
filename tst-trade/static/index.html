@@ -1,0 +1,39 @@
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TST Trade</title><link rel="stylesheet" href="/static/app.css"></head><body>
+<header class="top">
+  <div class="brand">TST <b>Trade</b></div>
+  <span class="pill" id="feed">…</span>
+  <span class="note" id="mkt"></span>
+  <span class="sp"></span>
+  <span class="clock" id="clock"></span>
+  <a href="/admin">Admin</a>
+  <form method="post" action="/logout" style="margin:0"><button class="link" type="submit">Çıxış</button></form>
+</header>
+<main class="wrap">
+  <div class="tiles" id="tiles"></div>
+  <div class="main">
+    <div class="box">
+      <h2><span id="ctitle">Qrafik</span><span class="sp"></span>
+        <span class="seg" id="tfs"></span></h2>
+      <div class="chart" id="chart"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
+      <div class="legend">
+        <span><i style="background:var(--up)"></i>yuxarı şam</span>
+        <span><i style="background:var(--down)"></i>aşağı şam</span>
+        <span><i style="background:var(--gold);opacity:.25"></i>növbəti şam üçün 80 % aralıq</span>
+        <span><i style="background:var(--gold);opacity:.55"></i>50 % aralıq</span>
+        <span id="ovnote"></span>
+      </div>
+    </div>
+    <div class="box"><h2>Proqnoz kartları <span class="sp"></span><span class="note" id="fcupd"></span></h2>
+      <div class="cards" id="cards"></div></div>
+  </div>
+  <div class="box"><h2>Hakim: proqnozlar nə qədər düz çıxır <span class="sp"></span>
+      <span class="seg" id="modes"><button data-m="live" class="on">Canlı</button><button data-m="history">Tarixçə üzrə</button></span></h2>
+    <p class="note">Hər üsul iki bazis qaydası ilə yarışır: «Dəyişməz» (istiqamət yoxdur) və «Həmişə yuxarı». «Sübut» statusu
+      üçün üsul daha çox düz çıxmalı (p &lt; 0.05), Brier balı müsbət olmalı və kifayət qədər yoxlama yığılmalıdır.</p>
+    <div class="tbl" id="judge"></div></div>
+  <div class="box"><h2>Son yoxlanmış proqnozlar</h2><div class="tbl" id="journal"></div></div>
+</main>
+<script src="/static/chart.js"></script>
+<script src="/static/panel.js"></script>
+</body></html>
