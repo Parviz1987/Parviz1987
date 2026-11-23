@@ -119,6 +119,28 @@ def _candle_check(db: DB) -> dict:
     return out
 
 
+def _forecast_check(db: DB) -> dict:
+    """Do the stored history forecasts still match today's candles? price0 is fixed when a forecast is issued; if the
+    candles were later replaced by another source, the forecast was judged on prices that are no longer the series.
+    Per metal and short horizon: share of issues whose price0 differs (>0.05 %) from the close of the candle before
+    the issue time, and the «reversal» hit rate on matching vs differing issues."""
+    out: dict = {}
+    for sym in ("XAU", "XAG", "XPT", "XPD"):
+        for h, tf in (("15m", "15m"), ("30m", "30m"), ("1h", "1h")):
+            r = db.execute(
+                "SELECT COUNT(*) n, SUM(bad) nbad, AVG(CASE WHEN bad=0 THEN hit END) hit_ok, "
+                "AVG(CASE WHEN bad=1 THEN hit END) hit_bad, MIN(CASE WHEN bad=1 THEN issued_t END) t0, "
+                "MAX(CASE WHEN bad=1 THEN issued_t END) t1 FROM ("
+                " SELECT f.issued_t, f.hit, ABS(f.price0 / (SELECT c.c FROM candles c WHERE c.symbol=f.symbol "
+                "   AND c.tf=? AND c.t < f.issued_t ORDER BY c.t DESC LIMIT 1) - 1) > 0.0005 AS bad"
+                " FROM forecasts f WHERE f.symbol=? AND f.horizon=? AND f.mode='history' AND f.method='reversal' "
+                "   AND f.hit IS NOT NULL)", (tf, sym, h)).fetchone()
+            if r["n"]:
+                out[f"{sym}/{h}"] = {"n": r["n"], "differ": r["nbad"], "rev_hit_match": r["hit_ok"],
+                                     "rev_hit_differ": r["hit_bad"], "differ_from": r["t0"], "differ_to": r["t1"]}
+    return out
+
+
 def _security(db: DB) -> dict:
     from .security import Guard
     return Guard(db).summary()
@@ -196,6 +218,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "shadow_trading": _shadow(db),
         "pipeline": _pipeline(db, keys, engine, feeds, jobs),
         "candle_check": _candle_check(db),
+        "forecast_check": _forecast_check(db),
         "security": _security(db),
         "related": {**json.loads(db.get("related:epics") or "{}"),
                     "quotes": {c: engine.status(c, now) for c in json.loads(db.get("related:epics") or "{}").get("epics", {})}},
