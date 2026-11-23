@@ -238,7 +238,7 @@ function renderReaderScore(rs) {
 }
 function renderScout(d) {
   const x = d.scout;
-  if (!x) { $("scout").innerHTML = `<p class="note">${esc((d.scout_state && d.scout_state.message) || "Kəşfiyyatçı (Grok) hələ axtarmayıb: bazar açıq olanda 2 saatda bir, mühüm ABŞ rəqəmi ətrafında 20 dəqiqədə bir axtarır. xAI açarı lazımdır.")}</p>`; $("scmeta").textContent = ""; return; }
+  if (!x) { $("scout").innerHTML = `<p class="note">${esc((d.scout_state && d.scout_state.message) || "Kəşfiyyatçı (Grok) hələ axtarmayıb: bazar açıq olanda 4 saatda bir, mühüm ABŞ rəqəmi ətrafında 30 dəqiqədə bir axtarır. xAI açarı lazımdır.")}</p>`; $("scmeta").textContent = ""; return; }
   $("scmeta").textContent = `${x.brain} · ${new Date(x.ts * 1000).toLocaleString("az")}`;
   const items = x.items.filter((i) => nfilter === "all" || !i.metals.length || i.metals.includes(sym));
   $("scout").innerHTML = (x.mood ? `<p>${esc(x.mood)}</p>` : "") + (items.length ? items.map((i) => `<div class="nitem">

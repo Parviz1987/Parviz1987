@@ -56,7 +56,7 @@ STRATEGIST_SCHEMA = {
 NUM = re.compile(r"\d+(?:[.,]\d+)?")
 
 
-SCOUT_EVERY, SCOUT_EVENT_EVERY = 2 * 3600, 20 * 60
+SCOUT_EVERY, SCOUT_EVENT_EVERY = 4 * 3600, 30 * 60   # one search cost ~0.9 $ (counted high): the monthly cap lasts
 SCOUT_SYSTEM = (
     "You are the Scout of a precious-metals forecasting desk. Use X search and web search to find what moved or may "
     "move gold, silver, platinum and palladium in the LAST 3 HOURS: central banks and Fed speakers, US data surprises, "
@@ -212,7 +212,7 @@ class BrainJobs:
     async def tick(self, now: float | None = None) -> None:
         now = time.time() if now is None else now
         if now >= self.next_scout and self.feeds is not None:
-            # Every 2 hours while the market is open; every 20 minutes around a high-impact US release.
+            # Every 4 hours while the market is open; every 30 minutes around a high-impact US release.
             from .engine import market_open
             hot = self.feeds.event_mode(now) is not None
             self.next_scout = now + (SCOUT_EVENT_EVERY if hot else SCOUT_EVERY)
