@@ -30,7 +30,7 @@ RULES = [
      r"michigan|sentiment|jolts|job openings|housing starts|building permits|new home sales|existing home", -1),
     (r"interest rate decision|fed funds|federal funds", -1),
 ]
-WINDOW = {"1m": 15 * 60, "1h": 3600, "4h": 4 * 3600, "1d": 86400}
+WINDOW = {"15m": 15 * 60, "30m": 30 * 60, "1h": 3600, "4h": 4 * 3600, "1d": 86400}
 WEIGHT = {"High": 1.0, "Medium": 0.5}
 
 

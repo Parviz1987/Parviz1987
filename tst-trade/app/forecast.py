@@ -14,7 +14,7 @@ this moment says P = 0.5: the Judge then counts no hit or miss for it (only fore
             swing's direction; elsewhere no view.
 - session   (one hour) the same UTC hour's past up-share: metals are known to drift differently in Asian, London
             and New York hours. Shrunk toward 0.5 by its sample size.
-- surprise  (1 minute to 1 day) US releases in the window before the forecast: the figure against the estimate and
+- surprise  (15 minutes to 1 day) US releases in the window before the forecast: the figure against the estimate and
             what that usually means for gold (app/surprise.py). No release in the window: no view.
 - consensus the plain average of every other method's lean (P - 0.5) among those that have a view right now; no
             fitting to past results (so no hidden look-ahead). No view unless at least two methods agree in sum.
@@ -27,11 +27,13 @@ from __future__ import annotations
 import math
 
 # horizon -> (candle size, candles ahead)
-HORIZON_SPEC = {"1m": ("1m", 1), "1h": ("1h", 1), "4h": ("4h", 1), "1d": ("1d", 1), "3d": ("1d", 3),
+# No one-minute desk: a minute's move in gold (~1 $) is about twice the spread, and news reaches the brains 1-3
+# minutes late. 15 and 30 minutes are the shortest horizons where a signal can arrive in time and beat the cost.
+HORIZON_SPEC = {"15m": ("15m", 1), "30m": ("30m", 1), "1h": ("1h", 1), "4h": ("4h", 1), "1d": ("1d", 1), "3d": ("1d", 3),
                 "1w": ("1w", 1),
                 "10d": ("1d", 10), "1mo": ("1d", 21)}
 HORIZONS = {h: tf for h, (tf, _) in HORIZON_SPEC.items()}      # horizon -> candle size it is built from
-HORIZON_NAMES = {"1m": "1 dəqiqə", "1h": "1 saat", "4h": "4 saat (gün içi)", "1d": "1 gün", "3d": "3 gün",
+HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h": "4 saat (gün içi)", "1d": "1 gün", "3d": "3 gün",
                  "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
 METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro", "session", "surprise",
@@ -42,8 +44,8 @@ METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", 
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
                 "consensus": "Konsensus (hamısı birlikdə)"}
 BASELINES = ("rw", "up")
-LOOKBACK = {"1m": 15, "1h": 24, "4h": 18, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
-TREND_WINDOWS = {"1m": (5, 15, 60), "1h": (6, 24, 120), "4h": (6, 30, 120), "1d": (10, 50, 150),
+LOOKBACK = {"15m": 16, "30m": 16, "1h": 24, "4h": 18, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
+TREND_WINDOWS = {"15m": (4, 16, 96), "30m": (4, 16, 96), "1h": (6, 24, 120), "4h": (6, 30, 120), "1d": (10, 50, 150),
                  "1w": (4, 13, 26)}
 MIN_CANDLES = 30                                       # fewer finished candles: no forecast
 HISTORY_NEED = 200                                     # candles a desk is given (oldest first)
@@ -70,7 +72,7 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("macro")      # FRED is daily: the macro view only for daily candles
     if h != "1h":
         out.remove("session")    # hour-of-day only for the one-hour desk
-    if h not in ("1m", "1h", "4h", "1d"):
+    if h not in ("15m", "30m", "1h", "4h", "1d"):
         out.remove("surprise")   # a release moves the next minutes to a day; longer horizons drown it
     return tuple(out)
 
@@ -79,7 +81,7 @@ def target_time(issued_t: int, h: str) -> int:
     """When the forecast's target candle closes: k candles on; daily candles skip Saturday and Sunday."""
     from datetime import datetime, timezone
     tf, k = HORIZON_SPEC[h]
-    step = {"1m": 60, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800}[tf]
+    step = {"15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800}[tf]
     if tf != "1d":
         return issued_t + k * step
     t, left = issued_t, k

@@ -16,7 +16,7 @@ from .base import HistoryProvider, NotServed, PriceProvider, ProviderError, Quot
 from .. import netutil
 
 BASE_URL = "https://api.twelvedata.com"
-INTERVALS = {"1m": "1min", "5m": "5min", "15m": "15min", "1h": "1h", "4h": "4h", "1d": "1day", "1w": "1week"}
+INTERVALS = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min", "1h": "1h", "4h": "4h", "1d": "1day", "1w": "1week"}
 
 
 def td_symbol(symbol: str) -> str:

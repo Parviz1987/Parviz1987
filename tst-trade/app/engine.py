@@ -19,7 +19,7 @@ from .providers.twelvedata import TwelveDataHistory, TwelveDataPrices
 
 log = logging.getLogger("tst.engine")
 HISTORY_EVERY = 6 * 3600
-HISTORY_LIMIT = {"1m": 1500, "1h": 1500, "4h": 1500, "1d": 2000, "1w": 600}
+HISTORY_LIMIT = {"1m": 1500, "15m": 1500, "30m": 1500, "1h": 1500, "4h": 1500, "1d": 2000, "1w": 600}
 BACKTEST_MAX = 2000
 TICK_KEEP = 3 * 86400
 MINUTE_KEEP = 30 * 86400
@@ -190,6 +190,13 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:no_1m_desk"):
+            # The one-minute desk was removed: its history replay goes (derived data); its live results stay
+            # until the normal 30-day clean-up, as the record of why it was removed.
+            self.db.execute("DELETE FROM forecasts WHERE horizon='1m' AND mode='history'")
+            self.db.execute("DELETE FROM forecasts WHERE horizon='1m' AND scored_ts IS NULL")
+            self.history_state["ts"] = 0      # 15- and 30-minute history is loaded and replayed at once
+            self.db.put("migr:no_1m_desk", "1")
         if not self.db.get("migr:ranges_v2"):
             # Ranges now take their width from past move/volatility ratios. History forecasts are derived data:
             # replayed once so the Judge's range coverage describes the ranges in use. Live forecasts stay.
@@ -341,10 +348,12 @@ class Engine:
 
     # ---------- loop ----------
     def prune(self, now: float) -> None:
-        """Ticks live 3 days; one-minute candles and their scored forecasts 30 days (the Judge's one-minute verdict
-        covers the last month, which is also the most relevant one). Everything longer is kept."""
+        """Ticks live 3 days; one- and five-minute candles 30 days (the chart only); scored forecasts of the old
+        one-minute desk 30 days; 15- and 30-minute forecasts 180 days (the Judge's recent half year). The rest is kept."""
         self.db.execute("DELETE FROM ticks WHERE ts < ?", (now - TICK_KEEP,))
         self.db.execute("DELETE FROM candles WHERE tf IN ('1m', '5m') AND t < ?", (now - MINUTE_KEEP,))
+        self.db.execute("DELETE FROM forecasts WHERE horizon IN ('15m', '30m') AND scored_ts IS NOT NULL "
+                        "AND target_t < ?", (now - 180 * 86400,))
         self.db.execute("DELETE FROM forecasts WHERE horizon='1m' AND scored_ts IS NOT NULL AND target_t < ?",
                         (now - MINUTE_KEEP,))
 

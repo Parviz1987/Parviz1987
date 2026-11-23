@@ -132,16 +132,17 @@ def test_trend_makes_momentum_proven():
 def test_live_issue_and_score():
     db = mem()
     eng = Engine(db, KeyStore(db, SECRET), "demo", 15)
-    t = 1_700_000_000 // 60 * 60
+    t = 1_700_000_000 // 900 * 900
     for i in range(40):
-        candles.add_tick(db, "XAU", t + i * 60 + 1, 100 + (i % 3))
-    now = t + 40 * 60 + 2
+        candles.add_tick(db, "XAU", t + i * 900 + 1, 100 + (i % 3))
+    now = t + 40 * 900 + 2
     n = eng.issue_due(now)
-    assert n == len(forecast.methods_for("1m"))   # only XAU has candles; only the 1m desk has enough
+    assert n == len(forecast.methods_for("15m"))   # only XAU has candles; only the 15-minute desk has enough
     candles.add_tick(db, "XAU", now + 5, 105)
-    judge.score_due(db, now + 61)
+    judge.score_due(db, now + 901)
     r = db.execute("SELECT COUNT(*) FROM forecasts WHERE scored_ts IS NOT NULL").fetchone()[0]
-    assert r == len(forecast.methods_for("1m"))
+    assert r == len(forecast.methods_for("15m"))
+    assert "1m" not in forecast.HORIZONS
 
 
 def test_market_open_weekend():

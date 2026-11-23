@@ -1,7 +1,7 @@
 /* TST Trade panel: prices, candles, forecast cards, the Judge's table and the journal. */
 const $ = (id) => document.getElementById(id);
-const TFS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"];
-const TF_NAMES = { "1m": "1 dəq", "5m": "5 dəq", "15m": "15 dəq", "1h": "1 saat", "4h": "4 saat", "1d": "1 gün", "1w": "1 həftə" };
+const TFS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"];
+const TF_NAMES = { "1m": "1 dəq", "5m": "5 dəq", "15m": "15 dəq", "30m": "30 dəq", "1h": "1 saat", "4h": "4 saat", "1d": "1 gün", "1w": "1 həftə" };
 const STATUS_AZ = { LIVE: "Canlı", DELAYED: "Gecikir", OFFLINE: "Əlaqə yoxdur", DEMO: "DEMO" };
 const VERDICT_AZ = { "sübut": "Sübut olunub", "yox": "Sübut yoxdur", "az": "Məlumat azdır", "bazis": "Bazis",
   "xərc": "Spreaddən kiçik" };
@@ -83,7 +83,7 @@ async function loadChart() {
   const ov = overlayFor(lastFc);
   const name = (lastState?.metals.find((m) => m.symbol === sym) || {}).name || sym;
   $("ctitle").textContent = `${name} · ${TF_NAMES[tf]} şamlar`;
-  $("ovnote").textContent = ov ? `Aralıq: ${ov.name} proqnozu` : "Bu zaman çərçivəsi üçün növbəti şam aralığı yoxdur (1 dəq, 1 saat, 1 gün, 1 həftə seçin)";
+  $("ovnote").textContent = ov ? `Aralıq: ${ov.name} proqnozu` : "Bu zaman çərçivəsi üçün proqnoz yoxdur (15 dəq, 30 dəq, 1 saat, 4 saat, 1 gün, 1 həftə seçin)";
   drawChart($("cv"), $("tip"), d.candles, ov, tf, { ...ta, day });
   renderTaSummary(d.candles);
 }
@@ -153,8 +153,8 @@ function renderCards(fc) {
   $("fcupd").textContent = "yeniləndi " + hhmm(Date.now() / 1000);
 }
 
-let jh = "1m";
-try { jh = localStorage.getItem("tst_jh") || jh; } catch (e) {}
+let jh = "15m";
+try { jh = localStorage.getItem("tst_jh") || jh; if (jh === "1m") jh = "15m"; } catch (e) {}
 const MCOL = { momentum: "#4ea1ff", reversal: "#c77dff", trend: "#3fb27f", breakout: "#ff9f43", rsi: "#e0605a",
   fib: "#d4a73c", macro: "#2ec4b6", session: "#f78fb3", surprise: "#ffd166", consensus: "#9aa5b1" };
 function renderJudge(fc) {
@@ -230,7 +230,7 @@ async function loadJournal() {
   const d = await api(`/api/journal?symbol=${sym}`);
   const names = lastFc ? lastFc.method_names : {};
   const hn = Object.fromEntries((lastFc ? lastFc.cards : []).map((c) => [c.horizon, c.name]));
-  if (!d.rows.length) { $("journal").innerHTML = "<p class='note'>Hələ yoxlanmış proqnoz yoxdur. 1 dəqiqəlik proqnozlar bazar açıq olanda hər dəqiqə yoxlanır.</p>"; return; }
+  if (!d.rows.length) { $("journal").innerHTML = "<p class='note'>Hələ yoxlanmış proqnoz yoxdur. Ən qısa proqnoz 15 dəqiqəlikdir: bazar açıq olanda hər 15 dəqiqədə yoxlanır.</p>"; return; }
   $("journal").innerHTML = `<table><tr><th>Vaxt</th><th>Üfüq</th><th>Üsul</th><th>Başlanğıc</th><th>Nəticə</th><th>Yuxarı ehtimalı</th><th>İstiqamət</th><th>80 % aralıq</th></tr>` +
     d.rows.map((r) => `<tr><td>${hhmm(r.target_t)}</td><td>${hn[r.horizon]}</td><td>${esc(names[r.method] || r.method)}</td>
       <td class="n">${fmt(r.price0)}</td><td class="n">${fmt(r.price1)}</td><td class="n">${(r.p_up * 100).toFixed(1)} %</td>

@@ -169,7 +169,7 @@ def _weekday_open(ts: float) -> bool:
 
 
 # ---------- history ----------
-RESOLUTION = {"1m": "MINUTE", "5m": "MINUTE_5", "15m": "MINUTE_15", "1h": "HOUR", "4h": "HOUR_4", "1d": "DAY",
+RESOLUTION = {"1m": "MINUTE", "5m": "MINUTE_5", "15m": "MINUTE_15", "30m": "MINUTE_30", "1h": "HOUR", "4h": "HOUR_4", "1d": "DAY",
               "1w": "WEEK"}
 MAX_ROWS = 1000             # the broker returns at most 1000 candles per request
 
