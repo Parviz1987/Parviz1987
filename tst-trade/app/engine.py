@@ -415,14 +415,20 @@ class Engine:
         epics = markets.saved(self.db).get("epics", {})
         out = {}
         for key, codes in (("dollar", ("DXY", "EURUSD")), ("oil", ("OIL", "BRENT"))):
-            code = next((c for c in codes if c in epics), None)
-            if not code or not past:
-                continue
-            if rows_by_code is not None and code in rows_by_code:
-                bymap = rows_by_code[code]
-            else:
-                bymap = {r["t"]: r["c"] for r in candles.closed(self.db, code, tf, now, limit=150)}
-            if past[-1]["t"] not in bymap:
+            # the first linked market that has the metal's last candle (the dollar index may be quiet or closed
+            # while EUR/USD trades): an input that does not arrive must not silence the method
+            code, bymap = None, {}
+            for c in codes:
+                if c not in epics or not past:
+                    continue
+                if rows_by_code is not None and c in rows_by_code:
+                    m = rows_by_code[c]
+                else:
+                    m = {r["t"]: r["c"] for r in candles.closed(self.db, c, tf, now, limit=150)}
+                if past[-1]["t"] in m:
+                    code, bymap = c, m
+                    break
+            if code is None:
                 continue
             pairs = [(c["c"], bymap[c["t"]]) for c in past[-101:] if c["t"] in bymap]
             out[key] = ([p[0] for p in pairs], [p[1] for p in pairs], markets.RELATED[code]["name"])

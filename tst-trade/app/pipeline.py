@@ -34,7 +34,9 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     rel_live = [c for c in epics if engine.status(c, now) == "LIVE"]
     if open_ and epics:
         out.append(_row("Əlaqəli bazarlar (dollar, neft...)", "dollar/neft impulsu, «Bazarlar»",
-                        "ok" if len(rel_live) == len(epics) else "warn", f"{len(rel_live)}/{len(epics)} canlı",
+                        "ok" if len(rel_live) == len(epics) else "warn",
+                        f"{len(rel_live)}/{len(epics)} canlı" + ("" if len(rel_live) == len(epics) else
+                        "; gəlməyən: " + ", ".join(markets.RELATED[c]["name"] for c in epics if c not in rel_live)),
                         len(rel_live)))
     # source clock against ours (a source far behind or ahead makes LIVE a lie)
     skews = [abs(q["recv_ts"] - q["source_ts"]) for s, q in engine.quotes.items()
@@ -78,11 +80,12 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
                     "hələ axtarmayıb" if age is None else f"son axtarış {age:.1f} saat əvvəl", None))
 
     # 6. calendar -> hunter -> 7. surprise
+    since = float(db.get("hunter:since") or now)   # releases before the hunter existed are not its misses
     try:
         missed = db.execute(
             "SELECT COUNT(*) FROM events e WHERE e.country='USD' AND e.impact IN ('High','Medium') AND e.forecast IS "
             "NOT NULL AND e.ts BETWEEN ? AND ? AND NOT EXISTS (SELECT 1 FROM hunter_log h WHERE h.event=e.title "
-            "AND h.accepted=1 AND h.ts > e.ts)", (now - 86400, now - 1500)).fetchone()[0]
+            "AND h.accepted=1 AND h.ts > e.ts)", (max(now - 86400, since), now - 1500)).fetchone()[0]
         found = db.execute("SELECT COUNT(*) FROM hunter_log WHERE accepted=1 AND ts > ?", (now - 86400,)).fetchone()[0]
     except Exception:
         missed, found = 0, 0
@@ -114,7 +117,10 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
         r = db.execute("SELECT COUNT(*) n, SUM(p_up != 0.5) v FROM forecasts WHERE method=? AND mode='live' "
                        "AND issued_t > ?", (m, now - 86400)).fetchone()
         if r["n"] and not r["v"]:
-            dead.append(label)
+            # why: the method's own words on its latest forecast ("no candles", "weak link"...)
+            why = db.execute("SELECT basis FROM forecasts WHERE method=? AND mode='live' ORDER BY issued_t DESC "
+                             "LIMIT 1", (m,)).fetchone()
+            dead.append(f"{label} («{why['basis'][:70]}»)" if why else label)
     out.append(_row("Üsulların girişi", "konsensus, kartlar", "ok" if not dead else "warn",
                     "hər üsulun son gündə fikri olub" if not dead else
                     "son gündə heç fikri olmayan: " + ", ".join(dead) + " (giriş gəlmir və ya şərt yaranmayıb)",

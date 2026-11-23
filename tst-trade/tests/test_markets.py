@@ -40,3 +40,18 @@ def test_related_closes_align_and_feed_the_methods():
     m = forecast.build(past, "15m", related=rel)["methods"]
     assert "dollar" in m and m["oil"]["p_up"] == 0.5
     assert "dollar" not in forecast.build(past, "1w")["methods"]
+
+
+def test_dollar_falls_back_to_eurusd_when_the_index_is_quiet():
+    db = DB(":memory:")
+    eng = Engine(db, KeyStore(db, "s" * 64), "demo", 15)
+    db.put("related:epics", json.dumps({"ts": 1, "epics": {"DXY": "DXY", "EURUSD": "EURUSD"}}))
+    t0 = 1_700_000_000 // 900 * 900
+    for i in range(130):
+        candles.store_history(db, "XAU", "15m", [(t0 + i * 900, 100, 100, 100, 100 + i * 0.01)])
+        candles.store_history(db, "EURUSD", "15m", [(t0 + i * 900, 1, 1, 1, 1 + i * 0.0001)])
+        if i < 120:                                   # the index stopped quoting 10 candles ago
+            candles.store_history(db, "DXY", "15m", [(t0 + i * 900, 99, 99, 99, 99 - i * 0.01)])
+    now = t0 + 130 * 900 + 5
+    rel = eng.related_closes(candles.closed(db, "XAU", "15m", now, limit=200), "15m", now)
+    assert rel["dollar"][2] == "EUR/USD"

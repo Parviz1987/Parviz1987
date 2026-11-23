@@ -43,6 +43,8 @@ class Hunter:
         self.keys = keys
         db.conn.executescript(SCHEMA)
         surprise.ensure(db)
+        if not db.get("hunter:since"):
+            db.put("hunter:since", str(time.time()))
 
     def due(self, now: float) -> list[dict]:
         rows = self.db.execute(
