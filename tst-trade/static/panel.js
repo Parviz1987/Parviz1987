@@ -4,7 +4,7 @@ const TFS = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"];
 const TF_NAMES = { "1m": "1 dəq", "5m": "5 dəq", "15m": "15 dəq", "1h": "1 saat", "4h": "4 saat", "1d": "1 gün", "1w": "1 həftə" };
 const STATUS_AZ = { LIVE: "Canlı", DELAYED: "Gecikir", OFFLINE: "Əlaqə yoxdur", DEMO: "DEMO" };
 const VERDICT_AZ = { "sübut": "Sübut olunub", "yox": "Sübut yoxdur", "az": "Məlumat azdır", "bazis": "Bazis" };
-const PROVIDER_AZ = { goldapi: "gold-api.com", twelvedata: "Twelve Data", demo: "DEMO" };
+const PROVIDER_AZ = { goldapi: "gold-api.com", capital: "Capital.com (axın)", twelvedata: "Twelve Data", demo: "DEMO" };
 let sym = "XAU", tf = "1m", mode = "live", lastState = null, lastFc = null;
 try { sym = localStorage.getItem("tst_sym") || sym; tf = localStorage.getItem("tst_tf") || tf; } catch (e) {}
 

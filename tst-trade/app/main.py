@@ -204,7 +204,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     async def check_key(slot: str):
         if slot not in registry.KEY_IDS:
             raise HTTPException(404, "naməlum açar yeri")
-        return await keys.check(store, slot)
+        res = await keys.check(store, slot)
+        if slot == "capital" and res["ok"]:
+            # A working Capital.com key switches the live price to its stream at once (gold-api.com stays the fallback).
+            db.put("setting:price_provider", "capital")
+            engine.reset_provider()
+        return res
 
     @app.post("/api/admin/brains/{slot}")
     async def save_brain(slot: str, request: Request):

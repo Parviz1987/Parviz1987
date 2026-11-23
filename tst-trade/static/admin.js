@@ -1,9 +1,10 @@
 /* TST Trade admin: key places, data sources, brain slots, price source, history. */
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const PROV = { goldapi: "gold-api.com (pulsuz)", twelvedata: "Twelve Data (açar)", demo: "DEMO (yalnız sınaq)" };
+const PROV = { goldapi: "gold-api.com (pulsuz)", capital: "Capital.com axını (açar)", twelvedata: "Twelve Data (açar)", demo: "DEMO (yalnız sınaq)" };
 const BRAIN_PROV = { anthropic: "Anthropic", openai: "OpenAI", xai: "xAI (Grok)", gemini: "Google Gemini" };
-const FIELD_AZ = { key: "Açar", key_id: "Açar ID", secret: "Gizli açar" };
+const FIELD_AZ = { key: "Açar", key_id: "Açar ID", secret: "Gizli açar", api_key: "API açarı",
+  login: "Login (Capital.com e-poçtunuz)", password: "API açarının parolu (açarı yaradanda yazdığınız parol)" };
 const STAGE = { live: ["ok", "işləyir"], next: ["next", "yeri hazırdır, toplayıcı növbəti mərhələdə"] };
 let data = null;
 

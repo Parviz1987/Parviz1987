@@ -11,7 +11,8 @@ from datetime import datetime, timezone
 from . import candles, forecast, judge
 from .db import DB
 from .keys import KeyStore
-from .providers.base import NotServed, ProviderError
+from .providers.base import NotServed, ProviderError, Quote
+from .providers.capital import CapitalStream
 from .providers.demo import DemoHistory, DemoPrices
 from .providers.goldapi import GoldApiProvider
 from .providers.twelvedata import TwelveDataHistory, TwelveDataPrices
@@ -65,6 +66,12 @@ class Engine:
                 self.errors = {"*": "Twelve Data seçilib, amma açar saxlanmayıb: gold-api.com işləyir"}
                 return GoldApiProvider(), "goldapi"
             return TwelveDataPrices(key), "twelvedata"
+        if name == "capital":
+            creds = self.keys.get("capital")
+            if not creds:
+                self.errors = {"*": "Capital.com seçilib, amma açar saxlanmayıb: gold-api.com işləyir"}
+                return GoldApiProvider(), "goldapi"
+            return CapitalStream(creds, on_quote=self.on_quote), "capital"
         if name == "demo":
             return DemoPrices(), "demo"
         return GoldApiProvider(), "goldapi"
@@ -78,6 +85,16 @@ class Engine:
     def reset_provider(self) -> None:
         self.provider_name = None   # rebuilt at the next poll (a new key or a new choice)
 
+    def on_quote(self, q: Quote) -> None:
+        """A streamed price: stored the moment it arrives (no wait for the next poll)."""
+        now = time.time()
+        self.quotes[q.symbol] = {"price": q.price, "source_ts": q.source_ts, "recv_ts": now,
+                                 "ts_missing": q.source_ts_missing}
+        self.db.execute("INSERT INTO ticks(symbol, ts, price, source, source_ts) VALUES(?,?,?,?,?)",
+                        (q.symbol, now, q.price, "capital", q.source_ts))
+        candles.add_tick(self.db, q.symbol, now, q.price)
+        self.last_ok = now
+
     async def poll_once(self, now: float | None = None) -> None:
         await self._ensure_provider()
         now = time.time() if now is None else now
@@ -87,6 +104,8 @@ class Engine:
         except ProviderError as e:
             quotes, errors = [], {"*": str(e)}
         self.errors = errors
+        if self.provider_name == "capital":
+            return   # the stream stores every quote itself (on_quote); the poll only reads its health
         for q in quotes:
             self.quotes[q.symbol] = {"price": q.price, "source_ts": q.source_ts, "recv_ts": now,
                                      "ts_missing": q.source_ts_missing}

@@ -17,6 +17,12 @@ CATEGORIES = [
 
 # Key places. fields: what the provider gives you (most give one key; Alpaca gives an ID and a secret).
 KEY_SLOTS: list[dict] = [
+    {"id": "capital", "category": "price", "name": "Capital.com qiymət axını",
+     "purpose": "Qiymət hər dəyişəndə dərhal gəlir (gold-api.com 30 saniyədə bir verir). 1 dəqiqə və 1 saat şamları dəqiq "
+                "olur. Ancaq qiymət oxunur: kodda ticarət əmri yoxdur. Demo hesabın açarı tövsiyə olunur.",
+     "cost": "Pulsuz (Capital.com hesabı ilə).", "url": "https://capital.com/trading/platform/",
+     "fields": ["api_key", "login", "password"], "used_by": "Canlı qiymət (açar işləyəndə özü qoşulur)",
+     "stage": LIVE},
     {"id": "twelvedata", "category": "price", "name": "Twelve Data açarı",
      "purpose": "Canlı qiymət və keçmiş şamlar (tarixçə). Tarixçə olmadan 1 günlük və 1 həftəlik proqnoz yoxlanmır.",
      "cost": "Pulsuz plan: ancaq qızıl. Pullu plan (Grow, ayda 29–79 $): 4 metal.",

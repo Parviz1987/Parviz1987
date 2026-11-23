@@ -129,6 +129,14 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
             ok, msg = await _http_check(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model or 'gemini-2.5-flash-lite'}",
                 headers={"x-goog-api-key": key})
+        elif slot == "capital":
+            from .providers.capital import CapitalStream
+            cs = CapitalStream(v)
+            try:
+                await cs._session()
+                ok, msg = True, f"işləyir ({'demo' if cs.env == 'demo' else 'real'} hesab)"
+            except Exception as e:
+                ok, msg = False, str(e)
         elif slot == "alpaca":
             ok, msg = await _http_check("https://data.alpaca.markets/v1beta1/news", params={"limit": 1},
                                         headers={"APCA-API-KEY-ID": v.get("key_id", ""),
