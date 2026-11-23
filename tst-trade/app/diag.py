@@ -56,6 +56,21 @@ class ErrorJournal(logging.Handler):
             pass   # the journal must never break the app
 
 
+def _memory() -> dict:
+    """The process's memory now and at its peak, and what the machine has left (Linux /proc; MB)."""
+    out = {}
+    try:
+        for line in open("/proc/self/status"):
+            if line.startswith(("VmRSS:", "VmHWM:")):
+                out[line.split(":")[0]] = round(int(line.split()[1]) / 1024)
+        for line in open("/proc/meminfo"):
+            if line.startswith(("MemTotal:", "MemAvailable:", "SwapFree:")):
+                out[line.split(":")[0]] = round(int(line.split()[1]) / 1024)
+    except OSError:
+        pass
+    return out
+
+
 def _bid_ask(engine, sym: str):
     q = getattr(engine.provider, "latest", {}).get(sym)
     return [q.bid, q.ask] if q is not None and q.bid is not None else None
@@ -108,6 +123,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
                     "config": {k: v for k, v in b["config"].items()}} for b in brains.view(db, keys)],
         "brain_jobs": {k: jobs.state(k) for k in ("scout", "reader", "strategist")},
         "history": engine.history_state,
+        "memory_mb": _memory(),
         "forecasts_open": open_fc,
         "forecasts_open_by": open_by,
         "judge": judging,

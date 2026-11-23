@@ -42,16 +42,19 @@ def score_due(db: DB, now: float | None = None) -> int:
     """Score every open forecast whose target candle has closed. The target is the k-th candle from the issue candle
     on (k = candles ahead of the horizon): one query per horizon finds it through the candles' primary key."""
     now = time.time() if now is None else now
-    updates, dropped = [], []
+    updates, dropped, n_done = [], [], 0
     for h, (tf, k) in HORIZON_SPEC.items():
         step = candles.TF[tf]
         sub = ("(SELECT {col} FROM candles c WHERE c.symbol=f.symbol AND c.tf=? AND c.t>=f.issued_t "
                "ORDER BY c.t LIMIT 1 OFFSET ?)")
-        rows = db.execute(
+        cur = db.execute(
             "SELECT f.id, f.issued_t, f.target_t, f.price0, f.p_up, f.lo50, f.hi50, f.lo80, f.hi80, "
             f"{sub.format(col='c.c')} AS close1, {sub.format(col='c.t')} AS t1 "
             "FROM forecasts f WHERE f.horizon=? AND f.scored_ts IS NULL AND f.target_t <= ?",
-            (tf, k - 1, tf, k - 1, h, now)).fetchall()
+            (tf, k - 1, tf, k - 1, h, now))
+        # Read in chunks: after a history replay there can be 100 000+ open rows and the server has 512 MB.
+        rows = iter(lambda: cur.fetchmany(5000), [])
+        rows = (r for chunk in rows for r in chunk)
         # Intraday candles must be exactly the expected ones; daily and weekly may skip a weekend or a holiday.
         slack = 0 if tf not in ("1d", "1w") else (5 * 86400 if tf == "1d" else 0)
         for r in rows:
@@ -65,12 +68,21 @@ def score_due(db: DB, now: float | None = None) -> int:
                 continue
             s = score_row(r["price0"], r["close1"], r["p_up"], r["lo50"], r["hi50"], r["lo80"], r["hi80"])
             updates.append((r["close1"], now, s["outcome"], s["hit"], s["brier"], s["in50"], s["in80"], r["id"]))
+        if len(updates) >= 20000:
+            _write(db, updates, dropped)
+            n_done += len(updates)
+            updates, dropped = [], []
+    n_done += len(updates)
+    _write(db, updates, dropped)
+    return n_done
+
+
+def _write(db: DB, updates: list, dropped: list) -> None:
     if updates:
         db.executemany("UPDATE forecasts SET price1=?, scored_ts=?, outcome=?, hit=?, brier=?, in50=?, in80=? "
                        "WHERE id=?", updates)
     if dropped:
         db.executemany("UPDATE forecasts SET scored_ts=? WHERE id=?", dropped)
-    return len(updates)
 
 
 def _p_one_sided(hits: int, n: int, p0: float) -> float:
