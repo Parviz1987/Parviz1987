@@ -148,3 +148,9 @@ def test_consensus_averages_views_only():
     m = forecast.build(up, "1d")["methods"]
     leans = [v["p_up"] - 0.5 for k, v in m.items() if k not in ("rw", "up", "consensus") and v["p_up"] != 0.5]
     assert abs(m["consensus"]["p_up"] - (0.5 + sum(leans) / len(leans))) < 1e-3
+
+
+def test_every_method_has_a_passport():
+    for m in forecast.METHODS:
+        p = forecast.PASSPORT[m]
+        assert p["why"] and p["expect"] and p["else"], m

@@ -215,6 +215,15 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             for r in db.execute("SELECT method, p_up, lo50, hi50, lo80, hi80, basis, price0, target_t FROM forecasts "
                                 "WHERE symbol=? AND horizon=? AND mode='live' AND issued_t=?", (sym, h, row["t"])):
                 methods.append(dict(r))
+        if verdict["status"] != "sübut" and methods:
+            # Conditional proof: a method proven only in this session or this market mood speaks only then.
+            rw = next((m for m in methods if m["method"] == "rw"), None)
+            width = (rw["hi80"] - rw["lo80"]) / rw["price0"] if rw and rw["price0"] else None
+            cond = judge.conditional(_where(sym, h, basis_mode), judge.session_of(time.time()), width)
+            live_view = cond and next((m for m in methods if m["method"] == cond["method"] and m["p_up"] != 0.5), None)
+            if live_view:
+                verdict = {"method": cond["method"], "status": "sübut", "by": basis_mode, "condition": cond["group"],
+                           "cond_hit_rate": cond["hit_rate"], "cond_n": cond["n"]}
         have = len(candles.closed(db, sym, tf, time.time(), limit=forecast.MIN_CANDLES))
         return {"horizon": h, "name": forecast.HORIZON_NAMES[h], "tf": tf, "issued_t": row["t"] if row else None,
                 "methods": methods, "verdict": verdict, "stats_live": live, "stats_history": hist,
@@ -229,17 +238,38 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     _series_cache: dict = {}
 
-    @app.get("/api/judge/where")
-    async def judge_where(symbol: str, horizon: str, mode: str = "history"):
-        if symbol not in candles.METALS or horizon not in forecast.HORIZONS or mode not in ("live", "history"):
-            raise HTTPException(400, "naməlum metal, üfüq və ya rejim")
+    @app.get("/api/passports")
+    async def passports(symbol: str = "XAU"):
+        """Each method's passport and the Judge's current verdict for it on every horizon (history and live)."""
+        if symbol not in candles.METALS:
+            raise HTTPException(400, "naməlum metal")
+        rows = []
+        for m in forecast.METHODS:
+            res = {}
+            for h in forecast.HORIZONS:
+                if m not in forecast.methods_for(h):
+                    continue
+                for mode in ("live", "history"):
+                    r = next((x for x in judge.stats(db, symbol, h, mode, ttl=300) if x["method"] == m), None)
+                    if r:
+                        res.setdefault(h, {})[mode] = {k: r[k] for k in ("status", "nh", "n", "hit_rate")}
+            rows.append({"method": m, "name": forecast.METHOD_NAMES[m], **forecast.PASSPORT.get(m, {}), "results": res})
+        return {"symbol": symbol, "horizons": forecast.HORIZON_NAMES, "methods": rows}
+
+    def _where(symbol: str, horizon: str, mode: str) -> dict:
         key = ("where", symbol, horizon, mode)
         hit = _series_cache.get(key)
-        if hit and time.time() - hit[0] < 600:
+        if hit and time.time() - hit[0] < 600:   # a heavy grouping; the picture changes slowly
             return hit[1]
         out = judge.where(db, symbol, horizon, mode)
         _series_cache[key] = (time.time(), out)
         return out
+
+    @app.get("/api/judge/where")
+    async def judge_where(symbol: str, horizon: str, mode: str = "history"):
+        if symbol not in candles.METALS or horizon not in forecast.HORIZONS or mode not in ("live", "history"):
+            raise HTTPException(400, "naməlum metal, üfüq və ya rejim")
+        return _where(symbol, horizon, mode)
 
     @app.get("/api/judge/series")
     async def judge_series(symbol: str, horizon: str, mode: str = "live"):

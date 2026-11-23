@@ -131,7 +131,9 @@ function cardHtml(c, names) {
   } else if (v.status === "sübut") {
     const p = off.p_up, dir = p > 0.5 ? "yuxarı" : "aşağı";
     head = `<div class="big ${p > 0.5 ? "up" : "down"}">${dir} · ${(Math.max(p, 1 - p) * 100).toFixed(0)} %</div>
-      <div class="note">${esc(names[v.method])}: ${esc(off.basis)}</div>`;
+      <div class="note">${esc(names[v.method])}: ${esc(off.basis)}</div>` +
+      (v.condition ? `<div class="note"><b>Şərtli sübut:</b> bu üsul yalnız «${esc(GROUP_AZ[v.condition] || v.condition)}» şəraitində
+        sübut olunub (${pct(v.cond_hit_rate, 0)}, ${v.cond_n} yoxlama). Şərait dəyişəndə istiqamət göstərilməyəcək.</div>` : "");
   } else {
     head = `<div class="big mut">İstiqamət göstərilmir</div>
       <div class="note">Heç bir üsul hələ bazis qaydalarını sübutla üstələməyib. Aşağıda yalnız gözlənilən aralıq var.</div>`;
@@ -200,18 +202,29 @@ function renderJudge(fc) {
     alış-satış fərqindən (spread) kiçikdirsə, statistik düz olsa da pul qazandırmaz («Spreaddən kiçik»). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı.</p>`;
   loadJudgeCharts(card).catch(() => {});
   loadWhere(card).catch(() => {});
+  loadPassports().catch(() => {});
 }
 const GROUP_AZ = { asia: "Asiya seansı (22–07 UTC)", london: "London (07–13)", ny: "Nyu-York (13–22)", calm: "Sakit bazar", wild: "Dalğalı bazar" };
+async function loadPassports() {
+  const d = await api(`/api/passports?symbol=${sym}`);
+  const short = { "sübut": "✓", "xərc": "spread", "yox": "✗", "az": "az" };
+  $("passports").innerHTML = `<table><tr><th>Üsul</th><th>Niyə var</th><th>Nə gözləyirik</th><th>Hakim indi (üfüq: nəticə)</th><th>Nəticə verməsə</th></tr>` +
+    d.methods.map((m) => `<tr><td><b>${esc(m.name)}</b></td><td>${esc(m.why)}</td><td>${esc(m.expect)}</td>
+      <td><div class="res">${Object.entries(m.results).map(([h, r]) => { const x = r.live && r.live.nh >= 1 && r.live.status !== "az" ? r.live : r.history || r.live || {};
+        return `<span class="${x.status || "az"}" title="${x.nh ?? x.n ?? 0} yoxlama">${esc(d.horizons[h])}: ${short[x.status] || x.status || "—"}${x.hit_rate != null && m.method !== "rw" ? " " + Math.round(x.hit_rate * 100) + "%" : ""}</span>`; }).join("")}</div></td>
+      <td>${esc(m.else)}</td></tr>`).join("") + `</table><p class="note">✓ sübut · ✗ kifayət qədər yoxlama var, sübut yoxdur · spread: düzdür, amma spreaddən kiçik · az: hələ az yoxlama.</p>`;
+}
 async function loadWhere(card) {
   const d = await api(`/api/judge/where?symbol=${sym}&horizon=${card.horizon}&mode=history`);
   const ms = Object.keys(d.methods);
   if (!ms.length) { $("jwhere").innerHTML = "<p class='note'>Hələ məlumat yoxdur.</p>"; return; }
-  const bar = (card.stats_history.find((r) => r.method === "momentum") || {}).bar || 0.5;
   $("jwhere").innerHTML = `<table><tr><th>Üsul</th>${d.groups.map((g) => `<th>${GROUP_AZ[g]}</th>`).join("")}</tr>` +
     ms.map((m) => `<tr><td>${esc(lastFc.method_names[m] || m)}</td>${d.groups.map((g) => { const c = d.methods[m][g];
-      return `<td class="cell ${c.hit_rate == null || c.n < 50 ? "mut" : c.hit_rate > bar + 0.03 ? "sübut" : c.hit_rate < bar - 0.03 ? "yox" : ""}" title="${c.n} yoxlama">${c.n ? pct(c.hit_rate, 0) : "—"}</td>`; }).join("")}</tr>`).join("") +
-    `</table><p class="note">Yaşıl = həddən (${pct(bar, 0)}) 3 bənd yuxarı, qırmızı = 3 bənd aşağı, boz = 50-dən az yoxlama. Bu cədvəl üsulun nə vaxt
-    işlədiyini və nə vaxt səhv etdiyini göstərir: növbəti düzəlişin ipucu. Bu, sübut deyil, yalnız tarixçə üzrə müşahidədir.</p>`;
+      const cls = c.status === "sübut" ? "sübut" : c.status === "xərc" ? "xərc" : c.hit_rate == null || c.n < 50 ? "mut" : c.hit_rate < d.bar - 0.03 ? "yox" : "";
+      return `<td class="cell ${cls}" title="${c.n} yoxlama, p ${c.p == null ? "—" : c.p.toFixed(4)}">${c.n ? pct(c.hit_rate, 0) : "—"}${c.status === "sübut" ? " ✓" : ""}</td>`; }).join("")}</tr>`).join("") +
+    `</table><p class="note">✓ yaşıl = bu şəraitdə sübut olunub (eyni sərt qaydalar; p həddi bütün xanaların sayına bölünür: ${d.p_bar ? d.p_bar.toFixed(4) : "—"}).
+    Belə üsul kartda yalnız həmin şərait olanda istiqamət göstərir. Qırmızı = həddən (${pct(d.bar, 0)}) 3 bənd aşağı, boz = 50-dən az yoxlama.
+    Sübutsuz xanalar yalnız müşahidədir: üsulun harada səhv etdiyini göstərir.</p>`;
 }
 async function loadJudgeCharts(card) {
   const d = await api(`/api/judge/series?symbol=${sym}&horizon=${card.horizon}&mode=${mode}`);

@@ -303,3 +303,25 @@ def test_where_splits_hits_by_session_and_mood():
     t = w["methods"]["trend"]
     assert sum(t[g]["n"] for g in ("asia", "london", "ny")) == 200 == t["calm"]["n"] + t["wild"]["n"]
     assert "rw" not in w["methods"]
+
+
+def test_conditional_proof_only_in_its_session():
+    db = mem()
+    rows = []
+    for i in range(1200):
+        t = 1_700_006_400 + i * 3600                       # hourly, all sessions
+        ny = judge.session_of(t) == "ny"
+        hit = (i % 10) < (9 if ny else 5)                  # 90 % right in New York, 50 % elsewhere
+        p1 = 101.0 if hit else 99.0
+        for m, pu in (("rw", 0.5), ("up", 0.55), ("trend", 0.6)):
+            rows.append(("XAU", "1h", m, "history", t, t + 3600, 100.0, pu, 99, 101, 98, 102, "", p1, 1.0,
+                         int(p1 > 100), None if pu == 0.5 else int(hit if m == "trend" else p1 > 100),
+                         (pu - int(p1 > 100)) ** 2, 1, 1))
+    db.executemany("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50, "
+                   "lo80, hi80, basis, price1, scored_ts, outcome, hit, brier, in50, in80) "
+                   "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    w = judge.where(db, "XAU", "1h", "history")
+    assert w["methods"]["trend"]["ny"]["status"] == "sübut"
+    assert w["methods"]["trend"]["asia"]["status"] != "sübut"
+    assert judge.conditional(w, "ny", None)["method"] == "trend"
+    assert judge.conditional(w, "asia", None) is None

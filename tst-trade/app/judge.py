@@ -221,29 +221,84 @@ def overview(db: DB, symbol: str, mode: str) -> list[dict]:
     return [{"horizon": h, "stats": stats(db, symbol, h, mode)} for h in HORIZONS]
 
 
+SESSIONS = {"asia": "Asiya", "london": "London", "ny": "Nyu-York"}
+
+
+def session_of(t: float) -> str:
+    h = int(t // 3600) % 24
+    return "asia" if h >= 22 or h < 7 else "london" if h < 13 else "ny"
+
+
 def where(db: DB, symbol: str, horizon: str, mode: str) -> dict:
     """Where each method is right and where it misses: by trading session (intraday horizons only) and by market
     mood (calm vs wild: the forecast's own 80 % range width against its average). Shows WHY a method fails, e.g.
-    "works in calm markets, loses in wild ones" or "only the New York session" — the hint for the next fix."""
+    "works in calm markets, loses in wild ones" or "only the New York session" — the hint for the next fix.
+
+    Each condition also gets a verdict (conditional proof): the same rules as the whole card — enough judged
+    forecasts, beat the bar with p < 0.05 divided by (methods x conditions) (Bonferroni over every cell tried), Brier
+    skill > 0 and an average move in the forecast's direction larger than the spread."""
     intraday = HORIZON_SPEC[horizon][0] in ("15m", "30m", "1h", "4h")
     avg = db.execute("SELECT AVG((hi80 - lo80) / price0) w FROM forecasts WHERE symbol=? AND horizon=? AND mode=? "
                      "AND method='rw' AND scored_ts IS NOT NULL", (symbol, horizon, mode)).fetchone()["w"]
     if avg is None:
-        return {"groups": [], "methods": {}}
+        return {"groups": [], "methods": {}, "avg_width": None}
     rows = db.execute(
         "SELECT method, "
         "CASE WHEN (issued_t / 3600) % 24 >= 22 OR (issued_t / 3600) % 24 < 7 THEN 'asia' "
         "     WHEN (issued_t / 3600) % 24 < 13 THEN 'london' ELSE 'ny' END sess, "
         "CASE WHEN (hi80 - lo80) / price0 > ? THEN 'wild' ELSE 'calm' END mood, "
-        "COUNT(hit) n, SUM(hit) k FROM forecasts WHERE symbol=? AND horizon=? AND mode=? AND scored_ts IS NOT NULL "
+        "COUNT(hit) n, SUM(hit) k, SUM(brier) b, "
+        "SUM(CASE WHEN p_up > 0.5 THEN price1 / price0 - 1 WHEN p_up < 0.5 THEN 1 - price1 / price0 END) e "
+        "FROM forecasts WHERE symbol=? AND horizon=? AND mode=? AND scored_ts IS NOT NULL "
         "AND hit IS NOT NULL AND method NOT IN ('rw', 'up') GROUP BY method, sess, mood",
         (avg, symbol, horizon, mode)).fetchall()
     groups = (["asia", "london", "ny"] if intraday else []) + ["calm", "wild"]
-    out: dict[str, dict] = {}
+    acc: dict[str, dict] = {}
     for r in rows:
-        m = out.setdefault(r["method"], {g: [0, 0] for g in groups})
+        m = acc.setdefault(r["method"], {g: [0, 0, 0.0, 0.0] for g in groups})
         for g in ((r["sess"],) if intraday else ()) + (r["mood"],):
-            m[g][0] += r["n"]
-            m[g][1] += r["k"] or 0
-    return {"groups": groups, "methods": {m: {g: {"n": v[0], "hit_rate": v[1] / v[0] if v[0] else None}
-                                              for g, v in d.items()} for m, d in out.items()}}
+            c = m[g]
+            c[0] += r["n"]
+            c[1] += r["k"] or 0
+            c[2] += r["b"] or 0
+            c[3] += r["e"] or 0
+    base = {r["method"]: r for r in _stats(db, symbol, horizon, mode)}
+    bar = next(iter(base.values()))["bar"] if base else 0.5
+    k = steps_of(horizon)
+    cells = max(1, len([m for m in methods_for(horizon) if m not in BASELINES]) * len(groups))
+    p_bar = P_MAX / cells
+    cost = COST.get(symbol, 0.0)
+    out = {}
+    for m, d in acc.items():
+        out[m] = {}
+        for g, (n, hits, brier, edge) in d.items():
+            hr = hits / n if n else None
+            p = _p_one_sided(round(hits / k), round(n / k), bar) if n >= k else None
+            bss = 1 - (brier / n) / 0.25 if n else None
+            e = edge / n if n else None
+            if n < MIN_N[horizon]:
+                st = "az"
+            elif p is not None and p < p_bar and bss is not None and bss > 0:
+                st = "sübut" if (e or 0) > cost else "xərc"
+            else:
+                st = "yox"
+            out[m][g] = {"n": n, "hit_rate": hr, "p": p, "edge": e, "status": st}
+    return {"groups": groups, "methods": out, "avg_width": avg, "bar": bar, "p_bar": p_bar, "cost": cost}
+
+
+def conditional(where_result: dict, session: str | None, width: float | None) -> dict | None:
+    """The best method proven for the conditions right now (this session, this market mood), or None."""
+    if not where_result.get("methods"):
+        return None
+    now = []
+    if session in where_result["groups"]:
+        now.append(session)
+    if width is not None and where_result.get("avg_width"):
+        now.append("wild" if width > where_result["avg_width"] else "calm")
+    best = None
+    for m, d in where_result["methods"].items():
+        for g in now:
+            c = d.get(g)
+            if c and c["status"] == "sübut" and (best is None or c["hit_rate"] > best["hit_rate"]):
+                best = {"method": m, "group": g, **c}
+    return best

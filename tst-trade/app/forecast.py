@@ -311,3 +311,37 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
     for v in out.values():
         v.update(rng)
     return {"price": price, "sigma": sigma, "methods": out}
+
+
+# Every method's passport: why it is here, what we expect, and what happens if it does not deliver. The Judge's
+# current numbers are added next to it in the panel, so nothing in the system is there without a reason and a test.
+PASSPORT = {
+    "rw": {"why": "Dürüst başlanğıc: istiqamət yoxdur, yalnız aralıq.",
+           "expect": "Aralıqlar 50 % və 80 % tutmalıdır.", "else": "Bazisdir, dəyişmir."},
+    "up": {"why": "Metallar uzun müddətdə daha çox qalxıb: «həmişə yuxarı» ən sadə rəqibdir.",
+           "expect": "Hər üsul bunu üstələməlidir.", "else": "Bazisdir, dəyişmir."},
+    "momentum": {"why": "Trend davam etməyə meyllidir (həftə-ay üfüqündə güclü araşdırma dəlili).",
+                 "expect": "1 həftə, 10 gün, 1 ay üfüqündə sübut.",
+                 "else": "Qısa üfüqlərdə konsensusdan çıxarılmağa namizəd."},
+    "reversal": {"why": "Qısa sıçrayış tez-tez geri qaytarılır.",
+                 "expect": "15–30 dəqiqədə; amma spread çox vaxt qazancı yeyir.",
+                 "else": "Spreaddən kiçikdirsə, çıxarılmağa namizəd."},
+    "trend": {"why": "Üç pəncərə (qısa, orta, uzun) eyni istiqaməti göstərəndə trend daha etibarlıdır.",
+              "expect": "1 gündən 1 aya qədər.", "else": "Pəncərələr dəyişdirilir və ya çıxarılır."},
+    "breakout": {"why": "20 şamın ən yüksəyi və ya ən aşağısı qırılanda hərəkət sürətlənir.",
+                 "expect": "4 saat və 1 gün; nadir, amma güclü siqnal.", "else": "Yalnız dalğalı bazarda saxlanılır."},
+    "rsi": {"why": "Çox alınmış və ya çox satılmış bazar geri dönməyə meyllidir.",
+            "expect": "Sakit bazarda daha yaxşı.", "else": "Şərtli (sakit/dalğalı) yoxlamaya keçir."},
+    "fib": {"why": "Treyderlər Fibonacci səviyyələrində alıb-satır, buna görə qiymət orada dayanır.",
+            "expect": "1 saat və 4 saat.", "else": "Səviyyə dözümü dəyişdirilir və ya çıxarılır."},
+    "macro": {"why": "Real faiz və dollar enəndə qızıl adətən qalxır (2022-dən zəifləyib).",
+              "expect": "1 gündən 1 aya qədər.", "else": "Dərc gecikməsi nəzərə alınıb; yenə yoxdursa, çıxarılır."},
+    "session": {"why": "Metallar Asiya, London və Nyu-York saatlarında fərqli hərəkət edir.",
+                "expect": "1 saat.", "else": "Seans üzrə şərtli yoxlama ilə əvəz olunur."},
+    "surprise": {"why": "ABŞ rəqəmi gözləntidən fərqli çıxanda dollar və qızıl dəqiqələr ərzində reaksiya verir.",
+                 "expect": "15 dəqiqədən 4 saata qədər — ən güclü qısa siqnal namizədi.",
+                 "else": "Fakt mənbəyi: FMP və ya beyin agenti (Rəqəm ovçusu)."},
+    "consensus": {"why": "Bütün alətlərin birgə fikri: tək alətin səhvini azaldır.",
+                  "expect": "Ən çox sübut olunan üsulların birləşməsi kimi.",
+                  "else": "Faydasız üsullar konsensusdan çıxarılır."},
+}

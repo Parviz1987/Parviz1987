@@ -154,3 +154,6 @@ pre.trace{white-space:pre-wrap;font-size:.72rem;color:var(--muted);max-height:22
 }
 .pill.xərc{background:var(--warn-soft);color:var(--warn)}
 td.cell.xərc{color:var(--warn);text-decoration:underline dotted}
+details.pass{margin:12px 0}details.pass summary{cursor:pointer}
+.res{display:flex;flex-wrap:wrap;gap:3px}.res span{font-size:.68rem;padding:1px 5px;border-radius:4px;background:var(--panel2);white-space:nowrap}
+.res span.sübut{background:var(--up-soft);color:var(--up)}.res span.yox{color:var(--down)}.res span.xərc{color:var(--warn)}.res span.az{color:var(--muted)}
