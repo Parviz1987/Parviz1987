@@ -19,7 +19,7 @@ from .engine import Engine, market_open
 from .keys import KeyStore
 
 STATIC = BASE_DIR / "static"
-PUBLIC = ("/login", "/healthz", "/static/")
+PUBLIC = ("/login", "/healthz", "/version", "/static/")
 
 
 def create_app(settings: Settings | None = None, start_engine: bool = True) -> FastAPI:
@@ -89,6 +89,17 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.get("/admin")
     async def admin():
         return FileResponse(STATIC / "admin.html")
+
+    @app.get("/version")
+    async def version():
+        """The commit the server runs (public: shows that the auto-update reached the server)."""
+        import subprocess
+        try:
+            sha = subprocess.run(["git", "-C", str(BASE_DIR), "rev-parse", "--short", "HEAD"], capture_output=True,
+                                 text=True, timeout=5).stdout.strip()
+        except Exception:
+            sha = ""
+        return {"commit": sha or None}
 
     @app.get("/healthz")
     async def healthz():
