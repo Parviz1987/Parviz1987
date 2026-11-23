@@ -385,8 +385,12 @@ class Feeds:
                 n += len(rows)
             except Exception as e:
                 errors.append(str(e).replace(key, "***")[:120])
+                if "HTTP 402" in str(e) or "HTTP 403" in str(e):
+                    errors[-1] = "FMP planınız iqtisadi təqvimi vermir (HTTP 402/403): faktiki rəqəmlər üçün plan lazımdır"
+                    self.next_run["fmp"] = time.time() + 6 * 3600   # the plan will not change in 5 minutes
+                    break
                 if "HTTP 4" in str(e):
-                    break          # not in the plan or a bad key: asking again changes nothing
+                    break          # a bad key or request: asking again changes nothing
         last = self.db.execute("SELECT raw_date, event FROM releases WHERE actual IS NOT NULL AND impact='High' "
                                "ORDER BY ts DESC LIMIT 1").fetchone()
         msg = f"{n} ABŞ rəqəmi" + (f"; son açıqlanan: {last['event']} ({last['raw_date']} UTC)" if last else "")
