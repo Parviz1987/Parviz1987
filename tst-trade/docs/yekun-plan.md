@@ -76,3 +76,19 @@ Beyinlər daim işləmir. Kiçik agent hadisəni gözləyir, beyni yalnız lazı
 
 **Dürüst gözlənti:** ən böyük şans 3-cü və 4-cü bənddədir (dollar və hadisə sürprizi qızılı qısa müddətdə ən çox
 hərəkət etdirir). Zəmanət yoxdur; amma hər hissənin işləyib-işləmədiyi rəqəmlə görünəcək.
+
+## İcra vəziyyəti — 23.11, axşam (serverdə yoxlanıb, versiya bb69a41)
+
+| # | İş | Vəziyyət |
+|---|---|---|
+| 0 | Üfüqlər: 1 dəqiqə çıxarıldı; 15 və 30 dəqiqə əlavə olundu | ✅ |
+| 1 | Pasportlar + seans və bazar əhvalı üzrə şərtli sübut | ✅ |
+| 2 | Bazarlar və əlaqələr: Capital-da 8 bazar tapıldı və canlıdır (dollar indeksi, EUR/USD, USD/JPY, WTI, Brent, S&P 500, VIX, 10 illik istiqraz), hər biri ~800–1000 şam tarixçə | ✅ |
+| 3 | Dollar və neft impulsu | ✅ işləyir; tarixçədə nəticə ~50 % (sübut yoxdur, 200–350 yoxlama) |
+| 4 | Rəqəm ovçusu (OpenAI + Claude, ikisi razı olmalı) | ✅ hazırdır; ilk mühüm ABŞ rəqəmini gözləyir |
+| 5 | Xəbər əhvalı və Strateqin fikri Hakimdə | ✅ canlı yığılır (tarixçə yoxdur) |
+| 6 | Grok yalnız X | ✅ |
+
+**Dürüst nəticə:** heç bir üsul, şərtli olanlar da daxil, hələ sübut almayıb. Dollar və neft impulsu tarixçədə
+(qızıl üçün 15 dəqiqədən 1 günə qədər) ~49–55 % düz çıxır — bazisdən fərqlənmir. Hakim, rəqəm ovçusu və beyin üsulları
+indi canlı yoxlama yığır; növbətçi gündə bir dəfə səbəbləri araşdırıb `docs/monitor/teklifler.md` faylına yazır.
