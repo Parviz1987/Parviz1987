@@ -82,6 +82,43 @@ def _shadow(db: DB) -> dict:
     return out
 
 
+def _candle_check(db: DB) -> dict:
+    """Are the stored candles one consistent series? Per metal and timeframe (last 60 days):
+    - lag1: correlation of each candle's move with the next one. Real metal prices sit near 0; strongly negative
+      means a zig-zag (e.g. two sources at different price levels interleaved), which fakes a «reversal» skill;
+    - jumps: candles whose open is far (>0.15 %) from the previous close, outside weekends;
+    - vs_15m: share of candles whose close differs (>0.05 %) from the 15-minute candle ending at the same time."""
+    out: dict = {}
+    since = int(time.time()) - 60 * 86400
+    for sym in ("XAU", "XAG", "XPT", "XPD"):
+        fine = {r["t"]: r["c"] for r in db.execute(
+            "SELECT t, c FROM candles WHERE symbol=? AND tf='15m' AND t>=?", (sym, since)).fetchall()}
+        for tf, step in (("15m", 900), ("30m", 1800), ("1h", 3600), ("4h", 14400)):
+            rows = db.execute("SELECT t, o, c FROM candles WHERE symbol=? AND tf=? AND t>=? ORDER BY t",
+                              (sym, tf, since)).fetchall()
+            if len(rows) < 50:
+                continue
+            rets, jumps, diff, cmp = [], 0, 0, 0
+            for a, b in zip(rows, rows[1:]):
+                if b["t"] - a["t"] == step:
+                    rets.append(b["c"] / a["c"] - 1)
+                    if abs(b["o"] / a["c"] - 1) > 0.0015:
+                        jumps += 1
+            for r in rows:
+                f = fine.get(r["t"] + step - 900)
+                if f and tf != "15m":
+                    cmp += 1
+                    diff += abs(r["c"] / f - 1) > 0.0005
+            lag1 = None
+            if len(rets) > 30:
+                m = sum(rets) / len(rets)
+                v = sum((x - m) ** 2 for x in rets)
+                lag1 = round(sum((x - m) * (y - m) for x, y in zip(rets, rets[1:])) / v, 3) if v else None
+            out[f"{sym}/{tf}"] = {"n": len(rows), "lag1": lag1, "jumps": jumps,
+                                  "vs_15m": round(diff / cmp, 3) if cmp else None}
+    return out
+
+
 def _security(db: DB) -> dict:
     from .security import Guard
     return Guard(db).summary()
@@ -158,6 +195,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "memory_mb": _memory(),
         "shadow_trading": _shadow(db),
         "pipeline": _pipeline(db, keys, engine, feeds, jobs),
+        "candle_check": _candle_check(db),
         "security": _security(db),
         "related": {**json.loads(db.get("related:epics") or "{}"),
                     "quotes": {c: engine.status(c, now) for c in json.loads(db.get("related:epics") or "{}").get("epics", {})}},

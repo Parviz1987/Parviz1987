@@ -49,3 +49,19 @@ def test_error_journal_groups_and_masks(tmp_path):
     mine = [e for e in errs if e["logger"] == "tst.test"]
     assert len(mine) == 1 and mine[0]["count"] == 3
     assert "fred-very-secret" not in mine[0]["message"] + mine[0]["trace"]
+
+
+def test_candle_check_spots_two_interleaved_sources():
+    """Two sources a few dollars apart, alternating: the zig-zag shows as strongly negative lag1 and big jumps."""
+    import time as _t
+    from app import diag
+    from tests.test_core import mem
+    db = mem()
+    t0 = (int(_t.time()) // 1800 - 400) * 1800
+    rows = []
+    for i in range(300):
+        px = 4000 + i * 0.1 + (3.0 if i % 2 else 0.0)        # every other candle from a source $3 higher
+        rows.append(("XAU", "30m", t0 + i * 1800, px, px, px, px))
+    db.executemany("INSERT INTO candles(symbol, tf, t, o, h, l, c, origin) VALUES(?,?,?,?,?,?,?,'history')", rows)
+    r = diag._candle_check(db)["XAU/30m"]
+    assert r["lag1"] < -0.5 and r["jumps"] == 0          # opens equal closes here: the zig-zag is close to close
