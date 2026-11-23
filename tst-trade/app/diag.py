@@ -57,6 +57,19 @@ class ErrorJournal(logging.Handler):
             pass   # the journal must never break the app
 
 
+def _pipeline(db: DB, keys, engine, feeds, jobs) -> list:
+    from .pipeline import check
+    try:
+        return check(db, keys, engine, feeds, jobs)
+    except Exception as e:   # the report must not fail because one check did
+        return [{"stage": "Axın xəritəsi", "into": "", "status": "bad", "msg": f"yoxlama xətası: {e}", "n": None}]
+
+
+def _security(db: DB) -> dict:
+    from .security import Guard
+    return Guard(db).summary()
+
+
 def _memory() -> dict:
     """The process's memory now and at its peak, and what the machine has left (Linux /proc; MB)."""
     out = {}
@@ -126,6 +139,8 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "hunter": jobs.hunter.recent(5),
         "history": engine.history_state,
         "memory_mb": _memory(),
+        "pipeline": _pipeline(db, keys, engine, feeds, jobs),
+        "security": _security(db),
         "related": {**json.loads(db.get("related:epics") or "{}"),
                     "quotes": {c: engine.status(c, now) for c in json.loads(db.get("related:epics") or "{}").get("epics", {})}},
         "calendar_actuals": db.execute("SELECT COUNT(*) n, COUNT(actual) a FROM events WHERE ts < ?", (now,)).fetchone()[:],

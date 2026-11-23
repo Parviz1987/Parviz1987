@@ -58,6 +58,20 @@ async function load() {
       <td>${esc(e.message)}${e.trace ? `<details><summary class="note">ətraflı</summary><pre class="trace">${esc(e.trace)}</pre></details>` : ""}</td></tr>`).join("") + "</table>"
     : "<p class='note'>Xəta yoxdur.</p>";
   if (d.errors.some((e) => Date.now() / 1000 - e.last_ts < 3600)) problems.push("son 1 saatda xəta yazılıb (aşağıya baxın)");
+  const ST = { ok: [true, "işləyir"], warn: [null, "diqqət"], bad: [false, "işləmir"], closed: [undefined, "bazar bağlı"] };
+  $("s-pipe").innerHTML = `<table><tr><th>Halqa</th><th>Vəziyyət</th><th>Nə göstərir</th><th>Nəyə ötürür</th></tr>` +
+    (d.pipeline || []).map((r) => { const [ok, t] = ST[r.status] || [null, r.status];
+      if (r.status === "warn" || r.status === "bad") problems.push(r.stage + ": " + r.msg);
+      return `<tr><td>${esc(r.stage)}</td><td>${r.status === "closed" ? "<span class='pill next'>bazar bağlı</span>" : pill(ok, t)}</td>
+        <td>${esc(r.msg)}</td><td class="note">→ ${esc(r.into)}</td></tr>`; }).join("") + "</table>";
+  const sec = d.security || {}, cnt = sec.last_24h || {};
+  if ((sec.alerts || []).length) problems.push("təhlükəsizlik: " + sec.alerts.length + " xəbərdarlıq (aşağıya baxın)");
+  $("s-sec").innerHTML = `<p>${pill((sec.alerts || []).length ? null : true, (sec.alerts || []).length ? "baxın" : "sakit")}
+      Son 24 saat: səhv parol ${cnt.login_fail || 0}, bloklanan ${cnt.login_blocked || 0}, giriş ${(cnt.login_ok || 0) + (cnt.login_new_ip || 0)},
+      yeni ünvandan giriş ${cnt.login_new_ip || 0}. İndi bloklu ünvan: ${(sec.blocked_now || []).length}. Tanınan ünvan: ${sec.known_ips || 0}.</p>` +
+    ((d.security_events || []).length ? `<table><tr><th>Vaxt</th><th>Hadisə</th><th>Ünvan</th><th>Qeyd</th></tr>` +
+      d.security_events.map((e) => `<tr><td>${ago(e.ts)}</td><td>${esc(e.kind_az)}</td><td class="n">${esc(e.ip)}</td><td>${esc(e.detail)}</td></tr>`).join("") + "</table>" : "") +
+    `<p class="note">Server firewall-u: internetdən yalnız sayt (80/443) açıqdır, SSH bağlıdır. 15 dəqiqədə 5 səhv parol → həmin ünvan 15 dəqiqə bloklanır.</p>`;
   $("sumbar").hidden = false;
   $("sumbar").className = "evbanner" + (problems.length ? "" : " okbar");
   $("sumbar").textContent = problems.length ? "Diqqət: " + problems.join(" · ") : "Hər şey qaydasındadır.";

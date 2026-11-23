@@ -3,6 +3,7 @@
 Run:  uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8100"""
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -49,6 +50,13 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 out += [x for x in v.values() if x]
         return out
 
+    from .security import Guard
+    sec = Guard(db)
+
+    def _ip(request: Request) -> str:
+        # uvicorn trusts Caddy's X-Forwarded-For from 127.0.0.1: this is the visitor's real address
+        return request.client.host if request.client else "?"
+
     journal = diag.ErrorJournal(db, _secrets)
     logging.getLogger().addHandler(journal)
 
@@ -75,6 +83,13 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             if origin and origin.split("://", 1)[-1] != request.headers.get("host"):
                 return JSONResponse({"error": "başqa saytdan sorğu"}, status_code=403)
         response = await call_next(request)
+        if request.method in ("POST", "DELETE") and response.status_code == 200 and path.startswith("/api/admin/"):
+            parts = path.split("/")
+            kind = {"keys": "key_deleted" if request.method == "DELETE" else "key_saved", "password": "password_changed",
+                    "guest": "guest_changed", "provider": "provider_changed",
+                    "diag-token": "diag_token_changed"}.get(parts[3] if len(parts) > 3 else "")
+            if kind and not path.endswith("/check"):
+                sec.log(kind, _ip(request), parts[4] if kind.startswith("key_") and len(parts) > 4 else "")
         tok = request.cookies.get(auth.COOKIE)
         if auth.needs_renewal(tok, s.session_secret):
             # Every visit pushes the 30 days forward: the owner logs in once and stays in.
@@ -83,6 +98,11 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"
+        # HTTPS only from now on (1 year), and only this site's own scripts may run on its pages
+        response.headers["Strict-Transport-Security"] = "max-age=31536000"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+            "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         return response
 
     # ---------- pages ----------
@@ -92,6 +112,9 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     @app.post("/login")
     async def login(request: Request):
+        ip = _ip(request)
+        if sec.is_blocked(ip):
+            return RedirectResponse("/login?e=blocked", status_code=303)
         form = await request.form()
         given = str(form.get("password", ""))
         if auth.password_ok(given, db_hash=db.get("auth:password_hash"), env_hash=s.app_password_hash,
@@ -100,7 +123,10 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         elif auth.guest_ok(given, db.get("auth:guest_hash")):
             who = "guest"
         else:
+            sec.failed(ip, "login")
+            await asyncio.sleep(1.0)      # every wrong try costs a second: guessing at speed is impossible
             return RedirectResponse("/login?e=1", status_code=303)
+        sec.succeeded(ip, who)
         r = RedirectResponse("/", status_code=303)
         r.set_cookie(auth.COOKIE, auth.make_token(s.session_secret, role=who), max_age=auth.DAYS * 86400,
                      httponly=True, secure=s.cookie_secure, samesite="lax")
@@ -148,14 +174,19 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     @app.get("/api/admin/status")
     async def status_data():
-        return diag.report(db, store, engine, feeds, jobs, _commit())
+        return {**diag.report(db, store, engine, feeds, jobs, _commit()), "security_events": sec.recent(30)}
 
     @app.get("/api/diag")
     async def diagnostics(request: Request):
         """Read-only report for the outside reviewer. Needs the diagnostics token (Authorization: Bearer ...)."""
+        ip = _ip(request)
+        if sec.is_blocked(ip):
+            return JSONResponse({"error": "çox səhv cəhd: 15 dəqiqə gözləyin"}, status_code=429)
         stored = db.get("auth:diag_hash")
         given = request.headers.get("authorization", "").removeprefix("Bearer ").strip()
         if not stored or not given or not auth.verify_hash(given, stored):
+            if given:
+                sec.failed(ip, "diag")
             return JSONResponse({"error": "diaqnostika açarı lazımdır"}, status_code=401)
         return diag.report(db, store, engine, feeds, jobs, _commit())
 
