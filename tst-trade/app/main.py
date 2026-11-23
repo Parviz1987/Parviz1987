@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import auth, brains, candles, forecast, judge, keys, registry
+from .feeds import Feeds
 from .config import BASE_DIR, PROVIDERS, Settings, load_settings
 from .db import DB
 from .engine import Engine, market_open
@@ -26,7 +27,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     db = DB(s.db_path)
     store = KeyStore(db, s.session_secret)
-    engine = Engine(db, store, s.price_provider, s.poll_seconds)
+    feeds = Feeds(db, store)
+    engine = Engine(db, store, s.price_provider, s.poll_seconds, feeds)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -107,6 +109,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                            "status": engine.status(sym, now), "day_open": day[-1]["o"] if day else None,
                            "error": engine.errors.get(sym) or engine.errors.get("*")})
         return {"now": now, "provider": engine.provider_name, "market_open": market_open(now),
+                "event_mode": feeds.event_mode(now),
                 "last_ok": engine.last_ok, "poll": engine.poll, "metals": metals}
 
     @app.get("/api/candles")
@@ -142,6 +145,13 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return {"symbol": symbol, "method_names": forecast.METHOD_NAMES,
                 "cards": [_card(symbol, h) for h in forecast.HORIZONS]}
 
+    @app.get("/api/feeds")
+    async def feeds_view(metal: str | None = None):
+        now = time.time()
+        return {"news": feeds.latest_news(30, metal if metal in candles.METALS else None),
+                "events": feeds.upcoming(now), "macro": feeds.macro_view(), "event_mode": feeds.event_mode(now),
+                "health": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred")}}
+
     @app.get("/api/journal")
     async def journal(symbol: str, limit: int = 40):
         rows = db.execute("SELECT horizon, method, issued_t, target_t, price0, price1, p_up, lo80, hi80, outcome, "
@@ -153,8 +163,10 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     # ---------- admin ----------
     @app.get("/api/admin/overview")
     async def overview():
-        slots = [{**slot, "state": store.status(slot["id"])} for slot in registry.KEY_SLOTS]
-        return {"categories": registry.CATEGORIES, "keys": slots, "free": registry.FREE_SOURCES,
+        slots = [{**slot, "state": store.status(slot["id"]), "health": feeds.health(slot["id"])}
+                 for slot in registry.KEY_SLOTS]
+        free = [{**f, "health": feeds.health(f["id"])} for f in registry.FREE_SOURCES]
+        return {"categories": registry.CATEGORIES, "keys": slots, "free": free,
                 "brains": brains.view(db, store), "providers": list(PROVIDERS),
                 "brain_providers": list(registry.BRAIN_PROVIDERS),
                 "price_provider": engine.chosen_provider(), "active_provider": engine.provider_name,
@@ -219,6 +231,13 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             raise HTTPException(400, "yeni parol iki dəfə eyni yazılmayıb")
         db.put("auth:password_hash", auth.hash_password(new))
         return {"ok": True}
+
+    @app.post("/api/admin/feeds/{name}")
+    async def refresh_feed(name: str):
+        if name not in ("news", "calendar", "macro"):
+            raise HTTPException(404, "naməlum mənbə")
+        await feeds.tick(force=name)
+        return {k: feeds.health(k) for k in ("rss", "forexfactory", "fred")}
 
     @app.post("/api/admin/history")
     async def history():

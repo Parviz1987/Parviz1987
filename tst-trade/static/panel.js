@@ -40,6 +40,9 @@ function renderTiles(st) {
     : st.metals.some((m) => m.status === "DELAYED") ? "DELAYED" : "LIVE";
   $("feed").className = "pill " + worst;
   $("feed").textContent = st.provider === "demo" ? "DEMO məlumat (real deyil)" : (PROVIDER_AZ[st.provider] || st.provider || "—") + " · " + (STATUS_AZ[worst] || worst);
+  const ev = st.event_mode;
+  $("evbanner").hidden = !ev;
+  if (ev) $("evbanner").textContent = `Hadisə rejimi: «${ev.title}» ${until(ev.ts)}. Bu vaxt qiymət sıçrayışlı olur, qısa proqnozlara ehtiyatla baxın.`;
   $("mkt").textContent = st.market_open ? "Bazar açıqdır" : "Bazar bağlıdır (həftə sonu): yeni şam və proqnoz yoxdur";
 }
 
@@ -127,6 +130,39 @@ async function loadJournal() {
       <td>${r.in80 ? "<span class='up'>tutdu</span>" : "<span class='down'>tutmadı</span>"}</td></tr>`).join("") + "</table>";
 }
 
+let nfilter = "metal";
+const ago = (ts) => { const m = Math.round((Date.now() / 1000 - ts) / 60);
+  return m < 60 ? m + " dəq əvvəl" : m < 1440 ? Math.round(m / 60) + " saat əvvəl" : Math.round(m / 1440) + " gün əvvəl"; };
+const until = (ts) => { const m = Math.round((ts - Date.now() / 1000) / 60);
+  if (m < 0) return "çıxıb";
+  return m < 60 ? m + " dəq sonra" : m < 1440 ? Math.floor(m / 60) + " saat " + (m % 60) + " dəq sonra" : Math.round(m / 1440) + " gün sonra"; };
+const SER = { DFII10: 2, DGS10: 2, T10YIE: 2, DTWEXBGS: 2 };
+
+async function loadFeeds() {
+  const d = await api(`/api/feeds${nfilter === "metal" ? "?metal=" + sym : ""}`);
+  const h = d.health || {};
+  $("macro").innerHTML = d.macro.map((m) => m.value == null
+    ? `<div class="mrow"><span>${esc(m.name)}</span><span class="mut">—</span><span></span></div>`
+    : `<div class="mrow"><span>${esc(m.name)}<br><span class="note">${esc(m.date)}</span></span>
+       <span class="v">${m.value.toFixed(SER[m.series] || 2)}</span>
+       <span class="v ${m.change_week > 0 ? "up" : m.change_week < 0 ? "down" : "mut"}">${m.change_week >= 0 ? "+" : ""}${m.change_week.toFixed(2)}</span></div>`).join("") +
+    `<p class="note">${h.fred && h.fred.ok ? "Son: həftəlik dəyişmə sağda. Real faiz yüksələndə qızıl adətən sıxılır, amma 2022-dən bu əlaqə zəifləyib."
+      : "FRED: " + esc((h.fred && h.fred.message) || "hələ yüklənməyib")}</p>`;
+  $("events").innerHTML = d.events.length ? `<table><tr><th>Vaxt</th><th>Hadisə</th><th>Gözlənti</th><th>Əvvəlki</th><th>Fakt</th></tr>` +
+    d.events.map((e) => `<tr><td>${new Date(e.ts * 1000).toLocaleString("az", { weekday: "short", hour: "2-digit", minute: "2-digit" })}<br>
+      <span class="note">${until(e.ts)}</span></td><td><span class="${e.impact === "High" ? "hi" : "me"}">●</span> ${esc(e.title)}</td>
+      <td class="n">${esc(e.forecast || "—")}</td><td class="n">${esc(e.previous || "—")}</td><td class="n">${esc(e.actual || "—")}</td></tr>`).join("") + "</table>"
+    : `<p class="note">${h.forexfactory && h.forexfactory.ok === false ? "Təqvim: " + esc(h.forexfactory.message) : "Yaxın 7 gündə mühüm ABŞ hadisəsi yoxdur və ya təqvim hələ yüklənməyib."}</p>`;
+  $("news").innerHTML = d.news.length ? d.news.slice(0, 20).map((n) => `<div class="nitem">
+      ${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a>` : `<span>${esc(n.title)}</span>`}
+      <span class="m">${esc(n.source)} · ${ago(n.ts)}${n.metals ? " · " + esc(n.metals) : ""}</span></div>`).join("")
+    : `<p class="note">${h.rss && h.rss.ok === false ? "Xəbər: " + esc(h.rss.message) : "Hələ başlıq yoxdur."}</p>`;
+}
+document.querySelectorAll("#nfilter button").forEach((b) => b.onclick = () => {
+  nfilter = b.dataset.f; document.querySelectorAll("#nfilter button").forEach((x) => x.classList.toggle("on", x === b));
+  loadFeeds().catch(() => {});
+});
+
 function save() { try { localStorage.setItem("tst_sym", sym); localStorage.setItem("tst_tf", tf); } catch (e) {} }
 
 async function refreshState() { lastState = await api("/api/state"); renderTiles(lastState); }
@@ -141,7 +177,7 @@ async function refreshFc() {
   }
   renderCards(lastFc); renderJudge(lastFc);
 }
-async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadJournal(); }
+async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadJournal(); await loadFeeds(); }
 
 document.querySelectorAll("#modes button").forEach((b) => b.onclick = () => {
   mode = b.dataset.m; modeTouched = true; document.querySelectorAll("#modes button").forEach((x) => x.classList.toggle("on", x === b));
@@ -157,3 +193,4 @@ refreshAll();
 setInterval(() => refreshState().catch(() => {}), 5000);
 setInterval(() => loadChart().catch(() => {}), 10000);
 setInterval(() => { refreshFc().catch(() => {}); loadJournal().catch(() => {}); }, 20000);
+setInterval(() => loadFeeds().catch(() => {}), 60000);

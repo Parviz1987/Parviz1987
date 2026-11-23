@@ -37,8 +37,9 @@ def market_open(ts: float) -> bool:
 
 
 class Engine:
-    def __init__(self, db: DB, keys: KeyStore, default_provider: str, poll_seconds: int):
+    def __init__(self, db: DB, keys: KeyStore, default_provider: str, poll_seconds: int, feeds=None):
         self.db = db
+        self.feeds = feeds
         self.keys = keys
         self.default_provider = default_provider
         self.poll = poll_seconds
@@ -202,6 +203,8 @@ class Engine:
                     self.prune(time.time())
                     last_prune = time.time()
                 await self.backfill()
+                if self.feeds is not None:
+                    await self.feeds.tick()
             except Exception:   # the loop must survive one bad poll
                 log.exception("engine step failed")
             try:

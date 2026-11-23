@@ -36,19 +36,28 @@ function keySlot(k) {
       <span>Mərhələ</span><span><span class="pill ${stage[0]}">${stage[1]}</span></span>
       <span>Haradan alınır</span><span><a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.url.replace("https://", ""))}</a></span>
       ${st.hint ? `<span>Saxlanan</span><span class="num">${esc(st.hint)} · ${when(st.saved_ts)}</span>` : ""}
-      ${st.check ? `<span>Son yoxlama</span><span>${esc(st.check.message)} · ${when(st.check.ts)}</span>` : ""}</div>
+      ${st.check ? `<span>Açar yoxlaması</span><span>${esc(st.check.message)} · ${when(st.check.ts)}</span>` : ""}
+      ${k.id === "fred" ? healthLine(k.health) : ""}</div>
     ${inputs}
+    ${k.id === "fred" ? `<div class="btns"><button class="btn" data-feed="macro">Makronu indi yüklə</button></div>` : ""}
     <div class="btns"><button class="btn pri" data-act="save" data-k="${k.id}">Saxla</button>
       <button class="btn" data-act="check" data-k="${k.id}" ${st.saved ? "" : "disabled"}>Yoxla</button>
       <button class="btn dan" data-act="del" data-k="${k.id}" ${st.saved ? "" : "disabled"}>Sil</button></div>
     <div class="msg" id="m-${k.id}"></div></div>`;
 }
 
+function healthLine(h) {
+  if (!h || !h.checked) return "";
+  return `<span>Son yoxlama</span><span>${h.ok ? "<span class='up'>işləyir</span>" : "<span class='down'>alınmadı</span>"} · ${esc(h.message)} · ${when(h.checked)}</span>`;
+}
+
 function freeSlot(f) {
   const stage = STAGE[f.stage];
   return `<div class="slot"><div class="hd"><b>${esc(f.name)}</b><span class="pill info">açar lazım deyil</span></div>
     <div class="meta"><span>Nə üçün</span><span>${esc(f.purpose)}</span><span>Qiymət</span><span>${esc(f.cost)}</span>
-    <span>Mərhələ</span><span><span class="pill ${stage[0]}">${stage[1]}</span></span></div></div>`;
+    <span>Mərhələ</span><span><span class="pill ${stage[0]}">${stage[1]}</span></span>${healthLine(f.health)}</div>
+    ${f.id === "rss" ? `<div class="btns"><button class="btn" data-feed="news">İndi yenilə</button></div>` : ""}
+    ${f.id === "forexfactory" ? `<div class="btns"><button class="btn" data-feed="calendar">İndi yenilə</button></div>` : ""}</div>`;
 }
 
 function brainSlot(b) {
@@ -94,6 +103,11 @@ function render() {
 }
 
 function wire() {
+  document.querySelectorAll("[data-feed]").forEach((b) => b.onclick = async () => {
+    b.disabled = true; b.textContent = "Yüklənir…";
+    try { await call("POST", `/api/admin/feeds/${b.dataset.feed}`); } catch (e) { alert(e.message); }
+    load();
+  });
   document.querySelectorAll("[data-prov]").forEach((b) => b.onclick = async () => {
     await call("POST", "/api/admin/provider", { provider: b.dataset.prov }); load();
   });

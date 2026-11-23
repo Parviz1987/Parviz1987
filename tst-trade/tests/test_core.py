@@ -232,8 +232,8 @@ def test_change_password_on_admin_page(tmp_path):
 def test_key_without_a_check_is_saved_not_an_error():
     db = mem()
     ks = KeyStore(db, SECRET)
-    ks.set("alpaca", {"key_id": "PKTEST1234", "secret": "secret-5678"})
+    ks.set("fmp", {"key": "fmp-test-5678"})
     from app import keys as keysmod
-    res = asyncio.run(keysmod.check(ks, "alpaca"))
+    res = asyncio.run(keysmod.check(ks, "fmp"))
     assert res["ok"] is None and "saxlanıb" in res["message"]
-    assert ks.status("alpaca")["check"]["ok"] is None
+    assert ks.status("fmp")["check"]["ok"] is None

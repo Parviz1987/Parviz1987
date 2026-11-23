@@ -129,6 +129,10 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
             ok, msg = await _http_check(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{model or 'gemini-2.5-flash-lite'}",
                 headers={"x-goog-api-key": key})
+        elif slot == "alpaca":
+            ok, msg = await _http_check("https://data.alpaca.markets/v1beta1/news", params={"limit": 1},
+                                        headers={"APCA-API-KEY-ID": v.get("key_id", ""),
+                                                 "APCA-API-SECRET-KEY": v.get("secret", "")})
         elif slot == "fred":
             ok, msg = await _http_check("https://api.stlouisfed.org/fred/series",
                                         params={"series_id": "DFII10", "api_key": key, "file_type": "json"})
