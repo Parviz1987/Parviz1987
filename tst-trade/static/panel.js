@@ -205,7 +205,11 @@ function renderJudge(fc) {
   loadWhere(card).catch(() => {});
   loadPassports().catch(() => {});
 }
-const GROUP_AZ = { asia: "Asiya seansı (22–07 UTC)", london: "London (07–13)", ny: "Nyu-York (13–22)", calm: "Sakit bazar", wild: "Dalğalı bazar" };
+// Session hours are fixed in UTC (22-07, 07-13, 13-22); shown in New York time for the owner (DST included).
+const nyHour = (utcH) => { const d = new Date(); d.setUTCHours(utcH, 0, 0, 0);
+  return d.toLocaleTimeString("az", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" }); };
+const GROUP_AZ = { asia: `Asiya seansı (${nyHour(22)}–${nyHour(7)} NY)`, london: `London (${nyHour(7)}–${nyHour(13)} NY)`,
+  ny: `Nyu-York (${nyHour(13)}–${nyHour(22)} NY)`, calm: "Sakit bazar", wild: "Dalğalı bazar" };
 function spark(vals, up) {
   if (!vals || vals.length < 2) return "";
   const lo = Math.min(...vals), hi = Math.max(...vals), w = 200, h = 34;
@@ -432,8 +436,9 @@ document.querySelectorAll("#modes button").forEach((b) => b.onclick = () => {
 });
 setInterval(() => {
   const d = new Date();
-  $("clock").textContent = "UTC " + d.toISOString().slice(11, 19) + " · Bakı " +
-    d.toLocaleTimeString("az", { timeZone: "Asia/Baku", hour: "2-digit", minute: "2-digit" });
+  // The owner lives in New York: New York time first (winter/summer time handled by the browser), UTC for the data.
+  $("clock").textContent = "Nyu-York " + d.toLocaleTimeString("az", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", second: "2-digit" }) +
+    " · UTC " + d.toISOString().slice(11, 16);
 }, 1000);
 renderTfs();
 renderTa();

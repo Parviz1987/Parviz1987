@@ -6,11 +6,12 @@
 (function () {
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
   function fmt(x) { return x >= 100 ? x.toFixed(2) : x.toFixed(3); }
+  // Times on the chart in New York time (the owner's city); daily and weekly candles keep their trading date.
   function tlabel(t, tf) {
     const d = new Date(t * 1000);
     const p = (n) => String(n).padStart(2, "0");
     if (tf === "1d" || tf === "1w") return p(d.getUTCDate()) + "." + p(d.getUTCMonth() + 1);
-    return p(d.getUTCHours()) + ":" + p(d.getUTCMinutes());
+    return d.toLocaleTimeString("en-GB", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" });
   }
 
   // ---------- indicators ----------
@@ -224,7 +225,7 @@
       g.strokeStyle = fg; g.globalAlpha = .4;
       g.beginPath(); g.moveTo(x(state.hover), padT); g.lineTo(x(state.hover), H - padB); g.stroke(); g.globalAlpha = 1;
     }
-    tip.textContent = tlabel(hcan.t, "1m") + " UTC  Açılış " + fmt(hcan.o) + "  Max " + fmt(hcan.h) + "  Min " + fmt(hcan.l) +
+    tip.textContent = tlabel(hcan.t, "1m") + " NY  Açılış " + fmt(hcan.o) + "  Max " + fmt(hcan.h) + "  Min " + fmt(hcan.l) +
       "  Bağlanış " + fmt(hcan.c);
     state.cw = cw;
   }

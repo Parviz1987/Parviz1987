@@ -6,6 +6,9 @@ Məqsəd: proqnozların həqiqətən düz çıxıb-çıxmadığını canlı öl�
 
 Tam plan və sxem: [`docs/karkas-plani.html`](docs/karkas-plani.html) (brauzerdə açın).
 
+
+**Vaxt:** sahib Nyu-Yorkda yaşayır: panel, qrafik və hesabatlar vaxtı Nyu-York vaxtı ilə göstərir (məlumat bazası UTC saxlayır).
+
 ## Nə var (bu versiya)
 
 | Hissə | Nə edir | Fayl |
