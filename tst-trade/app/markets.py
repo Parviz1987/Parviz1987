@@ -37,9 +37,11 @@ RELATED = {
               "sign": 0},
     "VIX": {"name": "VIX (qorxu)", "epics": ["VIX"], "search": "volatility index",
             "why": "Bazarın qorxu ölçüsü: qorxu artanda sığınacaq tələbi artır.", "sign": +1},
-    "US10Y": {"name": "ABŞ 10 illik faiz", "epics": ["US10Y", "TNOTE", "UST10Y", "T-NOTE"], "search": "10-year",
-              "why": "Faiz qalxanda qızıl saxlamağın «itirilmiş gəliri» artır; adətən qızıl üçün mənfidir.",
-              "sign": -1},
+    # The broker has the 10-year Treasury note FUTURE (a price), not the yield: the price falls when the yield rises.
+    "US10Y": {"name": "ABŞ 10 illik istiqraz (qiymət)", "epics": ["US10Y", "TNOTE", "UST10Y", "T-NOTE"],
+              "search": "10-year",
+              "why": "Faiz qalxanda bu istiqrazın qiyməti düşür və qızıl saxlamağın «itirilmiş gəliri» artır: "
+                     "istiqraz qiyməti qalxanda (faiz enəndə) qızıl üçün adətən müsbətdir.", "sign": +1},
 }
 HISTORY_TF = {"15m": 1000, "30m": 1000, "1h": 1000, "4h": 1000, "1d": 1000}
 RESOLVE_EVERY = 86400

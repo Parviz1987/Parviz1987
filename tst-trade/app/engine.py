@@ -187,6 +187,12 @@ class Engine:
             self._rel_cache = (now, surprise.Lookup(self.db))
         return self._rel_cache[1]
 
+    def _drop_unlinked(self) -> None:
+        """History impulse forecasts replayed before the linked market's candles existed said "no candles"; they are
+        replayed with the data now (only these rows)."""
+        self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method IN ('dollar', 'oil') AND basis=?",
+                        ("bu bazarın şamı yoxdur",))
+
     def migrate(self) -> None:
         """Once per start: daily candles labelled Saturday or Sunday came from the old bucketing (Sunday-evening
         ticks before the session shift); the forecasts issued on them over a weekend are duplicates."""
@@ -198,6 +204,10 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:linked_v1"):
+            self._drop_unlinked()
+            self.history_state["ts"] = 0
+            self.db.put("migr:linked_v1", "1")
         if not self.db.get("migr:no_1m_desk"):
             # The one-minute desk was removed: its history replay goes (derived data); its live results stay
             # until the normal 30-day clean-up, as the record of why it was removed.
@@ -397,6 +407,7 @@ class Engine:
         if epics != st.get("epics"):
             self.reset_provider()
             self.history_state["ts"] = 0
+            self._drop_unlinked()
 
     def related_closes(self, past: list[dict], tf: str, now: float, rows_by_code: dict | None = None) -> dict:
         """For the impulse methods: the dollar and oil closes aligned with the metal's candles (same candle times),
