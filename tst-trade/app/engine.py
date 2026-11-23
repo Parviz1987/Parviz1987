@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from . import candles, forecast, judge, markets, surprise
+from . import brainviews, candles, forecast, judge, markets, surprise
 from .db import DB
 from .keys import KeyStore
 from .providers.base import NotServed, ProviderError, Quote
@@ -225,6 +225,7 @@ class Engine:
         n = 0
         macro = self._macro(now)
         rel = self._releases(now)
+        bv = brainviews.Lookup(self.db)
         for h, tf in forecast.HORIZONS.items():
             issued_t = candles.bucket(now, tf)
             step = candles.TF[tf]
@@ -243,7 +244,8 @@ class Engine:
                 if gap != step and not (monday and gap == 3 * step):
                     continue
                 fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
-                                    rel.window(issued_t, h), self.related_closes(past, tf, now))
+                                    rel.window(issued_t, h), self.related_closes(past, tf, now),
+                                    bv.views(sym, issued_t, h))
                 if fc is None:
                     continue
                 n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
@@ -327,6 +329,7 @@ class Engine:
         n = 0
         macro = MacroLookup(self.db)
         rel = surprise.Lookup(self.db)
+        bv = brainviews.Lookup(self.db)
         first = macro.first_day()
         if first:
             # Replayed before FRED data arrived: those macro forecasts said "no data". Now that the data covers
@@ -353,7 +356,7 @@ class Engine:
                         continue   # a gap (weekend): the candle after it is not "the next one"
                     window = rows[max(0, i - forecast.history_need(h)):i]
                     fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
-                                        self.related_closes(window, tf, now, linked))
+                                        self.related_closes(window, tf, now, linked), bv.views(sym, t, h))
                     if fc is None:
                         continue
                     target = rows[i + k - 1]["t"] + step if i + k - 1 < len(rows) else target_time(t, h)

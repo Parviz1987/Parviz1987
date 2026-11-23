@@ -81,6 +81,13 @@ BRAIN_SLOTS: list[dict] = [
      "requirements": [("X-də axtarış", 50), ("Sürət", 25), ("Qiymət", 25)],
      "provider": "xai", "model": "grok-4.7", "fallback": None, "fallback_model": None,
      "why": "X-i daxildən axtaran yeganə provayder; veb axtarışı 1000 sorğu üçün 5 $ (OpenAI və Anthropic 10 $)."},
+    {"id": "hunter", "name": "Rəqəm ovçusu",
+     "job": "ABŞ rəqəmi açıqlanandan 2–10 dəqiqə sonra faktiki rəqəmi vebdən tapır, mənbə linki ilə. İki beyin ayrı-ayrı "
+            "tapır; rəqəmlər üst-üstə düşməsə, heç biri istifadə olunmur.",
+     "may_not": "Rəqəmi təxmin etmək; tək beynin tapdığını istifadə etmək; qiymət yazmaq.",
+     "requirements": [("Uydurmamaq", 50), ("Veb axtarışı", 30), ("Qiymət", 20)],
+     "provider": "openai", "model": "gpt-5.4-nano", "fallback": "anthropic", "fallback_model": "claude-opus-5-5",
+     "why": "İki fərqli şirkətin beyni bir-birini yoxlayır; FMP təqvimi olmadan faktı gətirmək üçün."},
     {"id": "reader", "name": "Oxuyucu",
      "job": "Başlığı oxuyur: nə oldu, hansı metal, hansı istiqamət, nə qədər güclü, mənbə. Cavab sərt formada.",
      "may_not": "Qiymət yazmaq, proqnoz vermək.",

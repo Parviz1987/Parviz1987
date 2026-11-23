@@ -10,7 +10,7 @@ from .db import DB
 from .keys import KeyStore
 
 EDITABLE = ("provider", "model", "fallback", "fallback_model", "month_usd")
-IN_USE = ("scout", "reader", "strategist")   # slots that already do their job; the others are configured and checked only
+IN_USE = ("scout", "hunter", "reader", "strategist")   # slots that already do their job; the others are configured and checked only
 
 
 def config(db: DB, slot: str) -> dict:
@@ -134,3 +134,33 @@ async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema:
             errors.append(f"{provider}: {msg}")
             db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)", (_time.time(), slot, provider, model, msg))
     return None, "; ".join(errors) or "beyin seçilməyib"
+
+
+async def run_both(db: DB, keys: KeyStore, slot: str, system: str, user: str,
+                   max_tokens: int = 2000) -> list[tuple[dict | None, str]]:
+    """Ask the slot's main brain AND its second brain independently, both with live web search: for jobs where two
+    independent answers must agree before anything is used (a figure found on the web). Never raises."""
+    db.conn.executescript(CALLS_SCHEMA)
+    cfg = config(db, slot)
+    if spent(db, slot) >= float(cfg["month_usd"]):
+        return [(None, f"aylıq limit doldu ({cfg['month_usd']} $)")]
+    out = []
+    for provider, model in ((cfg["provider"], cfg["model"]), (cfg.get("fallback"), cfg.get("fallback_model"))):
+        if not provider or not model:
+            out.append((None, "ikinci beyin seçilməyib"))
+            continue
+        key = keys.first(provider)
+        if not key:
+            out.append((None, f"{provider}: açar yoxdur"))
+            continue
+        try:
+            data, tin, tout, calls = await llm.search(provider, key, model, system, user, max_tokens)
+            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,1,?,?,?,NULL)",
+                       (_time.time(), slot, provider, model, tin, tout,
+                        llm.cost(model, tin, tout) + calls * llm.SEARCH_CALL_USD))
+            out.append((data, f"{provider} · {model}"))
+        except Exception as e:   # a broken brain must never stop the system
+            msg = str(e).replace(key, "***")[:200]
+            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)", (_time.time(), slot, provider, model, msg))
+            out.append((None, f"{provider}: {msg}"))
+    return out

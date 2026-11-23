@@ -123,16 +123,13 @@ async def ask(provider: str, key: str, model: str, system: str, user: str, schem
 SEARCH_CALL_USD = 0.01      # counted per server-side search call, on top of tokens (kept high on purpose for the cap)
 
 
-async def search(provider: str, key: str, model: str, system: str, user: str,
-                 max_tokens: int = 3000) -> tuple[dict, int, int, int]:
-    """Live search on X and the web by xAI's server-side tools (Responses API, tools x_search + web_search).
-    Returns (json answer, input tokens, output tokens, number of search calls). Only xAI has it here."""
-    if provider != "xai":
-        raise LLMError(f"{provider}: canlı X axtarışı yalnız xAI (Grok) ilə işləyir")
+async def _responses_search(base: str, key: str, model: str, system: str, user: str, tools: list,
+                            max_tokens: int) -> tuple[dict, int, int, int]:
+    """OpenAI-style Responses API with server-side search tools (xAI and OpenAI share the shape)."""
     body = {"model": model, "input": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "tools": [{"type": "x_search"}, {"type": "web_search"}], "max_output_tokens": max_tokens}
+            "tools": tools, "max_output_tokens": max_tokens}
     async with httpx.AsyncClient(timeout=180.0) as c:
-        r = await c.post("https://api.x.ai/v1/responses", headers={"Authorization": f"Bearer {key}"}, json=body)
+        r = await c.post(f"{base}/v1/responses", headers={"Authorization": f"Bearer {key}"}, json=body)
     if r.status_code in (401, 403):
         raise LLMError("açar qəbul olunmadı")
     if r.status_code != 200:
@@ -154,3 +151,56 @@ async def search(provider: str, key: str, model: str, system: str, user: str,
         raise LLMError("boş cavab")
     u = j.get("usage") or {}
     return _json("\n".join(texts)), int(u.get("input_tokens") or 0), int(u.get("output_tokens") or 0), calls
+
+
+async def _anthropic_search(key: str, model: str, system: str, user: str, max_tokens: int) -> tuple[dict, int, int, int]:
+    """Claude with the server-side web search tool (official SDK). A long search can pause the turn
+    (stop_reason pause_turn): the paused turn is sent back so the server continues, at most 3 times."""
+    import anthropic
+    client = anthropic.AsyncAnthropic(api_key=key, timeout=180.0, max_retries=1)
+    messages = [{"role": "user", "content": user}]
+    tin = tout = calls = 0
+    try:
+        for _ in range(4):
+            r = await client.messages.create(
+                model=model, max_tokens=max_tokens, system=system, messages=messages,
+                tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 3}],
+                output_config={"effort": "low"})
+            tin += r.usage.input_tokens
+            tout += r.usage.output_tokens
+            calls += sum(1 for b in r.content if b.type == "web_search_tool_result")
+            if r.stop_reason != "pause_turn":
+                break
+            messages.append({"role": "assistant", "content": r.content})
+    except anthropic.AuthenticationError as e:
+        raise LLMError("Anthropic: açar qəbul olunmadı") from e
+    except anthropic.NotFoundError as e:
+        raise LLMError(f"Anthropic: model tapılmadı ({model})") from e
+    except anthropic.RateLimitError as e:
+        raise LLMError("Anthropic: sorğu limiti") from e
+    except anthropic.APIConnectionError as e:
+        raise LLMError("Anthropic: qoşulmaq alınmadı") from e
+    except anthropic.APIStatusError as e:
+        raise LLMError(f"Anthropic: HTTP {e.status_code}") from e
+    finally:
+        await client.close()
+    if r.stop_reason == "refusal":
+        raise LLMError("Anthropic: model cavab verməkdən imtina etdi")
+    text = "".join(b.text for b in r.content if b.type == "text")
+    return _json(text), tin, tout, calls
+
+
+async def search(provider: str, key: str, model: str, system: str, user: str,
+                 max_tokens: int = 3000) -> tuple[dict, int, int, int]:
+    """Live search by the provider's own server-side tools. Returns (json answer, input tokens, output tokens,
+    number of search calls). xAI: X and the web; OpenAI and Anthropic: the web. Gemini: not wired."""
+    if provider == "xai":
+        # Grok only for X (its unique strength); the web is searched by the cheaper brains (Rəqəm ovçusu)
+        return await _responses_search("https://api.x.ai", key, model, system, user, [{"type": "x_search"}],
+                                       max_tokens)
+    if provider == "openai":
+        return await _responses_search("https://api.openai.com", key, model, system, user,
+                                       [{"type": "web_search"}], max_tokens)
+    if provider == "anthropic":
+        return await _anthropic_search(key, model, system, user, max_tokens)
+    raise LLMError(f"{provider}: canlı axtarış bu provayderdə qoşulmayıb")

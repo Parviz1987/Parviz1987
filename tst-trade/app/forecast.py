@@ -18,6 +18,8 @@ this moment says P = 0.5: the Judge then counts no hit or miss for it (only fore
             what that usually means for gold (app/surprise.py). No release in the window: no view.
 - dollar, oil (15 minutes to 1 day) catch-up after a move in the dollar or oil that the metal has not followed yet
             (app/markets.py: the usual same-candle link is measured from the last 100 candles).
+- news, strateq the brains as forecasters: the Reader's headline labels summed over the last hours, and the
+            Strategist's own lean (app/brainviews.py). Judged like the rest: a brain earns trust only by results.
 - consensus the plain average of every other method's lean (P - 0.5) among those that have a view right now; no
             fitting to past results (so no hidden look-ahead). No view unless at least two methods agree in sum.
 - macro     (daily and longer) the last week's change of the real interest rate and the dollar: both falling is good
@@ -39,12 +41,13 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
                  "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
 METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro", "session", "surprise",
-           "dollar", "oil", "consensus")
+           "dollar", "oil", "news", "strateq", "consensus")
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
                 "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)",
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "macro": "Makro (real faiz + dollar)",
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
-                "dollar": "Dollar impulsu", "oil": "Neft impulsu", "consensus": "Konsensus (hamısı birlikdə)"}
+                "dollar": "Dollar impulsu", "oil": "Neft impulsu",
+                "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "consensus": "Konsensus (hamısı birlikdə)"}
 BASELINES = ("rw", "up")
 LOOKBACK = {"15m": 16, "30m": 16, "1h": 24, "4h": 18, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
 TREND_WINDOWS = {"15m": (4, 16, 96), "30m": (4, 16, 96), "1h": (6, 24, 120), "4h": (6, 30, 120), "1d": (10, 50, 150),
@@ -77,7 +80,10 @@ def methods_for(h: str) -> tuple[str, ...]:
     if h not in ("15m", "30m", "1h", "4h", "1d"):
         out.remove("surprise")
         out.remove("dollar")     # catch-up after a linked market's move: a short-horizon effect
-        out.remove("oil")   # a release moves the next minutes to a day; longer horizons drown it
+        out.remove("oil")
+        out.remove("news")       # headlines move prices for hours, not weeks
+    if h not in ("4h", "1d"):
+        out.remove("strateq")    # the Strategist leans for the next hours to a day   # a release moves the next minutes to a day; longer horizons drown it
     return tuple(out)
 
 
@@ -206,7 +212,8 @@ def _clip(p: float) -> float:
 
 
 def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = None,
-          releases: list[dict] | None = None, related: dict | None = None) -> dict | None:
+          releases: list[dict] | None = None, related: dict | None = None,
+          views: dict | None = None) -> dict | None:
     """All methods' forecasts for the close `steps_of(horizon)` candles ahead, from past candles (oldest first;
     plain closes are accepted too). macro: {"dfii10": weekly change, "dollar": weekly change in %} or None."""
     longer = _as_candles(seq)
@@ -302,6 +309,11 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
                 p, basis = 0.5, "bu bazarın şamı yoxdur"
             out[key] = {"p_up": p, "basis": basis}
 
+    for key in ("news", "strateq"):          # the brains as forecasters (app/brainviews.py)
+        if key in methods_for(horizon):
+            p, basis = (views or {}).get(key, (0.5, "beyin məlumatı yoxdur"))
+            out[key] = {"p_up": p, "basis": basis}
+
     if "macro" in methods_for(horizon):
         if macro and macro.get("dfii10") is not None and macro.get("dollar") is not None:
             # A falling real rate (-0.10 pp) and a falling dollar (-1 %) are each worth about +0.05 of P(up).
@@ -361,6 +373,12 @@ PASSPORT = {
     "oil": {"why": "Neft inflyasiya gözləntisini və geosiyasi qorxunu daşıyır; qızıl ona gec qoşula bilər.",
             "expect": "1 saat – 1 gün, xüsusən Yaxın Şərq xəbərlərində.",
             "else": "Çıxarılır; neft «Bazarlar» bölməsində ölçü kimi qalır."},
+    "news": {"why": "Xəbərlər qiyməti saatlarla hərəkət etdirir; Oxuyucu hər başlığı metal, istiqamət və gücə görə qiymətləndirir.",
+             "expect": "15 dəqiqə – 4 saat, xüsusən böyük xəbərdən sonra.",
+             "else": "Oxuyucunun modeli dəyişdirilir və ya yalnız göstərici kimi qalır (xərc azalır)."},
+    "strateq": {"why": "Claude bütün faktları (kartlar, makro, təqvim, xəbər) birləşdirib meyl deyir: beynin özünü ölçürük.",
+                "expect": "4 saat və 1 gün.",
+                "else": "Strateq yalnız izahçı qalır, istiqamət soruşulmur (xərc azalır)."},
     "consensus": {"why": "Bütün alətlərin birgə fikri: tək alətin səhvini azaldır.",
                   "expect": "Ən çox sübut olunan üsulların birləşməsi kimi.",
                   "else": "Faydasız üsullar konsensusdan çıxarılır."},

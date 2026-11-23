@@ -111,7 +111,7 @@ def test_scout_search_parses_responses_output_and_strips_numbers(monkeypatch):
         async def __aenter__(self): return self
         async def __aexit__(self, *a): pass
         async def post(self, url, headers=None, json=None):
-            assert url.endswith("/v1/responses") and {"type": "x_search"} in json["tools"]
+            assert url.endswith("/v1/responses") and json["tools"] == [{"type": "x_search"}]
             return R()
 
     monkeypatch.setattr(llm.httpx, "AsyncClient", C)

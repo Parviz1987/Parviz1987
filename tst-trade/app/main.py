@@ -330,7 +330,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         for n in news:
             n["ai"] = labels.get(n.get("uid"))
         from . import surprise
-        return {"news": news, "releases": surprise.recent(db, now),
+        return {"news": news, "releases": surprise.recent(db, now), "hunter": jobs.hunter.recent(4),
                 "events": feeds.upcoming(now), "macro": feeds.macro_view(), "event_mode": feeds.event_mode(now),
                 "cot": feeds.cot_view(),
                 "health": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp")}}

@@ -45,3 +45,35 @@ def test_window_sees_only_past_releases():
     m = forecast.build(up, "1h", releases=lk.window(t + 3600, "1h"))["methods"]["surprise"]
     assert m["p_up"] < 0.5 and "CPI" in m["basis"]
     assert "surprise" not in forecast.build(up, "1w")["methods"]
+
+
+def test_hunter_needs_two_brains_to_agree(monkeypatch):
+    import asyncio
+    from app import brains
+    from app.feeds import Feeds
+    from app.hunter import Hunter
+    from app.keys import KeyStore
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    Feeds(db, ks)
+    ks.set("openai", {"key": "sk-test-1234"})
+    rel = dt.datetime(2026, 11, 13, 13, 30, tzinfo=dt.timezone.utc).timestamp()
+    db.execute("INSERT INTO events VALUES('e1', 'CPI m/m', 'USD', ?, 'High', '0.3%', '0.2%', NULL)", (rel,))
+    answers = [[({"found": True, "actual": "0.5%", "source_url": "https://www.bls.gov/x"}, "openai"),
+                ({"found": True, "actual": "0.4%", "source_url": "https://www.reuters.com/y"}, "anthropic")],
+               [({"found": True, "actual": "0.5%", "source_url": "https://www.bls.gov/x"}, "openai"),
+                ({"found": True, "actual": "0.5%", "source_url": "https://www.reuters.com/y"}, "anthropic")]]
+
+    async def fake(*a, **k):
+        return answers.pop(0)
+    monkeypatch.setattr(brains, "run_both", fake)
+    h = Hunter(db, ks)
+    assert asyncio.run(h.tick(rel + 60)) == 0 and not h.due(rel + 60)        # too early: not asked
+    assert asyncio.run(h.tick(rel + 150)) == 0                               # brains disagree: nothing used
+    assert surprise.Lookup(db).items == []
+    assert asyncio.run(h.tick(rel + 500)) == 1                               # second try: both say 0.5 %
+    lk = surprise.Lookup(db)
+    (item,) = lk.items
+    assert item["gold"] == -1 and item["ts"] == rel + 500                    # visible only from when it was found
+    assert lk.window(rel + 900, "15m") == [item] and not lk.window(rel + 400, "15m")
+    assert len(h.recent()) == 2

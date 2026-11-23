@@ -23,7 +23,7 @@ FMP_URL = "https://financialmodelingprep.com/stable/economic-calendar"
 
 # (pattern, gold direction when the figure comes in ABOVE the estimate)
 RULES = [
-    (r"unemployment rate|jobless claims|initial claims|continuing claims", +1),
+    (r"unemployment rate|unemployment claims|jobless claims|initial claims|continuing claims", +1),
     (r"\bcpi\b|consumer price|\bppi\b|producer price|\bpce\b|price index|inflation", -1),
     (r"non[- ]?farm|payroll|employment change|\badp\b", -1),
     (r"\bgdp\b|retail sales|\bism\b|\bpmi\b|durable goods|industrial production|consumer confidence|"
@@ -80,9 +80,20 @@ def parse_fmp(data) -> list[dict]:
     return out
 
 
+def ensure(db: DB) -> None:
+    """Schema, plus known_ts: when a figure became known here (a figure found by the brains minutes after the release
+    must not be used by a forecast issued before it was found)."""
+    db.conn.executescript(SCHEMA)
+    cols = {r[1] for r in db.execute("PRAGMA table_info(releases)").fetchall()}
+    if "known_ts" not in cols:
+        db.execute("ALTER TABLE releases ADD COLUMN known_ts REAL")
+
+
 def store(db: DB, rows: list[dict]) -> None:
-    db.executemany("INSERT INTO releases(uid, ts, event, impact, estimate, previous, actual, raw_date) "
-                   "VALUES(:uid, :ts, :event, :impact, :estimate, :previous, :actual, :raw_date) "
+    ensure(db)
+    rows = [{"known_ts": None, **r} for r in rows]
+    db.executemany("INSERT INTO releases(uid, ts, event, impact, estimate, previous, actual, raw_date, known_ts) "
+                   "VALUES(:uid, :ts, :event, :impact, :estimate, :previous, :actual, :raw_date, :known_ts) "
                    "ON CONFLICT(uid) DO UPDATE SET estimate=excluded.estimate, previous=excluded.previous, "
                    "actual=excluded.actual, impact=excluded.impact", rows)
 
@@ -94,7 +105,8 @@ def surprise_of(r) -> dict | None:
     if not d or not w or r["actual"] is None or r["estimate"] is None or r["actual"] == r["estimate"]:
         return None
     above = r["actual"] > r["estimate"]
-    return {"event": r["event"], "ts": r["ts"], "actual": r["actual"], "estimate": r["estimate"],
+    seen = r["known_ts"] if "known_ts" in r.keys() and r["known_ts"] else r["ts"]
+    return {"event": r["event"], "ts": max(r["ts"], seen), "actual": r["actual"], "estimate": r["estimate"],
             "above": above, "gold": d if above else -d, "weight": w}
 
 
@@ -103,11 +115,12 @@ class Lookup:
 
     def __init__(self, db: DB):
         try:
-            rows = db.execute("SELECT ts, event, impact, estimate, actual FROM releases WHERE actual IS NOT NULL "
-                              "ORDER BY ts").fetchall()
+            ensure(db)
+            rows = db.execute("SELECT ts, event, impact, estimate, actual, known_ts FROM releases "
+                              "WHERE actual IS NOT NULL").fetchall()
         except Exception:
             rows = []
-        self.items = [s for s in (surprise_of(r) for r in rows) if s]
+        self.items = sorted((s for s in (surprise_of(r) for r in rows) if s), key=lambda s: s["ts"])
         self.ts = [s["ts"] for s in self.items]
         self.first = self.items[0]["ts"] if self.items else None
 

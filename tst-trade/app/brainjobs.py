@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import time
 
@@ -16,6 +17,8 @@ from .keys import KeyStore
 
 READER_EVERY, STRATEGIST_EVERY = 120, 3600
 READER_BATCH = 15
+
+log = logging.getLogger("tst.brainjobs")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS news_ai (uid TEXT PRIMARY KEY, ts REAL, event TEXT, metals TEXT, direction TEXT,
@@ -43,14 +46,17 @@ STRATEGIST_SYSTEM = (
     "Sən qiymətli metallar üzrə analitiksən. Sənə proqnoz kartları, Hakimin statusları, makro göstəricilər, "
     "iqtisadi təqvim və xəbər etiketləri verilir. Azərbaycan dilində, sadə və qısa izah yaz. Qaydalar: yalnız verilən "
     "faktlardan istifadə et; faktlarda olmayan heç bir rəqəm yazma; qiymət proqnozu uydurma; alış-satış məsləhəti "
-    "vermə; «sübut» statusu olmayan istiqaməti dəqiq kimi təqdim etmə və bunu açıq de.")
+    "vermə; «sübut» statusu olmayan istiqaməti dəqiq kimi təqdim etmə və bunu açıq de. Hər metal üçün «lean» sahəsində "
+    "növbəti saatlar–1 gün üçün öz meylini yaz (up, down və ya neutral): bu, sənin fikrindir və Hakim onu ayrıca yoxlayır.")
 STRATEGIST_SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["summary", "metals", "watch"],
     "properties": {
         "summary": {"type": "string"},
         "metals": {"type": "array", "items": {"type": "object", "additionalProperties": False,
-                                              "required": ["symbol", "text"],
-                                              "properties": {"symbol": {"type": "string"}, "text": {"type": "string"}}}},
+                                              "required": ["symbol", "text", "lean"],
+                                              "properties": {"symbol": {"type": "string"}, "text": {"type": "string"},
+                                                             "lean": {"type": "string",
+                                                                      "enum": ["up", "down", "neutral"]}}}},
         "watch": {"type": "array", "items": {"type": "string"}}}}
 
 NUM = re.compile(r"\d+(?:[.,]\d+)?")
@@ -58,7 +64,7 @@ NUM = re.compile(r"\d+(?:[.,]\d+)?")
 
 SCOUT_EVERY, SCOUT_EVENT_EVERY = 4 * 3600, 30 * 60   # one search cost ~0.9 $ (counted high): the monthly cap lasts
 SCOUT_SYSTEM = (
-    "You are the Scout of a precious-metals forecasting desk. Use X search and web search to find what moved or may "
+    "You are the Scout of a precious-metals forecasting desk. Use X search to find what moved or may "
     "move gold, silver, platinum and palladium in the LAST 3 HOURS: central banks and Fed speakers, US data surprises, "
     "geopolitics, tariffs and sanctions, ETF and central-bank buying, China and India demand, mine supply, big trader "
     "or analyst posts on X. Prefer primary sources and well-known accounts; skip rumours you cannot source. Do not "
@@ -95,6 +101,10 @@ class BrainJobs:
         db.conn.executescript(SCHEMA)
         self.next_reader = 0.0
         self.next_strategist = 0.0
+        from .hunter import Hunter
+        self.hunter = Hunter(db, keys)
+        from .brainviews import SCHEMA as BV
+        db.conn.executescript(BV)
         # A restart (every update) must not buy an extra search: the next one follows the last one's time.
         last = json.loads(db.get("scout:last") or "{}")
         self.next_scout = float(last.get("ts", 0)) + SCOUT_EVERY
@@ -162,6 +172,10 @@ class BrainJobs:
                           for m in data.get("metals", []) if m.get("symbol") in ("XAU", "XAG", "XPT", "XPD")],
                "watch": [guard_numbers(str(w), facts) for w in data.get("watch", [])][:6]}
         self.db.put("strategist:last", json.dumps(out, ensure_ascii=False))
+        leans = {"up": 1, "down": -1, "neutral": 0}
+        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note) VALUES(?,?,?,?,?)",
+                            [(now, "strateq", m["symbol"], leans.get(m.get("lean"), 0), how)
+                             for m in data.get("metals", []) if m.get("symbol") in ("XAU", "XAG", "XPT", "XPD")])
         self._state("strategist", f"izah yazıldı · {how}")
         return True
 
@@ -211,6 +225,12 @@ class BrainJobs:
 
     async def tick(self, now: float | None = None) -> None:
         now = time.time() if now is None else now
+        try:
+            n = await self.hunter.tick(now)
+            if n:
+                self._state("hunter", f"{n} rəqəm tapıldı və iki beyin təsdiqlədi")
+        except Exception:
+            log.exception("hunter failed")
         if now >= self.next_scout and self.feeds is not None:
             # Every 4 hours while the market is open; every 30 minutes around a high-impact US release.
             from .engine import market_open

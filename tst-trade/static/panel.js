@@ -158,7 +158,8 @@ function renderCards(fc) {
 let jh = "15m";
 try { jh = localStorage.getItem("tst_jh") || jh; if (jh === "1m") jh = "15m"; } catch (e) {}
 const MCOL = { momentum: "#4ea1ff", reversal: "#c77dff", trend: "#3fb27f", breakout: "#ff9f43", rsi: "#e0605a",
-  fib: "#d4a73c", macro: "#2ec4b6", session: "#f78fb3", surprise: "#ffd166", consensus: "#9aa5b1" };
+  fib: "#d4a73c", macro: "#2ec4b6", session: "#f78fb3", surprise: "#ffd166", dollar: "#06d6a0", oil: "#8d6e63",
+  news: "#ef476f", strateq: "#118ab2", consensus: "#9aa5b1" };
 function renderJudge(fc) {
   const key = mode === "live" ? "stats_live" : "stats_history";
   const methods = Object.keys(fc.method_names).filter((m) => m !== "rw");
@@ -292,7 +293,7 @@ function renderReaderScore(rs) {
 }
 function renderScout(d) {
   const x = d.scout;
-  if (!x) { $("scout").innerHTML = `<p class="note">${esc((d.scout_state && d.scout_state.message) || "Kəşfiyyatçı (Grok) hələ axtarmayıb: bazar açıq olanda 4 saatda bir, mühüm ABŞ rəqəmi ətrafında 30 dəqiqədə bir axtarır. xAI açarı lazımdır.")}</p>`; $("scmeta").textContent = ""; return; }
+  if (!x) { $("scout").innerHTML = `<p class="note">${esc((d.scout_state && d.scout_state.message) || "Kəşfiyyatçı (Grok, yalnız X) hələ axtarmayıb: bazar açıq olanda 4 saatda bir, mühüm ABŞ rəqəmi ətrafında 30 dəqiqədə bir axtarır. xAI açarı lazımdır.")}</p>`; $("scmeta").textContent = ""; return; }
   $("scmeta").textContent = `${x.brain} · ${new Date(x.ts * 1000).toLocaleString("az")}`;
   const items = x.items.filter((i) => nfilter === "all" || !i.metals.length || i.metals.includes(sym));
   $("scout").innerHTML = (x.mood ? `<p>${esc(x.mood)}</p>` : "") + (items.length ? items.map((i) => `<div class="nitem">
@@ -393,6 +394,11 @@ async function loadFeeds() {
       <td>${r.actual == null ? "<span class='mut'>gözlənilir</span>" : !r.scored ? "<span class='mut'>—</span>" : r.gold > 0 ? "<span class='up'>↑ müsbət</span>" : "<span class='down'>↓ mənfi</span>"}</td></tr>`).join("") +
     `</table><p class="note">Məsələn, inflyasiya və ya iş yerləri gözləntidən yüksək çıxanda dollar güclənir və bu, adətən qızıl üçün mənfidir. Bu, ehtimaldır: «Hadisə sürprizi» üsulu Hakimdə yoxlanır.</p>`
     : `<p class="note">${h.fmp && h.fmp.ok === false ? "FMP: " + esc(h.fmp.message) : "Hələ açıqlanan rəqəm yoxdur (admin: FMP açarı)."}</p>`;
+  const hu = d.hunter || [];
+  $("releases").innerHTML += hu.length ? `<p class="note"><b>Rəqəm ovçusu</b> (iki beyin vebdə ayrı-ayrı axtarır): ` +
+    hu.map((x) => `${esc(x.event)} — ${x.accepted ? "<span class='up'>təsdiqləndi</span>" : "<span class='mut'>" + esc(x.note) + "</span>"}` +
+      [x.a, x.b].filter((v) => v && v.url).map((v) => ` <a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">${esc(v.raw)}</a>`).join("")).join(" · ") + "</p>"
+    : `<p class="note"><b>Rəqəm ovçusu:</b> mühüm ABŞ rəqəmi çıxandan 2–20 dəqiqə sonra iki beyin faktı vebdən tapır; üst-üstə düşsə, istifadə olunur.</p>`;
   $("news").innerHTML = d.news.length ? d.news.slice(0, 20).map((n) => `<div class="nitem">
       ${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a>` : `<span>${esc(n.title)}</span>`}
       <span class="m">${esc(n.source)} · ${ago(n.ts)}${n.metals ? " · " + esc(n.metals) : ""}${aiTag(n.ai)}</span></div>`).join("")
