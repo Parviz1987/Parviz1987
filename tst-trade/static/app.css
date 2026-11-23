@@ -125,3 +125,17 @@ section.adm>h2{font-size:1rem;margin:6px 0 0;color:var(--gold)}
 .tasum .v{font-family:var(--mono);text-align:right}
 .tasum p{grid-column:1/-1;margin:4px 0 0}
 @media (min-width:1101px){.cards{max-height:760px;overflow:auto;padding-right:4px}}
+h3.sub{font-size:.85rem;margin:12px 0 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.jcharts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:8px}
+.lc{position:relative;height:190px}.lc canvas{position:absolute;inset:0;width:100%;height:100%}
+@media (max-width:800px){.jcharts{grid-template-columns:minmax(0,1fr)}}
+td.cell{text-align:center;font-family:var(--mono)}
+td.cell.sübut{background:var(--up-soft);color:var(--up);font-weight:700}
+td.cell.yox{color:var(--down)}
+td.cell.az{color:var(--warn)}
+.btn.sm{padding:3px 10px;font-size:.8rem}
+.top{padding-top:max(10px,env(safe-area-inset-top,0px))}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;align-items:start}
+@media (max-width:420px){.sgrid{grid-template-columns:minmax(0,1fr)}}
+pre.trace{white-space:pre-wrap;font-size:.72rem;color:var(--muted);max-height:220px;overflow:auto;margin:4px 0 0}
+.evbanner.okbar{background:var(--up-soft);color:var(--up)}

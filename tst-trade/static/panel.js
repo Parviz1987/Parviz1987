@@ -152,24 +152,61 @@ function renderCards(fc) {
   $("fcupd").textContent = "yeniləndi " + hhmm(Date.now() / 1000);
 }
 
+let jh = "1m";
+try { jh = localStorage.getItem("tst_jh") || jh; } catch (e) {}
+const MCOL = { momentum: "#4ea1ff", reversal: "#c77dff", trend: "#3fb27f", breakout: "#ff9f43", rsi: "#e0605a",
+  fib: "#d4a73c", macro: "#2ec4b6" };
 function renderJudge(fc) {
   const key = mode === "live" ? "stats_live" : "stats_history";
-  let html = `<table><tr><th>Üfüq</th><th>Üsul</th><th>Yoxlama</th><th>Düz çıxıb</th><th>Keçməli hədd</th><th>p</th>
-    <th>Brier bal</th><th>50 % aralıq tutdu</th><th>80 % aralıq tutdu</th><th>Status</th></tr>`;
+  const methods = Object.keys(fc.method_names).filter((m) => m !== "rw");
+  // summary matrix: rows = horizons, cells = hit rate coloured by status
+  let mx = `<table><tr><th>Üfüq</th>${methods.map((m) => `<th>${esc(fc.method_names[m])}</th>`).join("")}<th>50 % aralıq</th><th>80 % aralıq</th></tr>`;
   for (const c of fc.cards) {
-    for (const r of c[key]) {
-      const cnt = r.method === "rw" || r.method === "up" ? r.n : r.nh;
-      const st = r.status === "az" ? `az (${cnt}/${r.min_n})` : VERDICT_AZ[r.status];
-      html += `<tr><td>${c.name}</td><td>${esc(fc.method_names[r.method])}</td><td class="n">${cnt}</td>
-        <td class="n">${r.method === "rw" ? "—" : pct(r.hit_rate)}</td><td class="n">${r.method === "rw" ? "—" : pct(r.bar)}</td>
-        <td class="n">${r.p == null || r.method === "rw" ? "—" : r.p.toFixed(3)}</td>
-        <td class="n">${r.bss == null ? "—" : (r.bss * 100).toFixed(1)}</td>
-        <td class="n">${pct(r.cover50, 0)}</td><td class="n">${pct(r.cover80, 0)}</td>
-        <td><span class="pill ${r.status}">${st}</span></td></tr>`;
-    }
+    const by = Object.fromEntries(c[key].map((r) => [r.method, r]));
+    const rw = by.rw || {};
+    mx += `<tr><td>${c.name}</td>` + methods.map((m) => {
+      const r = by[m];
+      if (!r) return `<td class="cell mut">·</td>`;
+      if (m === "up") return `<td class="cell bazis">${r.n ? pct(r.hit_rate, 0) : "—"}</td>`;
+      const cnt = r.nh;
+      return `<td class="cell ${r.status}" title="${cnt} yoxlama, keçməli hədd ${pct(r.bar, 0)}">${cnt ? pct(r.hit_rate, 0) : "—"}</td>`;
+    }).join("") + `<td class="cell">${rw.n ? pct(rw.cover50, 0) : "—"}</td><td class="cell">${rw.n ? pct(rw.cover80, 0) : "—"}</td></tr>`;
   }
-  $("judge").innerHTML = html + "</table><p class='note'>«Yoxlama»: üsulun istiqamət göstərdiyi proqnozların sayı (RSI, Fibonacci, sıçrayış yalnız siqnal olanda istiqamət göstərir). " +
-    "3 gün, 10 gün və 1 ay proqnozları hər gün verilir və üst-üstə düşür: p bunu nəzərə alır (say üfüqün gün sayına bölünür). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı. 50 % və 80 % aralıq düzgün qurulubsa, uyğun olaraq təxminən 50 % və 80 % tutmalıdır.</p>";
+  $("jmatrix").innerHTML = mx + `</table><p class="note">Xanada: üsul istiqamət göstərəndə neçə faiz düz çıxıb. Yaşıl = sübut olunub,
+    qırmızı = kifayət qədər yoxlama var, amma sübut yoxdur, sarı = hələ az yoxlama. Bazis «Həmişə yuxarı» sütunu: qiymət neçə faiz hallarda qalxıb.
+    Aralıq sütunları: qiymət 50 % və 80 % aralığa neçə faiz düşüb (düzgün aralıq ≈ 50 % və ≈ 80 %).</p>`;
+
+  $("jh").innerHTML = fc.cards.map((c) => `<button data-h="${c.horizon}" class="${c.horizon === jh ? "on" : ""}">${c.name}</button>`).join("");
+  document.querySelectorAll("#jh button").forEach((b) => b.onclick = () => { jh = b.dataset.h; try { localStorage.setItem("tst_jh", jh); } catch (e) {} renderJudge(fc); });
+  const card = fc.cards.find((c) => c.horizon === jh) || fc.cards[0];
+  let html = `<table><tr><th>Üsul</th><th>Yoxlama</th><th>Düz çıxıb</th><th>Keçməli hədd</th><th>p</th>
+    <th>Brier bal</th><th>50 % aralıq tutdu</th><th>80 % aralıq tutdu</th><th>Status</th></tr>`;
+  for (const r of card[key]) {
+    const cnt = r.method === "rw" || r.method === "up" ? r.n : r.nh;
+    const st = r.status === "az" ? `az (${cnt}/${r.min_n})` : VERDICT_AZ[r.status];
+    html += `<tr><td>${esc(fc.method_names[r.method])}</td><td class="n">${cnt}</td>
+      <td class="n">${r.method === "rw" ? "—" : pct(r.hit_rate)}</td><td class="n">${r.method === "rw" ? "—" : pct(r.bar)}</td>
+      <td class="n">${r.p == null || r.method === "rw" ? "—" : r.p.toFixed(3)}</td>
+      <td class="n">${r.bss == null ? "—" : (r.bss * 100).toFixed(1)}</td>
+      <td class="n">${pct(r.cover50, 0)}</td><td class="n">${pct(r.cover80, 0)}</td>
+      <td><span class="pill ${r.status}">${st}</span></td></tr>`;
+  }
+  $("judge").innerHTML = html + `</table><p class='note'>«Yoxlama»: üsulun istiqamət göstərdiyi proqnozların sayı (RSI, Fibonacci, sıçrayış
+    yalnız siqnal olanda istiqamət göstərir). 3 gün, 10 gün və 1 ay proqnozları hər gün verilir və üst-üstə düşür: p bunu nəzərə alır
+    (say üfüqün gün sayına bölünür). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı.</p>`;
+  loadJudgeCharts(card).catch(() => {});
+}
+async function loadJudgeCharts(card) {
+  const d = await api(`/api/judge/series?symbol=${sym}&horizon=${card.horizon}&mode=${mode}`);
+  $("jwin").textContent = d.window;
+  const names = lastFc.method_names, bar = (card[mode === "live" ? "stats_live" : "stats_history"].find((r) => r.method === "momentum") || {}).bar || 0.5;
+  const ser = Object.entries(d.methods).map(([m, pts]) => ({ name: names[m], color: MCOL[m] || "#888", pts }));
+  drawLines($("jc1"), ser, [{ v: bar, label: "keçməli hədd " + (bar * 100).toFixed(0) + " %", color: getComputedStyle(document.documentElement).getPropertyValue("--muted") }], 0.3, 0.8);
+  $("jl1").innerHTML = ser.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join("");
+  const gold = getComputedStyle(document.documentElement).getPropertyValue("--gold"), info = "#4ea1ff";
+  drawLines($("jc2"), [{ name: "50 %", color: info, pts: d.cover["50"] }, { name: "80 %", color: gold, pts: d.cover["80"] }],
+    [{ v: 0.5, color: info }, { v: 0.8, color: gold }], 0.2, 1.0);
+  $("jl2").innerHTML = `<span><i style="background:${info}"></i>50 % aralığa düşən</span><span><i style="background:${gold}"></i>80 % aralığa düşən</span>`;
 }
 
 async function loadJournal() {
@@ -275,7 +312,7 @@ renderTfs();
 renderTa();
 refreshAll();
 // A guest has no admin page: the link is hidden for them.
-api("/api/me").then((m) => { if (m.role === "guest") document.querySelectorAll('a[href="/admin"]').forEach((a) => a.hidden = true); }).catch(() => {});
+api("/api/me").then((m) => { if (m.role === "guest") document.querySelectorAll('a[href="/admin"],a[href="/status"]').forEach((a) => a.hidden = true); }).catch(() => {});
 setInterval(() => refreshState().catch(() => {}), 5000);
 setInterval(() => loadChart().catch(() => {}), 10000);
 setInterval(() => { refreshFc().catch(() => {}); loadJournal().catch(() => {}); }, 20000);

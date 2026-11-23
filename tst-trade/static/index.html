@@ -1,15 +1,23 @@
-<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TST Trade</title><link rel="stylesheet" href="/static/app.css"></head><body>
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TST Trade</title><link rel="stylesheet" href="/static/app.css">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0f1317">
+<link rel="icon" href="/static/icons/fav-64.png"><link rel="apple-touch-icon" href="/static/icons/apple-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="TST Trade">
+</head><body>
 <header class="top">
   <div class="brand">TST <b>Trade</b></div>
   <span class="pill" id="feed">…</span>
   <span class="note" id="mkt"></span>
   <span class="sp"></span>
   <span class="clock" id="clock"></span>
+  <button class="btn pri sm" id="install" hidden>Telefona yüklə</button>
+  <a href="/status">Sistem</a>
   <a href="/admin">Admin</a>
   <form method="post" action="/logout" style="margin:0"><button class="link" type="submit">Çıxış</button></form>
 </header>
 <main class="wrap">
+  <div class="evbanner" id="offline" hidden>İnternet yoxdur: qiymətlər yenilənmir. Əlaqə gələndə panel özü davam edəcək.</div>
   <div class="evbanner" id="evbanner" hidden></div>
   <div class="tiles" id="tiles"></div>
   <div class="main">
@@ -40,9 +48,17 @@
       <span class="seg" id="modes"><button data-m="live" class="on">Canlı</button><button data-m="history">Tarixçə üzrə</button></span></h2>
     <p class="note">Hər üsul iki bazis qaydası ilə yarışır: «Dəyişməz» (istiqamət yoxdur) və «Həmişə yuxarı». «Sübut» statusu
       üçün üsul daha çox düz çıxmalı (p &lt; 0.05), Brier balı müsbət olmalı və kifayət qədər yoxlama yığılmalıdır.</p>
+    <h3 class="sub">Ümumi mənzərə: hər üfüqdə hər üsul neçə faiz düz çıxır</h3>
+    <div class="tbl" id="jmatrix"></div>
+    <h3 class="sub">Ətraflı <span class="seg" id="jh"></span></h3>
+    <div class="jcharts">
+      <div><div class="note">Düz çıxma faizi zamanla (hər üsulun son <span id="jwin">100</span> yoxlaması)</div><div class="lc"><canvas id="jc1"></canvas></div><div class="legend" id="jl1"></div></div>
+      <div><div class="note">Qiymət proqnoz aralığına düşdü (hədəf: 50 % və 80 %)</div><div class="lc"><canvas id="jc2"></canvas></div><div class="legend" id="jl2"></div></div>
+    </div>
     <div class="tbl" id="judge"></div></div>
   <div class="box"><h2>Son yoxlanmış proqnozlar</h2><div class="tbl" id="journal"></div></div>
 </main>
 <script src="/static/chart.js"></script>
 <script src="/static/panel.js"></script>
+<script src="/static/pwa.js"></script>
 </body></html>

@@ -21,7 +21,7 @@ from .engine import Engine, market_open
 from .keys import KeyStore
 
 STATIC = BASE_DIR / "static"
-PUBLIC = ("/login", "/healthz", "/version", "/api/diag", "/static/")
+PUBLIC = ("/login", "/healthz", "/version", "/api/diag", "/static/", "/sw.js", "/manifest.webmanifest")
 
 
 def create_app(settings: Settings | None = None, start_engine: bool = True) -> FastAPI:
@@ -65,7 +65,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 if path.startswith("/api/"):
                     return JSONResponse({"error": "giriş lazımdır"}, status_code=401)
                 return RedirectResponse("/login", status_code=303)
-            if who == "guest" and (path.startswith("/admin") or path.startswith("/api/admin")):
+            if who == "guest" and (path.startswith(("/admin", "/api/admin", "/status"))):
                 # A guest sees the panel only: no keys, no settings, no password page.
                 if path.startswith("/api/"):
                     return JSONResponse({"error": "qonaq üçün bağlıdır"}, status_code=403)
@@ -116,6 +116,15 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     async def panel():
         return FileResponse(STATIC / "index.html")
 
+    # The installable app: the worker must be served from the root to control every page.
+    @app.get("/sw.js")
+    async def service_worker():
+        return FileResponse(STATIC / "sw.js", media_type="text/javascript", headers={"Cache-Control": "no-cache"})
+
+    @app.get("/manifest.webmanifest")
+    async def manifest():
+        return FileResponse(STATIC / "manifest.webmanifest", media_type="application/manifest+json")
+
     @app.get("/admin")
     async def admin():
         return FileResponse(STATIC / "admin.html")
@@ -132,6 +141,14 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     async def version():
         """The commit the server runs (public: shows that the auto-update reached the server)."""
         return {"commit": _commit()}
+
+    @app.get("/status")
+    async def status_page():
+        return FileResponse(STATIC / "status.html")
+
+    @app.get("/api/admin/status")
+    async def status_data():
+        return diag.report(db, store, engine, feeds, jobs, _commit())
 
     @app.get("/api/diag")
     async def diagnostics(request: Request):
@@ -209,6 +226,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             raise HTTPException(400, "naməlum metal")
         return {"symbol": symbol, "method_names": forecast.METHOD_NAMES,
                 "cards": [_card(symbol, h) for h in forecast.HORIZONS]}
+
+    @app.get("/api/judge/series")
+    async def judge_series(symbol: str, horizon: str, mode: str = "live"):
+        if symbol not in candles.METALS or horizon not in forecast.HORIZONS or mode not in ("live", "history"):
+            raise HTTPException(400, "naməlum metal, üfüq və ya rejim")
+        return judge.series(db, symbol, horizon, mode)
 
     @app.get("/api/feeds")
     async def feeds_view(metal: str | None = None):

@@ -123,3 +123,43 @@ def official(stat_rows: list[dict]) -> dict:
     if any(r["status"] == "yox" for r in stat_rows):
         return {"method": "rw", "status": "yox"}
     return {"method": "rw", "status": "az"}
+
+
+def series(db: DB, symbol: str, horizon: str, mode: str, window: int = 100, points: int = 120) -> dict:
+    """How accuracy moved over time: for each method a rolling hit rate over its last `window` judged forecasts, and
+    the rolling share of closes inside the 50 % and 80 % ranges (the same ranges for every method: taken from rw)."""
+    out = {"methods": {}, "cover": {}}
+    rows = db.execute("SELECT method, target_t, hit, in50, in80 FROM forecasts WHERE symbol=? AND horizon=? AND mode=? "
+                      "AND scored_ts IS NOT NULL AND price1 IS NOT NULL ORDER BY target_t", (symbol, horizon, mode)).fetchall()
+    by: dict[str, list] = {}
+    for r in rows:
+        by.setdefault(r["method"], []).append(r)
+
+    def roll(seq, key):
+        res, acc, buf = [], 0, []
+        for r in seq:
+            buf.append(r[key])
+            acc += r[key]
+            if len(buf) > window:
+                acc -= buf.pop(0)
+            if len(buf) >= min(window, 20):
+                res.append((r["target_t"], acc / len(buf)))
+        if len(res) > points:
+            stepn = len(res) / points
+            res = [res[int(i * stepn)] for i in range(points - 1)] + [res[-1]]
+        return [[t, round(v, 4)] for t, v in res]
+
+    for m, seq in by.items():
+        judged = [r for r in seq if r["hit"] is not None]
+        if m not in BASELINES and judged:
+            out["methods"][m] = roll(judged, "hit")
+    base = by.get("rw", [])
+    out["cover"] = {"50": roll(base, "in50"), "80": roll(base, "in80")}
+    out["window"] = window
+    return out
+
+
+def overview(db: DB, symbol: str, mode: str) -> list[dict]:
+    """One row per horizon: each method's hit rate and status, and the range coverage. The page's summary matrix."""
+    from .forecast import HORIZONS
+    return [{"horizon": h, "stats": stats(db, symbol, h, mode)} for h in HORIZONS]

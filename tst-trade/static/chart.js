@@ -248,3 +248,30 @@
     }
   };
 })();
+
+/* Small line chart for the Judge: drawLines(canvas, series [{name, color, pts: [[t, v]]}], refs [{v, label}], lo, hi) */
+window.drawLines = function (cv, series, refs, lo, hi) {
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  g.font = "11px " + css("--mono");
+  const fg = css("--muted"), lineC = css("--line"), padL = 38, padR = 8, padT = 8, padB = 20;
+  const pts = series.flatMap((s) => s.pts);
+  if (!pts.length) { g.fillStyle = fg; g.fillText("Hələ kifayət qədər yoxlanmış proqnoz yoxdur.", 12, 24); return; }
+  const t0 = Math.min(...pts.map((p) => p[0])), t1 = Math.max(...pts.map((p) => p[0])) || t0 + 1;
+  const x = (t) => padL + (t - t0) / Math.max(1, t1 - t0) * (W - padL - padR);
+  const y = (v) => padT + (hi - Math.min(hi, Math.max(lo, v))) / (hi - lo) * (H - padT - padB);
+  g.strokeStyle = lineC; g.fillStyle = fg;
+  for (let i = 0; i <= 4; i++) {
+    const v = lo + (hi - lo) * i / 4, yy = Math.round(y(v)) + .5;
+    g.beginPath(); g.moveTo(padL, yy); g.lineTo(W - padR, yy); g.stroke(); g.fillText((v * 100).toFixed(0) + "%", 2, yy + 4);
+  }
+  const d0 = new Date(t0 * 1000), d1 = new Date(t1 * 1000), span = t1 - t0;
+  const lab = (d) => span > 3 * 86400 ? d.toISOString().slice(0, 10) : d.toISOString().slice(5, 16).replace("T", " ");
+  g.fillText(lab(d0), padL, H - 5); const l1 = lab(d1); g.fillText(l1, W - padR - g.measureText(l1).width, H - 5);
+  refs.forEach((r) => { g.strokeStyle = r.color || fg; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(padL, y(r.v)); g.lineTo(W - padR, y(r.v)); g.stroke();
+    g.setLineDash([]); if (r.label) { g.fillStyle = r.color || fg; g.fillText(r.label, padL + 4, y(r.v) - 4); } });
+  series.forEach((s) => { if (!s.pts.length) return; g.strokeStyle = s.color; g.lineWidth = 1.6; g.beginPath();
+    s.pts.forEach((p, i) => i ? g.lineTo(x(p[0]), y(p[1])) : g.moveTo(x(p[0]), y(p[1]))); g.stroke(); g.lineWidth = 1; });
+};
