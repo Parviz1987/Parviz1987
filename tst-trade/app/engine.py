@@ -183,6 +183,13 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:ranges_v2"):
+            # Ranges now take their width from past move/volatility ratios. History forecasts are derived data:
+            # replayed once so the Judge's range coverage describes the ranges in use. Live forecasts stay.
+            self.db.execute("DELETE FROM forecasts WHERE mode='history'")
+            self.history_state["ts"] = 0
+            self.db.put("migr:ranges_v2", "1")
+            self.db.put("migr:macro_lag_v1", "1")
         if not self.db.get("migr:macro_lag_v1"):
             # Replayed before the publication lags were respected: dropped once and replayed at once.
             self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='macro'")
@@ -300,6 +307,7 @@ class Engine:
             for sym in candles.METALS:
                 rows = candles.closed(self.db, sym, tf, now, limit=BACKTEST_MAX + forecast.MIN_CANDLES)
                 k = forecast.steps_of(h)
+                batch: list = []
                 done = {r["issued_t"] for r in self.db.execute(
                     "SELECT issued_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='history' "
                     "GROUP BY issued_t HAVING COUNT(*) >= ?", (sym, h, len(forecast.methods_for(h)))).fetchall()}
@@ -314,7 +322,10 @@ class Engine:
                     if fc is None:
                         continue
                     target = rows[i + k - 1]["t"] + step if i + k - 1 < len(rows) else target_time(t, h)
-                    n += judge.issue(self.db, sym, h, t, target, fc, "history")
+                    batch += judge.issue_rows(sym, h, t, target, fc, "history")
+                # one transaction per metal and horizon (thousands of small commits are slow on a small disk)
+                judge.insert(self.db, batch)
+                n += len(batch)
         judge.score_due(self.db, now)
         return n
 
@@ -335,6 +346,11 @@ class Engine:
 
     async def run(self) -> None:
         last_prune = 0.0
+        try:
+            # Off the event loop: a large one-time clean-up must not keep /healthz from answering after an update.
+            await asyncio.to_thread(self.migrate)
+        except Exception:
+            log.exception("migration failed")
         while not self._stop.is_set():
             try:
                 await self.step()
@@ -355,7 +371,6 @@ class Engine:
                 pass
 
     def start(self) -> None:
-        self.migrate()
         self._task = asyncio.create_task(self.run())
 
     async def stop(self) -> None:

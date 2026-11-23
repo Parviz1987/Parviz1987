@@ -18,7 +18,8 @@ this moment says P = 0.5: the Judge then counts no hit or miss for it (only fore
             fitting to past results (so no hidden look-ahead). No view unless at least two methods agree in sum.
 - macro     (daily and longer) the last week's change of the real interest rate and the dollar: both falling is good
             for gold. Needs FRED data; without it no view.
-Every method gets the same range: an EWMA volatility (lambda 0.94) scaled to the horizon, normal quantiles."""
+Every method gets the same range: an EWMA volatility (lambda 0.94) scaled to the horizon, with the width taken from
+the past ratios of moves to volatility (fat tails), not from normal theory."""
 from __future__ import annotations
 
 import math
@@ -118,6 +119,29 @@ def ewma_sigma(rets: list[float], lam: float = 0.94) -> float:
     return math.sqrt(var)
 
 
+def range_quantiles(rets: list[float], lam: float = 0.94) -> tuple[float, float]:
+    """How wide the 50 % and 80 % ranges must be, in volatilities. Normal theory says 0.674 and 1.282, but metal
+    moves have fat tails: most candles are quieter than the volatility suggests and a few are much bigger, so normal
+    ranges catch too much at 50 %. Here each past move is divided by the volatility known just before it, and the
+    ranges use the middle 50 % and 80 % of those past ratios (past data only). Few candles: normal theory."""
+    if len(rets) < 60:
+        return Z50, Z80
+    warm = rets[:10]
+    var = sum(r * r for r in warm) / len(warm)
+    zs = []
+    for r in rets[10:]:
+        sd = math.sqrt(var)
+        if sd > 0:
+            zs.append(abs(r) / sd)
+        var = lam * var + (1 - lam) * r * r
+    if len(zs) < 50:
+        return Z50, Z80
+    zs.sort()
+    q = lambda f: zs[min(len(zs) - 1, int(f * len(zs)))]
+    # kept within a sane band around the normal values so one odd stretch cannot collapse or explode the ranges
+    return min(max(q(0.5), Z50 * 0.5), Z50 * 1.5), min(max(q(0.8), Z80 * 0.5), Z80 * 1.5)
+
+
 def rsi(closes: list[float], n: int = 14) -> float | None:
     """Wilder's RSI of the last close."""
     if len(closes) <= n:
@@ -182,7 +206,8 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
     sigma = ewma_sigma(rets) or 1e-6
     sk = sigma * math.sqrt(k)
     price = closes[-1]
-    span50, span80 = price * (math.exp(Z50 * sk) - 1), price * (math.exp(Z80 * sk) - 1)
+    q50, q80 = range_quantiles(rets)
+    span50, span80 = price * (math.exp(q50 * sk) - 1), price * (math.exp(q80 * sk) - 1)
     rng = {"lo50": price - span50, "hi50": price + span50, "lo80": price - span80, "hi80": price + span80}
 
     # «always up» over the same distance (k candles), from the past

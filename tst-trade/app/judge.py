@@ -25,9 +25,19 @@ MIN_N = {"1m": 300, "1h": 200, "1d": 250, "3d": 250, "1w": 100, "10d": 250, "1mo
 P_MAX = 0.05
 
 
-def issue(db: DB, symbol: str, horizon: str, issued_t: int, target_t: int, fc: dict, mode: str = "live") -> int:
-    rows = [(symbol, horizon, m, mode, issued_t, target_t, fc["price"], v["p_up"], v["lo50"], v["hi50"],
+def issue_rows(symbol: str, horizon: str, issued_t: int, target_t: int, fc: dict, mode: str = "live") -> list:
+    return [(symbol, horizon, m, mode, issued_t, target_t, fc["price"], v["p_up"], v["lo50"], v["hi50"],
              v["lo80"], v["hi80"], v["basis"]) for m, v in fc["methods"].items()]
+
+
+def insert(db: DB, rows: list) -> None:
+    db.executemany(
+        "INSERT OR IGNORE INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, "
+        "lo50, hi50, lo80, hi80, basis) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+
+
+def issue(db: DB, symbol: str, horizon: str, issued_t: int, target_t: int, fc: dict, mode: str = "live") -> int:
+    rows = issue_rows(symbol, horizon, issued_t, target_t, fc, mode)
     db.executemany(
         "INSERT OR IGNORE INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, "
         "lo50, hi50, lo80, hi80, basis) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
