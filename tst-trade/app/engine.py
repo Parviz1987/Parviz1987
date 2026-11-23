@@ -64,6 +64,10 @@ class MacroLookup:
                 rows = []
             self.series[sid] = ([r["d"] for r in rows], [r["v"] for r in rows])
 
+    def first_day(self) -> str | None:
+        firsts = [ds[0] for ds, _ in self.series.values() if ds]
+        return max(firsts) if len(firsts) == len(self.series) else None
+
     def _change(self, sid: str, day: str, pct: bool) -> float | None:
         import bisect
         ds, vs = self.series[sid]
@@ -263,6 +267,13 @@ class Engine:
         now = time.time() if now is None else now
         n = 0
         macro = MacroLookup(self.db)
+        first = macro.first_day()
+        if first:
+            # Replayed before FRED data arrived: those macro forecasts said "no data". Now that the data covers
+            # their dates, they are replayed (only these rows; every other forecast stays as issued).
+            start = int(datetime.strptime(first, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()) + 14 * 86400
+            self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='macro' AND basis=? AND issued_t>?",
+                            ("FRED məlumatı yoxdur", start))
         for h, tf in forecast.HORIZONS.items():
             step = candles.TF[tf]
             for sym in candles.METALS:
