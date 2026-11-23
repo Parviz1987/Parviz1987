@@ -178,6 +178,11 @@ class Engine:
         self.db.execute("DELETE FROM candles WHERE tf='1d' AND strftime('%w', t, 'unixepoch') IN ('0', '6')")
         self.db.execute("DELETE FROM forecasts WHERE horizon IN ('1d', '3d', '10d', '1mo') "
                         "AND strftime('%w', issued_t, 'unixepoch') IN ('0', '6')")
+        sig = ",".join(forecast.METHODS)
+        if self.db.get("methods_sig") != sig:
+            # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
+            self.history_state["ts"] = 0
+            self.db.put("methods_sig", sig)
         if not self.db.get("migr:macro_lag_v1"):
             # Replayed before the publication lags were respected: dropped once and replayed at once.
             self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='macro'")
