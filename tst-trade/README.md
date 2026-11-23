@@ -10,18 +10,22 @@ Tam plan və sxem: [`docs/karkas-plani.html`](docs/karkas-plani.html) (brauzerd�
 
 | Hissə | Nə edir | Fayl |
 |---|---|---|
-| Qiymət mənbəyi | gold-api.com (pulsuz, açarsız) və ya Twelve Data (açar). DEMO yalnız sınaq üçün, ekranda «DEMO» yazılır | `app/providers/` |
-| Şamlar | 1 dəq, 5 dəq, 15 dəq, 1 saat, 4 saat, 1 gün, 1 həftə — canlı qiymətdən yığılır, tarixçə Twelve Data-dan | `app/candles.py` |
-| Proqnoz masaları | 1 dəqiqə, 1 saat, 1 gün, 1 həftə. Hər şam bağlananda növbəti şam üçün proqnoz | `app/forecast.py` |
-| Üsullar | «Dəyişməz» və «Həmişə yuxarı» (bazis), «Momentum», «Qısa dönüş». Hamısına eyni volatillik aralığı | `app/forecast.py` |
-| Hakim | Hər proqnozu vaxtı çatanda yoxlayır, bazisləri üstələyib-üstələmədiyini statistikayla deyir: «sübut», «yox», «məlumat azdır» | `app/judge.py` |
-| Tarixçə üzrə yoxlama | Keçmiş şamlarda addım-addım (hər proqnoz yalnız özündən əvvəlki şamları görür) | `app/engine.py` |
-| Açar yerləri | Hər açarın adı, nə üçün olduğu, pulsuz/pullu, haradan alındığı, kim istifadə edir | `app/registry.py`, `app/keys.py` |
-| Beyin yuvaları | Kəşfiyyatçı, Oxuyucu, Strateq, Nəzarətçi: iş, tələblər və çəkisi, provayder və model seçimi, ehtiyat, aylıq limit | `app/registry.py`, `app/brains.py` |
-| Panel | 4 metal, şam qrafiki üzərində növbəti şamın 50 % və 80 % aralığı, proqnoz kartları, Hakim cədvəli, jurnal | `static/` |
+| Qiymət mənbəyi | Capital.com axını (saniyə-saniyə), gold-api.com (pulsuz), Twelve Data. DEMO yalnız sınaq üçün, ekranda «DEMO» yazılır | `app/providers/` |
+| Şamlar | 1 dəq … 1 həftə. Canlı qiymətdən yığılır; tarixçə Capital.com-dan (4 metal), Twelve Data qızılın köhnə günlərini tamamlayır. Gün 22:00 UTC-də bağlanır (metal bazarının günü) | `app/candles.py` |
+| Proqnoz üfüqləri | 1 dəqiqə, 1 saat, 1 gün, 3 gün, 1 həftə, 10 gün, 1 ay | `app/forecast.py` |
+| Üsullar | Bazis: «Dəyişməz», «Həmişə yuxarı». Yoxlananlar: Momentum, Qısa dönüş, Trend (3 pəncərə), Sıçrayış (20 şam), RSI 30/70, Fibonacci dönüşü, Makro (real faiz + dollar) | `app/forecast.py` |
+| Hakim | Hər proqnozu vaxtı çatanda yoxlayır; «sübut» üçün bazisi p < 0.05 ilə üstələmək və Brier balı müsbət olmalıdır. Üst-üstə düşən uzun proqnozlarda say üfüqün şam sayına bölünür | `app/judge.py` |
+| Dəqiqlik qrafikləri | Ümumi cədvəl (hər üfüq × hər üsul), zamanla düz çıxma faizi, 50 % / 80 % aralığın tutma faizi | `static/panel.js`, `/api/judge/series` |
+| Qrafik alətləri | EMA 20/50/200, Bollinger, Fibonacci, pivot, dəstək/müqavimət, dəyirmi səviyyələr, RSI və MACD paneli, «Texniki xülasə» | `static/chart.js` |
+| Fundamental | FRED: real faiz, nominal faiz, inflyasiya gözləntisi, dollar, VIX, S&P 500; CFTC COT (böyük fondların mövqeyi); qızıl üçün izah | `app/feeds.py` |
+| Xəbər və təqvim | Google News, Fed RSS, Forex Factory; mühüm ABŞ rəqəmi ətrafında «Hadisə rejimi» | `app/feeds.py` |
+| Beyinlər | Kəşfiyyatçı (Grok: X və vebdə canlı axtarış), Oxuyucu (başlıqları qiymətləndirir), Strateq (saatlıq izah). Hakim Oxuyucunun «yuxarı/aşağı» deməsini növbəti 1 saatla yoxlayır | `app/brainjobs.py`, `app/llm.py` |
+| Telefon | Proqram kimi quraşdırılır (PWA): «Telefona yüklə» düyməsi; iPhone-da Safari → Paylaş → «Ana ekrana əlavə et» | `static/manifest.webmanifest`, `static/sw.js` |
+| Sistem vəziyyəti | `/status`: qiymətlər, mənbələr, açarlar, beyinlər, tarixçə, xəta jurnalı (yalnız sahib) | `static/status.*` |
+| Diaqnostika | `/api/diag`: oxumaq üçün açarla, açar və parol göstərmir | `app/diag.py` |
 
-**Hələ qoşulmayanlar (yerləri hazırdır):** xəbər lenti, iqtisadi təqvim, makro məlumat toplayıcıları və beyinlərin
-proqnoza qatılması. Beyinlər bu versiyada yalnız saxlanır və yoxlanır («Beyni yoxla»), proqnoz vermir.
+Heç bir süni intellekt qiymət vermir: qiymət yalnız qiymət mənbəyindən gəlir; beyin cavabında rəqəm olan cümlələr silinir.
+Alış-satış yoxdur.
 
 ## Açar yerləri (admin səhifəsi)
 
