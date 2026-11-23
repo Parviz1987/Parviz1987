@@ -287,6 +287,9 @@ class Feeds:
     async def cot(self, client) -> None:
         codes = ",".join(f"'{c}'" for c in COT_CODES)
         data = await self._get(client, COT_URL, params={
+            "$select": "cftc_contract_market_code,report_date_as_yyyy_mm_dd,open_interest_all,"
+                       "m_money_positions_long_all,m_money_positions_short_all,prod_merc_positions_long,"
+                       "prod_merc_positions_short",
             "$where": f"cftc_contract_market_code in({codes})", "$order": "report_date_as_yyyy_mm_dd DESC",
             "$limit": str(len(COT_CODES) * 160)})
         rows = parse_cot(data)
