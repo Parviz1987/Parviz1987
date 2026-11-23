@@ -216,7 +216,8 @@ class CapitalHistory(HistoryProvider):
 
     def __init__(self, creds: dict, stream: "CapitalStream | None" = None):
         self.stream = stream
-        self.login_helper = stream or CapitalStream(creds)
+        # Its own login helper: a refused history login must never pause the live stream's logins.
+        self.login_helper = CapitalStream(creds, env=stream.env if stream is not None else None)
         self.tokens: dict | None = None
         self.client = httpx.AsyncClient(timeout=20.0)
 

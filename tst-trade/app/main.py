@@ -227,11 +227,19 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return {"symbol": symbol, "method_names": forecast.METHOD_NAMES,
                 "cards": [_card(symbol, h) for h in forecast.HORIZONS]}
 
+    _series_cache: dict = {}
+
     @app.get("/api/judge/series")
     async def judge_series(symbol: str, horizon: str, mode: str = "live"):
         if symbol not in candles.METALS or horizon not in forecast.HORIZONS or mode not in ("live", "history"):
             raise HTTPException(400, "naməlum metal, üfüq və ya rejim")
-        return judge.series(db, symbol, horizon, mode)
+        key = (symbol, horizon, mode)
+        hit = _series_cache.get(key)
+        if hit and time.time() - hit[0] < 120:     # the panel asks every 20 s; the picture changes slowly
+            return hit[1]
+        out = judge.series(db, symbol, horizon, mode)
+        _series_cache[key] = (time.time(), out)
+        return out
 
     @app.get("/api/feeds")
     async def feeds_view(metal: str | None = None):

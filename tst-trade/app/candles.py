@@ -36,6 +36,8 @@ def store_history(db: DB, symbol: str, tf: str, rows: list[tuple[int, float, flo
                   replace: bool = False) -> int:
     """History from a provider. A live candle already there is kept (it holds the newest prices).
     replace=True: this source is the main one (the live feed's own broker) and overwrites older history rows."""
+    if tf == "1d":   # no trading day on Saturday or Sunday: a source's weekend bar is not a candle here
+        rows = [r for r in rows if (int(r[0]) // 86400 + 3) % 7 < 5]   # epoch day 0 was a Thursday (3)
     conflict = ("DO UPDATE SET o=excluded.o, h=excluded.h, l=excluded.l, c=excluded.c WHERE candles.origin='history'"
                 if replace else "DO NOTHING")
     db.executemany(

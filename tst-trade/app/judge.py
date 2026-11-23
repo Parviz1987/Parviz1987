@@ -13,7 +13,7 @@ import time
 
 from .db import DB
 from . import candles
-from .forecast import BASELINES, HORIZON_SPEC, methods_for, steps_of
+from .forecast import BASELINES, HORIZON_SPEC, methods_for, steps_of, target_time
 
 MIN_N = {"1m": 300, "1h": 200, "1d": 250, "3d": 250, "1w": 100, "10d": 250, "1mo": 250}
 P_MAX = 0.05
@@ -55,12 +55,12 @@ def score_due(db: DB, now: float | None = None) -> int:
         # Read in chunks: after a history replay there can be 100 000+ open rows and the server has 512 MB.
         rows = iter(lambda: cur.fetchmany(5000), [])
         rows = (r for chunk in rows for r in chunk)
-        # Intraday candles must be exactly the expected ones; daily and weekly may skip a weekend or a holiday.
-        slack = 0 if tf not in ("1d", "1w") else (5 * 86400 if tf == "1d" else 0)
         for r in rows:
             t1 = r["t1"]
-            ok = (t1 is not None and t1 + step <= now
-                  and t1 <= r["issued_t"] + (k - 1) * step + slack * max(1, (k + 4) // 5))
+            # The target is exactly the expected candle; for daily candles the expected weekday (weekends skipped),
+            # with two days of grace for market holidays.
+            latest = (target_time(r["issued_t"], h) - step + 2 * 86400) if tf == "1d" else r["issued_t"] + (k - 1) * step
+            ok = t1 is not None and t1 + step <= now and t1 <= latest
             if not ok:
                 # No candle for the target (market closed, feed gap): dropped after a while, never guessed.
                 if now - r["target_t"] > (86400 if tf not in ("1d", "1w") else 10 * 86400):
@@ -68,7 +68,7 @@ def score_due(db: DB, now: float | None = None) -> int:
                 continue
             s = score_row(r["price0"], r["close1"], r["p_up"], r["lo50"], r["hi50"], r["lo80"], r["hi80"])
             updates.append((r["close1"], now, s["outcome"], s["hit"], s["brier"], s["in50"], s["in80"], r["id"]))
-        if len(updates) >= 20000:
+        if len(updates) >= 20000:      # the cursor of this horizon is fully read: writing now is safe
             _write(db, updates, dropped)
             n_done += len(updates)
             updates, dropped = [], []
@@ -141,8 +141,12 @@ def series(db: DB, symbol: str, horizon: str, mode: str, window: int = 100, poin
     """How accuracy moved over time: for each method a rolling hit rate over its last `window` judged forecasts, and
     the rolling share of closes inside the 50 % and 80 % ranges (the same ranges for every method: taken from rw)."""
     out = {"methods": {}, "cover": {}}
+    # Recent window only: a month of one-minute forecasts is ~400 000 rows; the chart needs the recent trend.
+    span = {"1m": 3 * 86400, "1h": 120 * 86400}.get(horizon)
+    since = (time.time() - span) if (span and mode == "live") else 0
     rows = db.execute("SELECT method, target_t, hit, in50, in80 FROM forecasts WHERE symbol=? AND horizon=? AND mode=? "
-                      "AND scored_ts IS NOT NULL AND price1 IS NOT NULL ORDER BY target_t", (symbol, horizon, mode)).fetchall()
+                      "AND scored_ts IS NOT NULL AND price1 IS NOT NULL AND target_t > ? ORDER BY target_t",
+                      (symbol, horizon, mode, since)).fetchall()
     by: dict[str, list] = {}
     for r in rows:
         by.setdefault(r["method"], []).append(r)

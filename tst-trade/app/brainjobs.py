@@ -177,15 +177,21 @@ class BrainJobs:
             self._state("scout", "alınmadı: " + how)
             return 0
         items = []
-        for it in (data.get("items") or [])[:12]:
+        raw_items = data.get("items") if isinstance(data, dict) else None
+        for it in (raw_items if isinstance(raw_items, list) else [])[:12]:
             if not isinstance(it, dict) or not str(it.get("title", "")).strip():
                 continue
+            try:
+                strength = int(it.get("strength") or 0)
+            except (TypeError, ValueError):
+                strength = 0       # a model wrote "high" instead of a number: no strength rather than a crash
             url = str(it.get("url", ""))
-            metals = [m for m in (it.get("metals") or []) if m in ("XAU", "XAG", "XPT", "XPD")]
+            metals = [m for m in (it.get("metals") or []) if m in ("XAU", "XAG", "XPT", "XPD")] \
+                if isinstance(it.get("metals"), list) else []
             items.append({"title": str(it["title"])[:240], "url": url if url.startswith(("https://", "http://")) else "",
                           "source": str(it.get("source", ""))[:60], "metals": metals,
                           "direction": it.get("direction") if it.get("direction") in ("up", "down", "neutral") else "neutral",
-                          "strength": max(0, min(3, int(it.get("strength") or 0))),
+                          "strength": max(0, min(3, strength)),
                           # No prices from a language model: a sentence with a number is dropped.
                           "why": strip_numbers(str(it.get("why", ""))[:300])})
         rows = [{"uid": "grok:" + hashlib.sha1(i["title"].lower().encode()).hexdigest()[:16], "source": "Grok: X / veb",
@@ -193,8 +199,9 @@ class BrainJobs:
         if rows:
             self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals) "
                                 "VALUES(:uid, :source, :url, :title, :ts, :metals)", rows)
+        mood = data.get("mood", "") if isinstance(data, dict) else ""
         self.db.put("scout:last", json.dumps({"ts": now, "brain": how, "items": items,
-                                              "mood": strip_numbers(str(data.get("mood", ""))[:400])}))
+                                              "mood": strip_numbers(str(mood)[:400])}))
         self._state("scout", f"{len(items)} xəbər tapıldı · {how}")
         return len(items)
 
@@ -229,9 +236,10 @@ def reader_score(db: DB, now: float | None = None, horizon: int = 3600) -> dict:
                       "AND a.ts < ? AND a.ts > ?", (now - horizon - 120, now - 30 * 86400)).fetchall()
 
     def px(sym: str, t: float) -> float | None:
+        """Close of the last minute that had ENDED by time t (never a price from after t)."""
         r = db.execute("SELECT t, c FROM candles WHERE symbol=? AND tf='1m' AND t<=? ORDER BY t DESC LIMIT 1",
-                       (sym, int(t))).fetchone()
-        return r["c"] if r and t - r["t"] < 300 else None
+                       (sym, int(t) - 60)).fetchone()
+        return r["c"] if r and t - r["t"] < 360 else None
 
     by: dict[int, list[int]] = {}
     ups = total = 0

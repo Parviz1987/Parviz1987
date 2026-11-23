@@ -38,23 +38,14 @@ def market_open(ts: float) -> bool:
     return True
 
 
-def target_time(issued_t: int, h: str) -> int:
-    """When the forecast's target candle closes: k candles on; daily candles skip Saturday and Sunday."""
-    tf, k = forecast.HORIZON_SPEC[h]
-    step = candles.TF[tf]
-    if tf != "1d":
-        return issued_t + k * step
-    t, left = issued_t, k
-    while True:
-        if datetime.fromtimestamp(t, timezone.utc).weekday() < 5:
-            left -= 1
-            if left == 0:
-                return t + step
-        t += step
+target_time = forecast.target_time   # kept here for older imports
 
 
 class MacroLookup:
-    """FRED values as they were known on a date (published the next day, so the day before is used)."""
+    """FRED values as they were known when a daily forecast was issued (22:00 UTC the evening before its candle).
+    DFII10 for a day is published the next afternoon; the broad dollar index (H.10) comes out weekly on Monday for the
+    week before. So a candle labelled D may use DFII10 up to D-2 and the dollar index up to D-10."""
+    LAG_DAYS = {"DFII10": 2, "DTWEXBGS": 10}
     def __init__(self, db: DB):
         self.series = {}
         for sid in ("DFII10", "DTWEXBGS"):
@@ -78,8 +69,9 @@ class MacroLookup:
         return (b / a - 1) * 100 if pct else b - a
 
     def at(self, t: int) -> dict | None:
-        day = datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%d")
-        r, d = self._change("DFII10", day, False), self._change("DTWEXBGS", day, True)
+        def day(sid: str) -> str:   # first day NOT yet known: values strictly before it may be used
+            return datetime.fromtimestamp(t - (self.LAG_DAYS[sid] - 1) * 86400, timezone.utc).strftime("%Y-%m-%d")
+        r, d = self._change("DFII10", day("DFII10"), False), self._change("DTWEXBGS", day("DTWEXBGS"), True)
         return None if r is None or d is None else {"dfii10": r, "dollar": d}
 
 
@@ -98,6 +90,7 @@ class Engine:
         self.last_poll: float | None = None
         self.last_ok: float | None = None
         self.history_state: dict = json.loads(db.get("history_state") or "{}")
+        self._macro_cache = None
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
 
@@ -173,25 +166,43 @@ class Engine:
             return "DELAYED"
         return "LIVE"
 
+    def _macro(self, now: float) -> "MacroLookup":
+        """FRED data changes a few times a day: the lookup is rebuilt at most once an hour, not at every poll."""
+        if self._macro_cache is None or now - self._macro_cache[0] > 3600:
+            self._macro_cache = (now, MacroLookup(self.db))
+        return self._macro_cache[1]
+
+    def migrate(self) -> None:
+        """Once per start: daily candles labelled Saturday or Sunday came from the old bucketing (Sunday-evening
+        ticks before the session shift); the forecasts issued on them over a weekend are duplicates."""
+        self.db.execute("DELETE FROM candles WHERE tf='1d' AND strftime('%w', t, 'unixepoch') IN ('0', '6')")
+        self.db.execute("DELETE FROM forecasts WHERE horizon IN ('1d', '3d', '10d', '1mo') "
+                        "AND strftime('%w', issued_t, 'unixepoch') IN ('0', '6')")
+
     # ---------- forecasts ----------
     def issue_due(self, now: float | None = None, mode: str = "live") -> int:
         """At each candle close: one forecast per horizon, metal and method, for the close k candles ahead."""
         now = time.time() if now is None else now
         n = 0
-        macro = MacroLookup(self.db)
+        macro = self._macro(now)
         for h, tf in forecast.HORIZONS.items():
             issued_t = candles.bucket(now, tf)
             step = candles.TF[tf]
+            # Saturday and Sunday have no daily candle: nothing is issued for them (the Monday forecast follows
+            # Friday's candle). Without this the same target would be forecast three times over a weekend.
+            if tf == "1d" and datetime.fromtimestamp(issued_t, timezone.utc).weekday() >= 5:
+                continue
             for sym in candles.METALS:
                 past = candles.closed(self.db, sym, tf, now, limit=forecast.history_need(h))
                 if not past:
                     continue
-                # Only right after a real candle: a closed market or a feed gap issues nothing. A daily or weekly
-                # candle may follow a weekend.
+                # Only right after a real candle: a closed market or a feed gap issues nothing. Monday's daily
+                # forecast follows Friday's candle.
                 gap = issued_t - past[-1]["t"]
-                if gap != step and not (tf == "1d" and step < gap <= 3 * step):
+                monday = tf == "1d" and datetime.fromtimestamp(issued_t, timezone.utc).weekday() == 0
+                if gap != step and not (monday and gap == 3 * step):
                     continue
-                fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None)
+                fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t)
                 if fc is None:
                     continue
                 n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
@@ -289,7 +300,7 @@ class Engine:
                     if rows[i]["t"] - rows[i - 1]["t"] > 3 * step and tf not in ("1d", "1w"):
                         continue   # a gap (weekend): the candle after it is not "the next one"
                     fc = forecast.build(rows[max(0, i - forecast.history_need(h)):i], h,
-                                        macro.at(t) if tf == "1d" else None)
+                                        macro.at(t) if tf == "1d" else None, t)
                     if fc is None:
                         continue
                     target = rows[i + k - 1]["t"] + step if i + k - 1 < len(rows) else target_time(t, h)
@@ -334,6 +345,7 @@ class Engine:
                 pass
 
     def start(self) -> None:
+        self.migrate()
         self._task = asyncio.create_task(self.run())
 
     async def stop(self) -> None:

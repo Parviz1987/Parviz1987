@@ -82,13 +82,17 @@ def test_macro_lookup_uses_only_past_values():
     db = DB(":memory:")
     from app.feeds import Feeds
     Feeds(db, KeyStore(db, SECRET))
-    for i in range(20):
+    for i in range(40):
         d = (dt.date(2026, 1, 1) + dt.timedelta(days=i)).isoformat()
         db.execute("INSERT INTO macro VALUES('DFII10', ?, ?)", (d, 2.0 - 0.01 * i))
         db.execute("INSERT INTO macro VALUES('DTWEXBGS', ?, ?)", (d, 120.0))
-    t = int(dt.datetime(2026, 1, 15, tzinfo=dt.timezone.utc).timestamp())
-    m = MacroLookup(db).at(t)
+    t = int(dt.datetime(2026, 1, 25, tzinfo=dt.timezone.utc).timestamp())
+    lk = MacroLookup(db)
+    m = lk.at(t)
     assert abs(m["dfii10"] - (-0.05)) < 1e-9 and m["dollar"] == 0
+    # published lags: the candle of 25 Jan (issued 24 Jan 22:00 UTC) may use DFII10 up to 23 Jan only
+    db.execute("UPDATE macro SET v=99 WHERE series='DFII10' AND d='2026-01-24'")
+    assert lk.at(t) == MacroLookup(db).at(t)
 
 
 def test_capital_history_parse_moves_sunday_session_to_monday():
@@ -114,3 +118,26 @@ def test_session_method_uses_same_hour_only():
     p4 = forecast.build(at4, "1h")["methods"]["session"]["p_up"]
     assert p3 > 0.6 and p4 < 0.4
     assert "session" not in forecast.build(at3, "1d")["methods"]
+
+
+def test_no_weekend_daily_forecasts_and_monday_follows_friday():
+    db = DB(":memory:")
+    eng = Engine(db, KeyStore(db, SECRET), "demo", 15)
+    rows = _daily(db, 60)
+    fri = rows[-1][0]
+    while dt.datetime.fromtimestamp(fri, dt.timezone.utc).weekday() != 4:
+        fri -= 86400
+    db.execute("DELETE FROM candles WHERE tf='1d' AND t>?", (fri,))
+    for day in (1, 2):                                 # Saturday and Sunday noon: nothing issued
+        assert eng.issue_due(fri + day * 86400 + 43200) == 0
+    n = eng.issue_due(fri + 3 * 86400 + 3600)          # Monday 01:00 UTC: forecasts for Monday's candle
+    assert n > 0
+    assert db.execute("SELECT COUNT(DISTINCT issued_t) FROM forecasts WHERE horizon='1d'").fetchone()[0] == 1
+
+
+def test_weekend_history_bars_are_not_daily_candles():
+    db = DB(":memory:")
+    sat = int(dt.datetime(2026, 11, 21, tzinfo=dt.timezone.utc).timestamp())
+    fri = sat - 86400
+    candles.store_history(db, "XAU", "1d", [(fri, 1, 1, 1, 1), (sat, 1, 1, 1, 1), (sat + 86400, 1, 1, 1, 1)])
+    assert [c["t"] for c in candles.get(db, "XAU", "1d")] == [fri]

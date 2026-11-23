@@ -63,6 +63,22 @@ def methods_for(h: str) -> tuple[str, ...]:
     return tuple(out)
 
 
+def target_time(issued_t: int, h: str) -> int:
+    """When the forecast's target candle closes: k candles on; daily candles skip Saturday and Sunday."""
+    from datetime import datetime, timezone
+    tf, k = HORIZON_SPEC[h]
+    step = {"1m": 60, "1h": 3600, "1d": 86400, "1w": 604800}[tf]
+    if tf != "1d":
+        return issued_t + k * step
+    t, left = issued_t, k
+    while True:
+        if datetime.fromtimestamp(t, timezone.utc).weekday() < 5:
+            left -= 1
+            if left == 0:
+                return t + step
+        t += step
+
+
 def history_need(h: str) -> int:
     return SESSION_NEED if h == "1h" else HISTORY_NEED
 
@@ -148,7 +164,7 @@ def _clip(p: float) -> float:
     return min(max(p, P_CAP[0]), P_CAP[1])
 
 
-def build(seq, horizon: str, macro: dict | None = None) -> dict | None:
+def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = None) -> dict | None:
     """All methods' forecasts for the close `steps_of(horizon)` candles ahead, from past candles (oldest first;
     plain closes are accepted too). macro: {"dfii10": weekly change, "dollar": weekly change in %} or None."""
     longer = _as_candles(seq)
@@ -217,7 +233,9 @@ def build(seq, horizon: str, macro: dict | None = None) -> dict | None:
 
     if "session" in methods_for(horizon):
         last_t = cands[-1].get("t")
-        p, basis = session_view(longer, last_t + 3600 if last_t is not None else None)
+        if next_t is None and last_t is not None:
+            next_t = last_t + 3600
+        p, basis = session_view(longer, next_t)
         out["session"] = {"p_up": p, "basis": basis}
 
     if "macro" in methods_for(horizon):
