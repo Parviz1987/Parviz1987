@@ -32,7 +32,7 @@ KEY_SLOTS: list[dict] = [
      "purpose": "Saniyələrlə gələn başlıqlar (Benzinga). Oxuyucu beyin onları hadisəyə çevirəcək.",
      "cost": "Pulsuz plan var; pullu plan ayda 99 $.",
      "url": "https://app.alpaca.markets/signup", "fields": ["key_id", "secret"],
-     "used_by": "Sürətli xəbər (açar yoxlanır; axın növbəti mərhələdə)", "stage": NEXT},
+     "used_by": "Sürətli xəbər: metal fondları və mədən şirkətləri üzrə Benzinga başlıqları, dəqiqədə bir", "stage": LIVE},
     {"id": "fmp", "category": "calendar", "name": "Financial Modeling Prep",
      "purpose": "İqtisadi təqvim: gözlənti və fakt. Rəqəmin gözləntidən fərqi (sürpriz) bununla ölçülür.",
      "cost": "Pullu, ayda təxminən 49–69 $ (hansı planda olduğu alışdan əvvəl yoxlanmalı).",

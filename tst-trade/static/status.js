@@ -10,7 +10,7 @@ const ago = (ts) => {
 };
 const pill = (ok, text) => `<span class="pill ${ok === true ? "ok" : ok === false ? "bad" : "warn"}">${esc(text)}</span>`;
 const NAMES = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
-const SRC = { rss: "Xəbərlər (RSS)", forexfactory: "İqtisadi təqvim", fred: "FRED makro", cot: "CFTC COT" };
+const SRC = { rss: "Xəbərlər (RSS)", forexfactory: "İqtisadi təqvim", fred: "FRED makro", cot: "CFTC COT", alpaca: "Alpaca / Benzinga" };
 
 async function load() {
   const r = await fetch("/api/admin/status", { credentials: "same-origin" });

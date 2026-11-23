@@ -77,3 +77,14 @@ def test_parse_cot_rows_and_field_change():
         raise AssertionError("must fail loudly")
     except ValueError as e:
         assert "sahə" in str(e)
+
+
+def test_parse_alpaca_maps_fund_symbols_to_metals():
+    from app.feeds import parse_alpaca
+    data = {"news": [{"id": 7, "headline": "Gold ETF sees record inflows", "created_at": "2026-11-23T08:00:00Z",
+                      "url": "https://www.benzinga.com/x", "symbols": ["GLD", "SPY"], "summary": ""},
+                     {"id": 8, "headline": "Miner update", "created_at": "2026-11-23T08:01:00Z", "url": "javascript:x",
+                      "symbols": ["PALL"], "summary": "silver output rises"}]}
+    a, b = parse_alpaca(data)
+    assert a["uid"] == "alp:7" and a["metals"] == "XAU" and a["url"].startswith("https://")
+    assert b["metals"] == "XAG,XPD" and b["url"] == ""

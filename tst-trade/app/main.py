@@ -253,7 +253,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return {"news": news,
                 "events": feeds.upcoming(now), "macro": feeds.macro_view(), "event_mode": feeds.event_mode(now),
                 "cot": feeds.cot_view(),
-                "health": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot")}}
+                "health": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot", "alpaca")}}
 
     _rs_cache: list = [0.0, None]
 

@@ -27,6 +27,11 @@ TIMEOUT = 15.0
 MAX_BYTES = 2 * 1024 * 1024
 
 NEWS_EVERY, CAL_EVERY, MACRO_EVERY = 120, 3600, 6 * 3600
+ALPACA_EVERY = 60
+ALPACA_URL = "https://data.alpaca.markets/v1beta1/news"
+# Metal funds and miners whose news Benzinga tags: the symbol says which metal the headline is about.
+ALPACA_SYMBOLS = {"GLD": "XAU", "IAU": "XAU", "GDX": "XAU", "NEM": "XAU", "SLV": "XAG", "PSLV": "XAG",
+                  "PPLT": "XPT", "PALL": "XPD", "SBSW": "XPT"}
 NEWS_MAX_AGE = 48 * 3600
 NEWS_KEEP = 7 * 86400
 
@@ -203,13 +208,36 @@ def parse_cot(data) -> list[tuple]:
     return out
 
 
+def parse_alpaca(data) -> list[dict]:
+    j = json.loads(data) if isinstance(data, (bytes, str)) else data
+    if not isinstance(j, dict) or not isinstance(j.get("news"), list):
+        raise ValueError("Alpaca: gözlənilməyən cavab")
+    out = []
+    for n in j["news"]:
+        title = str(n.get("headline") or "").strip()
+        if not title:
+            continue
+        try:
+            ts = datetime.fromisoformat(str(n.get("created_at", "")).replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            continue
+        metals = {ALPACA_SYMBOLS[s] for s in (n.get("symbols") or []) if s in ALPACA_SYMBOLS}
+        text = (title + " " + str(n.get("summary") or "")).lower()
+        metals |= {m for m, rx in METAL_WORDS.items() if re.search(rx, text)}
+        url = str(n.get("url") or "")
+        out.append({"uid": "alp:" + str(n.get("id")), "source": "Benzinga (Alpaca)",
+                    "url": url if url.startswith(("http://", "https://")) else "", "title": title[:300], "ts": ts,
+                    "metals": ",".join(sorted(metals))})
+    return out
+
+
 # ---------- the hub ----------
 class Feeds:
     def __init__(self, db: DB, keys: KeyStore):
         self.db = db
         self.keys = keys
         db.conn.executescript(SCHEMA)
-        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0}
+        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0}
 
     def _health(self, sid: str, ok: bool, msg: str, rows: int = 0) -> None:
         prev = json.loads(self.db.get(f"src:{sid}") or "{}")
@@ -225,8 +253,8 @@ class Feeds:
     def health(self, sid: str) -> dict:
         return json.loads(self.db.get(f"src:{sid}") or "{}")
 
-    async def _get(self, client: httpx.AsyncClient, url: str, **kw) -> bytes:
-        r = await client.get(url, headers=UA, **kw)
+    async def _get(self, client: httpx.AsyncClient, url: str, headers: dict | None = None, **kw) -> bytes:
+        r = await client.get(url, headers={**UA, **(headers or {})}, **kw)
         if r.status_code != 200:
             raise ValueError(f"HTTP {r.status_code}")
         if len(r.content) > MAX_BYTES:
@@ -301,7 +329,8 @@ class Feeds:
     async def tick(self, now: float | None = None, force: str | None = None) -> None:
         now = time.time() if now is None else now
         jobs = {"news": (self.news, NEWS_EVERY), "calendar": (self.calendar, CAL_EVERY),
-                "macro": (self.macro, MACRO_EVERY), "cot": (self._cot_safe, COT_EVERY)}
+                "macro": (self.macro, MACRO_EVERY), "cot": (self._cot_safe, COT_EVERY),
+                "alpaca": (self.alpaca, ALPACA_EVERY)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
@@ -310,6 +339,26 @@ class Feeds:
                         await fn(client)
                     except Exception:
                         log.exception("feed %s failed", name)
+
+    async def alpaca(self, client) -> None:
+        creds = self.keys.get("alpaca")
+        if not creds:
+            return
+        try:
+            data = await self._get(client, ALPACA_URL, params={"symbols": ",".join(ALPACA_SYMBOLS), "limit": "50",
+                                                               "sort": "desc"},
+                                   headers={**UA, "APCA-API-KEY-ID": creds.get("key_id", ""),
+                                            "APCA-API-SECRET-KEY": creds.get("secret", "")})
+            items = [i for i in parse_alpaca(data) if time.time() - i["ts"] < NEWS_MAX_AGE]
+            self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals) "
+                                "VALUES(:uid, :source, :url, :title, :ts, :metals)", items)
+            self._health("alpaca", True, f"{len(items)} başlıq (son 48 saat)", len(items))
+        except Exception as e:
+            msg = str(e)
+            for v in creds.values():
+                if v:
+                    msg = msg.replace(v, "***")
+            self._health("alpaca", False, f"Alpaca: {msg}"[:300])
 
     async def _cot_safe(self, client) -> None:
         try:
