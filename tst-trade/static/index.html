@@ -45,7 +45,8 @@
   </div>
   <div class="feeds">
     <div class="box"><h2>Makro fon <span class="sp"></span><span class="note">FRED, gündəlik</span></h2><div id="macro"></div></div>
-    <div class="box"><h2>İqtisadi təqvim (ABŞ) <span class="sp"></span><span class="note">Forex Factory</span></h2><div class="tbl" id="events"></div></div>
+    <div class="box"><h2>İqtisadi təqvim (ABŞ) <span class="sp"></span><span class="note">Forex Factory</span></h2><div class="tbl" id="events"></div>
+      <h3 class="sub">Son açıqlanan rəqəmlər: gözləntiyə qarşı <span class="note">FMP</span></h3><div class="tbl" id="releases"></div></div>
     <div class="box"><h2>Xəbərlər <span class="sp"></span><span class="seg" id="nfilter"><button data-f="metal" class="on">Seçilmiş metal</button><button data-f="all">Hamısı</button></span></h2><div id="news"></div></div>
   </div>
   <div class="box" id="sec-fund"><h2>Fundamental: qızıla təsir edən amillər <span class="sp"></span><span class="note">FRED gündəlik · CFTC həftəlik</span></h2>
@@ -63,7 +64,9 @@
       <div><div class="note">Düz çıxma faizi zamanla (hər üsulun son <span id="jwin">100</span> yoxlaması)</div><div class="lc"><canvas id="jc1"></canvas></div><div class="legend" id="jl1"></div></div>
       <div><div class="note">Qiymət proqnoz aralığına düşdü (hədəf: 50 % və 80 %)</div><div class="lc"><canvas id="jc2"></canvas></div><div class="legend" id="jl2"></div></div>
     </div>
-    <div class="tbl" id="judge"></div></div>
+    <div class="tbl" id="judge"></div>
+    <h3 class="sub">Harada düz, harada səhv: seans və bazar əhvalı üzrə (tarixçə)</h3>
+    <div class="tbl" id="jwhere"></div></div>
   <div class="box"><h2>Son yoxlanmış proqnozlar</h2><div class="tbl" id="journal"></div></div>
 </main>
 <script src="/static/chart.js"></script>

@@ -102,8 +102,8 @@ function render() {
   $("brains").innerHTML = data.brains.map(brainSlot).join("");
   const h = data.history || {};
   $("histres").innerHTML = h.note ? `<p class="note">${esc(h.note)}</p>` : h.result ?
-    `<table><tr><th>Metal</th><th>1 dəq</th><th>1 saat</th><th>1 gün</th><th>1 həftə</th></tr>` +
-    Object.entries(h.result).map(([s, r]) => `<tr><td>${s}</td>${["1m", "1h", "1d", "1w"].map((t) => `<td>${esc(r[t] || "—")}</td>`).join("")}</tr>`).join("") +
+    `<table><tr><th>Metal</th><th>1 dəq</th><th>1 saat</th><th>4 saat</th><th>1 gün</th><th>1 həftə</th></tr>` +
+    Object.entries(h.result).map(([s, r]) => `<tr><td>${s}</td>${["1m", "1h", "4h", "1d", "1w"].map((t) => `<td>${esc(r[t] || "—")}</td>`).join("")}</tr>`).join("") +
     `</table><p class="note">Son yükləmə: ${when(h.ts)} (${esc(h.source)})</p>` : "<p class='note'>Hələ yüklənməyib.</p>";
   wire();
 }

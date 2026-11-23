@@ -156,7 +156,7 @@ function renderCards(fc) {
 let jh = "1m";
 try { jh = localStorage.getItem("tst_jh") || jh; } catch (e) {}
 const MCOL = { momentum: "#4ea1ff", reversal: "#c77dff", trend: "#3fb27f", breakout: "#ff9f43", rsi: "#e0605a",
-  fib: "#d4a73c", macro: "#2ec4b6", session: "#f78fb3", consensus: "#9aa5b1" };
+  fib: "#d4a73c", macro: "#2ec4b6", session: "#f78fb3", surprise: "#ffd166", consensus: "#9aa5b1" };
 function renderJudge(fc) {
   const key = mode === "live" ? "stats_live" : "stats_history";
   const methods = Object.keys(fc.method_names).filter((m) => m !== "rw");
@@ -199,6 +199,19 @@ function renderJudge(fc) {
     (indi ${card[key][2] ? card[key][2].p_bar.toFixed(4) : "—"}): təsadüfi «sübut» olmasın. «Orta qazanc»: proqnoz istiqamətində orta hərəkət;
     alış-satış fərqindən (spread) kiçikdirsə, statistik düz olsa da pul qazandırmaz («Spreaddən kiçik»). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı.</p>`;
   loadJudgeCharts(card).catch(() => {});
+  loadWhere(card).catch(() => {});
+}
+const GROUP_AZ = { asia: "Asiya seansı (22–07 UTC)", london: "London (07–13)", ny: "Nyu-York (13–22)", calm: "Sakit bazar", wild: "Dalğalı bazar" };
+async function loadWhere(card) {
+  const d = await api(`/api/judge/where?symbol=${sym}&horizon=${card.horizon}&mode=history`);
+  const ms = Object.keys(d.methods);
+  if (!ms.length) { $("jwhere").innerHTML = "<p class='note'>Hələ məlumat yoxdur.</p>"; return; }
+  const bar = (card.stats_history.find((r) => r.method === "momentum") || {}).bar || 0.5;
+  $("jwhere").innerHTML = `<table><tr><th>Üsul</th>${d.groups.map((g) => `<th>${GROUP_AZ[g]}</th>`).join("")}</tr>` +
+    ms.map((m) => `<tr><td>${esc(lastFc.method_names[m] || m)}</td>${d.groups.map((g) => { const c = d.methods[m][g];
+      return `<td class="cell ${c.hit_rate == null || c.n < 50 ? "mut" : c.hit_rate > bar + 0.03 ? "sübut" : c.hit_rate < bar - 0.03 ? "yox" : ""}" title="${c.n} yoxlama">${c.n ? pct(c.hit_rate, 0) : "—"}</td>`; }).join("")}</tr>`).join("") +
+    `</table><p class="note">Yaşıl = həddən (${pct(bar, 0)}) 3 bənd yuxarı, qırmızı = 3 bənd aşağı, boz = 50-dən az yoxlama. Bu cədvəl üsulun nə vaxt
+    işlədiyini və nə vaxt səhv etdiyini göstərir: növbəti düzəlişin ipucu. Bu, sübut deyil, yalnız tarixçə üzrə müşahidədir.</p>`;
 }
 async function loadJudgeCharts(card) {
   const d = await api(`/api/judge/series?symbol=${sym}&horizon=${card.horizon}&mode=${mode}`);
@@ -335,6 +348,14 @@ async function loadFeeds() {
       <span class="note">${until(e.ts)}</span></td><td><span class="${e.impact === "High" ? "hi" : "me"}">●</span> ${esc(e.title)}</td>
       <td class="n">${esc(e.forecast || "—")}</td><td class="n">${esc(e.previous || "—")}</td><td class="n">${esc(e.actual || "—")}</td></tr>`).join("") + "</table>"
     : `<p class="note">${h.forexfactory && h.forexfactory.ok === false ? "Təqvim: " + esc(h.forexfactory.message) : "Yaxın 7 gündə mühüm ABŞ hadisəsi yoxdur və ya təqvim hələ yüklənməyib."}</p>`;
+  const fx = (v) => v == null ? "—" : Math.abs(v) >= 1e5 ? (v / 1e3).toFixed(0) + "K" : String(+v.toFixed(3));
+  $("releases").innerHTML = (d.releases || []).length ? `<table><tr><th>Vaxt</th><th>Rəqəm</th><th>Gözlənti</th><th>Fakt</th><th>Qızıl üçün</th></tr>` +
+    d.releases.map((r) => `<tr><td>${new Date(r.ts * 1000).toLocaleString("az", { weekday: "short", hour: "2-digit", minute: "2-digit" })}</td>
+      <td><span class="${r.impact === "High" ? "hi" : "me"}">●</span> ${esc(r.event)}</td><td class="n">${fx(r.estimate)}</td>
+      <td class="n"><b>${fx(r.actual)}</b></td>
+      <td>${r.actual == null ? "<span class='mut'>gözlənilir</span>" : !r.scored ? "<span class='mut'>—</span>" : r.gold > 0 ? "<span class='up'>↑ müsbət</span>" : "<span class='down'>↓ mənfi</span>"}</td></tr>`).join("") +
+    `</table><p class="note">Məsələn, inflyasiya və ya iş yerləri gözləntidən yüksək çıxanda dollar güclənir və bu, adətən qızıl üçün mənfidir. Bu, ehtimaldır: «Hadisə sürprizi» üsulu Hakimdə yoxlanır.</p>`
+    : `<p class="note">${h.fmp && h.fmp.ok === false ? "FMP: " + esc(h.fmp.message) : "Hələ açıqlanan rəqəm yoxdur (admin: FMP açarı)."}</p>`;
   $("news").innerHTML = d.news.length ? d.news.slice(0, 20).map((n) => `<div class="nitem">
       ${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a>` : `<span>${esc(n.title)}</span>`}
       <span class="m">${esc(n.source)} · ${ago(n.ts)}${n.metals ? " · " + esc(n.metals) : ""}${aiTag(n.ai)}</span></div>`).join("")

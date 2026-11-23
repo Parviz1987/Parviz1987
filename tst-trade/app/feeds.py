@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from . import surprise
 from .db import DB
 from .keys import KeyStore
 
@@ -237,7 +238,8 @@ class Feeds:
         self.db = db
         self.keys = keys
         db.conn.executescript(SCHEMA)
-        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0}
+        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0}
+        db.conn.executescript(surprise.SCHEMA)
 
     def _health(self, sid: str, ok: bool, msg: str, rows: int = 0) -> None:
         prev = json.loads(self.db.get(f"src:{sid}") or "{}")
@@ -330,7 +332,9 @@ class Feeds:
         now = time.time() if now is None else now
         jobs = {"news": (self.news, NEWS_EVERY), "calendar": (self.calendar, CAL_EVERY),
                 "macro": (self.macro, MACRO_EVERY), "cot": (self._cot_safe, COT_EVERY),
-                "alpaca": (self.alpaca, ALPACA_EVERY)}
+                "alpaca": (self.alpaca, ALPACA_EVERY),
+                # every 5 minutes; every minute around a high-impact release so the surprise is seen at once
+                "fmp": (self.fmp, 60 if self.event_mode(now) else 300)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
@@ -359,6 +363,34 @@ class Feeds:
                 if v:
                     msg = msg.replace(v, "***")
             self._health("alpaca", False, f"Alpaca: {msg}"[:300])
+
+    async def fmp(self, client) -> None:
+        """US releases with estimate and actual (FMP). The first run also loads two years back, so the history
+        replay can test the surprise method; then the last two days and the next week every few minutes."""
+        key = self.keys.first("fmp")
+        if not key:
+            return
+        today = datetime.now(timezone.utc).date()
+        from datetime import timedelta
+        spans = [(today - timedelta(days=2), today + timedelta(days=7))]
+        if self.db.execute("SELECT COUNT(*) FROM releases").fetchone()[0] < 300:
+            spans += [(today - timedelta(days=d + 89), today - timedelta(days=d)) for d in range(3, 731, 90)]
+        n, errors = 0, []
+        for a, b in spans:
+            try:
+                rows = surprise.parse_fmp(await self._get(client, surprise.FMP_URL,
+                                                          params={"from": a.isoformat(), "to": b.isoformat(),
+                                                                  "apikey": key}))
+                surprise.store(self.db, rows)
+                n += len(rows)
+            except Exception as e:
+                errors.append(str(e).replace(key, "***")[:120])
+                if "HTTP 4" in str(e):
+                    break          # not in the plan or a bad key: asking again changes nothing
+        last = self.db.execute("SELECT raw_date, event FROM releases WHERE actual IS NOT NULL AND impact='High' "
+                               "ORDER BY ts DESC LIMIT 1").fetchone()
+        msg = f"{n} ABŞ rəqəmi" + (f"; son açıqlanan: {last['event']} ({last['raw_date']} UTC)" if last else "")
+        self._health("fmp", n > 0, msg + (f"; xəta: {'; '.join(errors)}" if errors else ""), n)
 
     async def _cot_safe(self, client) -> None:
         try:

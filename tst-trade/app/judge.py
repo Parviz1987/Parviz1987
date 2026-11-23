@@ -21,7 +21,7 @@ from .forecast import BASELINES, HORIZON_SPEC, methods_for, steps_of, target_tim
 # silver 0.05 on 42, platinum 6 on 1318, palladium 5 on 904). A direction is worth something only if the average
 # move in the forecast's direction is larger than this.
 COST = {"XAU": 0.00014, "XAG": 0.0012, "XPT": 0.0046, "XPD": 0.0055}
-MIN_N = {"1m": 300, "1h": 200, "1d": 250, "3d": 250, "1w": 100, "10d": 250, "1mo": 250}
+MIN_N = {"1m": 300, "1h": 200, "4h": 200, "1d": 250, "3d": 250, "1w": 100, "10d": 250, "1mo": 250}
 P_MAX = 0.05
 
 
@@ -182,7 +182,7 @@ def series(db: DB, symbol: str, horizon: str, mode: str, window: int = 100, poin
     the rolling share of closes inside the 50 % and 80 % ranges (the same ranges for every method: taken from rw)."""
     out = {"methods": {}, "cover": {}}
     # Recent window only: a month of one-minute forecasts is ~400 000 rows; the chart needs the recent trend.
-    span = {"1m": 3 * 86400, "1h": 120 * 86400}.get(horizon)
+    span = {"1m": 3 * 86400, "1h": 120 * 86400, "4h": 365 * 86400}.get(horizon)
     since = (time.time() - span) if (span and mode == "live") else 0
     rows = db.execute("SELECT method, target_t, hit, in50, in80 FROM forecasts WHERE symbol=? AND horizon=? AND mode=? "
                       "AND scored_ts IS NOT NULL AND price1 IS NOT NULL AND target_t > ? ORDER BY target_t",
@@ -219,3 +219,31 @@ def overview(db: DB, symbol: str, mode: str) -> list[dict]:
     """One row per horizon: each method's hit rate and status, and the range coverage. The page's summary matrix."""
     from .forecast import HORIZONS
     return [{"horizon": h, "stats": stats(db, symbol, h, mode)} for h in HORIZONS]
+
+
+def where(db: DB, symbol: str, horizon: str, mode: str) -> dict:
+    """Where each method is right and where it misses: by trading session (intraday horizons only) and by market
+    mood (calm vs wild: the forecast's own 80 % range width against its average). Shows WHY a method fails, e.g.
+    "works in calm markets, loses in wild ones" or "only the New York session" — the hint for the next fix."""
+    intraday = HORIZON_SPEC[horizon][0] in ("1m", "1h", "4h")
+    avg = db.execute("SELECT AVG((hi80 - lo80) / price0) w FROM forecasts WHERE symbol=? AND horizon=? AND mode=? "
+                     "AND method='rw' AND scored_ts IS NOT NULL", (symbol, horizon, mode)).fetchone()["w"]
+    if avg is None:
+        return {"groups": [], "methods": {}}
+    rows = db.execute(
+        "SELECT method, "
+        "CASE WHEN (issued_t / 3600) % 24 >= 22 OR (issued_t / 3600) % 24 < 7 THEN 'asia' "
+        "     WHEN (issued_t / 3600) % 24 < 13 THEN 'london' ELSE 'ny' END sess, "
+        "CASE WHEN (hi80 - lo80) / price0 > ? THEN 'wild' ELSE 'calm' END mood, "
+        "COUNT(hit) n, SUM(hit) k FROM forecasts WHERE symbol=? AND horizon=? AND mode=? AND scored_ts IS NOT NULL "
+        "AND hit IS NOT NULL AND method NOT IN ('rw', 'up') GROUP BY method, sess, mood",
+        (avg, symbol, horizon, mode)).fetchall()
+    groups = (["asia", "london", "ny"] if intraday else []) + ["calm", "wild"]
+    out: dict[str, dict] = {}
+    for r in rows:
+        m = out.setdefault(r["method"], {g: [0, 0] for g in groups})
+        for g in ((r["sess"],) if intraday else ()) + (r["mood"],):
+            m[g][0] += r["n"]
+            m[g][1] += r["k"] or 0
+    return {"groups": groups, "methods": {m: {g: {"n": v[0], "hit_rate": v[1] / v[0] if v[0] else None}
+                                              for g, v in d.items()} for m, d in out.items()}}

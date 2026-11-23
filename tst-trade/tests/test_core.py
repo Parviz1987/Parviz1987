@@ -291,3 +291,14 @@ def test_judge_needs_bonferroni_and_a_move_bigger_than_the_spread():
     assert st["trend"]["status"] == "sübut"
     assert st["fib"]["p"] < 0.05 and st["fib"]["status"] == "yox"
     assert judge.official(list(st.values()))["method"] == "trend"
+
+
+def test_where_splits_hits_by_session_and_mood():
+    db = mem()
+    _fake_scored(db, "rw", 200, 100, 0.001)
+    _fake_scored(db, "trend", 200, 150, 0.01)
+    w = judge.where(db, "XAU", "1h", "history")
+    assert w["groups"] == ["asia", "london", "ny", "calm", "wild"]
+    t = w["methods"]["trend"]
+    assert sum(t[g]["n"] for g in ("asia", "london", "ny")) == 200 == t["calm"]["n"] + t["wild"]["n"]
+    assert "rw" not in w["methods"]

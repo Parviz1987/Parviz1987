@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from . import candles, forecast, judge
+from . import candles, forecast, judge, surprise
 from .db import DB
 from .keys import KeyStore
 from .providers.base import NotServed, ProviderError, Quote
@@ -19,7 +19,7 @@ from .providers.twelvedata import TwelveDataHistory, TwelveDataPrices
 
 log = logging.getLogger("tst.engine")
 HISTORY_EVERY = 6 * 3600
-HISTORY_LIMIT = {"1m": 1500, "1h": 1500, "1d": 2000, "1w": 600}
+HISTORY_LIMIT = {"1m": 1500, "1h": 1500, "4h": 1500, "1d": 2000, "1w": 600}
 BACKTEST_MAX = 2000
 TICK_KEEP = 3 * 86400
 MINUTE_KEEP = 30 * 86400
@@ -91,6 +91,7 @@ class Engine:
         self.last_ok: float | None = None
         self.history_state: dict = json.loads(db.get("history_state") or "{}")
         self._macro_cache = None
+        self._rel_cache = None
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
 
@@ -172,6 +173,12 @@ class Engine:
             self._macro_cache = (now, MacroLookup(self.db))
         return self._macro_cache[1]
 
+    def _releases(self, now: float) -> "surprise.Lookup":
+        """US releases change when a figure comes out: rebuilt every minute (cheap, a few thousand rows)."""
+        if self._rel_cache is None or now - self._rel_cache[0] > 60:
+            self._rel_cache = (now, surprise.Lookup(self.db))
+        return self._rel_cache[1]
+
     def migrate(self) -> None:
         """Once per start: daily candles labelled Saturday or Sunday came from the old bucketing (Sunday-evening
         ticks before the session shift); the forecasts issued on them over a weekend are duplicates."""
@@ -202,6 +209,7 @@ class Engine:
         now = time.time() if now is None else now
         n = 0
         macro = self._macro(now)
+        rel = self._releases(now)
         for h, tf in forecast.HORIZONS.items():
             issued_t = candles.bucket(now, tf)
             step = candles.TF[tf]
@@ -219,7 +227,8 @@ class Engine:
                 monday = tf == "1d" and datetime.fromtimestamp(issued_t, timezone.utc).weekday() == 0
                 if gap != step and not (monday and gap == 3 * step):
                     continue
-                fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t)
+                fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
+                                    rel.window(issued_t, h))
                 if fc is None:
                     continue
                 n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
@@ -295,6 +304,7 @@ class Engine:
         now = time.time() if now is None else now
         n = 0
         macro = MacroLookup(self.db)
+        rel = surprise.Lookup(self.db)
         first = macro.first_day()
         if first:
             # Replayed before FRED data arrived: those macro forecasts said "no data". Now that the data covers
@@ -318,7 +328,7 @@ class Engine:
                     if rows[i]["t"] - rows[i - 1]["t"] > 3 * step and tf not in ("1d", "1w"):
                         continue   # a gap (weekend): the candle after it is not "the next one"
                     fc = forecast.build(rows[max(0, i - forecast.history_need(h)):i], h,
-                                        macro.at(t) if tf == "1d" else None, t)
+                                        macro.at(t) if tf == "1d" else None, t, rel.window(t, h))
                     if fc is None:
                         continue
                     target = rows[i + k - 1]["t"] + step if i + k - 1 < len(rows) else target_time(t, h)

@@ -14,6 +14,8 @@ this moment says P = 0.5: the Judge then counts no hit or miss for it (only fore
             swing's direction; elsewhere no view.
 - session   (one hour) the same UTC hour's past up-share: metals are known to drift differently in Asian, London
             and New York hours. Shrunk toward 0.5 by its sample size.
+- surprise  (1 minute to 1 day) US releases in the window before the forecast: the figure against the estimate and
+            what that usually means for gold (app/surprise.py). No release in the window: no view.
 - consensus the plain average of every other method's lean (P - 0.5) among those that have a view right now; no
             fitting to past results (so no hidden look-ahead). No view unless at least two methods agree in sum.
 - macro     (daily and longer) the last week's change of the real interest rate and the dollar: both falling is good
@@ -25,19 +27,24 @@ from __future__ import annotations
 import math
 
 # horizon -> (candle size, candles ahead)
-HORIZON_SPEC = {"1m": ("1m", 1), "1h": ("1h", 1), "1d": ("1d", 1), "3d": ("1d", 3), "1w": ("1w", 1),
+HORIZON_SPEC = {"1m": ("1m", 1), "1h": ("1h", 1), "4h": ("4h", 1), "1d": ("1d", 1), "3d": ("1d", 3),
+                "1w": ("1w", 1),
                 "10d": ("1d", 10), "1mo": ("1d", 21)}
 HORIZONS = {h: tf for h, (tf, _) in HORIZON_SPEC.items()}      # horizon -> candle size it is built from
-HORIZON_NAMES = {"1m": "1 dəqiqə", "1h": "1 saat", "1d": "1 gün", "3d": "3 gün", "1w": "1 həftə", "10d": "10 gün",
+HORIZON_NAMES = {"1m": "1 dəqiqə", "1h": "1 saat", "4h": "4 saat (gün içi)", "1d": "1 gün", "3d": "3 gün",
+                 "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
-METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro", "session", "consensus")
+METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro", "session", "surprise",
+           "consensus")
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
                 "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)",
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "macro": "Makro (real faiz + dollar)",
-                "session": "Saat effekti", "consensus": "Konsensus (hamısı birlikdə)"}
+                "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
+                "consensus": "Konsensus (hamısı birlikdə)"}
 BASELINES = ("rw", "up")
-LOOKBACK = {"1m": 15, "1h": 24, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
-TREND_WINDOWS = {"1m": (5, 15, 60), "1h": (6, 24, 120), "1d": (10, 50, 150), "1w": (4, 13, 26)}
+LOOKBACK = {"1m": 15, "1h": 24, "4h": 18, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
+TREND_WINDOWS = {"1m": (5, 15, 60), "1h": (6, 24, 120), "4h": (6, 30, 120), "1d": (10, 50, 150),
+                 "1w": (4, 13, 26)}
 MIN_CANDLES = 30                                       # fewer finished candles: no forecast
 HISTORY_NEED = 200                                     # candles a desk is given (oldest first)
 SESSION_NEED = 1200                                    # the hour-of-day method looks back ~7 weeks of hourly candles
@@ -63,6 +70,8 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("macro")      # FRED is daily: the macro view only for daily candles
     if h != "1h":
         out.remove("session")    # hour-of-day only for the one-hour desk
+    if h not in ("1m", "1h", "4h", "1d"):
+        out.remove("surprise")   # a release moves the next minutes to a day; longer horizons drown it
     return tuple(out)
 
 
@@ -70,7 +79,7 @@ def target_time(issued_t: int, h: str) -> int:
     """When the forecast's target candle closes: k candles on; daily candles skip Saturday and Sunday."""
     from datetime import datetime, timezone
     tf, k = HORIZON_SPEC[h]
-    step = {"1m": 60, "1h": 3600, "1d": 86400, "1w": 604800}[tf]
+    step = {"1m": 60, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800}[tf]
     if tf != "1d":
         return issued_t + k * step
     t, left = issued_t, k
@@ -190,7 +199,8 @@ def _clip(p: float) -> float:
     return min(max(p, P_CAP[0]), P_CAP[1])
 
 
-def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = None) -> dict | None:
+def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = None,
+          releases: list[dict] | None = None) -> dict | None:
     """All methods' forecasts for the close `steps_of(horizon)` candles ahead, from past candles (oldest first;
     plain closes are accepted too). macro: {"dfii10": weekly change, "dollar": weekly change in %} or None."""
     longer = _as_candles(seq)
@@ -264,6 +274,17 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
             next_t = last_t + 3600
         p, basis = session_view(longer, next_t)
         out["session"] = {"p_up": p, "basis": basis}
+
+    if "surprise" in methods_for(horizon):
+        if releases:
+            score = sum(r["gold"] * r["weight"] for r in releases)
+            names = ", ".join(f"{r['event']} ({'gözləntidən yuxarı' if r['above'] else 'gözləntidən aşağı'})"
+                              for r in releases[-3:])
+            out["surprise"] = {"p_up": round(_clip(0.5 + 0.06 * score), 4) if abs(score) >= 0.5 else 0.5,
+                               "basis": f"{names}: qızıl üçün {'müsbət' if score > 0 else 'mənfi' if score < 0 else 'neytral'}"}
+        else:
+            out["surprise"] = {"p_up": 0.5, "basis": "bu müddətdə ABŞ rəqəmi açıqlanmayıb" if releases is not None
+                               else "təqvim məlumatı yoxdur"}
 
     if "macro" in methods_for(horizon):
         if macro and macro.get("dfii10") is not None and macro.get("dollar") is not None:

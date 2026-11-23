@@ -229,6 +229,18 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     _series_cache: dict = {}
 
+    @app.get("/api/judge/where")
+    async def judge_where(symbol: str, horizon: str, mode: str = "history"):
+        if symbol not in candles.METALS or horizon not in forecast.HORIZONS or mode not in ("live", "history"):
+            raise HTTPException(400, "naməlum metal, üfüq və ya rejim")
+        key = ("where", symbol, horizon, mode)
+        hit = _series_cache.get(key)
+        if hit and time.time() - hit[0] < 600:
+            return hit[1]
+        out = judge.where(db, symbol, horizon, mode)
+        _series_cache[key] = (time.time(), out)
+        return out
+
     @app.get("/api/judge/series")
     async def judge_series(symbol: str, horizon: str, mode: str = "live"):
         if symbol not in candles.METALS or horizon not in forecast.HORIZONS or mode not in ("live", "history"):
@@ -250,10 +262,11 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             "ON a.uid=n.uid WHERE n.ts > ?", (now - 7 * 86400,)).fetchall()} if news else {}
         for n in news:
             n["ai"] = labels.get(n.get("uid"))
-        return {"news": news,
+        from . import surprise
+        return {"news": news, "releases": surprise.recent(db, now),
                 "events": feeds.upcoming(now), "macro": feeds.macro_view(), "event_mode": feeds.event_mode(now),
                 "cot": feeds.cot_view(),
-                "health": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot", "alpaca")}}
+                "health": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp")}}
 
     _rs_cache: list = [0.0, None]
 
