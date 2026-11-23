@@ -101,3 +101,5 @@ section.adm>h2{font-size:1rem;margin:6px 0 0;color:var(--gold)}
 .login{max-width:340px;margin:12vh auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:12px}
 .login input{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px}
 .inp{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.tile .src{font-size:.74rem;color:var(--muted);overflow-wrap:anywhere}
+.tile .src b{color:var(--fg);font-weight:600}

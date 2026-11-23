@@ -14,6 +14,9 @@ async function api(path) {
   return r.json();
 }
 const fmt = (x) => x == null ? "—" : (x >= 100 ? x.toFixed(2) : x.toFixed(3));
+// The tile shows the price exactly as the source sent it (no rounding), at least two decimals.
+const exact = (x) => { if (x == null) return "—"; const t = String(x); const d = (t.split(".")[1] || "").length;
+  return d >= 2 ? t : x.toFixed(2); };
 const pct = (x, d = 1) => x == null ? "—" : (x * 100).toFixed(d) + " %";
 const hhmm = (ts) => ts ? new Date(ts * 1000).toLocaleTimeString("az", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
 const when = (ts, tf) => !ts ? "—" : (tf === "1d" || tf === "1w")
@@ -26,9 +29,11 @@ function renderTiles(st) {
     const cls = ch == null ? "mut" : ch >= 0 ? "up" : "down";
     return `<button class="tile ${m.symbol === sym ? "sel" : ""}" data-s="${m.symbol}">
       <div class="row"><span class="nm">${esc(m.name)}</span><span class="pill ${m.status}">${STATUS_AZ[m.status] || m.status}</span></div>
-      <div class="row"><span class="px">${fmt(m.price)}</span><span class="sym">${m.symbol}/USD</span></div>
-      <div class="row"><span class="ch ${cls}">${ch == null ? "—" : (ch >= 0 ? "+" : "") + (ch * 100).toFixed(2) + " % gün"}</span>
-      <span class="ts">${m.source_ts ? "yeniləndi " + hhmm(m.source_ts) : esc(m.error || "qiymət gözlənilir")}</span></div></button>`;
+      <div class="row"><span class="px">${exact(m.price)}</span><span class="sym">${m.symbol}/USD · unsiya</span></div>
+      <div class="row"><span class="ch ${cls}">${ch == null ? "—" : (ch >= 0 ? "+" : "") + (ch * 100).toFixed(2) + " % gün"}</span></div>
+      <div class="src">Mənbə: <b>${esc(PROVIDER_AZ[m.source] || m.source || "—")}</b></div>
+      <div class="src">${m.source_ts ? (m.ts_missing ? "Mənbə vaxt göstərmədi · alındı " + hhmm(m.recv_ts)
+        : "Mənbənin qiymət vaxtı " + hhmm(m.source_ts) + " · alındı " + hhmm(m.recv_ts)) : esc(m.error || "qiymət gözlənilir")}</div></button>`;
   }).join("");
   document.querySelectorAll(".tile").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); refreshAll(); });
   const worst = st.metals.some((m) => m.status === "OFFLINE") ? "OFFLINE" : st.metals.every((m) => m.status === "DEMO") ? "DEMO"

@@ -102,6 +102,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             day = candles.get(db, sym, "1d", limit=1)
             metals.append({"symbol": sym, "name": candles.NAMES[sym],
                            "price": q["price"] if q else None, "source_ts": q["source_ts"] if q else None,
+                           "recv_ts": q["recv_ts"] if q else None, "ts_missing": q["ts_missing"] if q else None,
+                           "source": engine.provider_name,
                            "status": engine.status(sym, now), "day_open": day[-1]["o"] if day else None,
                            "error": engine.errors.get(sym) or engine.errors.get("*")})
         return {"now": now, "provider": engine.provider_name, "market_open": market_open(now),
