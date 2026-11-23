@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from . import candles, forecast, judge, surprise
+from . import candles, forecast, judge, markets, surprise
 from .db import DB
 from .keys import KeyStore
 from .providers.base import NotServed, ProviderError, Quote
@@ -91,6 +91,7 @@ class Engine:
         self.last_ok: float | None = None
         self.history_state: dict = json.loads(db.get("history_state") or "{}")
         self._macro_cache = None
+        self._rel_written: dict[str, float] = {}
         self._rel_cache = None
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -112,7 +113,8 @@ class Engine:
             if not creds:
                 self.errors = {"*": "Capital.com seçilib, amma açar saxlanmayıb: gold-api.com işləyir"}
                 return GoldApiProvider(), "goldapi"
-            return CapitalStream(creds, on_quote=self.on_quote), "capital"
+            return CapitalStream(creds, on_quote=self.on_quote,
+                                 extra=markets.saved(self.db).get("epics")), "capital"
         if name == "demo":
             return DemoPrices(), "demo"
         return GoldApiProvider(), "goldapi"
@@ -127,10 +129,16 @@ class Engine:
         self.provider_name = None   # rebuilt at the next poll (a new key or a new choice)
 
     def on_quote(self, q: Quote) -> None:
-        """A streamed price: stored the moment it arrives (no wait for the next poll)."""
+        """A streamed price: stored the moment it arrives (no wait for the next poll). Related markets (dollar,
+        oil...) quote many times a second: they are written at most once a second each (candles only, no ticks)."""
         now = time.time()
         self.quotes[q.symbol] = {"price": q.price, "source_ts": q.source_ts, "recv_ts": now,
                                  "ts_missing": q.source_ts_missing}
+        if q.symbol not in candles.METALS:
+            if now - self._rel_written.get(q.symbol, 0) >= 1.0:
+                self._rel_written[q.symbol] = now
+                candles.add_tick(self.db, q.symbol, now, q.price)
+            return
         self.db.execute("INSERT INTO ticks(symbol, ts, price, source, source_ts) VALUES(?,?,?,?,?)",
                         (q.symbol, now, q.price, "capital", q.source_ts))
         candles.add_tick(self.db, q.symbol, now, q.price)
@@ -235,7 +243,7 @@ class Engine:
                 if gap != step and not (monday and gap == 3 * step):
                     continue
                 fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
-                                    rel.window(issued_t, h))
+                                    rel.window(issued_t, h), self.related_closes(past, tf, now))
                 if fc is None:
                     continue
                 n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
@@ -258,7 +266,8 @@ class Engine:
             elif name == "capital":
                 # The live stream's own session is reused: no second login to the broker.
                 stream = self.provider if self.provider_name == "capital" else None
-                out.append((CapitalHistory(self.keys.get("capital"), stream), True))
+                out.append((CapitalHistory(self.keys.get("capital"), stream,
+                                           extra=markets.saved(self.db).get("epics")), True))
             else:
                 out.append((TwelveDataHistory(self.keys.first("twelvedata")), False))
         return out
@@ -278,23 +287,29 @@ class Engine:
             self.db.put("history_state", json.dumps(self.history_state))
             return self.history_state
         result: dict[str, dict[str, str]] = {}
+        related = list(markets.saved(self.db).get("epics", {}))
         for src, replace in sources:
             try:
-                for sym in candles.METALS:
-                    for tf, limit in HISTORY_LIMIT.items():
-                        line = result.setdefault(sym, {})
-                        try:
-                            rows = await src.candles(sym, tf, limit)
-                            candles.store_history(self.db, sym, tf, rows, replace=replace)
-                            line[tf] = (line.get(tf, "") + f" {src.name}: {len(rows)} şam").strip()
-                        except NotServed as e:
-                            line[tf] = (line.get(tf, "") + f" {src.name}: planda yoxdur ({str(e)[:60]})").strip()
-                            if src.name == "twelvedata":
-                                break
-                        except ProviderError as e:
-                            line[tf] = (line.get(tf, "") + f" {src.name}: xəta ({str(e)[:80]})").strip()
-                        if src.request_gap:
-                            await asyncio.sleep(src.request_gap)
+                jobs = [(s, tf, lim) for s in candles.METALS for tf, lim in HISTORY_LIMIT.items()]
+                if src.name == "capital":   # related markets: only the broker has them
+                    jobs += [(s, tf, lim) for s in related for tf, lim in markets.HISTORY_TF.items()]
+                refused: set[str] = set()
+                for sym, tf, limit in jobs:
+                    if sym in refused:
+                        continue
+                    line = result.setdefault(sym, {})
+                    try:
+                        rows = await src.candles(sym, tf, limit)
+                        candles.store_history(self.db, sym, tf, rows, replace=replace)
+                        line[tf] = (line.get(tf, "") + f" {src.name}: {len(rows)} şam").strip()
+                    except NotServed as e:
+                        line[tf] = (line.get(tf, "") + f" {src.name}: planda yoxdur ({str(e)[:60]})").strip()
+                        if src.name == "twelvedata":
+                            refused.add(sym)   # the plan serves this symbol on no timeframe
+                    except ProviderError as e:
+                        line[tf] = (line.get(tf, "") + f" {src.name}: xəta ({str(e)[:80]})").strip()
+                    if src.request_gap:
+                        await asyncio.sleep(src.request_gap)
             except Exception as e:   # one source failing (login refused...) must not stop the next one
                 log.warning("history %s: %s", src.name, e)
                 result.setdefault("*", {})[src.name] = f"xəta: {str(e)[:120]}"
@@ -325,6 +340,8 @@ class Engine:
                 rows = candles.closed(self.db, sym, tf, now, limit=BACKTEST_MAX + forecast.MIN_CANDLES)
                 k = forecast.steps_of(h)
                 batch: list = []
+                linked = {c: {r["t"]: r["c"] for r in candles.closed(self.db, c, tf, now, limit=BACKTEST_MAX)}
+                          for c in markets.saved(self.db).get("epics", {})}
                 done = {r["issued_t"] for r in self.db.execute(
                     "SELECT issued_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='history' "
                     "GROUP BY issued_t HAVING COUNT(*) >= ?", (sym, h, len(forecast.methods_for(h)))).fetchall()}
@@ -334,8 +351,9 @@ class Engine:
                         continue   # replayed before: forecasts never change once issued
                     if rows[i]["t"] - rows[i - 1]["t"] > 3 * step and tf not in ("1d", "1w"):
                         continue   # a gap (weekend): the candle after it is not "the next one"
-                    fc = forecast.build(rows[max(0, i - forecast.history_need(h)):i], h,
-                                        macro.at(t) if tf == "1d" else None, t, rel.window(t, h))
+                    window = rows[max(0, i - forecast.history_need(h)):i]
+                    fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
+                                        self.related_closes(window, tf, now, linked))
                     if fc is None:
                         continue
                     target = rows[i + k - 1]["t"] + step if i + k - 1 < len(rows) else target_time(t, h)
@@ -357,6 +375,45 @@ class Engine:
         self.db.execute("DELETE FROM forecasts WHERE horizon='1m' AND scored_ts IS NOT NULL AND target_t < ?",
                         (now - MINUTE_KEEP,))
 
+    async def resolve_related(self, now: float) -> None:
+        """Once a day: which related markets the broker has (from its own list). A change resubscribes the stream
+        and loads their history at once."""
+        st = markets.saved(self.db)
+        stream = self.provider if self.provider_name == "capital" else None
+        if stream is None or not stream.tokens or now - st.get("ts", 0) < markets.RESOLVE_EVERY:
+            return
+        from .providers.capital import BASES
+        try:
+            epics = await markets.resolve(BASES[stream.env or "real"], stream.tokens)
+        except Exception as e:
+            log.warning("related markets: %s", e)
+            self.db.put("related:epics", json.dumps({**st, "ts": now - markets.RESOLVE_EVERY + 3600,
+                                                     "error": str(e)[:200]}))
+            return
+        self.db.put("related:epics", json.dumps({"ts": now, "epics": epics}))
+        if epics != st.get("epics"):
+            self.reset_provider()
+            self.history_state["ts"] = 0
+
+    def related_closes(self, past: list[dict], tf: str, now: float, rows_by_code: dict | None = None) -> dict:
+        """For the impulse methods: the dollar and oil closes aligned with the metal's candles (same candle times),
+        only when the linked market has the metal's last candle too (else no view)."""
+        epics = markets.saved(self.db).get("epics", {})
+        out = {}
+        for key, codes in (("dollar", ("DXY", "EURUSD")), ("oil", ("OIL", "BRENT"))):
+            code = next((c for c in codes if c in epics), None)
+            if not code or not past:
+                continue
+            if rows_by_code is not None and code in rows_by_code:
+                bymap = rows_by_code[code]
+            else:
+                bymap = {r["t"]: r["c"] for r in candles.closed(self.db, code, tf, now, limit=150)}
+            if past[-1]["t"] not in bymap:
+                continue
+            pairs = [(c["c"], bymap[c["t"]]) for c in past[-101:] if c["t"] in bymap]
+            out[key] = ([p[0] for p in pairs], [p[1] for p in pairs], markets.RELATED[code]["name"])
+        return out
+
     async def step(self) -> None:
         now = time.time()
         await self.poll_once(now)
@@ -376,6 +433,7 @@ class Engine:
                 if time.time() - last_prune > 3600:
                     self.prune(time.time())
                     last_prune = time.time()
+                await self.resolve_related(time.time())
                 # Feeds first: the history replay's macro method needs FRED data already loaded.
                 if self.feeds is not None:
                     await self.feeds.tick()

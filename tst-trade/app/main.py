@@ -238,6 +238,43 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     _series_cache: dict = {}
 
+    # FRED's daily value stands in for a related market the broker does not have (shown as daily, never as live)
+    FRED_FOR = {"DXY": "DTWEXBGS", "VIX": "VIXCLS", "US500": "SP500", "US10Y": "DGS10", "OIL": "DCOILWTICO"}
+
+    @app.get("/api/markets")
+    async def markets_view(metal: str = "XAU"):
+        """Every market that moves the metals on one screen: live price, day change, a 2-day sparkline, why it is
+        linked, how strongly it moves with the metal and whether it moves first (measured, cached 10 minutes)."""
+        from . import markets as mk
+        if metal not in candles.METALS:
+            raise HTTPException(400, "naməlum metal")
+        now = time.time()
+        epics = mk.saved(db).get("epics", {})
+        fred = {m["series"]: m for m in feeds.macro_view()}
+        out = []
+        for code in list(candles.METALS) + list(mk.RELATED):
+            info = mk.RELATED.get(code, {"name": candles.NAMES.get(code, code), "why": "", "sign": None})
+            row = {"code": code, "name": info["name"], "why": info["why"], "sign": info["sign"],
+                   "live": code in candles.METALS or code in epics}
+            if row["live"]:
+                q = engine.quotes.get(code)
+                day = candles.get(db, code, "1d", limit=1)
+                row.update({"price": q["price"] if q else None, "status": engine.status(code, now) if q else "OFFLINE",
+                            "day_open": day[-1]["o"] if day else None,
+                            "spark": [c["c"] for c in candles.get(db, code, "1h", limit=48)]})
+                if code != metal:
+                    key = ("links", code, metal)
+                    hit = _series_cache.get(key)
+                    if not hit or now - hit[0] > 600:
+                        hit = (now, mk.links(db, code, metal, now))
+                        _series_cache[key] = hit
+                    row["links"] = hit[1]
+            elif code in FRED_FOR and fred.get(FRED_FOR[code], {}).get("value") is not None:
+                f = fred[FRED_FOR[code]]
+                row.update({"daily": f["value"], "daily_date": f["date"], "daily_change": f.get("change_week")})
+            out.append(row)
+        return {"metal": metal, "markets": out, "resolved": bool(epics), "resolve_error": mk.saved(db).get("error")}
+
     @app.get("/api/passports")
     async def passports(symbol: str = "XAU"):
         """Each method's passport and the Judge's current verdict for it on every horizon (history and live)."""

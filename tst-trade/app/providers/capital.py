@@ -32,7 +32,7 @@ RETRY_S = 30.0
 LOGIN_PAUSE = (900, 1800, 3600)
 
 
-def quote_of(raw) -> dict | None:
+def quote_of(raw, symbols: dict | None = None) -> dict | None:
     try:
         j = json.loads(raw)
     except (TypeError, ValueError):
@@ -44,7 +44,7 @@ def quote_of(raw) -> dict | None:
         bid, ofr = float(p["bid"]), float(p["ofr"])
     except (KeyError, TypeError, ValueError):
         return None
-    sym = SYMBOL.get(p.get("epic"))
+    sym = (symbols or SYMBOL).get(p.get("epic"))
     if sym is None or bid <= 0 or ofr <= 0:
         return None
     ts = p.get("timestamp")
@@ -67,7 +67,8 @@ class CapitalStream(PriceProvider):
     name = "capital"
     delayed = False
 
-    def __init__(self, creds: dict, on_quote: Callable[[Quote], None] | None = None, env: str | None = None):
+    def __init__(self, creds: dict, on_quote: Callable[[Quote], None] | None = None, env: str | None = None,
+                 extra: dict[str, str] | None = None):
         self.api_key = creds.get("api_key", "")
         self.login = creds.get("login", "")
         self.password = creds.get("password", "")
@@ -75,6 +76,9 @@ class CapitalStream(PriceProvider):
         self.envs = [env] if env in BASES else ["demo", "real"]
         self.env: str | None = env if env in BASES else None
         self.on_quote = on_quote
+        # metals plus the related markets found at the broker (code -> epic): one subscription for all
+        self.epics = {**EPIC, **(extra or {})}
+        self.symbols = {v: k for k, v in self.epics.items()}
         self.latest: dict[str, Quote] = {}
         self.state = "connecting"
         self.error: str | None = None
@@ -110,7 +114,7 @@ class CapitalStream(PriceProvider):
                 tokens = await self._session()
                 self.tokens = tokens
                 async with connect(STREAM_URL) as ws:
-                    await ws.send(_msg("marketData.subscribe", tokens, {"epics": list(EPIC.values())}))
+                    await ws.send(_msg("marketData.subscribe", tokens, {"epics": list(self.epics.values())}))
                     self.state, self.error = "live", None
                     last_ping = last_rx = time.monotonic()
                     while True:
@@ -123,7 +127,7 @@ class CapitalStream(PriceProvider):
                             raw = await asyncio.wait_for(ws.recv(), timeout=RECV_S)
                         except asyncio.TimeoutError:
                             continue
-                        q = quote_of(raw)
+                        q = quote_of(raw, self.symbols)
                         if q is None:
                             continue
                         last_rx = time.monotonic()
@@ -214,21 +218,22 @@ class CapitalHistory(HistoryProvider):
     name = "capital"
     request_gap = 0.25
 
-    def __init__(self, creds: dict, stream: "CapitalStream | None" = None):
+    def __init__(self, creds: dict, stream: "CapitalStream | None" = None, extra: dict[str, str] | None = None):
         self.stream = stream
+        self.epics = {**EPIC, **(extra or {})}
         # Its own login helper: a refused history login must never pause the live stream's logins.
         self.login_helper = CapitalStream(creds, env=stream.env if stream is not None else None)
         self.tokens: dict | None = None
         self.client = httpx.AsyncClient(timeout=20.0)
 
     async def candles(self, symbol: str, tf: str, limit: int) -> list[tuple[int, float, float, float, float]]:
-        if tf not in RESOLUTION or symbol not in EPIC:
+        if tf not in RESOLUTION or symbol not in self.epics:
             raise NotServed(f"{symbol} {tf}: Capital.com bu çərçivəni vermir")
         if self.tokens is None:
             live = self.stream.tokens if self.stream is not None else None
             self.tokens = live or await self.login_helper._session()
         base = BASES[self.login_helper.env or "real"]
-        r = await self.client.get(f"{base}/prices/{EPIC[symbol]}",
+        r = await self.client.get(f"{base}/prices/{self.epics[symbol]}",
                                   params={"resolution": RESOLUTION[tf], "max": min(limit, MAX_ROWS)},
                                   headers=self.tokens)
         if r.status_code in (400, 404):

@@ -205,6 +205,30 @@ function renderJudge(fc) {
   loadPassports().catch(() => {});
 }
 const GROUP_AZ = { asia: "Asiya seansı (22–07 UTC)", london: "London (07–13)", ny: "Nyu-York (13–22)", calm: "Sakit bazar", wild: "Dalğalı bazar" };
+function spark(vals, up) {
+  if (!vals || vals.length < 2) return "";
+  const lo = Math.min(...vals), hi = Math.max(...vals), w = 200, h = 34;
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1) * w).toFixed(1)},${(h - 2 - (hi === lo ? 0.5 : (v - lo) / (hi - lo)) * (h - 4)).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="${up ? "var(--up)" : "var(--down)"}" stroke-width="1.5" points="${pts}"/></svg>`;
+}
+const corrTxt = (c) => c == null ? "—" : (c >= 0 ? "+" : "") + c.toFixed(2);
+async function loadMarkets() {
+  const d = await api(`/api/markets?metal=${sym}`);
+  $("mktnote").textContent = d.resolved ? "Capital.com axını, canlı" : (d.resolve_error ? "broker siyahısı: " + d.resolve_error : "broker siyahısı yoxlanır…");
+  $("mkts").innerHTML = d.markets.map((m) => {
+    if (m.live) {
+      const ch = m.price != null && m.day_open ? m.price / m.day_open - 1 : null;
+      const lk = m.links ? `<div class="lk"><span title="${m.links.n_1h} saat">Birlikdə ${corrTxt(m.links.corr_1h)}</span><span title="${m.links.n_15m} cüt">Qabaqlayır ${corrTxt(m.links.lead_15m)}</span></div>` : "";
+      return `<div class="mkt"><div class="row"><b>${esc(m.name)}</b><span class="pill ${m.status}">${STATUS_AZ[m.status] || m.status}</span></div>
+        <div class="row"><span class="px">${m.price == null ? "—" : exact(m.price)}</span><span class="${ch == null ? "mut" : ch >= 0 ? "up" : "down"}">${ch == null ? "—" : (ch >= 0 ? "+" : "") + (ch * 100).toFixed(2) + " %"}</span></div>
+        ${spark(m.spark, ch == null || ch >= 0)}${lk}${m.why ? `<div class="why">${esc(m.why)}</div>` : ""}</div>`;
+    }
+    if (m.daily != null) return `<div class="mkt"><div class="row"><b>${esc(m.name)}</b><span class="pill next">gündəlik</span></div>
+        <div class="row"><span class="px">${m.daily.toFixed(2)}</span><span class="note">${esc(m.daily_date)}</span></div>
+        <div class="why">Brokerdə tapılmadı: FRED-in gündəlik rəqəmi. ${esc(m.why)}</div></div>`;
+    return `<div class="mkt"><div class="row"><b>${esc(m.name)}</b><span class="pill next">yoxdur</span></div><div class="why">${esc(m.why)}</div></div>`;
+  }).join("");
+}
 async function loadPassports() {
   const d = await api(`/api/passports?symbol=${sym}`);
   const short = { "sübut": "✓", "xərc": "spread", "yox": "✗", "az": "az" };
@@ -393,7 +417,8 @@ async function refreshFc() {
   }
   renderCards(lastFc); renderJudge(lastFc);
 }
-async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadJournal(); await loadFeeds(); await loadBrains(); }
+async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadJournal(); await loadFeeds(); await loadBrains();
+  loadMarkets().catch(() => {}); }
 
 document.querySelectorAll("#modes button").forEach((b) => b.onclick = () => {
   mode = b.dataset.m; modeTouched = true; document.querySelectorAll("#modes button").forEach((x) => x.classList.toggle("on", x === b));
@@ -412,5 +437,5 @@ api("/api/me").then((m) => { if (m.role === "guest") document.querySelectorAll('
 setInterval(() => refreshState().catch(() => {}), 5000);
 setInterval(() => loadChart().catch(() => {}), 10000);
 setInterval(() => { refreshFc().catch(() => {}); loadJournal().catch(() => {}); }, 20000);
-setInterval(() => { loadFeeds().catch(() => {}); loadBrains().catch(() => {}); }, 60000);
+setInterval(() => { loadFeeds().catch(() => {}); loadBrains().catch(() => {}); loadMarkets().catch(() => {}); }, 60000);
 checkVersion(); setInterval(checkVersion, 60000);

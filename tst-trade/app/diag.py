@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import json
 import os
 import time
 import traceback
@@ -124,6 +125,8 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "brain_jobs": {k: jobs.state(k) for k in ("scout", "reader", "strategist")},
         "history": engine.history_state,
         "memory_mb": _memory(),
+        "related": {**json.loads(db.get("related:epics") or "{}"),
+                    "quotes": {c: engine.status(c, now) for c in json.loads(db.get("related:epics") or "{}").get("epics", {})}},
         "calendar_actuals": db.execute("SELECT COUNT(*) n, COUNT(actual) a FROM events WHERE ts < ?", (now,)).fetchone()[:],
         # where the methods miss (history), for the on-duty monitor's proposals
         "where": {f"{sym}/{h}": judge.where(db, sym, h, "history") for sym in ("XAU", "XAG") for h in ("1h", "4h", "1d")},

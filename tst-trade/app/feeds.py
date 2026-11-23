@@ -59,6 +59,7 @@ MACRO_SERIES = {
     "DTWEXBGS": "Dollar indeksi (geniş)",
     "VIXCLS": "VIX qorxu indeksi",
     "SP500": "S&P 500 səhm indeksi",
+    "DCOILWTICO": "Neft WTI (gündəlik), $",
 }
 # CFTC Commitments of Traders (disaggregated, futures only; public, no key): weekly positions on COMEX / NYMEX.
 COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
