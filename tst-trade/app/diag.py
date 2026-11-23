@@ -85,8 +85,11 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
                         continue
                     judging.setdefault(f"{sym}/{h}/{mode}", []).append(
                         {k: (round(v, 4) if isinstance(v, float) else v) for k, v in r.items()
-                         if k in ("method", "n", "hit_rate", "bar", "p", "bss", "cover80", "status")})
+                         if k in ("method", "n", "nh", "hit_rate", "bar", "p", "bss", "cover50", "cover80", "status")})
     open_fc = db.execute("SELECT COUNT(*) FROM forecasts WHERE scored_ts IS NULL").fetchone()[0]
+    open_by = {f"{r['horizon']}/{r['mode']}": {"n": r["n"], "oldest_target_age_h": round((now - r["t"]) / 3600, 1)}
+               for r in db.execute("SELECT horizon, mode, COUNT(*) n, MIN(target_t) t FROM forecasts "
+                                   "WHERE scored_ts IS NULL GROUP BY horizon, mode").fetchall()}
     key_state = {}
     for slot in registry.KEY_SLOTS:
         st = keys.status(slot["id"])
@@ -106,6 +109,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "brain_jobs": {k: jobs.state(k) for k in ("scout", "reader", "strategist")},
         "history": engine.history_state,
         "forecasts_open": open_fc,
+        "forecasts_open_by": open_by,
         "judge": judging,
         "errors": errors,
         "db_bytes": os.path.getsize(db_path) if db_path and os.path.exists(db_path) else None,
