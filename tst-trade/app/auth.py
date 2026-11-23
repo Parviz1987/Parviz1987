@@ -10,23 +10,32 @@ COOKIE = "tst_session"
 DAYS = 30
 
 
-def make_token(secret: str, now: float | None = None) -> str:
-    exp = str(int((time.time() if now is None else now) + DAYS * 86400))
+def make_token(secret: str, now: float | None = None, role: str = "owner") -> str:
+    """exp[.g].sig — ".g" marks a guest (view only). The signature covers both, so a guest cannot become the owner."""
+    exp = str(int((time.time() if now is None else now) + DAYS * 86400)) + (".g" if role == "guest" else "")
     sig = hmac.new(secret.encode(), exp.encode(), hashlib.sha256).hexdigest()
     return f"{exp}.{sig}"
 
 
-def valid(token: str | None, secret: str, now: float | None = None) -> bool:
+def role(token: str | None, secret: str, now: float | None = None) -> str | None:
+    """"owner", "guest" or None (not logged in)."""
     if not token or "." not in token:
-        return False
-    exp, sig = token.split(".", 1)
-    good = hmac.new(secret.encode(), exp.encode(), hashlib.sha256).hexdigest()
+        return None
+    body, sig = token.rsplit(".", 1)
+    good = hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(sig, good):
-        return False
+        return None
+    exp, _, mark = body.partition(".")
     try:
-        return int(exp) > (time.time() if now is None else now)
+        if int(exp) <= (time.time() if now is None else now):
+            return None
     except ValueError:
-        return False
+        return None
+    return "guest" if mark == "g" else "owner"
+
+
+def valid(token: str | None, secret: str, now: float | None = None) -> bool:
+    return role(token, secret, now) is not None
 
 
 def hash_password(pw: str, salt: bytes | None = None) -> str:
@@ -65,3 +74,7 @@ def needs_renewal(token: str | None, secret: str, now: float | None = None) -> b
         return False
     exp = int(token.split(".", 1)[0])
     return exp - now < (DAYS - 1) * 86400
+
+
+def guest_ok(given: str, guest_hash: str | None) -> bool:
+    return bool(guest_hash) and verify_hash(given, guest_hash)

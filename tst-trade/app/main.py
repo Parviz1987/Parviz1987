@@ -47,11 +47,17 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.middleware("http")
     async def guard(request: Request, call_next):
         path = request.url.path
+        who = auth.role(request.cookies.get(auth.COOKIE), s.session_secret)
         if not any(path == p or path.startswith(p) for p in PUBLIC):
-            if not auth.valid(request.cookies.get(auth.COOKIE), s.session_secret):
+            if who is None:
                 if path.startswith("/api/"):
                     return JSONResponse({"error": "giriş lazımdır"}, status_code=401)
                 return RedirectResponse("/login", status_code=303)
+            if who == "guest" and (path.startswith("/admin") or path.startswith("/api/admin")):
+                # A guest sees the panel only: no keys, no settings, no password page.
+                if path.startswith("/api/"):
+                    return JSONResponse({"error": "qonaq üçün bağlıdır"}, status_code=403)
+                return RedirectResponse("/", status_code=303)
         if request.method in ("POST", "DELETE") and path.startswith("/api/"):
             origin = request.headers.get("origin")
             if origin and origin.split("://", 1)[-1] != request.headers.get("host"):
@@ -60,8 +66,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         tok = request.cookies.get(auth.COOKIE)
         if auth.needs_renewal(tok, s.session_secret):
             # Every visit pushes the 30 days forward: the owner logs in once and stays in.
-            response.set_cookie(auth.COOKIE, auth.make_token(s.session_secret), max_age=auth.DAYS * 86400,
-                                httponly=True, secure=s.cookie_secure, samesite="lax")
+            response.set_cookie(auth.COOKIE, auth.make_token(s.session_secret, role=who or "owner"),
+                                max_age=auth.DAYS * 86400, httponly=True, secure=s.cookie_secure, samesite="lax")
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"
@@ -75,12 +81,17 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.post("/login")
     async def login(request: Request):
         form = await request.form()
-        if not auth.password_ok(str(form.get("password", "")), db_hash=db.get("auth:password_hash"),
-                                env_hash=s.app_password_hash, env_plain=s.app_password):
+        given = str(form.get("password", ""))
+        if auth.password_ok(given, db_hash=db.get("auth:password_hash"), env_hash=s.app_password_hash,
+                            env_plain=s.app_password):
+            who = "owner"
+        elif auth.guest_ok(given, db.get("auth:guest_hash")):
+            who = "guest"
+        else:
             return RedirectResponse("/login?e=1", status_code=303)
         r = RedirectResponse("/", status_code=303)
-        r.set_cookie(auth.COOKIE, auth.make_token(s.session_secret), max_age=auth.DAYS * 86400, httponly=True,
-                     secure=s.cookie_secure, samesite="lax")
+        r.set_cookie(auth.COOKIE, auth.make_token(s.session_secret, role=who), max_age=auth.DAYS * 86400,
+                     httponly=True, secure=s.cookie_secure, samesite="lax")
         return r
 
     @app.post("/logout")
@@ -199,7 +210,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 "brains": brains.view(db, store), "providers": list(PROVIDERS),
                 "brain_providers": list(registry.BRAIN_PROVIDERS),
                 "price_provider": engine.chosen_provider(), "active_provider": engine.provider_name,
-                "history": engine.history_state, "secret_fixed": s.secret_is_fixed}
+                "history": engine.history_state, "secret_fixed": s.secret_is_fixed,
+                "guest": db.get("auth:guest_hash") is not None}
 
     @app.post("/api/admin/keys/{slot}")
     async def save_key(slot: str, request: Request):
@@ -272,6 +284,22 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             raise HTTPException(404, "naməlum mənbə")
         await feeds.tick(force=name)
         return {k: feeds.health(k) for k in ("rss", "forexfactory", "fred")}
+
+    @app.post("/api/admin/guest")
+    async def set_guest(request: Request):
+        body = await request.json()
+        pw = str(body.get("password", ""))
+        if not pw:
+            db.delete("auth:guest_hash")
+            return {"guest": False}
+        if len(pw) < auth.MIN_LEN:
+            raise HTTPException(400, f"qonaq parolu ən azı {auth.MIN_LEN} simvol olmalıdır")
+        db.put("auth:guest_hash", auth.hash_password(pw))
+        return {"guest": True}
+
+    @app.get("/api/me")
+    async def me(request: Request):
+        return {"role": auth.role(request.cookies.get(auth.COOKIE), s.session_secret)}
 
     @app.post("/api/admin/history")
     async def history():

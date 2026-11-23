@@ -247,3 +247,22 @@ def test_session_renewal():
     assert not auth.needs_renewal(tok, SECRET, now=3600)
     assert auth.needs_renewal(tok, SECRET, now=2 * 86400)
     assert not auth.needs_renewal("bad", SECRET, now=10)
+
+
+def test_guest_sees_panel_not_admin(tmp_path):
+    c = TestClient(_app(tmp_path))
+    r = c.post("/login", data={"password": "pw"}, follow_redirects=False)
+    c.cookies.set(auth.COOKIE, r.cookies[auth.COOKIE])
+    assert c.post("/api/admin/guest", json={"password": "guestpass1"}).json()["guest"]
+    g = TestClient(c.app)
+    r = g.post("/login", data={"password": "guestpass1"}, follow_redirects=False)
+    g.cookies.set(auth.COOKIE, r.cookies[auth.COOKIE])
+    assert g.get("/api/state").status_code == 200
+    assert g.get("/api/me").json()["role"] == "guest"
+    assert g.get("/api/admin/overview").status_code == 403
+    assert g.get("/admin", follow_redirects=False).headers["location"] == "/"
+    assert g.post("/api/admin/keys/fred", json={"key": "x" * 10}).status_code == 403
+    # a guest token cannot be turned into an owner token
+    tok = r.cookies[auth.COOKIE]
+    exp, mark, sig = tok.split(".")
+    assert auth.role(f"{exp}.{sig}", SECRET) is None

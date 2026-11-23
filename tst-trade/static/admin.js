@@ -87,6 +87,7 @@ function brainSlot(b) {
 
 function render() {
   $("secretwarn").hidden = data.secret_fixed;
+  $("g-state").textContent = data.guest ? "Qonaq girişi açıqdır." : "Qonaq girişi bağlıdır.";
   $("provider").innerHTML = data.providers.map((p) =>
     `<button class="btn ${p === data.price_provider ? "pri" : ""}" data-prov="${p}">${PROV[p]}</button>`).join("");
   $("provnote").textContent = "İndi işləyən: " + (PROV[data.active_provider] || data.active_provider || "—") +
@@ -157,6 +158,14 @@ $("hist").onclick = async () => {
   load();
 };
 
+$("g-save").onclick = async () => {
+  try { await call("POST", "/api/admin/guest", { password: $("g-pw").value }); $("g-msg").textContent = "Qonaq parolu saxlanıldı."; $("g-pw").value = ""; load(); }
+  catch (e) { $("g-msg").textContent = "Xəta: " + e.message; }
+};
+$("g-off").onclick = async () => {
+  try { await call("POST", "/api/admin/guest", { password: "" }); $("g-msg").textContent = "Qonaq girişi bağlandı."; load(); }
+  catch (e) { $("g-msg").textContent = "Xəta: " + e.message; }
+};
 $("pw-save").onclick = async () => {
   try {
     await call("POST", "/api/admin/password", { old: $("pw-old").value, new: $("pw-new").value, again: $("pw-again").value });
