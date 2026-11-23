@@ -14,6 +14,8 @@ this moment says P = 0.5: the Judge then counts no hit or miss for it (only fore
             swing's direction; elsewhere no view.
 - session   (one hour) the same UTC hour's past up-share: metals are known to drift differently in Asian, London
             and New York hours. Shrunk toward 0.5 by its sample size.
+- consensus the plain average of every other method's lean (P - 0.5) among those that have a view right now; no
+            fitting to past results (so no hidden look-ahead). No view unless at least two methods agree in sum.
 - macro     (daily and longer) the last week's change of the real interest rate and the dollar: both falling is good
             for gold. Needs FRED data; without it no view.
 Every method gets the same range: an EWMA volatility (lambda 0.94) scaled to the horizon, normal quantiles."""
@@ -27,11 +29,11 @@ HORIZON_SPEC = {"1m": ("1m", 1), "1h": ("1h", 1), "1d": ("1d", 1), "3d": ("1d", 
 HORIZONS = {h: tf for h, (tf, _) in HORIZON_SPEC.items()}      # horizon -> candle size it is built from
 HORIZON_NAMES = {"1m": "1 dəqiqə", "1h": "1 saat", "1d": "1 gün", "3d": "3 gün", "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
-METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro", "session")
+METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "rsi", "fib", "macro", "session", "consensus")
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
                 "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)",
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "macro": "Makro (real faiz + dollar)",
-                "session": "Saat effekti"}
+                "session": "Saat effekti", "consensus": "Konsensus (hamısı birlikdə)"}
 BASELINES = ("rw", "up")
 LOOKBACK = {"1m": 15, "1h": 24, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
 TREND_WINDOWS = {"1m": (5, 15, 60), "1h": (6, 24, 120), "1d": (10, 50, 150), "1w": (4, 13, 26)}
@@ -247,6 +249,16 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
                             "basis": f"həftədə real faiz {macro['dfii10']:+.2f} pp, dollar {macro['dollar']:+.2f} %"}
         else:
             out["macro"] = {"p_up": 0.5, "basis": "FRED məlumatı yoxdur"}
+
+    views = {m: v["p_up"] - 0.5 for m, v in out.items() if m not in ("rw", "up") and v["p_up"] != 0.5}
+    if len(views) >= 2 and abs(sum(views.values()) / len(views)) >= 0.01:
+        lean = sum(views.values()) / len(views)
+        ups = sorted(m for m, d in views.items() if d > 0)
+        downs = sorted(m for m, d in views.items() if d < 0)
+        out["consensus"] = {"p_up": round(_clip(0.5 + lean), 4),
+                            "basis": f"{len(views)} üsulun ortası: yuxarı {len(ups)}, aşağı {len(downs)}"}
+    else:
+        out["consensus"] = {"p_up": 0.5, "basis": f"fikri olan üsul azdır və ya fikirlər bir-birini sıfırlayır ({len(views)})"}
 
     for v in out.values():
         v.update(rng)

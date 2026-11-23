@@ -141,3 +141,10 @@ def test_weekend_history_bars_are_not_daily_candles():
     fri = sat - 86400
     candles.store_history(db, "XAU", "1d", [(fri, 1, 1, 1, 1), (sat, 1, 1, 1, 1), (sat + 86400, 1, 1, 1, 1)])
     assert [c["t"] for c in candles.get(db, "XAU", "1d")] == [fri]
+
+
+def test_consensus_averages_views_only():
+    up = [{"o": 100 + i, "h": 100.5 + i, "l": 99.5 + i, "c": 100 + i} for i in range(200)]
+    m = forecast.build(up, "1d")["methods"]
+    leans = [v["p_up"] - 0.5 for k, v in m.items() if k not in ("rw", "up", "consensus") and v["p_up"] != 0.5]
+    assert abs(m["consensus"]["p_up"] - (0.5 + sum(leans) / len(leans))) < 1e-3
