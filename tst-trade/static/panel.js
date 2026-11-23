@@ -228,8 +228,17 @@ function aiTag(a) {
   const arrow = a.direction === "up" ? "<span class='up'>↑</span>" : a.direction === "down" ? "<span class='down'>↓</span>" : "→";
   return ` · <b>Oxuyucu:</b> ${esc(a.ai_metals || "—")} ${arrow} ${STR_AZ[a.strength] || ""}${a.event ? " (" + esc(a.event) + ")" : ""}`;
 }
+function renderReaderScore(rs) {
+  if (!rs || !rs.n) { $("rscore").innerHTML = "<p class='note'>Hələ yoxlanmış qiymətləndirmə yoxdur: Oxuyucu başlığa «yuxarı» və ya «aşağı» deyəndən 1 saat sonra yoxlanır.</p>"; return; }
+  $("rscore").innerHTML = `<table><tr><th>Güc</th><th>Yoxlama</th><th>Düz çıxıb</th><th>p (sikkəyə qarşı)</th></tr>` +
+    rs.rows.map((r) => `<tr><td>${STR_AZ[r.strength] || r.strength}</td><td class="n">${r.n}</td><td class="n">${pct(r.hit_rate)}</td>
+      <td class="n">${r.p == null ? "—" : r.p.toFixed(3)}</td></tr>`).join("") +
+    `<tr><td><b>Cəmi</b></td><td class="n">${rs.n}</td><td class="n"><b>${pct(rs.hit_rate)}</b></td><td></td></tr></table>
+    <p class="note">Eyni hadisə haqqında bir neçə başlıq bir-birindən asılıdır: bu ilk baxışdır, sübut deyil. Müqayisə üçün: bu saatlarda qiymət ${pct(rs.up_rate, 0)} hallarda qalxıb.</p>`;
+}
 async function loadBrains() {
   const d = await api("/api/brains");
+  renderReaderScore(d.reader_score);
   const x = d.strategist;
   if (!x) {
     $("strat").innerHTML = `<p class="note">${esc((d.strategist_state && d.strategist_state.message) || "Strateq hələ izah yazmayıb (saatda bir yazır).")}</p>`;

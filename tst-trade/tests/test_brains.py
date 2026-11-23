@@ -63,3 +63,23 @@ def test_no_key_never_raises():
     db, ks, jobs = setup()
     data, why = asyncio.run(brains.run(db, ks, "reader", "s", "u", {}))
     assert data is None and "açar yoxdur" in why
+
+
+def test_reader_score_checks_direction_one_hour_later():
+    from app import candles
+    from app.brainjobs import BrainJobs, reader_score
+    from app.db import DB
+    from app.feeds import Feeds
+    from app.keys import KeyStore
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    BrainJobs(db, ks, Feeds(db, ks))
+    t0 = 1_700_000_000 // 60 * 60
+    for i in range(0, 130):
+        candles.add_tick(db, "XAU", t0 + i * 60 + 1, 100 + i * 0.1)      # steady rise
+    db.execute("INSERT INTO news_ai VALUES('a', ?, 'cpi', 'XAU', 'up', 2, 'x')", (t0 + 120,))
+    db.execute("INSERT INTO news_ai VALUES('b', ?, 'cpi', 'XAU', 'down', 1, 'x')", (t0 + 180,))
+    db.execute("INSERT INTO news_ai VALUES('c', ?, 'cpi', 'XAU', 'neutral', 0, 'x')", (t0 + 180,))
+    rs = reader_score(db, t0 + 130 * 60 + 200)
+    assert rs["n"] == 2 and rs["hit_rate"] == 0.5
+    assert {r["strength"]: r["hit_rate"] for r in rs["rows"]} == {1: 0.0, 2: 1.0}

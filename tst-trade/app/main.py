@@ -247,10 +247,16 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 "cot": feeds.cot_view(),
                 "health": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot")}}
 
+    _rs_cache: list = [0.0, None]
+
     @app.get("/api/brains")
     async def brains_view():
+        from .brainjobs import reader_score
+        now = time.time()
+        if now - _rs_cache[0] > 300:           # many small lookups: recomputed at most every 5 minutes
+            _rs_cache[:] = [now, reader_score(db, now)]
         return {"strategist": jobs.last_explanation(), "reader": jobs.state("reader"),
-                "strategist_state": jobs.state("strategist")}
+                "strategist_state": jobs.state("strategist"), "reader_score": _rs_cache[1]}
 
     @app.get("/api/journal")
     async def journal(symbol: str, limit: int = 40):

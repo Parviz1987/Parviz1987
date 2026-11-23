@@ -153,3 +153,41 @@ class BrainJobs:
         if now >= self.next_strategist:
             self.next_strategist = now + STRATEGIST_EVERY
             await self.strategist(now)
+
+
+def reader_score(db: DB, now: float | None = None, horizon: int = 3600) -> dict:
+    """The Judge for the Reader brain: when it labels a headline "up" or "down" for a metal, did that metal move that
+    way over the next hour (from the labelling time, one-minute closes)? Neutral labels are not scored.
+    Headlines about one event are not independent, so this is a first look, not proof."""
+    import math
+    now = time.time() if now is None else now
+    rows = db.execute("SELECT a.ts, a.metals, a.direction, a.strength FROM news_ai a WHERE a.direction IN ('up', 'down') "
+                      "AND a.ts < ? AND a.ts > ?", (now - horizon - 120, now - 30 * 86400)).fetchall()
+
+    def px(sym: str, t: float) -> float | None:
+        r = db.execute("SELECT t, c FROM candles WHERE symbol=? AND tf='1m' AND t<=? ORDER BY t DESC LIMIT 1",
+                       (sym, int(t))).fetchone()
+        return r["c"] if r and t - r["t"] < 300 else None
+
+    by: dict[int, list[int]] = {}
+    ups = total = 0
+    for r in rows:
+        for sym in [m for m in (r["metals"] or "").split(",") if m in ("XAU", "XAG", "XPT", "XPD")]:
+            a, b = px(sym, r["ts"]), px(sym, r["ts"] + horizon)
+            if a is None or b is None or a == b:
+                continue
+            hit = int((b > a) == (r["direction"] == "up"))
+            by.setdefault(int(r["strength"] or 0), []).append(hit)
+            ups += int(b > a)
+            total += 1
+    out = []
+    for strength in sorted(by):
+        hs = by[strength]
+        n, k = len(hs), sum(hs)
+        z = (k - 0.5 - n * 0.5) / math.sqrt(n * 0.25) if n else 0
+        out.append({"strength": strength, "n": n, "hit_rate": k / n if n else None,
+                    "p": 1 - 0.5 * (1 + math.erf(z / math.sqrt(2))) if n else None})
+    alln = sum(len(v) for v in by.values())
+    allk = sum(sum(v) for v in by.values())
+    return {"horizon_s": horizon, "rows": out, "n": alln, "hit_rate": allk / alln if alln else None,
+            "up_rate": ups / total if total else None}
