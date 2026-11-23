@@ -56,7 +56,7 @@ def view(db: DB, keys: KeyStore) -> list[dict]:
             state = "açar yoxdur"
         elif ks["unreadable"]:
             state = "açarı yenidən daxil edin"
-        elif ks["check"] and not ks["check"]["ok"]:
+        elif ks["check"] and ks["check"]["ok"] is False:
             state = "xəta"
         elif ks["check"] and ks["check"]["ok"]:
             state = "hazırdır"

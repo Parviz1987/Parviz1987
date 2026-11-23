@@ -76,6 +76,24 @@ WantedBy=multi-user.target
 UNIT
 sudo -u $APP_USER mkdir -p $APP_DIR/data
 
+# Auto-update: every 5 minutes the server installs what is new on GitHub (deploy/update.sh, rollback if it fails).
+cat > /etc/systemd/system/tst-trade-update.service <<UNIT
+[Unit]
+Description=TST Trade auto-update from GitHub
+[Service]
+Type=oneshot
+ExecStart=/bin/bash $APP_DIR/deploy/update.sh
+UNIT
+cat > /etc/systemd/system/tst-trade-update.timer <<UNIT
+[Unit]
+Description=TST Trade auto-update every 5 minutes
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+[Install]
+WantedBy=timers.target
+UNIT
+
 SITE="${DOMAIN:-:80}"
 cat > /etc/caddy/Caddyfile <<CADDY
 $SITE {
@@ -86,6 +104,7 @@ CADDY
 
 systemctl daemon-reload
 systemctl enable --now tst-trade
+systemctl enable --now tst-trade-update.timer
 systemctl restart tst-trade
 systemctl reload caddy || systemctl restart caddy
 sleep 3

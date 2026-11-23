@@ -20,6 +20,7 @@ const when = (ts) => ts ? new Date(ts * 1000).toLocaleString("az") : "";
 function keyState(st) {
   if (st.unreadable) return `<span class="pill bad">yenidən daxil edin</span>`;
   if (!st.saved) return `<span class="pill next">açar yoxdur</span>`;
+  if (st.check && st.check.ok === null) return `<span class="pill warn">saxlanıb</span>`;
   if (st.check) return st.check.ok ? `<span class="pill ok">işləyir</span>` : `<span class="pill bad">xəta</span>`;
   return `<span class="pill warn">saxlanıb, yoxlanmayıb</span>`;
 }

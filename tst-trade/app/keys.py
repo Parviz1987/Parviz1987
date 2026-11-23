@@ -62,7 +62,7 @@ class KeyStore:
             "check": json.loads(check) if check else None,
         }
 
-    def record_check(self, slot: str, ok: bool, message: str) -> dict:
+    def record_check(self, slot: str, ok: bool | None, message: str) -> dict:
         res = {"ok": ok, "message": message[:300], "ts": time.time()}
         self.db.put(f"check:{slot}", json.dumps(res))
         return res
@@ -133,7 +133,8 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
             ok, msg = await _http_check("https://api.stlouisfed.org/fred/series",
                                         params={"series_id": "DFII10", "api_key": key, "file_type": "json"})
         else:
-            ok, msg = False, "bu açarın yoxlaması növbəti mərhələdə qoşulacaq (açar saxlanıb)"
+            # No check exists yet for this provider: the key is saved, nothing is known about it (not an error).
+            ok, msg = None, "açar saxlanıb; bu açarın yoxlaması növbəti mərhələdə qoşulacaq"
     except httpx.HTTPError as e:
         ok, msg = False, f"qoşulmaq alınmadı: {type(e).__name__}"
     return store.record_check(slot, ok, _scrub(msg, list(v.values())))
