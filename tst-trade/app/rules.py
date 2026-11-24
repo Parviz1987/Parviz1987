@@ -240,7 +240,7 @@ def run(db: DB, now: float | None = None) -> dict:
     from .candles import METALS
     ensure(db)
     now = time.time() if now is None else now
-    first = db.execute("SELECT 1 FROM rule_signals LIMIT 1").fetchone() is None
+    first_any = False
     added = 0
     for sym in METALS:
         data = {tf: _load(db, sym, tf, now) for tf in TFS}
@@ -250,6 +250,10 @@ def run(db: DB, now: float | None = None) -> dict:
             cs = ind.cs
             have = {r["t"] for r in db.execute("SELECT DISTINCT t FROM rule_signals WHERE metal=? AND tf=?",
                                                  (sym, tf)).fetchall()}
+            # each metal and timeframe replays its own history once (a replay cut by a restart resumes here)
+            first = db.execute("SELECT 1 FROM rule_signals WHERE metal=? AND tf=? AND mode='history' LIMIT 1",
+                               (sym, tf)).fetchone() is None
+            first_any = first_any or first
             start = 210 if first else max(210, len(cs) - 30)
             rows = []
             hi_ts = {h: [x["t"] for x in inds[h].cs] for h in ("4h", "1d") if h in inds}
@@ -281,7 +285,7 @@ def run(db: DB, now: float | None = None) -> dict:
                 if j + 1 < len(cs) and cs[j]["t"] == r["t"]:
                     db.execute("UPDATE rule_signals SET price1=? WHERE metal=? AND tf=? AND t=? AND price1 IS NULL",
                                (cs[j + 1]["c"], sym, tf, r["t"]))
-    return {"added": added, "replay": first}
+    return {"added": added, "replay": first_any}
 
 
 def records(db: DB) -> dict:

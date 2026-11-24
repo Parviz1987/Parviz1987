@@ -398,6 +398,8 @@ class BrainJobs:
         errors = await asyncio.to_thread(learning.day_errors, self.db, now)
         self.db.script(learning.LESSONS_SCHEMA)
         self.db.execute("UPDATE lessons SET active=0 WHERE ts < ?", (now - 7 * 86400,))
+        self.db.script(learning.PROPOSALS_SCHEMA)
+        await asyncio.to_thread(learning.judge_proposals, self.db, now)   # decided every night, quiet or not
         if len(errors) < 2:
             self.db.put("sleep:last", json.dumps({"ts": now, "errors": len(errors), "lessons": 0}))
             return 0
@@ -409,10 +411,8 @@ class BrainJobs:
         lessons = [guard_numbers(x, facts) for x in lessons]
         self.db.executemany("INSERT INTO lessons(ts, text) VALUES(?,?)", [(now, x) for x in lessons if x.strip()])
         # Block 29: each lesson is also a rule proposal — tested (A/B by day on the second analyst) before it counts
-        self.db.script(learning.PROPOSALS_SCHEMA)
         self.db.executemany("INSERT INTO rule_proposals(ts, text, status) VALUES(?,?,?)",
                             [(now, x, "sınaqda (A/B, 7 gün)") for x in lessons if x.strip()])
-        await asyncio.to_thread(learning.judge_proposals, self.db, now)
         self.db.put("sleep:last", json.dumps({"ts": now, "errors": len(errors), "lessons": len(lessons), "brain": how}))
         self._rep("strateq", "done", note=f"gecə yoxlaması: {len(errors)} səhv → {len(lessons)} dərs")
         return len(lessons)

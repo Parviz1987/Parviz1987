@@ -152,14 +152,15 @@ def lessons_today(db: DB, now: float | None = None) -> bool:
     return datetime.fromtimestamp(now, timezone.utc).toordinal() % 2 == 0
 
 
-def ab_report(db: DB, now: float | None = None) -> dict:
+def ab_report(db: DB, now: float | None = None, since: float | None = None, until: float | None = None) -> dict:
     """The second analyst's 1-hour hit rate on lesson days vs other days (honest scoring)."""
     from . import brainviews
     brainviews.ensure(db)
     now = time.time() if now is None else now
     out = {"with": [0, 0], "without": [0, 0]}
     for r in db.execute("SELECT known_ts, metal, p FROM brain_views WHERE source='brain2' AND horizon='1h' AND "
-                        "known_ts > ? AND ABS(p - 0.5) >= 0.02", (now - 60 * 86400,)).fetchall():
+                        "known_ts > ? AND known_ts < ? AND ABS(p - 0.5) >= 0.02",
+                        (since if since is not None else now - 60 * 86400, until if until is not None else now)).fetchall():
         end = r["known_ts"] + 3600
         if end > now:
             continue
@@ -180,7 +181,7 @@ PROPOSALS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS rule_proposals (id INTEGER PRIMARY KEY, ts REAL NOT NULL, text TEXT NOT NULL,
   status TEXT NOT NULL, decided_ts REAL, evidence TEXT);
 """
-MIN_AB = 60
+MIN_AB = 30          # per arm, within the proposal's own week
 
 
 def judge_proposals(db: DB, now: float | None = None) -> int:
@@ -189,10 +190,12 @@ def judge_proposals(db: DB, now: float | None = None) -> int:
     least 3 points on 60+ views each; otherwise rejected (and the reason is kept)."""
     db.script(PROPOSALS_SCHEMA)
     now = time.time() if now is None else now
-    ab = ab_report(db, now)
-    w, wo = ab["with"], ab["without"]
     n = 0
-    for r in db.execute("SELECT id FROM rule_proposals WHERE decided_ts IS NULL AND ts < ?", (now - 7 * 86400,)).fetchall():
+    for r in db.execute("SELECT id, ts FROM rule_proposals WHERE decided_ts IS NULL AND ts < ?",
+                        (now - 7 * 86400,)).fetchall():
+        # measured only on the week the proposal was in use (lessons are given for 7 days, on even days)
+        ab = ab_report(db, now, since=r["ts"], until=r["ts"] + 7 * 86400)
+        w, wo = ab["with"], ab["without"]
         if w["n"] >= MIN_AB and wo["n"] >= MIN_AB and w["hit_rate"] is not None and wo["hit_rate"] is not None:
             ok = w["hit_rate"] - wo["hit_rate"] >= 0.03
             status = "qəbul (A/B-də daha yaxşı)" if ok else "rədd (A/B-də fayda yoxdur)"

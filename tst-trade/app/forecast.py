@@ -615,7 +615,7 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
         days = {"1d": 1, "3d": 3, "1w": 5, "10d": 10, "1mo": 21}.get(horizon, 1)
         gr = gvz_range((related or {}).get("gvz"), price, days)
         out["gvz"] = ({"p_up": 0.5, "basis": f"yalnız aralıq: opsionların gözlədiyi dəyişkənlik {related['gvz']:.1f} %",
-                       **gr} if gr else {"p_up": 0.5, "basis": "GVZ məlumatı yoxdur"})
+                       **gr} if gr else {"p_up": 0.5, "basis": "GVZ yalnız qızılın opsion dəyişkənliyidir (və ya məlumat yoxdur)"})
     if "chartist" in mf:
         p, basis = (views or {}).get("chartist", (0.5, "Qrafik analitikinin yeni fikri yoxdur"))
         out["chartist"] = {"p_up": p, "basis": basis}

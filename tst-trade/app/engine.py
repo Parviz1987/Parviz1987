@@ -368,7 +368,7 @@ class Engine:
                 if gap != step and not (monday and gap == 3 * step):
                     continue
                 linked_now = {**self.related_closes(past, tf, now, sym=sym), "bond": bonds.at(issued_t),
-                              "gvz": gvz.at(issued_t) if tf in ("1d", "1w") else None}
+                              "gvz": gvz.at(issued_t) if tf in ("1d", "1w") and sym == "XAU" else None}
                 fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
                                     rel.window(issued_t, h), linked_now,
                                     {**bv.views(sym, issued_t, h), **sv.views(sym, issued_t, h),
@@ -541,7 +541,7 @@ class Engine:
                     window = rows[max(0, i - forecast.history_need(h)):i]
                     fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
                                         {**self.related_closes(window, tf, now, linked, sym), "bond": bonds.at(t),
-                                         "gvz": gvz.at(t) if tf in ("1d", "1w") else None},
+                                         "gvz": gvz.at(t) if tf in ("1d", "1w") and sym == "XAU" else None},
                                         {**bv.views(sym, t, h), **sv.views(sym, t, h)},
                                         ev.near(t))
                     if fc is None:
@@ -623,6 +623,20 @@ class Engine:
                 pairs = [(x["c"], m[x["t"]]) for x in past[-101:] if x["t"] in m]
                 out["pair"] = ([a for a, _ in pairs], [b for _, b in pairs])
         return out
+
+    _rules_busy = False
+
+    async def _rules_job(self) -> None:
+        from . import rules
+        self._rules_busy = True
+        try:
+            res = await asyncio.to_thread(rules.run, self.db)
+            self._rep("judge", "done", note=f"qaydalar: {res['added']} yeni siqnal"
+                                            + (" (tarixçə sınağı)" if res["replay"] else ""))
+        except Exception as e:
+            log.warning("rules: %s", e)
+        finally:
+            self._rules_busy = False
 
     def _rep(self, task: str, status: str, *a, **k) -> None:
         if self.activity is not None:
@@ -730,12 +744,9 @@ class Engine:
                 if time.time() - self._weights_ts > 600:
                     self._weights_ts = time.time()
                     await asyncio.to_thread(self.refresh_weights)
-                if time.time() - float(self.db.get("rules:ts") or 0) > 900:
+                if time.time() - float(self.db.get("rules:ts") or 0) > 900 and not self._rules_busy:
                     self.db.put("rules:ts", str(time.time()))
-                    from . import rules
-                    res = await asyncio.to_thread(rules.run, self.db)
-                    self._rep("judge", "done", note=f"qaydalar: {res['added']} yeni siqnal"
-                                                    + (" (tarixçə sınağı)" if res["replay"] else ""))
+                    asyncio.get_running_loop().create_task(self._rules_job())   # never blocks the price step
                 if time.time() - float(self.db.get("unified:ts") or 0) > UNIFIED_EVERY:
                     self.db.put("unified:ts", str(time.time()))
                     self._rep("judge", "working", note="vahid proqnoz: öz-özünü sınaq")

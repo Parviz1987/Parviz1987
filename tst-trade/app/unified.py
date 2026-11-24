@@ -26,7 +26,7 @@ from .db import DB
 SKIP = ("rw", "up", "terazi", "consensus", "vahid")
 LR, L2 = 0.08, 0.002
 SCALE = 4.0                   # x = (p - 0.5) * SCALE: a 0.6 view is +0.4 before the weight
-MAX_ROWS = 60000              # newest forecasts per desk (bounded memory and time)
+MAX_MOMENTS = 2500            # newest forecast moments per desk (bounded memory and time)
 
 
 def _sig(z: float) -> float:
@@ -40,12 +40,16 @@ def _sig(z: float) -> float:
 def _rows(db: DB, symbol: str, horizon: str) -> list:
     live0 = db.execute("SELECT MIN(issued_t) t FROM forecasts WHERE symbol=? AND horizon=? AND mode='live'",
                        (symbol, horizon)).fetchone()["t"]
+    cut = live0 if live0 is not None else 1e18
+    # the newest MOMENTS (not rows: a moment holds ~35 analysts' rows), so no moment is cut in half
+    t0 = db.execute("SELECT MIN(issued_t) t FROM (SELECT DISTINCT issued_t FROM forecasts WHERE symbol=? AND horizon=? "
+                    "AND price1 IS NOT NULL AND ((mode='history' AND issued_t < ?) OR mode='live') "
+                    "ORDER BY issued_t DESC LIMIT ?)", (symbol, horizon, cut, MAX_MOMENTS)).fetchone()["t"]
+    if t0 is None:
+        return []
     q = ("SELECT issued_t, target_t, method, p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? "
-         "AND price1 IS NOT NULL AND ((mode='history' AND issued_t < ?) OR mode='live') "
-         "ORDER BY issued_t DESC LIMIT ?")
-    rows = db.execute(q, (symbol, horizon, live0 if live0 is not None else 1e18, MAX_ROWS)).fetchall()
-    rows.reverse()
-    return rows
+         "AND issued_t >= ? AND price1 IS NOT NULL AND ((mode='history' AND issued_t < ?) OR mode='live')")
+    return db.execute(q, (symbol, horizon, t0, cut)).fetchall()
 
 
 def simulate(db: DB, symbol: str, horizon: str) -> dict:

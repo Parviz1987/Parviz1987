@@ -21,7 +21,7 @@ def test_walk_forward_learns_the_useful_analyst_without_look_ahead(tmp_path):
                    "lo80, hi80, basis, price1, scored_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     r = unified.simulate(db, "XAU", "1h")
     assert r["weights"]["good"] > 5 * abs(r["weights"].get("noise", 0))
-    assert r["hit_rate"] > 0.9 and r["n"] == 3000
+    assert r["hit_rate"] > 0.9 and r["n"] == unified.MAX_MOMENTS     # the newest whole moments
     v = unified.view(r, {"good": {"p_up": 0.62}, "noise": {"p_up": 0.38}})
     assert v["p_up"] > 0.55
     assert unified.view(None, {})["p_up"] == 0.5
