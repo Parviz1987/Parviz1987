@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from . import brainviews, candles, forecast, judge, markets, surprise
+from . import brainviews, candles, forecast, judge, markets, slowviews, surprise
 from .db import DB
 from .keys import KeyStore
 from .providers.base import NotServed, ProviderError, Quote
@@ -123,6 +123,7 @@ class Engine:
         self.errors: dict[str, str] = {}
         self.last_poll: float | None = None
         self.last_ok: float | None = None
+        self._weights_cache: dict = {}
         self.history_state: dict = json.loads(db.get("history_state") or "{}")
         self._macro_cache = None
         self.activity = None      # app.activity.Hub, set by the app: where this agent reports its status
@@ -285,6 +286,7 @@ class Engine:
         macro = self._macro(now)
         rel = self._releases(now)
         bv = brainviews.Lookup(self.db)
+        sv = slowviews.Lookup(self.db)
         ev = EventLookup(self.db)
         bonds = BondLookup(self.db)
         for h, tf in forecast.HORIZONS.items():
@@ -307,11 +309,30 @@ class Engine:
                 linked_now = {**self.related_closes(past, tf, now), "bond": bonds.at(issued_t)}
                 fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
                                     rel.window(issued_t, h), linked_now,
-                                    bv.views(sym, issued_t, h), ev.near(issued_t))
+                                    {**bv.views(sym, issued_t, h), **sv.views(sym, issued_t, h),
+                                     "_weights": self.weights(sym, h, now) if mode == "live" else None},
+                                    ev.near(issued_t))
                 if fc is None:
                     continue
                 n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
         return n
+
+    def weights(self, symbol: str, horizon: str, now: float) -> dict[str, float]:
+        """The scale (tərəzi): each analyst's weight on this desk from the Judge's live record once it is long enough
+        (MIN_N), otherwise from the history replay. Recomputed at most every 10 minutes."""
+        key = (symbol, horizon)
+        hit = self._weights_cache.get(key)
+        if hit and now - hit[0] < 600:
+            return hit[1]
+        live = judge.stats(self.db, symbol, horizon, "live", ttl=600)
+        hist = judge.stats(self.db, symbol, horizon, "history", ttl=600)
+        by = {r["method"]: r for r in hist}
+        for r in live:
+            if (r.get("nh") or 0) >= judge.MIN_N[horizon]:
+                by[r["method"]] = r                     # enough live forecasts: the live record decides
+        w = judge.weights(list(by.values()), forecast.steps_of(horizon))
+        self._weights_cache[key] = (now, w)
+        return w
 
     # ---------- history and backtest ----------
     def _history_names(self) -> list[str]:
@@ -403,6 +424,7 @@ class Engine:
         macro = MacroLookup(self.db)
         rel = surprise.Lookup(self.db)
         bv = brainviews.Lookup(self.db)
+        sv = slowviews.Lookup(self.db)
         ev = EventLookup(self.db)
         bonds = BondLookup(self.db)
         first = macro.first_day()
@@ -433,7 +455,7 @@ class Engine:
                     window = rows[max(0, i - forecast.history_need(h)):i]
                     fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
                                         {**self.related_closes(window, tf, now, linked), "bond": bonds.at(t)},
-                                        bv.views(sym, t, h),
+                                        {**bv.views(sym, t, h), **sv.views(sym, t, h)},
                                         ev.near(t))
                     if fc is None:
                         continue

@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import auth, brains, candles, forecast, judge, keys, registry
+from . import auth, brains, brainviews, candles, forecast, judge, keys, registry
 from . import diag
 from .brainjobs import BrainJobs
 from .feeds import Feeds
@@ -323,6 +323,34 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             pass
         finally:
             hub.subscribers.discard(q)
+
+    @app.get("/api/analysts")
+    async def analysts(symbol: str = "XAU"):
+        """Block 3, the scale: every analyst (method or brain) on each desk with its record and its weight, and the
+        brains' own report card (alarm versus hourly)."""
+        if symbol not in candles.METALS:
+            raise HTTPException(400, "naməlum metal")
+
+        def build():
+            now = time.time()
+            out = []
+            for h in forecast.HORIZONS:
+                live = {r["method"]: r for r in judge.stats(db, symbol, h, "live", ttl=600)}
+                hist = {r["method"]: r for r in judge.stats(db, symbol, h, "history", ttl=600)}
+                w = engine.weights(symbol, h, now)
+                rows = []
+                for m in forecast.methods_for(h):
+                    if m in forecast.BASELINES:
+                        continue
+                    lv, hv = live.get(m, {}), hist.get(m, {})
+                    rows.append({"method": m, "name": forecast.METHOD_NAMES.get(m, m),
+                                 "family": forecast.FAMILY_NAMES.get(forecast.FAMILY.get(m, ""), ""),
+                                 "live": {k: lv.get(k) for k in ("nh", "hit_rate", "bar", "status")},
+                                 "history": {k: hv.get(k) for k in ("nh", "hit_rate", "bar", "status")},
+                                 "weight": w.get(m, 0.0)})
+                out.append({"horizon": h, "name": forecast.HORIZON_NAMES[h], "rows": rows})
+            return {"symbol": symbol, "desks": out, "brains": brainviews.score(db, now)}
+        return await asyncio.to_thread(build)
 
     @app.get("/results")
     async def results_page():

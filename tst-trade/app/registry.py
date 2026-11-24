@@ -100,6 +100,13 @@ BRAIN_SLOTS: list[dict] = [
      "requirements": [("Maliyyə düşüncəsi", 50), ("Rəqəmlə dəqiqlik", 30), ("Qiymət", 20)],
      "provider": "anthropic", "model": "claude-opus-5-5", "fallback": "gemini", "fallback_model": "gemini-4-argon",
      "why": "Vals maliyyə testlərində 1-ci (67.85 % və 65.59 %); Gemini 4 praktik bərabərdir, ehtiyatdadır."},
+    {"id": "analyst2", "name": "İkinci analitik",
+     "job": "Strateqlə eyni faktları alır və ondan ayrı, öz ehtimalını verir (1 saat, 4 saat, 1 gün). Hakim hər birini "
+            "ayrıca ölçür; iki beyin razı olanda konsensusda görünür.",
+     "may_not": "Qiymət yazmaq; Strateqin cavabını görmək.",
+     "requirements": [("Başqa şirkətdən olmaq (müstəqil fikir)", 50), ("Qiymət", 30), ("Sərt cavab forması", 20)],
+     "provider": "openai", "model": "gpt-5.4-nano", "fallback": None, "fallback_model": None,
+     "why": "Strateq Claude-dur; müstəqil ikinci fikir üçün başqa şirkət. Ucuz model: saatda bir sorğu ayda ~1-3 $."},
     {"id": "reviewer", "name": "Nəzarətçi",
      "job": "Hər sövdələşmə təklifinə baxır: təsdiq, azalt və ya ləğv et, səbəbi ilə.",
      "may_not": "Sövdələşmə açmaq, ölçünü artırmaq, ayar dəyişmək.",

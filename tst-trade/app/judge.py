@@ -302,3 +302,20 @@ def conditional(where_result: dict, session: str | None, width: float | None) ->
             if c and c["status"] == "sübut" and (best is None or c["hit_rate"] > best["hit_rate"]):
                 best = {"method": m, "group": g, **c}
     return best
+
+
+def weights(rows: list[dict], k: int, skip: tuple = ("consensus", "terazi")) -> dict[str, float]:
+    """«Tərəzi»nin çəkiləri: for each analyst on one desk, how many standard errors its hit rate stands above the bar
+    (overlapping forecasts count as n / k tests). Only analysts at least one standard error above the bar weigh
+    anything; the weight is capped at 3 so one lucky streak cannot rule the scale."""
+    import math
+    out = {}
+    for r in rows:
+        m, hr, nh, bar = r["method"], r.get("hit_rate"), r.get("nh") or 0, r.get("bar") or 0.5
+        if m in BASELINES or m in skip or hr is None or nh < 30:
+            continue
+        n_eff = max(1.0, nh / max(1, k))
+        z = (hr - bar) / math.sqrt(bar * (1 - bar) / n_eff)
+        if z >= 1:
+            out[m] = round(min(z, 3.0), 2)
+    return out

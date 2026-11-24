@@ -68,3 +68,26 @@ def test_strategist_saves_its_forecast_and_gets_price_moves(monkeypatch):
     assert [(r["metal"], r["horizon"], r["p"]) for r in rows] == [("XAU", "1d", 0.5), ("XAU", "1h", 0.62),
                                                                     ("XAU", "4h", 0.55)]
     assert Lookup(db).views("XAU", now + 600, "1h")["strateq"][0] == 0.62
+
+
+def test_second_brain_answers_alone_and_is_stored_apart(monkeypatch):
+    import asyncio
+    from app import brains
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    ks.set("openai", {"key": "sk-test-1234"})
+    jobs = BrainJobs(db, ks, Feeds(db, ks))
+    slots = []
+
+    async def fake(db_, keys, slot, system, user, schema, max_tokens=2000, search=False):
+        slots.append(slot)
+        assert "Strateq" not in user                       # the second brain never sees the first one's answer
+        return {"summary": "s", "watch": [], "metals": [
+            {"symbol": "XAG", "text": "t", "p1h": 0.4 if slot == "analyst2" else 0.6, "p4h": 0.5, "p1d": 0.5,
+             "why": "x"}]}, "test · m"
+    monkeypatch.setattr(brains, "run", fake)
+    now = 1_800_000_000
+    assert asyncio.run(jobs.strategist(now))
+    assert slots == ["strategist", "analyst2"]
+    v = Lookup(db).views("XAG", now + 600, "1h")
+    assert v["strateq"][0] == 0.6 and v["brain2"][0] == 0.4

@@ -5,7 +5,9 @@
 - strateq   «Strateqin fikri»: the Strategist's own probability that the metal is higher in 1 hour, 4 hours and 1 day,
             from its latest hourly note written before the forecast (one row per metal and horizon). Older notes
             (before 2026-11-24) only had a lean up / down / neutral; they still count for 4 h and 1 day.
-Both use only what was written BEFORE the forecast's issue time (60 s margin)."""
+- brain2    «İkinci beyin»: the same question and facts to a brain of another company (OpenAI), on its own: if two
+            brains agree it shows in the consensus; each is judged alone.
+All use only what was written BEFORE the forecast's issue time (60 s margin)."""
 from __future__ import annotations
 
 import bisect
@@ -47,16 +49,16 @@ class Lookup:
                 ts.append(r["ts"])
                 vs.append(v)
         # (metal, horizon) -> times and probabilities; a lean-only note maps to 0.6 / 0.4 / 0.5 for 4 h and 1 day
-        self.strat: dict[tuple[str, str], tuple[list[float], list[float]]] = {}
-        for r in db.execute("SELECT ts, metal, lean, horizon, p FROM brain_views WHERE source='strateq' "
-                            "ORDER BY ts").fetchall():
+        self.strat: dict[tuple[str, str, str], tuple[list[float], list[float]]] = {}
+        for r in db.execute("SELECT ts, source, metal, lean, horizon, p FROM brain_views "
+                            "WHERE source IN ('strateq', 'brain2') ORDER BY ts").fetchall():
             if r["horizon"]:
                 targets = [(r["horizon"], r["p"])]
             else:
                 p = 0.5 + 0.1 * int(r["lean"])
                 targets = [("4h", p), ("1d", p)]
             for h, p in targets:
-                ts, vs = self.strat.setdefault((r["metal"], h), ([], []))
+                ts, vs = self.strat.setdefault((r["source"], r["metal"], h), ([], []))
                 ts.append(r["ts"])
                 vs.append(float(p if p is not None else 0.5))
 
@@ -78,13 +80,44 @@ class Lookup:
                     out["news"] = (0.5, f"son {w // 3600} saatda {n} xəbər: aydın əhval yoxdur ({score:+d})")
         age = STRATEQ_FOR.get(horizon)
         if age:
-            ts, vs = self.strat.get((metal, horizon), ([], []))
-            i = bisect.bisect_right(ts, t - 60) - 1
-            if i < 0 or t - ts[i] > age:
-                out["strateq"] = (0.5, "Strateqin yeni fikri yoxdur")
-            elif abs(vs[i] - 0.5) < 0.02:
-                out["strateq"] = (0.5, "Strateq bilmir deyir (50 %)")
-            else:
-                p = round(min(max(vs[i], P_CLIP[0]), P_CLIP[1]), 4)
-                out["strateq"] = (p, f"Strateq: yuxarı ehtimalı {round(vs[i] * 100)} %")
+            for src, who in (("strateq", "Strateq"), ("brain2", "İkinci beyin")):
+                ts, vs = self.strat.get((src, metal, horizon), ([], []))
+                i = bisect.bisect_right(ts, t - 60) - 1
+                if i < 0 or t - ts[i] > age:
+                    out[src] = (0.5, f"{who}: yeni fikir yoxdur")
+                elif abs(vs[i] - 0.5) < 0.02:
+                    out[src] = (0.5, f"{who} bilmir deyir (50 %)")
+                else:
+                    p = round(min(max(vs[i], P_CLIP[0]), P_CLIP[1]), 4)
+                    out[src] = (p, f"{who}: yuxarı ehtimalı {round(vs[i] * 100)} %")
         return out
+
+
+H_SEC = {"1h": 3600, "4h": 4 * 3600, "1d": 86400}
+
+
+def score(db: DB, now: float, days: int = 30) -> list[dict]:
+    """The brains' own report card: every probability a brain gave (not 50 %), checked against the price that
+    followed (one-minute closes: the last minute ended by the time). Split by brain, by alarm versus the hourly
+    run, and by horizon. Views given minutes apart about one event are not independent: a first look, not proof."""
+    ensure(db)
+    rows = db.execute("SELECT ts, source, metal, horizon, p, note FROM brain_views WHERE horizon IS NOT NULL "
+                      "AND p IS NOT NULL AND ABS(p - 0.5) >= 0.02 AND ts > ?", (now - days * 86400,)).fetchall()
+
+    def px(sym: str, t: float) -> float | None:
+        r = db.execute("SELECT c FROM candles WHERE symbol=? AND tf='1m' AND t<=? AND t>? ORDER BY t DESC LIMIT 1",
+                       (sym, t - 60, t - 1800)).fetchone()
+        return r["c"] if r else None
+    agg: dict[tuple, list[int]] = {}
+    for r in rows:
+        end = r["ts"] + H_SEC.get(r["horizon"], 0)
+        if end > now:
+            continue
+        a, b = px(r["metal"], r["ts"]), px(r["metal"], end)
+        if not a or not b or a == b:
+            continue
+        hit = int((b > a) == (r["p"] > 0.5))
+        key = (r["source"], "həyəcan" if (r["note"] or "").startswith("həyəcan") else "saatlıq", r["horizon"])
+        agg.setdefault(key, []).append(hit)
+    return [{"brain": k[0], "when": k[1], "horizon": k[2], "n": len(v), "hit_rate": sum(v) / len(v)}
+            for k, v in sorted(agg.items())]

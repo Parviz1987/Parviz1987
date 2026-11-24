@@ -65,6 +65,19 @@ STRATEGIST_SCHEMA = {
                                                              "p1d": {"type": "number"}, "why": {"type": "string"}}}},
         "watch": {"type": "array", "items": {"type": "string"}}}}
 
+ANALYST2_SYSTEM = (
+    "You are an independent precious-metals analyst. From the facts only (recent moves in %, linked markets, US "
+    "releases, labelled news, macro, and 'what_just_happened' if something just happened), give for each of XAU, XAG, "
+    "XPT, XPD the probability (0..1) that its price is HIGHER than now in 1 hour (p1h), 4 hours (p4h) and 1 day (p1d), "
+    "and one sentence why. 0.5 means no edge; move away from it only for a reason in the facts (usually 0.4-0.6). "
+    "Never invent numbers. Your answers are checked later against real prices.")
+ANALYST2_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["metals"],
+    "properties": {"metals": {"type": "array", "items": {
+        "type": "object", "additionalProperties": False, "required": ["symbol", "p1h", "p4h", "p1d", "why"],
+        "properties": {"symbol": {"type": "string"}, "p1h": {"type": "number"}, "p4h": {"type": "number"},
+                       "p1d": {"type": "number"}, "why": {"type": "string"}}}}}}
+
 NUM = re.compile(r"\d+(?:[.,]\d+)?")
 
 
@@ -213,6 +226,15 @@ class BrainJobs:
                "watch": [guard_numbers(str(w), facts) for w in data.get("watch", [])][:6]}
         self._rep("strateq", "working", "W4 Yaddaş", 0.9)
         self.db.put("strategist:last", json.dumps(out, ensure_ascii=False))
+        rows = self._prob_rows(now, "strateq", data, how, trigger)
+        brainviews.ensure(self.db)
+        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p) VALUES(?,?,?,?,?,?,?)",
+                            rows)
+        await self.second_brain(now, facts, trigger)
+        self._state("strategist", f"izah yazıldı · {how}")
+        return True
+
+    def _prob_rows(self, now: float, source: str, data: dict, how: str, trigger) -> list[tuple]:
         rows = []
         for m in data.get("metals", []):
             if m.get("symbol") not in ("XAU", "XAG", "XPT", "XPD"):
@@ -225,11 +247,22 @@ class BrainJobs:
                 if 0.0 <= p <= 1.0:
                     lean = 1 if p > 0.52 else -1 if p < 0.48 else 0
                     tag = "həyəcan · " if trigger else ""
-                    rows.append((now, "strateq", m["symbol"], lean, f"{tag}{how} · {str(m.get('why', ''))[:200]}", h, p))
-        brainviews.ensure(self.db)
+                    rows.append((now, source, m["symbol"], lean, f"{tag}{how} · {str(m.get('why', ''))[:200]}", h, p))
+        return rows
+
+    async def second_brain(self, now: float, facts: str, trigger) -> bool:
+        """The same facts to a brain of another company, which never sees the Strategist's answer."""
+        if not self.keys.first(brains.config(self.db, "analyst2")["provider"]):
+            return False
+        data, how = await brains.run(self.db, self.keys, "analyst2", ANALYST2_SYSTEM, "Facts (JSON):\n" + facts,
+                                     ANALYST2_SCHEMA, max_tokens=1500)
+        if data is None:
+            self._state("analyst2", "alınmadı: " + how)
+            return False
+        rows = self._prob_rows(now, "brain2", data, how, trigger)
         self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p) VALUES(?,?,?,?,?,?,?)",
                             rows)
-        self._state("strategist", f"izah yazıldı · {how}")
+        self._state("analyst2", f"{len(rows)} ehtimal yazıldı · {how}")
         return True
 
     def last_explanation(self) -> dict | None:

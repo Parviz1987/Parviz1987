@@ -23,7 +23,7 @@ async function api(path) {
 
 function metals() {
   $("metals").innerHTML = Object.entries(NAMES).map(([k, n]) => `<button data-s="${k}" class="${k === sym ? "on" : ""}">${n}</button>`).join("");
-  document.querySelectorAll("#metals button").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); metals(); load(); loadSim().catch(() => {}); });
+  document.querySelectorAll("#metals button").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); metals(); load(); loadSim().catch(() => {}); loadAnalysts().catch(() => {}); });
 }
 function save() { try { localStorage.setItem("tst_sym", sym); localStorage.setItem("tst_res_h", hz); } catch (e) {} }
 
@@ -144,10 +144,31 @@ async function loadSim() {
        Sübut gələndə burada yaşıl ✓ ilə görünəcək.</p>`;
 }
 
+let ahz = "1h", adata = null;
+const BRAIN_NAMES = { strateq: "Strateq (Claude)", brain2: "İkinci beyin (OpenAI)" };
+function renderAnalysts() {
+  const d = adata; if (!d) return;
+  $("ahz").innerHTML = d.desks.map((x) => `<button data-h="${x.horizon}" class="${x.horizon === ahz ? "on" : ""}">${esc(x.name)}</button>`).join("");
+  document.querySelectorAll("#ahz button").forEach((b) => b.onclick = () => { ahz = b.dataset.h; renderAnalysts(); });
+  const desk = d.desks.find((x) => x.horizon === ahz) || d.desks[0];
+  const cell = (r) => !r || !r.nh ? `<td class="c mut">·</td>` :
+    `<td class="c ${r.hit_rate > r.bar ? "" : "mut"}">${pc(r.hit_rate)} <span class="note">/ ${pc(r.bar)} · ${r.nh}</span></td>`;
+  const rows = desk.rows.slice().sort((a, b) => b.weight - a.weight);
+  $("analysts").innerHTML = `<table class="sc"><tr><th>Analitik</th><th>Ailə</th><th>Canlı: düz / hədd · say</th><th>Tarixçə: düz / hədd · say</th><th>Çəki</th></tr>` +
+    rows.map((r) => `<tr><td>${esc(r.name)}</td><td class="mut">${esc(r.family)}</td>${cell(r.live)}${cell(r.history)}
+      <td class="c">${r.weight > 0 ? "<b>" + r.weight.toFixed(1) + "</b>" : "<span class='mut'>0</span>"}</td></tr>`).join("") + "</table>";
+  $("brainscore").innerHTML = d.brains.length
+    ? `<table class="sc"><tr><th>Beyin</th><th>Nə vaxt</th><th>Üfüq</th><th>Düz</th><th>Say</th></tr>` +
+      d.brains.map((b) => `<tr><td>${esc(BRAIN_NAMES[b.brain] || b.brain)}</td><td>${esc(b.when)}</td><td>${esc(b.horizon)}</td>
+        <td class="c">${pc(b.hit_rate)}</td><td class="c mut">${b.n}</td></tr>`).join("") + "</table>"
+    : "<p class='note'>Hələ yoxlanmış beyin fikri yoxdur: ilk nəticələr fikir verildikdən 1 saat sonra gəlir.</p>";
+}
+async function loadAnalysts() { adata = await api(`/api/analysts?symbol=${sym}`); renderAnalysts(); }
+
 async function load() {
   const d = await api(`/api/results?symbol=${sym}&horizon=${hz}`);
   renderExpect(d); renderScore(d); renderHz(d); renderPast(d);
 }
 setInterval(() => { $("clock").textContent = "Nyu-York " + new Date().toLocaleTimeString("az", { ...NY, hour: "2-digit", minute: "2-digit" }); }, 1000);
-metals(); load(); loadSim().catch(() => {}); setInterval(() => load().catch(() => {}), 30000);
+metals(); load(); loadSim().catch(() => {}); loadAnalysts().catch(() => {}); setInterval(() => load().catch(() => {}), 30000);
 window.addEventListener("resize", () => load().catch(() => {}));

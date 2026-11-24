@@ -41,21 +41,25 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
                  "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
 METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "tsmom", "rsi", "fib", "pullback", "macro",
-           "session", "surprise", "dollar", "oil", "news", "strateq", "consensus")
+           "session", "surprise", "dollar", "oil", "news", "strateq", "brain2", "cot", "season", "jewel", "consensus",
+           "terazi")
 # Families: methods that carry the SAME idea (momentum and trend are both "the move continues"). The consensus gives
 # each family one voice, so one idea measured three ways cannot outvote two independent ideas.
 FAMILY = {"momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
           "reversal": "revert", "rsi": "revert", "fib": "revert", "pullback": "revert",
           "dollar": "cross", "oil": "cross", "macro": "fund", "surprise": "fund",
-          "news": "brain", "strateq": "brain", "session": "time"}
+          "news": "brain", "strateq": "brain", "brain2": "brain", "session": "time", "cot": "position",
+          "season": "calendar", "jewel": "calendar"}
 FAMILY_NAMES = {"trend": "trend", "revert": "geri dönüş", "cross": "bazarlar arası", "fund": "fundamental",
-                "brain": "beyinlər", "time": "vaxt"}
+                "brain": "beyinlər", "time": "vaxt", "position": "fond mövqeləri", "calendar": "təqvim"}
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
                 "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)", "tsmom": "12 aylıq trend + istiqraz",
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "pullback": "Trend içində geri çəkilmə", "macro": "Makro (real faiz + dollar)",
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
                 "dollar": "Dollar impulsu", "oil": "Neft impulsu",
-                "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri",
+                "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)",
+                "cot": "COT: fond mövqeləri", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
+                "terazi": "Tərəzi (Hakimin çəkisi ilə)",
                 "consensus": "Seçici konsensus (müstəqil ailələr)"}
 BASELINES = ("rw", "up")
 LOOKBACK = {"15m": 16, "30m": 16, "1h": 24, "4h": 18, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
@@ -94,6 +98,11 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("news")       # headlines move prices for hours, not weeks
     if h not in ("1h", "4h", "1d"):
         out.remove("strateq")
+        out.remove("brain2")
+    if h not in ("1w", "10d", "1mo"):
+        out.remove("cot")        # weekly positions, monthly seasons, festival seasons: weeks-to-months effects
+        out.remove("season")
+        out.remove("jewel")
     if h not in ("1w", "10d", "1mo"):
         out.remove("tsmom")      # the 12-month trend is a weeks-to-months effect    # the Strategist leans for the next hours to a day   # a release moves the next minutes to a day; longer horizons drown it
     return tuple(out)
@@ -280,6 +289,27 @@ def _clip(p: float) -> float:
     return min(max(p, P_CAP[0]), P_CAP[1])
 
 
+def weighted_view(out: dict, weights: dict | None) -> dict:
+    """«Tərəzi»: every analyst's lean weighted by what the Judge measured for it on this desk (weights from
+    judge.weights: 0 for an analyst not better than the bar). Live only: in the history replay the weights would
+    come from the future, so there it stays without a view."""
+    if not weights:
+        return {"p_up": 0.5, "basis": "çəkilər yoxdur: Hakim hələ heç bir analitiki həddən yaxşı görməyib"}
+    num = den = 0.0
+    used = []
+    for m, w in weights.items():
+        v = out.get(m)
+        if v and v["p_up"] != 0.5 and w > 0:
+            num += w * (v["p_up"] - 0.5)
+            den += w
+            used.append(m)
+    if not den:
+        return {"p_up": 0.5, "basis": f"çəkisi olan analitiklərin ({len(weights)}) indi fikri yoxdur"}
+    p = round(_clip(0.5 + num / den), 4)
+    return {"p_up": p if abs(p - 0.5) >= 0.01 else 0.5,
+            "basis": "çəki ilə: " + ", ".join(f"{METHOD_NAMES.get(m, m)} {weights[m]:.1f}" for m in used)}
+
+
 def selective_consensus(out: dict, rets: list[float], sigma: float, event_near: bool) -> dict:
     """Quality over quantity. Each family (one idea) gets one voice: the average lean of its members that have a view.
     A direction only when at least two independent families lean the same way and no family leans against them,
@@ -413,7 +443,7 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
                 p, basis = 0.5, "bu bazarın şamı yoxdur"
             out[key] = {"p_up": p, "basis": basis}
 
-    for key in ("news", "strateq"):          # the brains as forecasters (app/brainviews.py)
+    for key in ("news", "strateq", "brain2", "cot", "season", "jewel"):   # brainviews.py, slowviews.py
         if key in methods_for(horizon):
             p, basis = (views or {}).get(key, (0.5, "beyin məlumatı yoxdur"))
             out[key] = {"p_up": p, "basis": basis}
@@ -429,6 +459,7 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
             out["macro"] = {"p_up": 0.5, "basis": "FRED məlumatı yoxdur"}
 
     out["consensus"] = selective_consensus(out, rets, sigma, event_near)
+    out["terazi"] = weighted_view(out, (views or {}).get("_weights"))
 
     for v in out.values():
         v.update(rng)
@@ -484,6 +515,22 @@ PASSPORT = {
                         "davam edir. Trend və dönüşün ayrı-ayrılıqda ~50 % verdiyi yerdə birləşmə daha dəqiq ola bilər.",
                  "expect": "1 saat – 1 gün; nadir siqnal.",
                  "else": "Konsensusdan çıxarılır; dözüm və EMA uzunluğu yalnız yeni sınaqla dəyişdirilir."},
+    "brain2": {"why": "Eyni sual və faktlar başqa şirkətin beyninə (OpenAI) ayrıca verilir: iki müstəqil beyin razı olanda "
+                      "konsensusda görünür; hər biri ayrıca ölçülür.",
+               "expect": "1 saat – 1 gün, xüsusən həyəcan (güclü xəbər, rəqəm) anlarında.",
+               "else": "Sübut olmasa söndürülür (xərc azalır)."},
+    "cot": {"why": "Böyük fondlar həddən çox alanda (3 ilin 80 %-dən yuxarı) mövqe adətən açılır və qiymət geri çəkilir; "
+                   "həddən çox satanda əksinə. Dostun 31 agentli layihəsindən (#15) ideya.",
+            "expect": "1 həftə – 1 ay; nadir siqnal.", "else": "Çıxarılır; COT «Fundamental» bölməsində ölçü kimi qalır."},
+    "season": {"why": "Bəzi aylarda metal illər boyu eyni istiqamətdə gedib (məs. yanvar). Yalnız 5+ ilin 70 %-i razı olanda. "
+                      "Dostun layihəsindən (#22) ideya.",
+               "expect": "1 ay.", "else": "Çıxarılır."},
+    "jewel": {"why": "Divali (qızıl, gümüş) və Çin Yeni ili (qızıl) öncəsi 21 gün zərgərlik alışı artır. Dostun "
+                     "layihəsindən (#14) ideya; sahibin sahəsi.",
+              "expect": "1 həftə – 1 ay; ildə iki pəncərə.", "else": "Çıxarılır."},
+    "terazi": {"why": "Hər analitikin (üsul, beyin) fikri Hakimin ölçdüyü nəticəyə görə çəki alır: düz deyənin sözü ağır, "
+                      "həddən yaxşı olmayanınki sıfır. Yalnız canlı (keçmişdə çəki gələcəkdən gələrdi).",
+               "expect": "Tək üsullardan yüksək düz çıxma faizi.", "else": "Çəki qaydası yalnız Hakimin rəqəmi ilə dəyişir."},
     "consensus": {"why": "Az, amma keyfiyyətli proqnoz: yalnız müstəqil fikir ailələri razı olanda, hadisə ərəfəsi və "
                          "həddən artıq dalğalı bazar xaricində. Eyni fikrin iki dəfə sayılmasının qarşısını alır.",
                   "expect": "Az proqnoz, amma tək üsullardan yüksək düz çıxma faizi.",
