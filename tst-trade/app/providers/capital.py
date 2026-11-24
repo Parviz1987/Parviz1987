@@ -279,5 +279,32 @@ class CapitalHistory(HistoryProvider):
             cursor = rows[0][0]
         return rows[-limit:]
 
+    async def overnight_fee(self, symbol: str) -> float | None:
+        """The broker's own overnight financing for this market, as a fraction of the price per night (the average of
+        what a long and a short pay; a side that is paid, not charged, counts as 0). None if the broker does not say."""
+        if symbol not in self.epics:
+            return None
+        if self.tokens is None:
+            live = self.stream.tokens if self.stream is not None else None
+            self.tokens = live or await self.login_helper._session()
+        base = BASES[self.login_helper.env or "real"]
+        r = await self.client.get(f"{base}/markets/{self.epics[symbol]}", headers=self.tokens)
+        if r.status_code != 200:
+            return None
+        return parse_overnight(r.json())
+
     async def aclose(self) -> None:
         await self.client.aclose()
+
+
+def parse_overnight(data: object) -> float | None:
+    """instrument.overnightFee {longRate, shortRate} in % per day; negative = the trader pays."""
+    try:
+        fee = data["instrument"]["overnightFee"]
+        rates = [float(fee[k]) for k in ("longRate", "shortRate") if fee.get(k) is not None]
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not rates:
+        return None
+    paid = [max(0.0, -x) / 100 for x in rates]
+    return sum(paid) / len(paid)

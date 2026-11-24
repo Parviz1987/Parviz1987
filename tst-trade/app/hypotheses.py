@@ -82,6 +82,7 @@ def evaluate(db: DB, now: float | None = None) -> list[dict]:
         hits = sum((r["price1"] > r["price0"]) == (r["p_up"] > 0.5) for r in rows)
         ups = sum(r["price1"] > r["price0"] for r in rows) / n
         bar = max(0.5, ups, 1 - ups)
+        # registered 2026-11-24 with the spread as the cost: kept as registered (full_cost came later)
         net = sum(((r["price1"] / r["price0"] - 1) * (1 if r["p_up"] > 0.5 else -1)) - judge.COST.get(r["symbol"], 0)
                   for r in rows) / n
         metals = 1 if h.get("symbol") else 4

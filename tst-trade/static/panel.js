@@ -37,6 +37,9 @@ const pct = (x, d = 1) => x == null ? "—" : (x * 100).toFixed(d) + " %";
 const hhmm = (ts) => ts ? new Date(ts * 1000).toLocaleTimeString("az", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
 const when = (ts, tf) => !ts ? "—" : (tf === "1d" || tf === "1w")
   ? new Date(ts * 1000).toLocaleString("az", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : hhmm(ts);
+// Block 15: what the full cost is made of (spread, slippage, overnight financing for the nights held)
+const costTip = (c) => !c ? "" : `Tam xərc ${(c.total * 100).toFixed(3)} %: spred ${(c.spread * 100).toFixed(3)} % + sürüşmə ${(c.slip * 100).toFixed(3)} %` +
+  (c.swap ? ` + gecəlik haqq ${(c.swap * 100).toFixed(3)} %${c.swap_source === "təxmini" ? " (təxmini, broker hələ deməyib)" : " (brokerin öz rəqəmi)"}` : "");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 function renderTiles(st) {
@@ -186,14 +189,14 @@ function renderJudge(fc) {
   document.querySelectorAll("#jh button").forEach((b) => b.onclick = () => { jh = b.dataset.h; try { localStorage.setItem("tst_jh", jh); } catch (e) {} renderJudge(fc); });
   const card = fc.cards.find((c) => c.horizon === jh) || fc.cards[0];
   let html = `<table><tr><th>Üsul</th><th>Yoxlama</th><th>Düz çıxıb</th><th>Keçməli hədd</th><th>p</th>
-    <th>Orta qazanc / spread</th><th>Brier bal</th><th>50 % aralıq tutdu</th><th>80 % aralıq tutdu</th><th>Status</th></tr>`;
+    <th title="Tam xərc: spred + sürüşmə + gecəlik saxlama haqqı (swap)">Orta qazanc / tam xərc</th><th>Brier bal</th><th>50 % aralıq tutdu</th><th>80 % aralıq tutdu</th><th>Status</th></tr>`;
   for (const r of card[key]) {
     const cnt = r.method === "rw" || r.method === "up" ? r.n : r.nh;
     const st = r.status === "az" ? `az (${cnt}/${r.min_n})` : VERDICT_AZ[r.status];
     html += `<tr><td>${esc(fc.method_names[r.method])}</td><td class="n">${cnt}</td>
       <td class="n">${r.method === "rw" ? "—" : pct(r.hit_rate)}</td><td class="n">${r.method === "rw" ? "—" : pct(r.bar)}</td>
       <td class="n">${r.p == null || r.method === "rw" ? "—" : r.p.toFixed(3)}</td>
-      <td class="n ${r.edge > r.cost ? "up" : ""}">${r.edge == null || r.method === "rw" ? "—" : (r.edge * 100).toFixed(3) + " / " + (r.cost * 100).toFixed(3) + " %"}</td>
+      <td class="n ${r.edge > r.cost ? "up" : ""}" title="${costTip(r.cost_parts)}">${r.edge == null || r.method === "rw" ? "—" : (r.edge * 100).toFixed(3) + " / " + (r.cost * 100).toFixed(3) + " %"}</td>
       <td class="n">${r.bss == null ? "—" : (r.bss * 100).toFixed(1)}</td>
       <td class="n">${pct(r.cover50, 0)}</td><td class="n">${pct(r.cover80, 0)}</td>
       <td><span class="pill ${r.status}">${st}</span></td></tr>`;

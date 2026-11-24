@@ -109,12 +109,12 @@ def score(db: DB, now: float, days: int = 30) -> list[dict]:
     """The brains' own report card, measured honestly (Block 8):
     - from the moment the answer ARRIVED (known_ts), at the last price available then — never from a price before the
       brain had spoken (a move that had already happened is not a forecast);
-    - net of the bid/ask spread (judge.COST): «net» = average result in the brain's direction after cost;
+    - net of the full cost (judge.full_cost: spread, slippage, nights held): «net» = average result after cost;
     - against a free rival: «continue the move that already happened» (for an alarm: the move from the alarm to the
       answer; otherwise the last 15 minutes). A brain earns trust only by beating it.
     Views minutes apart about one event are not independent: a first look, not proof. Rows without known_ts (before
     the fix of 2026-11-24) are left out."""
-    from .judge import COST
+    from .judge import full_cost
     ensure(db)
     sig = {}
     try:
@@ -151,7 +151,7 @@ def score(db: DB, now: float, days: int = 30) -> list[dict]:
         g = agg.setdefault(k, {"n": 0, "hits": 0, "net": 0.0, "base_n": 0, "base_hits": 0})
         g["n"] += 1
         g["hits"] += int((ret > 0) == up)
-        g["net"] += (ret if up else -ret) - COST.get(r["metal"], 0.0)
+        g["net"] += (ret if up else -ret) - full_cost(r["metal"], r["horizon"])
         if before and before != a:
             g["base_n"] += 1
             g["base_hits"] += int((ret > 0) == (a > before))      # «the move goes on»

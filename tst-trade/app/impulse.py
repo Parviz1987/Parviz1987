@@ -7,7 +7,7 @@ days), with no look-ahead:
 - an impulse is a minute whose move is at least K times the usual (K = 4 and 6) and at least a floor;
 - we act one minute later: entry at the close of minute t+1 (the minute we need to see it), exit H minutes after
   (5, 15, 30); «continues» = the exit is further in the impulse's direction than the entry;
-- each result is net of the bid/ask spread (judge.COST); impulses within 30 minutes of the previous one are skipped
+- each result is net of the spread and slippage (judge.full_cost); impulses within 30 minutes of the previous one are skipped
   (one move, one test);
 - where raw updates exist, impulses are split by activity: the minute's updates vs their usual count (big players
   trading -> many updates).
@@ -33,7 +33,7 @@ def _p_two(hits: int, n: int) -> float | None:
 
 
 def study(db: DB, now: float | None = None) -> dict:
-    from .judge import COST
+    from .judge import full_cost
     now = time.time() if now is None else now
     out = {"computed": now, "metals": {}}
     for sym in ("XAU", "XAG", "XPT", "XPD"):
@@ -79,7 +79,7 @@ def study(db: DB, now: float | None = None) -> dict:
                     if j0 >= len(rows) or ts[j0] != ts[i] + 60 or j1 is None:
                         continue
                     move = cs[j1] / cs[j0] - 1
-                    net = (move if r > 0 else -move) - COST.get(sym, 0.0)
+                    net = (move if r > 0 else -move) - full_cost(sym)
                     cont = (move > 0) == (r > 0) and move != 0
                     for key in ((K, H, "hamısı"),) + (((K, H, busy),) if busy else ()):
                         res.setdefault(key, []).append((cont, net))

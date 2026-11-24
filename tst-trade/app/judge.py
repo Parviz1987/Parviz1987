@@ -21,6 +21,41 @@ from .forecast import BASELINES, HORIZON_SPEC, methods_for, steps_of, target_tim
 # silver 0.05 on 42, platinum 6 on 1318, palladium 5 on 904). A direction is worth something only if the average
 # move in the forecast's direction is larger than this.
 COST = {"XAU": 0.00014, "XAG": 0.0012, "XPT": 0.0046, "XPD": 0.0055}
+
+# Full cost (Block 15, owner 2026-11-24): the spread is not all a trade pays.
+# - slippage: a market order fills a little worse than the price we saw, most of all when the market moves fast.
+#   Assumed half a spread per round trip (no fill data yet: we place no orders). SLIP is that share.
+# - overnight financing (swap): a CFD held past the broker's daily cut-off pays a fee each night. Capital.com
+#   publishes it per market (instrument.overnightFee, % per day); engine stores what the broker says in SWAP. Until
+#   it has been read, SWAP_GUESS per day is used and the cost is marked «təxmini» (an estimate).
+#   A forecast issued every candle holds on average H / 24 h nights, so a 4-hour view pays 1/6 of a night, a week
+#   7 nights.
+SLIP = 0.5
+SWAP_GUESS = 0.0002
+SWAP: dict[str, float] = {}          # symbol -> fraction of the price paid per night (average of long and short)
+HOLD_DAYS = {"15m": 1 / 96, "30m": 1 / 48, "1h": 1 / 24, "4h": 1 / 6, "1d": 1.0, "3d": 4.2, "1w": 7.0, "10d": 14.0,
+             "1mo": 30.0}
+
+
+def set_swap(rates: dict[str, float]) -> None:
+    SWAP.clear()
+    SWAP.update({k: float(v) for k, v in rates.items() if v is not None and 0 <= float(v) < 0.01})
+
+
+def full_cost(symbol: str, horizon: str | None = None) -> float:
+    """What one forecast's trade really costs, as a fraction of the price: spread + slippage + the nights it holds."""
+    spread = COST.get(symbol, 0.0)
+    nights = HOLD_DAYS.get(horizon, 0.0) if horizon else 0.0
+    return spread * (1 + SLIP) + nights * SWAP.get(symbol, SWAP_GUESS)
+
+
+def cost_parts(symbol: str, horizon: str | None = None) -> dict:
+    spread = COST.get(symbol, 0.0)
+    nights = HOLD_DAYS.get(horizon, 0.0) if horizon else 0.0
+    sw = SWAP.get(symbol)
+    return {"spread": spread, "slip": spread * SLIP, "swap": nights * (sw if sw is not None else SWAP_GUESS),
+            "swap_source": "broker" if sw is not None else ("təxmini" if nights else None),
+            "total": full_cost(symbol, horizon)}
 MIN_N = {"15m": 300, "30m": 250, "1h": 200, "4h": 200, "1d": 250, "3d": 250, "1w": 100, "10d": 250, "1mo": 250}
 P_MAX = 0.05
 
@@ -140,7 +175,8 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
     # divided by the number of methods competing on this card.
     tested = [m for m in methods_for(horizon) if m not in BASELINES]
     p_bar = P_MAX / max(1, len(tested))
-    cost = COST.get(symbol, 0.0)
+    cost = full_cost(symbol, horizon)
+    parts = cost_parts(symbol, horizon)
     for m in methods_for(horizon):
         r = rows.get(m) or {"n": 0, "nh": 0, "hits": 0, "brier": None, "c50": None, "c80": None}
         n, nh, hits = r["n"] or 0, r["nh"] or 0, r["hits"] or 0
@@ -162,7 +198,8 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
             status = "yox"
         out.append({"method": m, "n": n, "hit_rate": hit_rate, "bar": bar, "p": p, "brier": r["brier"],
                     "bss": bss, "cover50": r["c50"], "cover80": r["c80"], "status": status, "nh": nh,
-                    "min_n": MIN_N[horizon], "p_bar": p_bar, "edge": r.get("edge"), "cost": cost})
+                    "min_n": MIN_N[horizon], "p_bar": p_bar, "edge": r.get("edge"), "cost": cost,
+                    "cost_parts": parts})
     return out
 
 
@@ -267,7 +304,7 @@ def where(db: DB, symbol: str, horizon: str, mode: str) -> dict:
     k = steps_of(horizon)
     cells = max(1, len([m for m in methods_for(horizon) if m not in BASELINES]) * len(groups))
     p_bar = P_MAX / cells
-    cost = COST.get(symbol, 0.0)
+    cost = full_cost(symbol, horizon)
     out = {}
     for m, d in acc.items():
         out[m] = {}

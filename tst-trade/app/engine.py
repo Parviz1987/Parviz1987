@@ -245,6 +245,10 @@ class Engine:
         self.db.execute("DELETE FROM candles WHERE tf='1d' AND strftime('%w', t, 'unixepoch') IN ('0', '6')")
         self.db.execute("DELETE FROM forecasts WHERE horizon IN ('1d', '3d', '10d', '1mo') "
                         "AND strftime('%w', issued_t, 'unixepoch') IN ('0', '6')")
+        try:
+            judge.set_swap(json.loads(self.db.get("swap_rates") or "{}").get("rates", {}))
+        except (ValueError, AttributeError):
+            pass
         sig = ",".join(forecast.METHODS)
         if self.db.get("methods_sig") != sig:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
@@ -391,6 +395,21 @@ class Engine:
                 out.append((TwelveDataHistory(self.keys.first("twelvedata")), False))
         return out
 
+    async def _read_swap(self, src) -> None:
+        """Block 15: the broker's overnight fees, read with each history load and kept for the Judge's full cost."""
+        rates = {}
+        for sym in candles.METALS:
+            try:
+                v = await src.overnight_fee(sym)
+            except Exception as e:      # a missing fee leaves the estimate in place; it never stops the history
+                log.info("overnight fee %s: %s", sym, e)
+                v = None
+            if v is not None:
+                rates[sym] = v
+        if rates:
+            self.db.put("swap_rates", json.dumps({"ts": time.time(), "rates": rates}))
+            judge.set_swap(rates)
+
     async def backfill(self, force: bool = False) -> dict:
         now = time.time()
         # A new source (a key just saved, a new version that reads another broker) loads at once, not in 6 hours;
@@ -438,6 +457,8 @@ class Engine:
             except Exception as e:   # one source failing (login refused...) must not stop the next one
                 log.warning("history %s: %s", src.name, e)
                 result.setdefault("*", {})[src.name] = f"xəta: {str(e)[:120]}"
+                if src.name == "capital":
+                    await self._read_swap(src)
             finally:
                 await src.aclose()
         self.history_state = {"ts": now, "result": result, "source": ", ".join(s.name for s, _ in sources)}

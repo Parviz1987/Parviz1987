@@ -9,7 +9,7 @@ Rules of one trade (the same for every method, fixed in advance, never tuned to 
   one time in ten: reaching it means the idea was wrong;
 - target: the near edge of the 50 % corridor in the trade's direction;
 - time stop: if neither is hit, the trade closes at the horizon's end (where the Judge also checks the forecast);
-- cost: one bid/ask spread per round trip (judge.COST); a gap through the stop fills at the worse open price;
+- cost: judge.full_cost (spread, slippage, overnight financing for the nights held); a gap through the stop fills at the worse open price;
 - inside one candle, if both stop and target were touched and the order is unknown, the stop counts (pessimistic).
 The path between entry and exit is read from finer candles where they exist (e.g. 15-minute candles for a 1-hour
 trade), otherwise from the horizon's own candles with the pessimistic rule.
@@ -104,7 +104,7 @@ def _summary(trades: list[dict], k: int) -> dict:
 def simulate(db: DB, symbol: str, horizon: str, mode: str = "history") -> dict:
     """Every method's shadow trades on one metal and horizon, with the proof status and the session/mood split."""
     tf, k = HORIZON_SPEC[horizon]
-    cost = judge.COST.get(symbol, 0.0)
+    cost = judge.full_cost(symbol, horizon)
     step = candles.TF[tf]
     rows = [dict(r) for r in db.execute(
         "SELECT method, issued_t, target_t, price0, price1, p_up, lo50, hi50, lo80, hi80 FROM forecasts "
