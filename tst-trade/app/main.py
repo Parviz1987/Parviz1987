@@ -389,6 +389,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 "focus_registered": hypotheses.FOCUS_REGISTERED, "focus_p_bar": hypotheses.FOCUS_P_BAR,
                 "focus": await asyncio.to_thread(diag._slow, "focus", lambda: hypotheses.evaluate_focus(db))}
 
+    @app.get("/api/futstudy")
+    async def futstudy_api():
+        """Block 21: the futures tests (impulse with real volume, after US releases, both years, futures vs Capital cost)."""
+        from . import futstudy
+        return {"study": futstudy.summary(db), "download": json.loads(db.get("futures:last") or "null")}
+
     @app.get("/api/cards")
     async def cards_api(symbol: str | None = None, limit: int = 20):
         """Block 16: the frozen forecast cards (newest first) and the right/wrong summary of the scored ones."""

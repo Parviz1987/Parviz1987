@@ -143,6 +143,17 @@ async def download(db: DB, key: str, limit_usd: float, report=None, now: float |
     res = {"ok": not errors, "ts": time.time(), "cost_usd": q["total_usd"], "loaded_now": got, "stored": total,
            "errors": errors[:12]}
     db.put("futures:last", json.dumps(res, ensure_ascii=False))
+    if not errors:          # Block 21: the tests run once the data is complete (CPU work: off the event loop)
+        import asyncio
+        from . import futstudy
+        if report:
+            report("history", "working", "W6 Sınaqlar", 0.95, "fyuçers sınaqları hesablanır")
+        try:
+            await asyncio.to_thread(futstudy.run_and_store, db)
+            res["study"] = "hesablandı"
+        except Exception as e:
+            res["study"] = f"xəta: {type(e).__name__}: {str(e)[:120]}"
+        db.put("futures:last", json.dumps(res, ensure_ascii=False))
     if report:
         report("history", "done" if not errors else "error",
                note="Databento fyuçers: " + ", ".join(f"{k} {v} şam" for k, v in total.items()) +

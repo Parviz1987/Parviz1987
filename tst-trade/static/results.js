@@ -189,10 +189,34 @@ async function loadHyp() {
   }
 }
 
+// Block 21: the futures tests
+async function loadFut() {
+  const d = await api("/api/futstudy");
+  const st = d.study;
+  if (!st) {
+    const dl = d.download;
+    $("fut").innerHTML = `<p class="note">${dl ? (dl.ok === false ? "Yükləmə: " + esc(dl.msg || (dl.errors || []).join("; ")) : "Məlumat yüklənir…")
+      : "Hələ məlumat yoxdur: Databento tarixçəsi yüklənəndən sonra sınaqlar özü hesablanır."}</p>`;
+    return;
+  }
+  $("futwhen").textContent = "hesablandı " + dt(st.computed) + " NY · hədd p < " + (st.p_bar || 0).toExponential(1);
+  const NM = { XAU: "Qızıl (GC)", XAG: "Gümüş (SI)", XPT: "Platin (PL)", XPD: "Palladium (PA)" };
+  const V = { "sübut": "✅ sübut", yox: "❌ yox", az: "⏳ az" };
+  $("fut").innerHTML = Object.entries(st.metals).map(([sym, m]) => {
+    const c = st.check[sym] || {};
+    return `<h3 class="sub">${NM[sym] || sym} · ${m.bars} dəqiqə (${esc(c.first || "")} – ${esc(c.last || "")}) · xərc: fyuçers ${(m.cost_futures * 100).toFixed(3)} %, Capital ${(m.cost_capital * 100).toFixed(3)} %</h3>
+      <table class="sc"><tr><th>Qrup</th><th>Sonra</th><th>Say</th><th>Davam etdi</th><th>Fyuçersdə</th><th>Capital-da</th><th>Hər iki il</th><th>Hökm</th></tr>` +
+      m.rows.map((x) => `<tr><td>${esc(x.group)}</td><td class="c">${x.H} dəq</td><td class="c mut">${x.n}</td>
+        <td class="c ${x.continues > 0.5 ? "" : "mut"}">${pc(x.continues)}</td><td class="c ${x.net_futures > 0 ? "up" : "down"}">${usd(x.net_futures)}</td>
+        <td class="c ${x.net_capital > 0 ? "up" : "down"}">${usd(x.net_capital)}</td><td class="c">${x.both_years ? "✓" : "—"}</td>
+        <td class="c">${V[x.verdict] || ""}</td></tr>`).join("") + "</table>";
+  }).join("");
+}
+
 async function load() {
   const d = await api(`/api/results?symbol=${sym}&horizon=${hz}`);
   renderExpect(d); renderScore(d); renderHz(d); renderPast(d);
 }
 setInterval(() => { $("clock").textContent = "Nyu-York " + new Date().toLocaleTimeString("az", { ...NY, hour: "2-digit", minute: "2-digit" }); }, 1000);
-metals(); load(); loadSim().catch(() => {}); loadAnalysts().catch(() => {}); loadHyp().catch(() => {}); setInterval(() => load().catch(() => {}), 30000);
+metals(); load(); loadSim().catch(() => {}); loadAnalysts().catch(() => {}); loadHyp().catch(() => {}); loadFut().catch(() => {}); setInterval(() => load().catch(() => {}), 30000);
 window.addEventListener("resize", () => load().catch(() => {}));

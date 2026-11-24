@@ -123,13 +123,14 @@ def _bid_ask(engine, sym: str):
 
 
 def _plan_v3(db) -> dict:
-    from . import cards, checker, judge, newsevents
+    from . import cards, checker, futstudy, judge, newsevents
     last = cards.recent(db, None, 4)
     return {"swap": json.loads(db.get("swap_rates") or "null"),
             "cost_1d": {s: judge.cost_parts(s, "1d") for s in candles.METALS},
             "cards": {"last": last, "summary": cards.summary(db)},
             "checker": checker.report(db), "news_events": newsevents.day_counts(db),
             "focus": hypotheses.evaluate_focus(db), "alfred": json.loads(db.get("alfred:last") or "null"),
+            "futstudy": futstudy.summary(db),
             "futures": {"quote": json.loads(db.get("futures:quote") or "null"),
                         "last": json.loads(db.get("futures:last") or "null"), "running": db.get("futures:running")}}
 
