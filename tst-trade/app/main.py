@@ -767,7 +767,14 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             appr = json.loads(db.get("futures:approved") or "null")
             last = json.loads(db.get("futures:last") or "null")
             key = store.first("databento")
-            if not appr or not key or (last and last.get("ok")):
+            if last and last.get("ok"):
+                # data complete: recompute the tests if they were made by an older version (e.g. before VWAP)
+                if '"vwap"' not in (db.get("futstudy:last") or ""):
+                    from . import futstudy
+                    await asyncio.sleep(90)
+                    await asyncio.to_thread(futstudy.run_and_store, db)
+                return
+            if not appr or not key:
                 return
             await asyncio.sleep(60)
             if fut_busy["on"]:

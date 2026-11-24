@@ -133,7 +133,8 @@ def study(db: DB) -> dict:
             if part == "cəmi":
                 cells += 1
         raw[sym] = rows
-        out["metals"][sym] = {"bars": n, "cost_futures": round(fut_cost, 6), "cost_capital": round(cap_cost, 6)}
+        out["metals"][sym] = {"bars": n, "cost_futures": round(fut_cost, 6), "cost_capital": round(cap_cost, 6),
+                              "vwap": _vwap_test(ts, cs, vs, mid, fut_cost)}
     out["check"] = check(db, loaded_ts)
     p_bar = 0.05 / max(1, cells)
     out["p_bar"] = p_bar
@@ -150,6 +151,48 @@ def study(db: DB) -> dict:
                             "sübut" if x["p"] is not None and x["p"] < p_bar and x["continues"] > 0.5
                             and x["net_futures"] > 0 and both else "yox")
         out["metals"][sym]["rows"] = rows
+    return out
+
+
+def _vwap_test(ts, cs, vs, mid: int, cost: float) -> dict:
+    """Block 24, volume: at every full hour, is the price above or below its volume-weighted average of the last 24
+    hours (VWAP)? Test both readings over the next 60 minutes: «continue» (above -> up) and «revert» (above -> down).
+    Real volume is needed: only the exchange's futures have it."""
+    n = len(ts)
+    pv, vv = [0.0] * (n + 1), [0.0] * (n + 1)
+    for i in range(n):
+        pv[i + 1] = pv[i] + cs[i] * vs[i]
+        vv[i + 1] = vv[i] + vs[i]
+    res = {"cəmi": [0, 0, 0.0], "1-ci il": [0, 0, 0.0], "2-ci il": [0, 0, 0.0]}
+    j0 = 0
+    for i in range(n):
+        if ts[i] % 3600:
+            continue
+        while ts[j0] < ts[i] - 86400:
+            j0 += 1
+        vol = vv[i + 1] - vv[j0]
+        if vol <= 0:
+            continue
+        vwap = (pv[i + 1] - pv[j0]) / vol
+        want = ts[i] + 3600
+        j1 = bisect_left(ts, want, i)
+        if j1 >= n or ts[j1] != want or cs[i] == vwap:
+            continue
+        move = cs[j1] / cs[i] - 1
+        side = 1 if cs[i] > vwap else -1
+        gain = move * side
+        for part in ("cəmi", "1-ci il" if ts[i] < mid else "2-ci il"):
+            r = res[part]
+            r[0] += 1
+            r[1] += int(gain > 0)
+            r[2] += gain
+    out = {}
+    for part, (m, hits, g) in res.items():
+        if not m:
+            continue
+        p = _p_two(hits, m)
+        out[part] = {"n": m, "continues": round(hits / m, 3), "p": None if p is None else round(p, 5),
+                     "net_continue": round(g / m - cost, 6), "net_revert": round(-g / m - cost, 6)}
     return out
 
 
@@ -171,6 +214,7 @@ def summary(db: DB) -> dict | None:
     for sym, m in res["metals"].items():
         rows = [x for x in m.get("rows", []) if x["part"] == "cəmi"]
         short["metals"][sym] = {"bars": m["bars"], "cost_futures": m["cost_futures"], "cost_capital": m["cost_capital"],
+                                "vwap": m.get("vwap"),
                                 "proven": [x for x in rows if x.get("verdict") == "sübut"],
                                 "rows": [x for x in rows if x["K"] == 4.0]}
     return short

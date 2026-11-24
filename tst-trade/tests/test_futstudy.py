@@ -28,3 +28,17 @@ def test_study_finds_continuing_heavy_impulses(tmp_path):
     assert cell["verdict"] == "sübut" and cell["both_years"]
     s = futstudy.summary(db)
     assert s["metals"]["XAU"]["proven"]
+
+
+def test_vwap_test_runs(tmp_path):
+    from app import futstudy
+    from app.db import DB
+    from app.futures import ensure
+    db = DB(str(tmp_path / "v.db"))
+    ensure(db)
+    rows = [("XAG", 1_700_002_800 + 60 * i, 25 + 0.001 * i, 25 + 0.001 * i, 25 + 0.001 * i, 25 + 0.001 * i, 10.0)
+            for i in range(20000)]
+    db.executemany("INSERT INTO fut_candles VALUES(?,?,?,?,?,?,?)", rows)
+    res = futstudy.study(db)
+    v = res["metals"]["XAG"]["vwap"]["cəmi"]
+    assert v["n"] > 300 and v["continues"] == 1.0          # a steady rise: above VWAP and still rising

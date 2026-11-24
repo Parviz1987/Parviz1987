@@ -209,7 +209,10 @@ async function loadFut() {
       m.rows.map((x) => `<tr><td>${esc(x.group)}</td><td class="c">${x.H} dəq</td><td class="c mut">${x.n}</td>
         <td class="c ${x.continues > 0.5 ? "" : "mut"}">${pc(x.continues)}</td><td class="c ${x.net_futures > 0 ? "up" : "down"}">${usd(x.net_futures)}</td>
         <td class="c ${x.net_capital > 0 ? "up" : "down"}">${usd(x.net_capital)}</td><td class="c">${x.both_years ? "✓" : "—"}</td>
-        <td class="c">${V[x.verdict] || ""}</td></tr>`).join("") + "</table>";
+        <td class="c">${V[x.verdict] || ""}</td></tr>`).join("") + "</table>" +
+      (m.vwap && m.vwap["cəmi"] ? `<p class="note"><b>Həcm (VWAP, 24 saat):</b> qiymət VWAP-dan yuxarı olanda növbəti 1 saatda davam etdi
+        ${pc(m.vwap["cəmi"].continues)} (${m.vwap["cəmi"].n} saat) · «davam» strategiyası ${usd(m.vwap["cəmi"].net_continue)},
+        «geri dönüş» ${usd(m.vwap["cəmi"].net_revert)} · illər: ${["1-ci il", "2-ci il"].map((y) => m.vwap[y] ? y + " " + pc(m.vwap[y].continues) : "").join(", ")}</p>` : "");
   }).join("");
 }
 
