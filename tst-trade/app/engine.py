@@ -124,7 +124,10 @@ class Engine:
         self.last_poll: float | None = None
         self.last_ok: float | None = None
         self._weights_cache: dict = {}
+        from .liquidity import Liquidity
+        self.liquidity = Liquidity()           # the liquidity agent: spread and activity per metal, from the stream
         self._weights_ts = 0.0
+        self.decisions: dict = {}
         self.history_state: dict = json.loads(db.get("history_state") or "{}")
         self._macro_cache = None
         self.activity = None      # app.activity.Hub, set by the app: where this agent reports its status
@@ -179,6 +182,7 @@ class Engine:
         self.db.execute("INSERT INTO ticks(symbol, ts, price, source, source_ts) VALUES(?,?,?,?,?)",
                         (q.symbol, now, q.price, "capital", q.source_ts))
         candles.add_tick(self.db, q.symbol, now, q.price)
+        self.liquidity.add(q.symbol, now, q.bid, q.ask)
         self.last_ok = now
 
     async def poll_once(self, now: float | None = None) -> None:
@@ -198,6 +202,7 @@ class Engine:
             self.db.execute("INSERT INTO ticks(symbol, ts, price, source, source_ts) VALUES(?,?,?,?,?)",
                             (q.symbol, now, q.price, self.provider_name, q.source_ts))
             candles.add_tick(self.db, q.symbol, now, q.price)
+            self.liquidity.add(q.symbol, now, q.bid, q.ask)
         if quotes:
             self.last_ok = now
 
@@ -551,13 +556,34 @@ class Engine:
         if scored:
             self._rep("judge", "done", note=f"{scored} proqnoz yoxlandı")
 
+    def refresh_decisions(self) -> None:
+        """Off the event loop (a thread), every minute: the liquidity view, the risk gate and the decision per metal."""
+        from . import risk
+        now = time.time()
+        out = {s: risk.decision(self.db, self, s, now) for s in candles.METALS}
+        self.decisions = out
+        thin = [s for s in out if (out[s]["gate"]["liquidity"] or {}).get("state") == "nazik"]
+        closed = [s for s in out if not out[s]["gate"]["open"]]
+        calls = [f"{s} {d['name']} {d['call']}" for s in out for d in out[s]["desks"] if d["call"] != "GÖZLƏ"]
+        self._rep("liquidity", "done", note=("nazik: " + ", ".join(thin)) if thin else "4 metalda normal")
+        self._rep("risk", "done", note=("bağlı: " + ", ".join(f"{s} ({out[s]['gate']['reasons'][0]})" for s in closed))
+                  if closed else "4 metalda açıq")
+        self._rep("decision", "done", note=", ".join(calls) if calls else "hamısı GÖZLƏ: sübut yoxdur")
+
     async def _jobs_loop(self) -> None:
         """The brains in their own loop: an alarm must not wait behind a history reload (minutes after an update)."""
+        last_dec = 0.0
         while not self._stop.is_set():
             try:
                 await self.jobs.tick()
             except Exception:
                 log.exception("brain jobs failed")
+            if time.time() - last_dec > 60:
+                last_dec = time.time()
+                try:
+                    await asyncio.to_thread(self.refresh_decisions)
+                except Exception:
+                    log.exception("decision failed")
             try:
                 await asyncio.wait_for(self._stop.wait(), JOBS_EVERY)
             except asyncio.TimeoutError:

@@ -79,6 +79,24 @@ ANALYST2_SCHEMA = {
         "properties": {"symbol": {"type": "string"}, "p1h": {"type": "number"}, "p4h": {"type": "number"},
                        "p1d": {"type": "number"}, "why": {"type": "string"}}}}}}
 
+# Müzakirə (debate, the TradingAgents idea): one brain argues the strongest honest case for UP, another for DOWN, from
+# the same facts; a third brain weighs both and gives the probabilities. Judged like every other analyst.
+BULL_SYSTEM = (
+    "You are the BULL analyst of a precious-metals desk. From the facts only, make the strongest honest case that each "
+    "of XAU, XAG, XPT, XPD will be HIGHER in the next hours to a day: 2-3 concrete reasons per metal, citing the facts. "
+    "If the facts give no good reason, say so plainly. Never invent numbers.")
+BEAR_SYSTEM = BULL_SYSTEM.replace("BULL", "BEAR").replace("HIGHER", "LOWER")
+CASE_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["metals"],
+    "properties": {"metals": {"type": "array", "items": {
+        "type": "object", "additionalProperties": False, "required": ["symbol", "case"],
+        "properties": {"symbol": {"type": "string"}, "case": {"type": "string"}}}}}}
+DEBATE_JUDGE_SYSTEM = (
+    "You judge a debate on precious metals. You get the facts, the BULL case and the BEAR case. For each of XAU, XAG, "
+    "XPT, XPD weigh which arguments the facts support better (an argument not backed by the facts counts for nothing) "
+    "and give the probability (0..1) that the price is HIGHER than now in 1 hour (p1h), 4 hours (p4h) and 1 day (p1d), "
+    "and one sentence why. 0.5 = the cases balance. Your answers are checked later against real prices.")
+
 NUM = re.compile(r"\d+(?:[.,]\d+)?")
 
 
@@ -212,7 +230,8 @@ class BrainJobs:
 
     async def strategist(self, now: float, trigger: list[dict] | None = None) -> bool:
         """The hourly analysis, or at once after an alarm (trigger: the signals that woke it)."""
-        self._rep("strateq", "working", "W1 Faktlar", 0.1, ("Həyəcan: " + trigger[0]["text"]) if trigger else "")
+        self._rep("strateq", "working", "W1 Faktlar", 0.1,
+                  (self._chain(trigger) + ": " + trigger[0]["text"]) if trigger else "saatlıq")
         facts = await asyncio.to_thread(self.facts, now, trigger)    # the Judge's numbers: heavy, off the loop
         self._rep("strateq", "working", "W2 Beyin", 0.35)
         data, how = await brains.run(self.db, self.keys, "strategist", STRATEGIST_SYSTEM,
@@ -232,6 +251,7 @@ class BrainJobs:
         self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p) VALUES(?,?,?,?,?,?,?)",
                             rows)
         await self.second_brain(now, facts, trigger)
+        await self.debate(now, facts, trigger)
         self._state("strategist", f"izah yazıldı · {how}")
         return True
 
@@ -247,9 +267,43 @@ class BrainJobs:
                     continue
                 if 0.0 <= p <= 1.0:
                     lean = 1 if p > 0.52 else -1 if p < 0.48 else 0
-                    tag = "həyəcan · " if trigger else ""
+                    tag = (self._chain(trigger) + " · ") if trigger else ""
                     rows.append((now, source, m["symbol"], lean, f"{tag}{how} · {str(m.get('why', ''))[:200]}", h, p))
         return rows
+
+    async def debate(self, now: float, facts: str, trigger) -> bool:
+        """Bull and bear argue (the second analyst's brain, cheap), the reviewer brain judges (another company)."""
+        if not (self.keys.first(brains.config(self.db, "analyst2")["provider"])
+                and self.keys.first(brains.config(self.db, "reviewer")["provider"])):
+            return False
+        self._rep("debate", "working", "W1 Yuxarı tərəfdarı", 0.2, self._chain(trigger))
+        bull, _ = await brains.run(self.db, self.keys, "analyst2", BULL_SYSTEM, "Facts (JSON):\n" + facts,
+                                   CASE_SCHEMA, max_tokens=1500)
+        self._rep("debate", "working", "W2 Aşağı tərəfdarı", 0.5, self._chain(trigger))
+        bear, _ = await brains.run(self.db, self.keys, "analyst2", BEAR_SYSTEM, "Facts (JSON):\n" + facts,
+                                   CASE_SCHEMA, max_tokens=1500)
+        if bull is None or bear is None:
+            self._rep("debate", "error", note="tərəfdarlardan biri cavab vermədi")
+            return False
+        self._rep("debate", "working", "W3 Hakim beyin", 0.8, self._chain(trigger))
+        user = ("Facts (JSON):\n" + facts + "\n\nBULL case:\n" + json.dumps(bull, ensure_ascii=False) +
+                "\n\nBEAR case:\n" + json.dumps(bear, ensure_ascii=False))
+        data, how = await brains.run(self.db, self.keys, "reviewer", DEBATE_JUDGE_SYSTEM, user, ANALYST2_SCHEMA,
+                                     max_tokens=1500)
+        if data is None:
+            self._rep("debate", "error", note="hakim beyin cavab vermədi: " + how)
+            return False
+        rows = self._prob_rows(now, "debate", data, how, trigger)
+        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p) VALUES(?,?,?,?,?,?,?)",
+                            rows)
+        self.db.put("debate:last", json.dumps({"ts": now, "bull": bull, "bear": bear, "judge": data, "brain": how},
+                                              ensure_ascii=False))
+        self._rep("debate", "done", note=f"{len(rows)} ehtimal · {how}")
+        return True
+
+    @staticmethod
+    def _chain(trigger) -> str:
+        return ("həyəcan #" + ",".join(str(a["id"]) for a in trigger)) if trigger else "saatlıq"
 
     async def second_brain(self, now: float, facts: str, trigger) -> bool:
         """The same facts to a brain of another company, which never sees the Strategist's answer."""
@@ -348,6 +402,8 @@ class BrainJobs:
         if alarm and all(a["kind"] == "move" for a in alarm) and count.get("move", 0) >= signals.MOVE_ALARMS_PER_DAY:
             signals.mark(self.db, [a["id"] for a in alarm], now)    # moves alone: today's share is used up
             alarm = []
+        if alarm:
+            self._rep("signals", "working", note=f"{len(alarm)} siqnal: " + alarm[0]["text"][:100])
         if alarm and now - float(self.db.get("alarm:last") or 0) >= ALARM_GAP and count["n"] < ALARMS_PER_DAY:
             self.db.put("alarm:last", str(now))
             count["n"] += 1
@@ -364,6 +420,7 @@ class BrainJobs:
             ok = await self.strategist(now, alarm)
             self.next_strategist = now + STRATEGIST_EVERY      # the hourly one restarts from here
             self._rep("strateq", "done" if ok else "error", note="həyəcan təhlili: " + alarm[0]["text"][:100])
+            self._rep("signals", "done", note=self._chain(alarm) + " işləndi")
         elif now >= self.next_strategist:
             self.next_strategist = now + STRATEGIST_EVERY
             ok = await self.strategist(now)

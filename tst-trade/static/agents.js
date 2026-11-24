@@ -6,10 +6,10 @@ const COLOR = { waiting: "#6b7a99", working: "#38c8ff", done: "#3ee08f", error: 
 const FRESH = 12;                       // seconds a just-finished task keeps its green dot
 // where each card sits on the stage (percent of width, height); the orchestrator is the centre
 const POS = {
-  orch: [50, 50], history: [50, 11], scout: [74, 12],
-  prices: [25, 25], forecast: [10, 50], judge: [16, 78],
-  news: [77, 30], reader: [91, 54], strateq: [84, 80],
-  macro: [32, 89], calendar: [54, 89], hunter: [70, 93],
+  orch: [50, 50], history: [50, 8], macro: [32, 8], scout: [68, 8],
+  prices: [19, 22], liquidity: [8, 41], risk: [8, 62], forecast: [24, 44], judge: [24, 70], decision: [36, 91],
+  news: [81, 22], reader: [92, 41], signals: [75, 47], strateq: [92, 62], debate: [75, 71],
+  calendar: [58, 91], hunter: [79, 92],
 };
 let NODES = [], live = {}, shown = {}, skew = 0, events = [], mode = "live";
 let winH = 1, speed = 10, playT = null, lastPulse = 0;

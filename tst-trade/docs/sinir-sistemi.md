@@ -52,6 +52,8 @@ Hakim yoxlayır. Həyəcan fikirləri ayrıca da hesablanır ki, «hadisədən s
 | 2 | Gözlər tam: «sakit» bazar ilə «gəlməyən» bazar ayrıldı; tarixçə brokerdə səhifə-səhifə 4000 şama | Sistem səhifəsində əlaqəli bazarlar yaşıl; 15 dəq tarixçə ~40 gün | ✅ kod (eac4272) |
 | 3 | Tərəzi: hər analitikin çəkisi Hakimin ölçüsü ilə; Nəticələr 5-ci bölmə; beyinlərin öz hesabı (həyəcan / saatlıq) | Nəticələr səhifəsində analitik cədvəli | ✅ (1c4e1e8) |
 | 4 | Yeni üsullar: COT, mövsümilik, zərgərlik təqvimi; İkinci beyin (OpenAI) | hər biri Hakimdə | ✅ (1c4e1e8) |
+| 6 | Agentlər genişlənir (Radar Gold arayışı əsasında): **Müzakirə** (yuxarı tərəfdarı ↔ aşağı tərəfdarı → hakim beyin ehtimal verir), **Likvidlik** (spred və tik sıxlığı), **Risk qapısı** (köhnə qiymət, hadisə ərəfəsi, nazik likvidlik, vəhşi bazar → istiqamət göstərilmir), **Qərar** (Hakimin sübutu + tərəzi + risk qapısı → «al / sat / gözlə» yalnız göstərici), **Hadisə zənciri** (siqnal → beyin → proqnoz bir id ilə) | hər yeni agent Agentlər panelində və Hakimdə (müzakirə tərəzidə ölçülür) | ✅ kod; serverdə yoxlanılır |
+| 7 | Görünüş: bütün səhifələr PDF-dəki tünd «HUD» üslubunda (oxunaqlı mətn, məhdud neon, rəng + söz); Agentlər səhifəsi: solda bazar, mərkəzdə şəbəkə, sağda qərar/risk/hadisə jurnalı, aşağıda zaman xətti; «Animasiyanı dayandır», «Görünüşü sıfırla» düymələri | 1366×768 bir ekrana sığır, telefonda bölmələr | növbədə |
 | 5 | Ölçmə: həftəlik hesabat (bazar ertəsi, bu söhbətdə), 3 saatlıq növbətçi yoxlama | hər həftə: «harada işləyir» siyahısı | ✅ quruldu; nəticə 2-4 həftəyə |
 
 ### Hər analitikin yeri (kim nəyi kimə ötürür)

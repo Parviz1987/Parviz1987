@@ -51,7 +51,7 @@ class Lookup:
         # (metal, horizon) -> times and probabilities; a lean-only note maps to 0.6 / 0.4 / 0.5 for 4 h and 1 day
         self.strat: dict[tuple[str, str, str], tuple[list[float], list[float]]] = {}
         for r in db.execute("SELECT ts, source, metal, lean, horizon, p FROM brain_views "
-                            "WHERE source IN ('strateq', 'brain2') ORDER BY ts").fetchall():
+                            "WHERE source IN ('strateq', 'brain2', 'debate') ORDER BY ts").fetchall():
             if r["horizon"]:
                 targets = [(r["horizon"], r["p"])]
             else:
@@ -80,7 +80,7 @@ class Lookup:
                     out["news"] = (0.5, f"son {w // 3600} saatda {n} xəbər: aydın əhval yoxdur ({score:+d})")
         age = STRATEQ_FOR.get(horizon)
         if age:
-            for src, who in (("strateq", "Strateq"), ("brain2", "İkinci beyin")):
+            for src, who in (("strateq", "Strateq"), ("brain2", "İkinci beyin"), ("debate", "Müzakirə")):
                 ts, vs = self.strat.get((src, metal, horizon), ([], []))
                 i = bisect.bisect_right(ts, t - 60) - 1
                 if i < 0 or t - ts[i] > age:

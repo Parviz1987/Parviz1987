@@ -41,14 +41,14 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
                  "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
 METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "tsmom", "rsi", "fib", "pullback", "macro",
-           "session", "surprise", "dollar", "oil", "news", "strateq", "brain2", "cot", "season", "jewel", "consensus",
+           "session", "surprise", "dollar", "oil", "news", "strateq", "brain2", "debate", "cot", "season", "jewel", "consensus",
            "terazi")
 # Families: methods that carry the SAME idea (momentum and trend are both "the move continues"). The consensus gives
 # each family one voice, so one idea measured three ways cannot outvote two independent ideas.
 FAMILY = {"momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
           "reversal": "revert", "rsi": "revert", "fib": "revert", "pullback": "revert",
           "dollar": "cross", "oil": "cross", "macro": "fund", "surprise": "fund",
-          "news": "brain", "strateq": "brain", "brain2": "brain", "session": "time", "cot": "position",
+          "news": "brain", "strateq": "brain", "brain2": "brain", "debate": "brain", "session": "time", "cot": "position",
           "season": "calendar", "jewel": "calendar"}
 FAMILY_NAMES = {"trend": "trend", "revert": "geri dönüş", "cross": "bazarlar arası", "fund": "fundamental",
                 "brain": "beyinlər", "time": "vaxt", "position": "fond mövqeləri", "calendar": "təqvim"}
@@ -57,7 +57,7 @@ METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", 
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "pullback": "Trend içində geri çəkilmə", "macro": "Makro (real faiz + dollar)",
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
                 "dollar": "Dollar impulsu", "oil": "Neft impulsu",
-                "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)",
+                "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)", "debate": "Müzakirə (yuxarı ↔ aşağı)",
                 "cot": "COT: fond mövqeləri", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
                 "terazi": "Tərəzi (Hakimin çəkisi ilə)",
                 "consensus": "Seçici konsensus (müstəqil ailələr)"}
@@ -99,6 +99,7 @@ def methods_for(h: str) -> tuple[str, ...]:
     if h not in ("1h", "4h", "1d"):
         out.remove("strateq")
         out.remove("brain2")
+        out.remove("debate")
     if h not in ("1w", "10d", "1mo"):
         out.remove("cot")        # weekly positions, monthly seasons, festival seasons: weeks-to-months effects
         out.remove("season")
@@ -443,7 +444,7 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
                 p, basis = 0.5, "bu bazarın şamı yoxdur"
             out[key] = {"p_up": p, "basis": basis}
 
-    for key in ("news", "strateq", "brain2", "cot", "season", "jewel"):   # brainviews.py, slowviews.py
+    for key in ("news", "strateq", "brain2", "debate", "cot", "season", "jewel"):   # brainviews.py, slowviews.py
         if key in methods_for(horizon):
             p, basis = (views or {}).get(key, (0.5, "beyin məlumatı yoxdur"))
             out[key] = {"p_up": p, "basis": basis}
@@ -519,6 +520,10 @@ PASSPORT = {
                       "konsensusda görünür; hər biri ayrıca ölçülür.",
                "expect": "1 saat – 1 gün, xüsusən həyəcan (güclü xəbər, rəqəm) anlarında.",
                "else": "Sübut olmasa söndürülür (xərc azalır)."},
+    "debate": {"why": "Bir beyin yuxarı, digəri aşağı üçün ən güclü dəlili gətirir; üçüncü beyin (başqa şirkət) dəlilləri "
+                      "faktlarla tutuşdurub ehtimal verir (TradingAgents ideyası, Radar Gold arayışı).",
+               "expect": "1 saat – 1 gün; xüsusən həyəcan anlarında tək beyindən yaxşı.",
+               "else": "Tək beyinlərdən yaxşı deyilsə söndürülür (3 sorğu: xərc azalır)."},
     "cot": {"why": "Böyük fondlar həddən çox alanda (3 ilin 80 %-dən yuxarı) mövqe adətən açılır və qiymət geri çəkilir; "
                    "həddən çox satanda əksinə. Dostun 31 agentli layihəsindən (#15) ideya.",
             "expect": "1 həftə – 1 ay; nadir siqnal.", "else": "Çıxarılır; COT «Fundamental» bölməsində ölçü kimi qalır."},

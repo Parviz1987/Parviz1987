@@ -41,8 +41,18 @@ NODES = {
     "scout":    (9,  "Kəşfiyyatçı",        "orch",     [],                                   "Beyin (Grok): X-də son xəbərləri axtarır"),
     "hunter":   (10, "Rəqəm ovçusu",       "calendar", ["W1 Rəqəm çıxdı", "W2 İki beyin axtarır", "W3 Müqayisə"],
                  "İki beyin ABŞ rəqəminin faktını vebdə ayrı-ayrı tapır"),
-    "strateq":  (11, "Strateq",            "reader",   ["W1 Faktlar", "W2 Beyin", "W3 Rəqəm yoxlaması", "W4 Yaddaş"],
-                 "Beyin (Claude): saatlıq izah və meyl"),
+    "signals":  (12, "Sinirlər",           "reader",   [],
+                 "Siqnal lenti: güclü xəbər, xəbər axını, ABŞ rəqəmi, qəfil sıçrayış → həyəcan"),
+    "strateq":  (11, "Strateq",            "signals",  ["W1 Faktlar", "W2 Beyin", "W3 Rəqəm yoxlaması", "W4 Yaddaş"],
+                 "Beyin (Claude): saatda bir və hər həyəcanda 1 saat, 4 saat, 1 gün ehtimalı"),
+    "debate":   (13, "Müzakirə",           "signals",  ["W1 Yuxarı tərəfdarı", "W2 Aşağı tərəfdarı", "W3 Hakim beyin"],
+                 "İki beyin yuxarı və aşağı üçün dəlil gətirir, üçüncüsü tərəzidə çəkib ehtimal verir"),
+    "liquidity": (14, "Likvidlik",         "prices",   [],
+                  "Spred və bazar fəallığı: nazik bazarda proqnoz baha başa gəlir"),
+    "risk":     (15, "Risk qapısı",        "liquidity", [],
+                 "Köhnə qiymət, ABŞ rəqəmi ərəfəsi, nazik və ya vəhşi bazar → istiqamət göstərilmir"),
+    "decision": (16, "Qərar",              "judge",    [],
+                 "AL / SAT yalnız Hakimin sübutu və açıq risk qapısı ilə; əks halda GÖZLƏ (yalnız göstərici)"),
 }
 
 

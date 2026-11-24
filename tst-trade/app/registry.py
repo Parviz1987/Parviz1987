@@ -108,8 +108,9 @@ BRAIN_SLOTS: list[dict] = [
      "provider": "openai", "model": "gpt-5.4-nano", "fallback": None, "fallback_model": None,
      "why": "Strateq Claude-dur; müstəqil ikinci fikir üçün başqa şirkət. Ucuz model: saatda bir sorğu ayda ~1-3 $."},
     {"id": "reviewer", "name": "Nəzarətçi",
-     "job": "Hər sövdələşmə təklifinə baxır: təsdiq, azalt və ya ləğv et, səbəbi ilə.",
-     "may_not": "Sövdələşmə açmaq, ölçünü artırmaq, ayar dəyişmək.",
+     "job": "Müzakirənin hakimi: «yuxarı» və «aşağı» tərəfdarlarının dəlillərini faktlarla tutuşdurub ehtimal verir. "
+            "Gələcəkdə: hər sövdələşmə təklifinə baxır (təsdiq, azalt, ləğv).",
+     "may_not": "Sövdələşmə açmaq, ölçünü artırmaq, ayar dəyişmək; faktda olmayan dəlili saymaq.",
      "requirements": [("Özünə həddən artıq güvənməmək", 50), ("Sərt cavab forması", 25), ("Sabitlik", 25)],
      "provider": "anthropic", "model": "claude-sonnet-5-5", "fallback": "gemini", "fallback_model": "gemini-4-argon",
      "why": "KalshiBench: Claude ailəsi ən az özünə güvənən (xəta 0.120), OpenAI ən çox (0.395)."},

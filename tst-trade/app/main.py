@@ -325,6 +325,11 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         finally:
             hub.subscribers.discard(q)
 
+    @app.get("/api/decision")
+    async def decision_api():
+        """Block 6: per metal the risk gate (with the liquidity view) and the decision per horizon (indication only)."""
+        return {"metals": engine.decisions, "ts": time.time()}
+
     @app.get("/api/analysts")
     async def analysts(symbol: str = "XAU"):
         """Block 3, the scale: every analyst (method or brain) on each desk with its record and its weight, and the
