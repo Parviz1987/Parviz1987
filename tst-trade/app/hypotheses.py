@@ -43,7 +43,7 @@ HYPOTHESES = [
 # Əsas hədəflər (Block 18, owner's focus 2026-11-24): a SECOND small family, registered later with its own time and
 # bar, judged net of the FULL cost (spread + slippage + overnight financing). The first family is left as registered.
 FOCUS_REGISTERED = 1795521600      # 2026-11-24 12:00 UTC (registered 08:30 UTC the same day, before any count)
-FOCUS_P_BAR = 0.05 / 4
+FOCUS_P_BAR = 0.05 / 5
 FOCUS = [
     {"id": "H9", "name": "Qızıl, 1 gün: tərəzi", "method": "terazi", "horizon": "1d", "symbol": "XAU",
      "idea": "Hakimin çəkdiyi analitiklərin birləşmiş fikri, sahibin əsas hədəfi olan gün üfüqündə.",
@@ -55,6 +55,11 @@ FOCUS = [
      "idea": "Sahibə göstərilən son söz: bütün analitiklər bir ehtimalda, çəkiləri sistemin öz keçmişindən öyrənilib "
              "(əlavə: 2026-11-24 10:30 UTC, qeyd vaxtından əvvəl).",
      "source": "sahibin «vahid proqnoz» tələbi; ansambl öyrənməsi"},
+    {"id": "H13", "name": "Qızıl: ABŞ rəqəmi dəqiqəsində impuls, 60 dəqiqə", "kind": "news_impulse",
+     "idea": "08:30, 10:00, 14:00 NY dəqiqəsində böyük hərəkət olanda 1 dəqiqə gec girib 60 dəqiqə saxlamaq. Databento "
+             "2 illik sınağında: 104 halda 63,5 % davam, iki ildə də müsbət (amma sərt hədd keçilmədi). Əlavə: "
+             "2026-11-24 11:20 UTC, qeyd vaxtından əvvəl.",
+     "source": "öz fyuçers sınağımız (futstudy); Smales-Yang; elan sonrası sürüşmə araşdırmaları"},
     {"id": "H11", "name": "Platin və palladium impulsu (15 dəqiqə)", "kind": "impulse",
      "idea": "Böyük oyunçu tərpədəndən 1 dəqiqə sonra hərəkət 15 dəqiqə davam edir (sahibin fikri; ilk 2 gündə "
              "67-83 %, amma spreddən sonra mənfi idi).", "source": "sahibin fikri; öz impuls araşdırmamız"},
@@ -147,6 +152,25 @@ def evaluate_focus(db: DB, now: float | None = None) -> list[dict]:
     now = time.time() if now is None else now
     out = []
     for h in FOCUS:
+        if h.get("kind") == "news_impulse":
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+            row = {k: h[k] for k in ("id", "name", "idea", "source")}
+            db.script("CREATE TABLE IF NOT EXISTS focus_news_impulse (t INTEGER PRIMARY KEY, cont INTEGER, net REAL)")
+            ny = ZoneInfo("America/New_York")
+            db.executemany("INSERT OR IGNORE INTO focus_news_impulse VALUES(?,?,?)",
+                           [(e["t"], e["cont"], e["net"]) for e in impulse.events(db, now)
+                            if e["t"] >= FOCUS_REGISTERED and e["symbol"] == "XAU" and e["K"] == 4.0 and e["H"] == 60
+                            and (datetime.fromtimestamp(e["t"], ny).hour, datetime.fromtimestamp(e["t"], ny).minute)
+                            in ((8, 30), (10, 0), (14, 0))])
+            evs = [dict(r) for r in db.execute("SELECT cont, net FROM focus_news_impulse").fetchall()]
+            n = len(evs)
+            hits = sum(e["cont"] for e in evs)
+            net = sum(e["net"] for e in evs) / n if n else None
+            p, st = _verdict(n, hits, 0.5, net, n, 30, FOCUS_P_BAR)
+            row.update({"n": n, "hit_rate": hits / n if n else None, "bar": 0.5, "net_avg": net, "p": p, "status": st})
+            out.append(row)
+            continue
         if h.get("kind") == "impulse":
             row = {k: h[k] for k in ("id", "name", "idea", "source")}
             # one-minute candles are kept 30 days: each impulse is stored once when seen, so the count only grows

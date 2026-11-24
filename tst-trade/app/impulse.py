@@ -20,7 +20,7 @@ import time
 from .db import DB
 
 KS = (4.0, 6.0)
-HS = (5, 15, 30)
+HS = (5, 15, 30, 60)
 FLOOR = {"XAU": 0.0003, "XAG": 0.0006, "XPT": 0.0006, "XPD": 0.0008}
 GAP = 30
 
