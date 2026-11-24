@@ -43,7 +43,7 @@ HYPOTHESES = [
 # Əsas hədəflər (Block 18, owner's focus 2026-11-24): a SECOND small family, registered later with its own time and
 # bar, judged net of the FULL cost (spread + slippage + overnight financing). The first family is left as registered.
 FOCUS_REGISTERED = 1795521600      # 2026-11-24 12:00 UTC (registered 08:30 UTC the same day, before any count)
-FOCUS_P_BAR = 0.05 / 3
+FOCUS_P_BAR = 0.05 / 4
 FOCUS = [
     {"id": "H9", "name": "Qızıl, 1 gün: tərəzi", "method": "terazi", "horizon": "1d", "symbol": "XAU",
      "idea": "Hakimin çəkdiyi analitiklərin birləşmiş fikri, sahibin əsas hədəfi olan gün üfüqündə.",
@@ -51,6 +51,10 @@ FOCUS = [
     {"id": "H10", "name": "Qızıl, 1 həftə: çox sürətli trend", "method": "trendmix", "horizon": "1w", "symbol": "XAU",
      "idea": "1 həftədən 1 aya qədər trendlərin dəyişkənliyə görə çəkili qarışığı.",
      "source": "Moskowitz-Ooi-Pedersen; Baltas-Kosowski"},
+    {"id": "H12", "name": "Qızıl, 1 gün: vahid proqnoz", "method": "vahid", "horizon": "1d", "symbol": "XAU",
+     "idea": "Sahibə göstərilən son söz: bütün analitiklər bir ehtimalda, çəkiləri sistemin öz keçmişindən öyrənilib "
+             "(əlavə: 2026-11-24 10:30 UTC, qeyd vaxtından əvvəl).",
+     "source": "sahibin «vahid proqnoz» tələbi; ansambl öyrənməsi"},
     {"id": "H11", "name": "Platin və palladium impulsu (15 dəqiqə)", "kind": "impulse",
      "idea": "Böyük oyunçu tərpədəndən 1 dəqiqə sonra hərəkət 15 dəqiqə davam edir (sahibin fikri; ilk 2 gündə "
              "67-83 %, amma spreddən sonra mənfi idi).", "source": "sahibin fikri; öz impuls araşdırmamız"},
