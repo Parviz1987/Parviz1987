@@ -45,7 +45,7 @@ METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "tsmom", "rs
            "sam", "ichimoku", "pair", "garch", "gvz", "chartist", "terazi", "vahid")
 # Families: methods that carry the SAME idea (momentum and trend are both "the move continues"). The consensus gives
 # each family one voice, so one idea measured three ways cannot outvote two independent ideas.
-FAMILY = {"sam": "revert", "ichimoku": "trend", "pair": "cross", "momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
+FAMILY = {"chartist": "chart", "sam": "revert", "ichimoku": "trend", "pair": "cross", "momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
           "reversal": "revert", "rsi": "revert", "fib": "revert", "pullback": "revert",
           "dollar": "cross", "oil": "cross", "macro": "fund", "surprise": "fund",
           "news": "brain", "strateq": "brain", "brain2": "brain", "debate": "brain", "session": "time", "seans": "time", "trendmix": "trend", "cot": "position",
@@ -114,8 +114,7 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("cot")        # weekly positions, monthly seasons, festival seasons: weeks-to-months effects
         out.remove("season")
         out.remove("jewel")
-    if h not in ("1w", "10d", "1mo"):
-        out.remove("tsmom")      # the 12-month trend is a weeks-to-months effect    # the Strategist leans for the next hours to a day   # a release moves the next minutes to a day; longer horizons drown it
+        out.remove("tsmom")      # the 12-month trend is a weeks-to-months effect
     return tuple(out)
 
 

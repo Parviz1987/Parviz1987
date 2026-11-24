@@ -31,7 +31,7 @@ def gate(db: DB, engine, symbol: str, now: float | None = None) -> dict:
     try:
         from .engine import EventLookup
         if EventLookup(db).near(now):
-            reasons.append("mühüm ABŞ rəqəminə 60 dəqiqədən az qalıb və ya 30 dəqiqədən az keçib")
+            reasons.append(EVENT_REASON)
     except Exception:
         pass
     liq = engine.liquidity.view(symbol, now) if engine is not None and hasattr(engine, "liquidity") else None
@@ -46,6 +46,10 @@ def gate(db: DB, engine, symbol: str, now: float | None = None) -> dict:
         if usual and last > 2 * usual:
             reasons.append(f"bazar dalğalıdır: son saatın hərəkəti adətdən {last / usual:.1f} dəfə böyükdür")
     return {"symbol": symbol, "open": not reasons, "reasons": reasons, "liquidity": liq}
+
+
+EVENT_REASON = "mühüm ABŞ rəqəminə 60 dəqiqədən az qalıb və ya 30 dəqiqədən az keçib"
+EVENT_METHODS = ("surprise", "dollar", "news")      # built for the release window: it must not silence them
 
 
 def decision(db: DB, engine, symbol: str, now: float | None = None) -> dict:
@@ -64,7 +68,7 @@ def decision(db: DB, engine, symbol: str, now: float | None = None) -> dict:
                 f" ({verdict['condition']} şəraitində)" if verdict.get("condition") else "")
             if not f or f["p_up"] == 0.5:
                 row["why"] = f"{row['method']} indi fikir bildirmir"
-            elif not g["open"]:
+            elif not g["open"] and not (verdict["method"] in EVENT_METHODS and g["reasons"] == [EVENT_REASON]):
                 row["why"] = "risk qapısı bağlıdır: " + "; ".join(g["reasons"])
             else:
                 row.update({"call": "AL" if f["p_up"] > 0.5 else "SAT", "p_up": f["p_up"],

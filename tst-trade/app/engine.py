@@ -509,6 +509,7 @@ class Engine:
         macro = MacroLookup(self.db)
         rel = surprise.Lookup(self.db)
         bv = brainviews.Lookup(self.db)
+        bv.calib = {}        # calibration bands come from recent outcomes: never applied to the past (look-ahead)
         sv = slowviews.Lookup(self.db)
         ev = EventLookup(self.db)
         bonds, gvz = BondLookup(self.db), GvzLookup(self.db)

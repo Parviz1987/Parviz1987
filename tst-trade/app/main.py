@@ -44,7 +44,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         hub.attach_loop(asyncio.get_running_loop())
         if start_engine:
             engine.start()
-            asyncio.get_running_loop().create_task(app.state.futures_resume())
+            asyncio.get_running_loop().create_task(app.state.futures_keeper())
         yield
         if start_engine:
             await engine.stop()
@@ -765,6 +765,15 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     fut_busy = {"on": False}             # one Databento download at a time: never two paying for the same month
 
+    async def futures_keeper():
+        """An approved download that stopped (a restart, a timeout) is resumed every 30 minutes until it is complete."""
+        while True:
+            await futures_resume()
+            last = json.loads(db.get("futures:last") or "null")
+            if last and last.get("ok"):
+                return
+            await asyncio.sleep(1800)
+
     async def futures_resume():
         """A download the owner approved but a restart cut off goes on by itself (stored months are skipped, so
         nothing is paid twice; the approved limit still applies)."""
@@ -797,6 +806,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         except Exception as e:
             db.put("futures:last", json.dumps({"ok": False, "msg": f"{type(e).__name__}: {str(e)[:200]}"}))
     app.state.futures_resume = futures_resume
+    app.state.futures_keeper = futures_keeper
 
     @app.get("/api/admin/futures/quote")
     async def futures_quote():

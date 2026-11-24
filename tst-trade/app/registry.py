@@ -65,10 +65,10 @@ KEY_SLOTS: list[dict] = [
      "stage": LIVE},
     {"id": "anthropic", "category": "brain", "name": "Anthropic (Claude)",
      "purpose": "Strateq və Nəzarətçi yuvalarının beyni.", "cost": "İstifadəyə görə ödəniş.",
-     "url": "https://platform.claude.com", "fields": ["key"], "used_by": "Strateq, Nəzarətçi", "stage": LIVE},
+     "url": "https://platform.claude.com", "fields": ["key"], "used_by": "Strateq, Nəzarətçi (müzakirə və gecə yoxlaması), Oxuyucu, Qrafik analitiki", "stage": LIVE},
     {"id": "openai", "category": "brain", "name": "OpenAI (GPT)",
      "purpose": "Oxuyucu yuvasının beyni.", "cost": "İstifadəyə görə ödəniş.",
-     "url": "https://platform.openai.com/api-keys", "fields": ["key"], "used_by": "Oxuyucu", "stage": LIVE},
+     "url": "https://platform.openai.com/api-keys", "fields": ["key"], "used_by": "İkinci analitik, müzakirənin tərəfləri, Oxuyucu və Qrafik analitikinin ehtiyatı", "stage": LIVE},
     {"id": "xai", "category": "brain", "name": "xAI (Grok)",
      "purpose": "Kəşfiyyatçı yuvasının beyni: X və vebdə axtarış.", "cost": "İstifadəyə görə ödəniş.",
      "url": "https://console.x.ai", "fields": ["key"], "used_by": "Kəşfiyyatçı", "stage": LIVE},
@@ -124,7 +124,7 @@ BRAIN_SLOTS: list[dict] = [
             "beyinin dəyərini ölçür: Sonnet Opus-dan zəif çıxsa, geri qaytarılır."},
     {"id": "analyst2", "name": "İkinci analitik",
      "job": "Strateqlə eyni faktları alır və ondan ayrı, öz ehtimalını verir (1 saat, 4 saat, 1 gün). Hakim hər birini "
-            "ayrıca ölçür; iki beyin razı olanda konsensusda görünür.",
+            "ayrıca ölçür; vahid proqnozda hər biri öz ölçülmüş nəticəsinə görə çəki alır.",
      "may_not": "Qiymət yazmaq; Strateqin cavabını görmək.",
      "requirements": [("Başqa şirkətdən olmaq (müstəqil fikir)", 50), ("Qiymət", 30), ("Sərt cavab forması", 20)],
      "provider": "openai", "model": "gpt-5.4-nano", "fallback": None, "fallback_model": None,
@@ -152,7 +152,8 @@ MISSION = (
     "aralığını əvvəlcədən demək; bunun düz olduğunu Hakim real qiymətlə, xərcdən sonra yoxlayır. Sənin işin bu "
     "məqsədin bir hissəsidir: yalnız verilən faktlardan istifadə et, rəqəm uydurma, bilmədiyin yerdə «fikir yoxdur» de "
     "(ehtimal yarıya yaxın), əminliyini şişirtmə — kalibrlənmiş, dürüst ehtimal ən faydalıdır. Sənin fikrin vahid "
-    "proqnozda digər analitiklərlə birləşir və çəkisi yalnız Hakimin ölçdüyü nəticədən asılıdır.\n\n")
+    "proqnozda digər analitiklərlə birləşir; çəkisi yalnız sənin ölçülmüş nəticəndən asılıdır (Hakim real qiymətlə "
+    "yoxlayır).\n\n")
 
 BRAIN_IDS = {b["id"] for b in BRAIN_SLOTS}
 BRAIN_PROVIDERS = ("anthropic", "openai", "xai", "gemini")

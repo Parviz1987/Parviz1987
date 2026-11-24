@@ -11,7 +11,7 @@ or is cancelled), source (where the idea comes from and how strong the evidence 
 in rules.py and the Judge measures it on its own; False: an analyst applies it by reading the facts)."""
 from __future__ import annotations
 
-VERSION = "2026-11-24.1"
+VERSION = "2026-11-24.2"
 
 RULES = [
     # ---------------- Texniki analiz: trend ----------------
@@ -122,7 +122,8 @@ RULES = [
      "void": "Gözlənti məlumatı yoxdursa — uydurulmur, qayda susur.",
      "source": "Smales-Yang (2015); Elder-Miao-Ramchander (2012)."},
     {"id": "FA-COT-1", "area": "Fundamental", "name": "Fondların mövqeyi (COT) ifrat halda", "detector": False,
-     "how": "CFTC: idarə olunan fondların xalis mövqeyi son 3 ilin ən yüksək/aşağı 10 %-ində.",
+     "how": "CFTC: idarə olunan fondların xalis mövqeyi son 3 ilin aralığında ən yüksək və ya ən aşağı 20 %-də "
+            "(kodda «COT» üsulu eyni həddi işlədir).",
      "signal": "İfrat uzun mövqe → aşağı risk (əks fikir); ifrat qısa → yuxarı.",
      "void": "Həftəlik məlumat: qısa üfüq üçün deyil.",
      "source": "Sanders-Irwin-Merrin; sübutu qarışıqdır."},
@@ -137,7 +138,8 @@ RULES = [
      "void": "Təkrar yayılan köhnə xəbər (hadisə birləşdiricisi) yeni risk deyil.",
      "source": "Baur-Lucey (2010): qızıl böhranda sığınacaqdır; təsir qısa ömürlü ola bilər."},
     {"id": "FA-SEAS-1", "area": "Fundamental", "name": "Mövsümilik", "detector": False,
-     "how": "Ayın keçmiş orta qayıdışı (tarixçə).",
+     "how": "Eyni ayın keçmiş illərdəki istiqaməti: ən azı 5 il və illərin 70 %-i eyni istiqamətdədirsə meyl verilir "
+            "(kodda «Mövsümilik» üsulu).",
      "signal": "Tarixən güclü ay → yuxarı meyl.",
      "void": "Zəif sübut: yalnız kiçik çəki.",
      "source": "Baur (2013) qızılda mövsümilik."},

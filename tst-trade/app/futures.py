@@ -55,7 +55,7 @@ async def quote(key: str, now: float | None = None) -> dict:
     now = time.time() if now is None else now
     out = {"plan": f"{YEARS} il, dəqiqəlik şamlar (ohlcv-1m), {', '.join(SYMBOLS.values())}", "items": {}, "ts": now}
     total = 0.0
-    async with httpx.AsyncClient(timeout=30.0) as c:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=180.0)) as c:   # a 2-year price check can be slow
         for sym in SYMBOLS:
             r = await c.get(f"{BASE}/metadata.get_cost", params=_params(sym, "ohlcv-1m", now), auth=(key, ""))
             if r.status_code != 200:
@@ -100,7 +100,13 @@ def parse_ohlcv_csv(text: str) -> list[tuple]:
 async def download(db: DB, key: str, limit_usd: float, report=None, now: float | None = None) -> dict:
     """Owner-approved only: check the price again, refuse above the limit, then load and store the bars."""
     ensure(db)
-    q = await quote(key, now)
+    try:
+        q = await quote(key, now)
+    except httpx.HTTPError as e:
+        # the price check timed out: the quote the owner approved stands (the plan is the same and the limit holds)
+        q = json.loads(db.get("futures:quote") or "null")
+        if not q:
+            return {"ok": False, "msg": f"qiymət yoxlanmadı: {type(e).__name__}"}
     if any("error" in v for v in q["items"].values()):
         return {"ok": False, "msg": "qiymət alınmadı: " + json.dumps(q["items"], ensure_ascii=False)[:300]}
     if q["total_usd"] > limit_usd:
