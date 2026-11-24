@@ -47,17 +47,24 @@ Hakim yoxlayır. Həyəcan fikirləri ayrıca da hesablanır ki, «hadisədən s
 
 | Blok | Nə | Bitdi meyarı | Vəziyyət |
 |---|---|---|---|
-| 1 | Beyin proqnozçu: Strateq 1s/4s/1g ehtimal verir, Hakim yoxlayır | Hakimdə «Strateqin fikri» canlı istiqamət sayır | ✅ işləyir (965283b): Hakimdə ilk canlı istiqamət sayıldı |
-| A | Sinirlər: siqnal lenti + həyəcan təhlili (yuxarıdakı cədvəl) | güclü xəbər/rəqəm/sıçrayışdan sonra 15 dəqiqəyə qədər Strateq fikri yazılır; Agentlər panelində görünür | ✅ işləyir: ilk həyəcan 2026-11-23 20:07 NY (qızıl sıçrayışı + Fed xəbərləri) → Grok axtardı → 20:12 NY Strateq fikri (f4f1709) |
-| 2 | Gözlər tam: 8/8 əlaqəli bazar; pulsuz uzun tarixçə | Sistem səhifəsində zəncir yaşıl | növbəti |
-| 3 | Tərəzi: Hakim hər analitikin (üsul, beyin, həyəcan fikri) çəkisini nəticəyə görə verir; konsensus çəki ilə | Nəticələr səhifəsində analitik cədvəli | növbədə |
-| 4 | Yeni üsullar: COT, mövsümilik, zərgərlik təqvimi; ikinci beyin (OpenAI) ehtimalı | hər biri Hakimdə | növbədə |
-| 5 | Ölçmə 2-4 həftə, həftəlik hesabat, sübut olan yerdə kağız ticarəti | «harada işləyir» siyahısı | növbədə |
+| 1 | Beyin proqnozçu: Strateq 1s/4s/1g ehtimal verir, Hakim yoxlayır | Hakimdə «Strateqin fikri» canlı istiqamət sayır | ✅ (965283b) |
+| A | Sinirlər: siqnal lenti + həyəcan təhlili; beyinlərin öz dövrü | güclü xəbər/rəqəm/sıçrayışdan sonra 15 dəq içində Strateq fikri | ✅ ilk həyəcan 2026-11-23 20:07 NY → 20:12 NY fikir (f4f1709) |
+| 2 | Gözlər tam: «sakit» bazar ilə «gəlməyən» bazar ayrıldı; tarixçə brokerdə səhifə-səhifə 4000 şama | Sistem səhifəsində əlaqəli bazarlar yaşıl; 15 dəq tarixçə ~40 gün | ✅ kod (eac4272) |
+| 3 | Tərəzi: hər analitikin çəkisi Hakimin ölçüsü ilə; Nəticələr 5-ci bölmə; beyinlərin öz hesabı (həyəcan / saatlıq) | Nəticələr səhifəsində analitik cədvəli | ✅ (1c4e1e8) |
+| 4 | Yeni üsullar: COT, mövsümilik, zərgərlik təqvimi; İkinci beyin (OpenAI) | hər biri Hakimdə | ✅ (1c4e1e8) |
+| 5 | Ölçmə: həftəlik hesabat (bazar ertəsi, bu söhbətdə), 3 saatlıq növbətçi yoxlama | hər həftə: «harada işləyir» siyahısı | ✅ quruldu; nəticə 2-4 həftəyə |
+
+### Hər analitikin yeri (kim nəyi kimə ötürür)
+- Qiymət axını → şamlar → 21 analitik (18 hesab üsulu + 3 yavaş üsul) → Hakim
+- Xəbər lentləri + Grok → Oxuyucu → «Xəbər əhvalı» üsulu + siqnal lenti
+- Təqvim → Rəqəm ovçusu → «Hadisə sürprizi» + siqnal lenti
+- Şamlar (metal və 8 bazar) → sıçrayış siqnalı
+- Siqnal lenti → həyəcan → (Grok) → Strateq + İkinci beyin → «Strateqin fikri», «İkinci beyin» üsulları
+- Hakim → çəkilər → Tərəzi; ailələr → Seçici konsensus → Nəticələr və kölgə ticarəti
+- Hər agent öz vəziyyətini mərkəzə yazır → Agentlər paneli (/agents)
 
 ## Sahibin işləri
-- Məcburi heç nə yoxdur. Açarlar artıq yerindədir (Capital, Twelve Data, OpenAI, Anthropic, xAI, FRED, Alpaca, FMP).
-- İstəyə görə: FMP Starter (~29 $/ay) — ABŞ rəqəmlərinin **keçmiş** faktlarını verir (sürpriz üsulunu keçmişdə
-  yoxlamaq üçün). Canlı faktları rəqəm ovçusu (iki beyin) onsuz da tapır.
+- Ətraflı: `docs/acarlar.md`. Məcburi heç nə yoxdur; FMP Starter yalnız istəyə görə.
 
 ## Gözləmə siyahısı (yeni istəklər, sırası gələndə)
 - (boş)

@@ -12,7 +12,7 @@ import os
 import time
 import traceback
 
-from . import brains, candles, forecast, judge, registry, signals
+from . import brains, brainviews, candles, forecast, judge, registry, signals
 from .db import DB
 
 SCHEMA = """
@@ -219,6 +219,9 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "pipeline": _pipeline(db, keys, engine, feeds, jobs),
         "candle_check": _candle_check(db),
         "forecast_check": _forecast_check(db),
+        "brain_score": brainviews.score(db, time.time()),
+        "weights": {f"{s}/{h}": engine.weights(s, h, time.time()) for s in candles.METALS
+                    for h in forecast.HORIZONS} if engine is not None else {},
         "signals": {"recent": signals.recent(db, 10),
                     "alarms_today": db.get("alarm:count")},
         "security": _security(db),
