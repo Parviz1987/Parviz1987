@@ -65,10 +65,20 @@ def build(db: DB, sym: str) -> dict:
         r = st.get("terazi") or {}
         out["terazi"] = {"p": ter["p_up"], "basis": ter["basis"], "n": r.get("nh"), "hit_rate": r.get("hit_rate"),
                          "bar": r.get("bar")}
+    # the headline: the unified forecast (every analyst and brain in one probability, weights learned walk-forward)
+    vh = fc.get("vahid")
+    if vh:
+        from . import unified
+        mdl = unified.models(db).get(f"{sym}:{H}") or {}
+        r = st.get("vahid") or {}
+        out["vahid"] = {"p": vh["p_up"], "basis": vh["basis"], "self_test": {
+            "n": mdl.get("viewed"), "hit_rate": mdl.get("hit_rate"), "bar": mdl.get("bar"), "bss": mdl.get("bss"),
+            "net_avg": mdl.get("net_avg")}, "live": {"n": r.get("nh"), "hit_rate": r.get("hit_rate"),
+                                                    "status": r.get("status")}}
     # voice 3: the analysts' vote (methods with a view, baselines and combiners left out)
     up, down, names_up, names_down = 0, 0, [], []
     for m, v in fc.items():
-        if m in BASELINES or m in ("terazi", "consensus"):
+        if m in BASELINES or m in ("terazi", "consensus", "vahid"):
             continue
         d = _dir(v["p_up"])
         if d > 0:

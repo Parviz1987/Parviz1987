@@ -24,7 +24,7 @@ from .db import DB
 ETA, FLOOR = 0.05, 0.05
 MAX_ROWS = 20000
 WINDOW = {"15m": 20, "30m": 30, "1h": 60, "4h": 180, "1d": 1100, "3d": 1100, "1w": 1100, "10d": 1100, "1mo": 1100}
-SKIP = ("rw", "up", "consensus", "terazi")
+SKIP = ("rw", "up", "consensus", "terazi", "vahid")
 BANDS = [(0.0, 0.40), (0.40, 0.48), (0.52, 0.60), (0.60, 1.01)]
 LESSONS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS lessons (id INTEGER PRIMARY KEY, ts REAL NOT NULL, text TEXT NOT NULL, active INTEGER DEFAULT 1);

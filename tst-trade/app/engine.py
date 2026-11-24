@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from . import brainviews, candles, registry, forecast, judge, markets, slowviews, surprise
+from . import brainviews, candles, registry, forecast, judge, markets, slowviews, surprise, unified
 from .db import DB
 from .keys import KeyStore
 from .providers.base import NotServed, ProviderError, Quote
@@ -41,6 +41,9 @@ def market_open(ts: float) -> bool:
 
 
 target_time = forecast.target_time   # kept here for older imports
+
+
+UNIFIED_EVERY = 6 * 3600       # the unified forecast's walk-forward self-simulation
 
 
 class MacroLookup:
@@ -349,7 +352,8 @@ class Engine:
                 fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
                                     rel.window(issued_t, h), linked_now,
                                     {**bv.views(sym, issued_t, h), **sv.views(sym, issued_t, h),
-                                     "_weights": self.weights(sym, h, now) if mode == "live" else None},
+                                     "_weights": self.weights(sym, h, now) if mode == "live" else None,
+                                     "_unified": unified.models(self.db).get(f"{sym}:{h}") if mode == "live" else None},
                                     ev.near(issued_t))
                 if fc is None:
                     continue
@@ -695,6 +699,11 @@ class Engine:
                 if time.time() - self._weights_ts > 600:
                     self._weights_ts = time.time()
                     await asyncio.to_thread(self.refresh_weights)
+                if time.time() - float(self.db.get("unified:ts") or 0) > UNIFIED_EVERY:
+                    self.db.put("unified:ts", str(time.time()))
+                    self._rep("judge", "working", note="vahid proqnoz: öz-özünü sınaq")
+                    await asyncio.to_thread(unified.refresh, self.db)
+                    self._rep("judge", "done", note="vahid proqnoz yeniləndi")
                 self._rep("orch", "done", note=f"dövr {time.time() - t_start:.1f} san")
             except Exception as e:   # the loop must survive one bad poll
                 log.exception("engine step failed")

@@ -278,3 +278,5 @@ body.simple .main,body.simple .split,body.simple .feeds,body.simple .box[data-fo
 .olw{font-size:12px;line-height:1.35;overflow-wrap:anywhere}
 @media (max-width:1100px){.olgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:560px){.olgrid{grid-template-columns:1fr}.olr{grid-template-columns:104px 1fr}}
+.olv{display:grid;gap:2px;padding:6px 8px;border-radius:8px;background:var(--acc-soft);border:1px solid var(--line)}
+.olv>span:first-child{color:var(--muted);font-size:12px}.olv b{font-size:16px}.olv b.up{color:#3ee08f}.olv b.down{color:#ff5d6c}.olv b.mut{color:var(--muted)}

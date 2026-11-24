@@ -22,6 +22,8 @@
       return `<div class="olc">
         <div class="olh"><b>${NAMES[m.symbol]}</b><span class="ol-lean ${cls}">${arrow}${esc(m.lean)}</span></div>
         <div class="note">${esc(m.agree)} · ${PROOF[m.proof] || esc(m.proof)}</div>
+        ${m.vahid ? `<div class="olv"><span>Vahid proqnoz</span><b class="${m.vahid.p > 0.51 ? "up" : m.vahid.p < 0.49 ? "down" : "mut"}">${dirWord(m.vahid.p)} ${pct(m.vahid.p)}</b>
+          <span class="note">öz-özünü sınaq: ${m.vahid.self_test.n || 0} proqnoz, düz ${pct(m.vahid.self_test.hit_rate)} (hədd ${pct(m.vahid.self_test.bar)}) · canlı: ${m.vahid.live.n || 0} yoxlanıb${m.vahid.live.n ? ", düz " + pct(m.vahid.live.hit_rate) : ""}</span></div>` : ""}
         <div class="olr"><span>Aralıq (80 %)</span><span>${rg ? px(rg.lo80) + " – " + px(rg.hi80) + ` <span class="note">real tutma ${pct(rg.cover80)}</span>` : "—"}</span></div>
         <div class="olr"><span>Aralıq (50 %)</span><span>${rg ? px(rg.lo50) + " – " + px(rg.hi50) : "—"}</span></div>
         <div class="olr"><span>Strateq (AI)</span><span>${s ? `${dirWord(s.p)} ${pct(s.p)}${s.calibrated ? " (kalibrli)" : ""} <span class="note">· indiyə qədər: düz ${s.record.right}, səhv ${s.record.wrong}</span>` : "kart hələ yoxdur"}</span></div>

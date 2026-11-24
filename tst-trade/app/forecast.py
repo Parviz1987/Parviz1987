@@ -42,7 +42,7 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
                  "1mo": "1 ay"}
 METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "tsmom", "rsi", "fib", "pullback", "macro",
            "session", "surprise", "dollar", "oil", "news", "strateq", "brain2", "debate", "cot", "season", "jewel", "seans", "trendmix", "consensus",
-           "terazi")
+           "terazi", "vahid")
 # Families: methods that carry the SAME idea (momentum and trend are both "the move continues"). The consensus gives
 # each family one voice, so one idea measured three ways cannot outvote two independent ideas.
 FAMILY = {"momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
@@ -60,7 +60,7 @@ METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", 
                 "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)", "debate": "Müzakirə (yuxarı ↔ aşağı)",
                 "cot": "COT: fond mövqeləri", "seans": "Seans: Asiya ↑ / ABŞ ↓",
                 "trendmix": "Çoxsürətli trend (dalğalanmaya görə)", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
-                "terazi": "Tərəzi (Hakimin çəkisi ilə)",
+                "terazi": "Tərəzi (Hakimin çəkisi ilə)", "vahid": "Vahid proqnoz (hamısı birlikdə, öyrənən)",
                 "consensus": "Seçici konsensus (müstəqil ailələr)"}
 BASELINES = ("rw", "up")
 LOOKBACK = {"15m": 16, "30m": 16, "1h": 24, "4h": 18, "1d": 20, "3d": 20, "1w": 12, "10d": 60, "1mo": 120}   # momentum window
@@ -513,6 +513,8 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
 
     out["consensus"] = selective_consensus(out, rets, sigma, event_near)
     out["terazi"] = weighted_view(out, (views or {}).get("_weights"))
+    from .unified import view as unified_view       # one forecast from every analyst, weights learned walk-forward
+    out["vahid"] = unified_view((views or {}).get("_unified"), out)
 
     for v in out.values():
         v.update(rng)
@@ -591,6 +593,10 @@ PASSPORT = {
     "jewel": {"why": "Divali (qızıl, gümüş) və Çin Yeni ili (qızıl) öncəsi 21 gün zərgərlik alışı artır. Dostun "
                      "layihəsindən (#14) ideya; sahibin sahəsi.",
               "expect": "1 həftə – 1 ay; ildə iki pəncərə.", "else": "Çıxarılır."},
+    "vahid": {"why": "Bütün analitiklərin və beyinlərin fikri bir ehtimalda: kimin nə qədər çəki alacağını sistem öz "
+                     "keçmiş nəticələrindən addım-addım öyrənir (yalnız o anda bilinən nəticələrlə).",
+              "expect": "Ayrı-ayrı analitiklərdən və tərəzidən yaxşı olmalıdır; öz-özünü sınaqda həddi keçməlidir.",
+              "else": "Sübut gəlməsə, sadəcə göstərici qalır; heç bir qərara təsir etmir."},
     "terazi": {"why": "Hər analitikin (üsul, beyin) fikri Hakimin ölçdüyü nəticəyə görə çəki alır: düz deyənin sözü ağır, "
                       "həddən yaxşı olmayanınki sıfır. Yalnız canlı (keçmişdə çəki gələcəkdən gələrdi).",
                "expect": "Tək üsullardan yüksək düz çıxma faizi.", "else": "Çəki qaydası yalnız Hakimin rəqəmi ilə dəyişir."},
