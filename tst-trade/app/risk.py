@@ -53,17 +53,15 @@ def decision(db: DB, engine, symbol: str, now: float | None = None) -> dict:
     g = gate(db, engine, symbol, now)
     desks = []
     for h in forecast.HORIZONS:
-        live = judge.stats(db, symbol, h, "live", ttl=600)
-        hist = judge.stats(db, symbol, h, "history", ttl=600)
-        enough = live and max((r["n"] or 0) for r in live) >= judge.MIN_N[h]
-        verdict = judge.official(live if enough else hist)
+        verdict = judge.verdict(db, symbol, h, now)          # the one verdict shared with the card and outlook
         row = {"horizon": h, "name": forecast.HORIZON_NAMES[h], "call": "GÖZLƏ", "method": None, "p_up": None}
         if verdict["status"] != "sübut":
             row["why"] = "Hakimin sübutu yoxdur: istiqamət göstərilmir"
         else:
             f = db.execute("SELECT p_up, issued_t FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND "
                            "mode='live' ORDER BY issued_t DESC LIMIT 1", (symbol, h, verdict["method"])).fetchone()
-            row["method"] = forecast.METHOD_NAMES.get(verdict["method"], verdict["method"])
+            row["method"] = forecast.METHOD_NAMES.get(verdict["method"], verdict["method"]) + (
+                f" ({verdict['condition']} şəraitində)" if verdict.get("condition") else "")
             if not f or f["p_up"] == 0.5:
                 row["why"] = f"{row['method']} indi fikir bildirmir"
             elif not g["open"]:

@@ -301,9 +301,7 @@ class BrainJobs:
                 row = self.db.execute("SELECT method, p_up, lo80, hi80, price0 FROM forecasts WHERE symbol=? AND "
                                       "horizon=? AND mode='live' AND method='rw' ORDER BY issued_t DESC LIMIT 1",
                                       (sym, h)).fetchone()
-                st = judge.stats(self.db, sym, h, "live", ttl=60)
-                hist = judge.stats(self.db, sym, h, "history", ttl=300)
-                verdict = judge.official(st if max(r["n"] for r in st) >= judge.MIN_N[h] else hist)
+                verdict = judge.verdict(self.db, sym, h)           # the one verdict the owner sees too
                 cards.append({"metal": sym, "horizon": forecast.HORIZON_NAMES[h], "status": verdict["status"],
                               "price": round(row["price0"], 2) if row else None,
                               "range80": [round(row["lo80"], 2), round(row["hi80"], 2)] if row else None})

@@ -247,24 +247,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                          (sym, h)).fetchone()
         live = judge.stats(db, sym, h, "live", ttl=60)
         hist = judge.stats(db, sym, h, "history", ttl=300)
-        live_n = max((r["n"] for r in live if r["method"] == "momentum"), default=0)   # momentum always has a view
-        basis_stats, basis_mode = (live, "live") if live_n >= judge.MIN_N[h] else (hist, "history")
-        verdict = judge.official(basis_stats)
-        verdict["by"] = basis_mode
+        verdict = judge.verdict(db, sym, h)          # the one verdict (also used by the decision strip and outlook)
         methods = []
         if row and row["t"] is not None:
             for r in db.execute("SELECT method, p_up, lo50, hi50, lo80, hi80, basis, price0, target_t FROM forecasts "
                                 "WHERE symbol=? AND horizon=? AND mode='live' AND issued_t=?", (sym, h, row["t"])):
                 methods.append(dict(r))
-        if verdict["status"] != "sübut" and methods:
-            # Conditional proof: a method proven only in this session or this market mood speaks only then.
-            rw = next((m for m in methods if m["method"] == "rw"), None)
-            width = (rw["hi80"] - rw["lo80"]) / rw["price0"] if rw and rw["price0"] else None
-            cond = judge.conditional(_where(sym, h, basis_mode), judge.session_of(time.time()), width)
-            live_view = cond and next((m for m in methods if m["method"] == cond["method"] and m["p_up"] != 0.5), None)
-            if live_view:
-                verdict = {"method": cond["method"], "status": "sübut", "by": basis_mode, "condition": cond["group"],
-                           "cond_hit_rate": cond["hit_rate"], "cond_n": cond["n"]}
         have = len(candles.closed(db, sym, tf, time.time(), limit=forecast.MIN_CANDLES))
         return {"horizon": h, "name": forecast.HORIZON_NAMES[h], "tf": tf, "issued_t": row["t"] if row else None,
                 "methods": methods, "verdict": verdict, "stats_live": live, "stats_history": hist,

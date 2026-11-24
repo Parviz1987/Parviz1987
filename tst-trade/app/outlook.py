@@ -117,9 +117,11 @@ def build(db: DB, sym: str) -> dict:
     out["agree"] = ("vahid proqnoz hələ yoxdur" if vp is None else
                     f"səslərdən {sum(1 for d in voices if d == lean)} razı, {sum(1 for d in voices if d == -lean)} əks"
                     if lean else f"{len(voices)} səsin fikri var, vahid nəticə: aydın deyil")
-    verdict = judge.official(list(st.values()) if max((r.get("n") or 0) for r in st.values()) >= judge.MIN_N[H]
-                             else list(hist.values())) if st else {"status": "az"}
+    verdict = judge.verdict(db, sym, H)
     out["proof"] = verdict.get("status")
+    out["proof_method"] = METHOD_NAMES.get(verdict.get("method"), verdict.get("method"))
+    if out.get("vahid"):            # the headline's own record decides its badge, not the best other method
+        out["vahid"]["proof"] = (st.get("vahid") or {}).get("status")
     out["cost"] = judge.full_cost(sym, H)
     return out
 

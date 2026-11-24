@@ -1,4 +1,5 @@
-// «Sabah üçün proqnoz» (owner 2026-11-24): per metal the 1-day range, the three voices on direction and their records.
+// «Sabah üçün proqnoz» (owner 2026-11-24): per metal ONE answer — the unified forecast — with the 1-day range and the
+// voices that explain it (Strateq, Qrafik analitiki, Tərəzi, the analysts' vote) and their records.
 // Indication only, and honest about proof: a lean is shown as a lean, never as a proven forecast.
 (function () {
   "use strict";
@@ -21,8 +22,8 @@
       const arrow = (m.lean_dir || m.weak_dir) > 0 ? "▲ " : (m.lean_dir || m.weak_dir) < 0 ? "▼ " : "";
       return `<div class="olc">
         <div class="olh"><b>${NAMES[m.symbol]}</b><span class="ol-lean ${cls}">${arrow}${esc(m.lean)}</span></div>
-        <div class="note">${esc(m.agree)} · ${PROOF[m.proof] || esc(m.proof)}</div>
-        ${m.vahid ? `<div class="olv"><span>Vahid proqnoz</span><b class="${m.vahid.p > 0.51 ? "up" : m.vahid.p < 0.49 ? "down" : "mut"}">${dirWord(m.vahid.p)} ${pct(m.vahid.p)}</b>
+        <div class="note">${esc(m.agree)} · vahid proqnozun sübutu: ${m.vahid ? (PROOF[m.vahid.proof] || "⏳ hələ az yoxlanıb") : "—"}${m.proof === "sübut" ? " · 1 günlük masada sübutlu üsul: " + esc(m.proof_method || "") : ""}</div>
+        ${m.vahid ? `<div class="olv"><span>Vahid proqnoz</span><b class="${m.vahid.p >= 0.53 ? "up" : m.vahid.p <= 0.47 ? "down" : "mut"}">${dirWord(m.vahid.p)} ${pct(m.vahid.p)}</b>
           <span class="note">öz-özünü sınaq: ${m.vahid.self_test.n || 0} proqnoz, düz ${pct(m.vahid.self_test.hit_rate)} (hədd ${pct(m.vahid.self_test.bar)}) · canlı: ${m.vahid.live.n || 0} yoxlanıb${m.vahid.live.n ? ", düz " + pct(m.vahid.live.hit_rate) : ""}</span></div>` : ""}
         <div class="olr"><span>Aralıq (80 %)</span><span>${rg ? px(rg.lo80) + " – " + px(rg.hi80) + ` <span class="note">real tutma ${pct(rg.cover80)}</span>` : "—"}</span></div>
         <div class="olr"><span>Aralıq (50 %)</span><span>${rg ? px(rg.lo50) + " – " + px(rg.hi50) : "—"}</span></div>

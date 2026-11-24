@@ -134,8 +134,8 @@ function cardHtml(c, names) {
     head = `<p class="note">Proqnoz hələ yoxdur: ${c.candles_have} bitmiş şam var, ${c.candles_need} lazımdır.
       ${c.tf === "1d" || c.tf === "1w" ? "Bu üfüq üçün tarixçə lazımdır (admin: Capital.com və ya Twelve Data açarı)." : ""}</p>`;
   } else if (v.status === "sübut") {
-    const p = off.p_up, dir = p > 0.5 ? "yuxarı" : "aşağı";
-    head = `<div class="big ${p > 0.5 ? "up" : "down"}">${dir} · ${(Math.max(p, 1 - p) * 100).toFixed(0)} %</div>
+    const p = off.p_up, dir = p > 0.5 ? "yuxarı" : p < 0.5 ? "aşağı" : "indi fikir yoxdur";
+    head = `<div class="big ${p > 0.5 ? "up" : p < 0.5 ? "down" : "mut"}">${dir}${p === 0.5 ? "" : " · " + (Math.max(p, 1 - p) * 100).toFixed(0) + " %"}</div>
       <div class="note">${esc(names[v.method])}: ${esc(off.basis)}</div>` +
       (v.condition ? `<div class="note"><b>Şərtli sübut:</b> bu üsul yalnız «${esc(GROUP_AZ[v.condition] || v.condition)}» şəraitində
         sübut olunub (${pct(v.cond_hit_rate, 0)}, ${v.cond_n} yoxlama). Şərait dəyişəndə istiqamət göstərilməyəcək.</div>` : "");
@@ -205,7 +205,7 @@ function renderJudge(fc) {
     yalnız siqnal olanda istiqamət göstərir). 3 gün, 10 gün və 1 ay proqnozları hər gün verilir və üst-üstə düşür: p bunu nəzərə alır
     (say üfüqün gün sayına bölünür). Eyni məlumatda çox üsul yoxlandığı üçün p həddi üsulların sayına bölünür
     (indi ${card[key][2] ? card[key][2].p_bar.toFixed(4) : "—"}): təsadüfi «sübut» olmasın. «Orta qazanc»: proqnoz istiqamətində orta hərəkət;
-    alış-satış fərqindən (spread) kiçikdirsə, statistik düz olsa da pul qazandırmaz («Spreaddən kiçik»). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı.</p>`;
+    tam xərcdən (spred + sürüşmə + gecəlik haqq) kiçikdirsə, statistik düz olsa da pul qazandırmaz («xərcdən kiçik»). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı.</p>`;
   loadJudgeCharts(card).catch(() => {});
   loadWhere(card).catch(() => {});
   loadPassports().catch(() => {});
@@ -241,12 +241,12 @@ async function loadMarkets() {
 }
 async function loadPassports() {
   const d = await api(`/api/passports?symbol=${sym}`);
-  const short = { "sübut": "✓", "xərc": "spread", "yox": "✗", "az": "az" };
+  const short = { "sübut": "✓", "xərc": "xərc", "yox": "✗", "az": "az" };
   $("passports").innerHTML = `<table><tr><th>Üsul</th><th>Niyə var</th><th>Nə gözləyirik</th><th>Hakim indi (üfüq: nəticə)</th><th>Nəticə verməsə</th></tr>` +
     d.methods.map((m) => `<tr><td><b>${esc(m.name)}</b>${m.family ? `<br><span class="note">ailə: ${esc(m.family)}</span>` : ""}</td><td>${esc(m.why)}</td><td>${esc(m.expect)}</td>
       <td><div class="res">${Object.entries(m.results).map(([h, r]) => { const x = r.live && r.live.nh >= 1 && r.live.status !== "az" ? r.live : r.history || r.live || {};
         return `<span class="${x.status || "az"}" title="${x.nh ?? x.n ?? 0} yoxlama">${esc(d.horizons[h])}: ${short[x.status] || x.status || "—"}${x.hit_rate != null && m.method !== "rw" ? " " + Math.round(x.hit_rate * 100) + "%" : ""}</span>`; }).join("")}</div></td>
-      <td>${esc(m.else)}</td></tr>`).join("") + `</table><p class="note">✓ sübut · ✗ kifayət qədər yoxlama var, sübut yoxdur · spread: düzdür, amma spreaddən kiçik · az: hələ az yoxlama.</p>`;
+      <td>${esc(m.else)}</td></tr>`).join("") + `</table><p class="note">✓ sübut · ✗ kifayət qədər yoxlama var, sübut yoxdur · xərc: düzdür, amma tam xərcdən kiçik · az: hələ az yoxlama.</p>`;
 }
 async function loadWhere(card) {
   const d = await api(`/api/judge/where?symbol=${sym}&horizon=${card.horizon}&mode=history`);

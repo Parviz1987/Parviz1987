@@ -425,7 +425,7 @@ def gvz_range(gvz: float | None, price: float, days: float) -> dict | None:
 
 def weighted_view(out: dict, weights: dict | None) -> dict:
     """«Tərəzi»: every analyst's lean weighted by what the Judge measured for it on this desk (weights from
-    judge.weights: 0 for an analyst not better than the bar). Live only: in the history replay the weights would
+    learning.combine: Hedge weight > 1.05 and not below the bar in the long run, else 0). Live only: in the history replay the weights would
     come from the future, so there it stays without a view."""
     if not weights:
         return {"p_up": 0.5, "basis": "çəkilər yoxdur: Hakim hələ heç bir analitiki həddən yaxşı görməyib"}

@@ -55,8 +55,9 @@ def test_scale_weighs_only_analysts_above_the_bar():
             {"method": "fib", "hit_rate": 0.49, "nh": 400, "bar": 0.5},
             {"method": "up", "hit_rate": 0.7, "nh": 400, "bar": 0.5},
             {"method": "news", "hit_rate": 0.9, "nh": 10, "bar": 0.5}]
-    w = judge.weights(rows, k=1)
-    assert set(w) == {"momentum"} and w["momentum"] == 3.0
+    from app import learning
+    w = learning.combine({"momentum": 1.5, "fib": 0.6, "news": 2.0}, rows, k=1)   # the scale's real weights
+    assert set(w) == {"momentum"}
     v = forecast.weighted_view({"momentum": {"p_up": 0.6}, "fib": {"p_up": 0.3}}, w)
     assert v["p_up"] == 0.6 and "Momentum" in v["basis"]
     assert forecast.weighted_view({"momentum": {"p_up": 0.6}}, None)["p_up"] == 0.5

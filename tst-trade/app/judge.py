@@ -4,9 +4,10 @@ Per forecast: outcome (1 up / 0 down; an unchanged close is not scored), hit (di
 direction and gets no hit), Brier score, and whether the close fell inside the 50 % and 80 % ranges.
 Per method: hit rate against «Həmişə yuxarı», Brier skill against a coin (0.25), range coverage, and a status:
 - "az"      fewer scored forecasts than MIN_N: no verdict yet
-- "sübut"   beats the better baseline on hit rate with one-sided p < 0.05 / (number of methods) AND Brier skill > 0
-            AND its average move in the forecast's direction is larger than the bid/ask spread
-- "xərc"    statistically real but smaller than the spread: no use for trading
+- "sübut"   beats the better baseline on hit rate with one-sided p passing Holm's step-down over the direction methods
+            (alpha 0.05) AND Brier skill > 0 AND its average move in the forecast's direction is larger than the full cost
+            (spread + slippage + overnight financing)
+- "xərc"    statistically real but smaller than the full cost: no use for trading
 - "yox"     enough forecasts, no proof of skill"""
 from __future__ import annotations
 
@@ -327,7 +328,8 @@ def where(db: DB, symbol: str, horizon: str, mode: str) -> dict:
     base = {r["method"]: r for r in _stats(db, symbol, horizon, mode)}
     bar = next(iter(base.values()))["bar"] if base else 0.5
     k = steps_of(horizon)
-    cells = max(1, len([m for m in methods_for(horizon) if m not in BASELINES]) * len(groups))
+    cells = max(1, len([m for m in methods_for(horizon) if m not in BASELINES and m not in RANGE_ONLY])
+                * len(groups))
     p_bar = P_MAX / cells
     cost = full_cost(symbol, horizon)
     out = {}
@@ -366,18 +368,39 @@ def conditional(where_result: dict, session: str | None, width: float | None) ->
     return best
 
 
-def weights(rows: list[dict], k: int, skip: tuple = ("consensus", "terazi")) -> dict[str, float]:
-    """«Tərəzi»nin çəkiləri: for each analyst on one desk, how many standard errors its hit rate stands above the bar
-    (overlapping forecasts count as n / k tests). Only analysts at least one standard error above the bar weigh
-    anything; the weight is capped at 3 so one lucky streak cannot rule the scale."""
-    import math
-    out = {}
-    for r in rows:
-        m, hr, nh, bar = r["method"], r.get("hit_rate"), r.get("nh") or 0, r.get("bar") or 0.5
-        if m in BASELINES or m in skip or hr is None or nh < 30:
-            continue
-        n_eff = max(1.0, nh / max(1, k))
-        z = (hr - bar) / math.sqrt(bar * (1 - bar) / n_eff)
-        if z >= 1:
-            out[m] = round(min(z, 3.0), 2)
-    return out
+# ---------- one verdict (2026-11-24 audit: the card, the decision strip, the outlook and the brains' facts each used
+# to decide «proven or not» their own way and could disagree) ----------
+_WHERE: dict = {}
+
+
+def mode_of(live: list[dict], horizon: str) -> str:
+    """Live once any direction method has MIN_N live forecasts with a view; history until then. One rule for all."""
+    enough = any((r.get("nh") or 0) >= MIN_N[horizon] for r in live
+                 if r["method"] not in BASELINES and r["method"] not in RANGE_ONLY)
+    return "live" if enough else "history"
+
+
+def verdict(db: DB, symbol: str, horizon: str, now: float | None = None) -> dict:
+    """THE Judge's verdict for a desk: the proven method (overall, or only in the conditions right now: this session or
+    this market mood), with the mode it was judged in. Everyone who needs «proven or not» asks here."""
+    now = time.time() if now is None else now
+    live = stats(db, symbol, horizon, "live", ttl=600)
+    mode = mode_of(live, horizon)
+    rows = live if mode == "live" else stats(db, symbol, horizon, "history", ttl=600)
+    v = official(rows)
+    v["by"] = mode
+    if v["status"] == "sübut":
+        return v
+    key = (id(db), symbol, horizon, mode)
+    hit = _WHERE.get(key)
+    if not hit or now - hit[0] > 600:
+        hit = (now, where(db, symbol, horizon, mode))
+        _WHERE[key] = hit
+    rw = db.execute("SELECT lo80, hi80, price0 FROM forecasts WHERE symbol=? AND horizon=? AND mode='live' AND "
+                    "method='rw' ORDER BY issued_t DESC LIMIT 1", (symbol, horizon)).fetchone()
+    width = (rw["hi80"] - rw["lo80"]) / rw["price0"] if rw and rw["price0"] else None
+    cond = conditional(hit[1], session_of(now), width)
+    if cond:
+        return {"method": cond["method"], "status": "sübut", "by": mode, "condition": cond["group"],
+                "cond_hit_rate": cond["hit_rate"], "cond_n": cond["n"]}
+    return v
