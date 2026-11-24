@@ -92,7 +92,7 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("dollar")     # catch-up after a linked market's move: a short-horizon effect
         out.remove("oil")
         out.remove("news")       # headlines move prices for hours, not weeks
-    if h not in ("4h", "1d"):
+    if h not in ("1h", "4h", "1d"):
         out.remove("strateq")
     if h not in ("1w", "10d", "1mo"):
         out.remove("tsmom")      # the 12-month trend is a weeks-to-months effect    # the Strategist leans for the next hours to a day   # a release moves the next minutes to a day; longer horizons drown it
@@ -477,7 +477,7 @@ PASSPORT = {
     "news": {"why": "Xəbərlər qiyməti saatlarla hərəkət etdirir; Oxuyucu hər başlığı metal, istiqamət və gücə görə qiymətləndirir.",
              "expect": "15 dəqiqə – 4 saat, xüsusən böyük xəbərdən sonra.",
              "else": "Oxuyucunun modeli dəyişdirilir və ya yalnız göstərici kimi qalır (xərc azalır)."},
-    "strateq": {"why": "Claude bütün faktları (kartlar, makro, təqvim, xəbər) birləşdirib meyl deyir: beynin özünü ölçürük.",
+    "strateq": {"why": "Claude hər saat faktları (son hərəkətlər, dollar, neft, istiqraz, ABŞ rəqəmləri, xəbər) oxuyub 1 saat, 4 saat və 1 gün üçün yuxarı ehtimalı deyir: beynin özünü ölçürük.",
                 "expect": "4 saat və 1 gün.",
                 "else": "Strateq yalnız izahçı qalır, istiqamət soruşulmur (xərc azalır)."},
     "pullback": {"why": "Treyderlərin ən çox işlətdiyi qurulum: trend içində qiymət dəstəyə (EMA 20) enir və trend "

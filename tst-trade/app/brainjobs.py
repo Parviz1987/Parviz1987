@@ -11,7 +11,7 @@ import logging
 import re
 import time
 
-from . import brains, forecast, judge
+from . import brains, brainviews, candles, forecast, judge, markets
 from .db import DB
 from .keys import KeyStore
 
@@ -46,17 +46,21 @@ STRATEGIST_SYSTEM = (
     "Sən qiymətli metallar üzrə analitiksən. Sənə proqnoz kartları, Hakimin statusları, makro göstəricilər, "
     "iqtisadi təqvim və xəbər etiketləri verilir. Azərbaycan dilində, sadə və qısa izah yaz. Qaydalar: yalnız verilən "
     "faktlardan istifadə et; faktlarda olmayan heç bir rəqəm yazma; qiymət proqnozu uydurma; alış-satış məsləhəti "
-    "vermə; «sübut» statusu olmayan istiqaməti dəqiq kimi təqdim etmə və bunu açıq de. Hər metal üçün «lean» sahəsində "
-    "növbəti saatlar–1 gün üçün öz meylini yaz (up, down və ya neutral): bu, sənin fikrindir və Hakim onu ayrıca yoxlayır.")
+    "vermə; «sübut» statusu olmayan istiqaməti dəqiq kimi təqdim etmə və bunu açıq de.\n"
+    "Ayrıca, hər metal üçün öz proqnozunu ver: p1h, p4h, p1d — qiymətin 1 saat, 4 saat və 1 gün sonra indikindən YUXARI "
+    "olma ehtimalı (0..1). 0.5 «bilmirəm» deməkdir; yalnız faktlarda səbəb görəndə ondan uzaqlaş (adətən 0.4-0.6). "
+    "Faktlar: hər metalın son hərəkətləri (moves, %), əlaqəli bazarlar (dollar, neft, səhm, VIX, istiqraz), son və "
+    "gələn ABŞ rəqəmləri, xəbər etiketləri, makro. «why» sahəsində bir cümlə ilə əsas səbəbi yaz. Bu proqnozları Hakim "
+    "sonra real qiymətlə yoxlayır: düz çıxmasa, etibar qazanmır.")
 STRATEGIST_SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["summary", "metals", "watch"],
     "properties": {
         "summary": {"type": "string"},
         "metals": {"type": "array", "items": {"type": "object", "additionalProperties": False,
-                                              "required": ["symbol", "text", "lean"],
+                                              "required": ["symbol", "text", "p1h", "p4h", "p1d", "why"],
                                               "properties": {"symbol": {"type": "string"}, "text": {"type": "string"},
-                                                             "lean": {"type": "string",
-                                                                      "enum": ["up", "down", "neutral"]}}}},
+                                                             "p1h": {"type": "number"}, "p4h": {"type": "number"},
+                                                             "p1d": {"type": "number"}, "why": {"type": "string"}}}},
         "watch": {"type": "array", "items": {"type": "string"}}}}
 
 NUM = re.compile(r"\d+(?:[.,]\d+)?")
@@ -91,6 +95,20 @@ def guard_numbers(text: str, facts: str) -> str:
         if all(n in known or n.rstrip("0").rstrip(".") in {k.rstrip("0").rstrip(".") for k in known} for n in nums):
             keep.append(sentence)
     return " ".join(keep).strip()
+
+
+def _has(db: DB, table: str) -> bool:
+    return db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone() is not None
+
+
+def _moves(db: DB, sym: str, now: float) -> dict | None:
+    """How far a market moved over the last 1 h, 4 h, 1 day and 1 week, in %, from finished candles only."""
+    out = {}
+    for name, tf, back in (("1h", "15m", 4), ("4h", "15m", 16), ("1d", "1h", 24), ("1w", "1d", 5)):
+        rows = candles.closed(db, sym, tf, now, limit=back + 1)
+        if len(rows) == back + 1 and rows[0]["c"]:
+            out[name] = round((rows[-1]["c"] / rows[0]["c"] - 1) * 100, 3)
+    return out or None
 
 
 class BrainJobs:
@@ -156,7 +174,17 @@ class BrainJobs:
         news = [dict(r) for r in self.db.execute(
             "SELECT n.title, a.metals, a.direction, a.strength FROM news n JOIN news_ai a ON a.uid=n.uid "
             "WHERE n.ts > ? AND a.strength >= 2 ORDER BY n.ts DESC LIMIT 10", (now - 24 * 3600,)).fetchall()]
-        return json.dumps({"cards": cards, "macro": self.feeds.macro_view(),
+        moves = {}
+        for sym in ("XAU", "XAG", "XPT", "XPD") + tuple(markets.saved(self.db).get("epics", {})):
+            m = _moves(self.db, sym, now)
+            if m:
+                moves[sym] = m
+        released = [dict(r) for r in self.db.execute(
+            "SELECT event, estimate, actual, ts FROM releases WHERE actual IS NOT NULL AND ts BETWEEN ? AND ? "
+            "ORDER BY ts DESC LIMIT 6", (now - 12 * 3600, now)).fetchall()] if _has(self.db, "releases") else []
+        return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)), "moves_pct": moves,
+                           "released_last_12h": released,
+                           "cards": cards, "macro": self.feeds.macro_view(),
                            "calendar": [{k: e[k] for k in ("title", "impact", "forecast", "previous", "actual")}
                                         for e in self.feeds.upcoming(now)[:8]],
                            "news": news}, ensure_ascii=False)
@@ -181,10 +209,21 @@ class BrainJobs:
                "watch": [guard_numbers(str(w), facts) for w in data.get("watch", [])][:6]}
         self._rep("strateq", "working", "W4 Yaddaş", 0.9)
         self.db.put("strategist:last", json.dumps(out, ensure_ascii=False))
-        leans = {"up": 1, "down": -1, "neutral": 0}
-        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note) VALUES(?,?,?,?,?)",
-                            [(now, "strateq", m["symbol"], leans.get(m.get("lean"), 0), how)
-                             for m in data.get("metals", []) if m.get("symbol") in ("XAU", "XAG", "XPT", "XPD")])
+        rows = []
+        for m in data.get("metals", []):
+            if m.get("symbol") not in ("XAU", "XAG", "XPT", "XPD"):
+                continue
+            for h, key in (("1h", "p1h"), ("4h", "p4h"), ("1d", "p1d")):
+                try:
+                    p = float(m.get(key))
+                except (TypeError, ValueError):
+                    continue
+                if 0.0 <= p <= 1.0:
+                    lean = 1 if p > 0.52 else -1 if p < 0.48 else 0
+                    rows.append((now, "strateq", m["symbol"], lean, f"{how} · {str(m.get('why', ''))[:200]}", h, p))
+        brainviews.ensure(self.db)
+        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p) VALUES(?,?,?,?,?,?,?)",
+                            rows)
         self._state("strategist", f"izah yazıldı · {how}")
         return True
 

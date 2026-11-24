@@ -2,8 +2,9 @@
 
 - news      «Xəbər əhvalı»: the Reader's labels (metal, up/down, strength 0-3) on headlines labelled in the window
             before the forecast, summed per metal. Needs at least a clear sum (|score| >= 2) for a view.
-- strateq   «Strateqin fikri»: the Strategist's own lean per metal (up / down / neutral), from its latest hourly
-            note written before the forecast (for the 4-hour and 1-day desks).
+- strateq   «Strateqin fikri»: the Strategist's own probability that the metal is higher in 1 hour, 4 hours and 1 day,
+            from its latest hourly note written before the forecast (one row per metal and horizon). Older notes
+            (before 2026-11-24) only had a lean up / down / neutral; they still count for 4 h and 1 day.
 Both use only what was written BEFORE the forecast's issue time (60 s margin)."""
 from __future__ import annotations
 
@@ -16,13 +17,23 @@ CREATE TABLE IF NOT EXISTS brain_views (ts REAL NOT NULL, source TEXT NOT NULL, 
   lean INTEGER NOT NULL, note TEXT);
 CREATE INDEX IF NOT EXISTS brain_views_ts ON brain_views(source, metal, ts);
 """
+P_CLIP = (0.3, 0.7)          # a brain's probability is capped: one hour's view never counts as near-certain
+
+
+def ensure(db: DB) -> None:
+    db.conn.executescript(SCHEMA)
+    cols = {r[1] for r in db.execute("PRAGMA table_info(brain_views)").fetchall()}
+    if "horizon" not in cols:
+        db.execute("ALTER TABLE brain_views ADD COLUMN horizon TEXT")
+    if "p" not in cols:
+        db.execute("ALTER TABLE brain_views ADD COLUMN p REAL")
 NEWS_WINDOW = {"15m": 3600, "30m": 3600, "1h": 2 * 3600, "4h": 6 * 3600, "1d": 86400}
-STRATEQ_FOR = {"4h": 3 * 3600, "1d": 6 * 3600}       # horizon -> how old the Strategist's note may be
+STRATEQ_FOR = {"1h": 75 * 60, "4h": 3 * 3600, "1d": 6 * 3600}   # horizon -> how old the Strategist's note may be
 
 
 class Lookup:
     def __init__(self, db: DB):
-        db.conn.executescript(SCHEMA)
+        ensure(db)
         self.news: dict[str, tuple[list[float], list[int]]] = {}
         try:
             rows = db.execute("SELECT ts, metals, direction, strength FROM news_ai WHERE direction IN ('up', 'down') "
@@ -35,11 +46,19 @@ class Lookup:
                 ts, vs = self.news.setdefault(m, ([], []))
                 ts.append(r["ts"])
                 vs.append(v)
-        self.strat: dict[str, tuple[list[float], list[int]]] = {}
-        for r in db.execute("SELECT ts, metal, lean FROM brain_views WHERE source='strateq' ORDER BY ts").fetchall():
-            ts, vs = self.strat.setdefault(r["metal"], ([], []))
-            ts.append(r["ts"])
-            vs.append(int(r["lean"]))
+        # (metal, horizon) -> times and probabilities; a lean-only note maps to 0.6 / 0.4 / 0.5 for 4 h and 1 day
+        self.strat: dict[tuple[str, str], tuple[list[float], list[float]]] = {}
+        for r in db.execute("SELECT ts, metal, lean, horizon, p FROM brain_views WHERE source='strateq' "
+                            "ORDER BY ts").fetchall():
+            if r["horizon"]:
+                targets = [(r["horizon"], r["p"])]
+            else:
+                p = 0.5 + 0.1 * int(r["lean"])
+                targets = [("4h", p), ("1d", p)]
+            for h, p in targets:
+                ts, vs = self.strat.setdefault((r["metal"], h), ([], []))
+                ts.append(r["ts"])
+                vs.append(float(p if p is not None else 0.5))
 
     def views(self, metal: str, t: float, horizon: str) -> dict:
         out = {}
@@ -59,13 +78,13 @@ class Lookup:
                     out["news"] = (0.5, f"son {w // 3600} saatda {n} xəbər: aydın əhval yoxdur ({score:+d})")
         age = STRATEQ_FOR.get(horizon)
         if age:
-            ts, vs = self.strat.get(metal, ([], []))
+            ts, vs = self.strat.get((metal, horizon), ([], []))
             i = bisect.bisect_right(ts, t - 60) - 1
             if i < 0 or t - ts[i] > age:
                 out["strateq"] = (0.5, "Strateqin yeni fikri yoxdur")
-            elif vs[i] == 0:
-                out["strateq"] = (0.5, "Strateq neytraldır")
+            elif abs(vs[i] - 0.5) < 0.02:
+                out["strateq"] = (0.5, "Strateq bilmir deyir (50 %)")
             else:
-                out["strateq"] = (0.6 if vs[i] > 0 else 0.4,
-                                  f"Strateq {'yuxarı' if vs[i] > 0 else 'aşağı'} meyllidir")
+                p = round(min(max(vs[i], P_CLIP[0]), P_CLIP[1]), 4)
+                out["strateq"] = (p, f"Strateq: yuxarı ehtimalı {round(vs[i] * 100)} %")
         return out
