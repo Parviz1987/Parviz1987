@@ -12,7 +12,7 @@ import os
 import time
 import traceback
 
-from . import brains, brainviews, candles, forecast, hypotheses, judge, learning, registry, signals
+from . import brains, brainviews, candles, forecast, hypotheses, impulse, judge, learning, registry, signals
 from . import feeds as feeds_mod
 from .db import DB
 
@@ -175,6 +175,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "pipeline": _pipeline(db, keys, engine, feeds, jobs),
         "brain_score": _slow("brain_score", lambda: brainviews.score(db, time.time())),
         "hypotheses": _slow("hypotheses", lambda: hypotheses.evaluate(db)),
+        "impulse_study": _slow("impulse", lambda: impulse.study(db), ttl=3600),
         "learning": {"ab_lessons": _slow("ab", lambda: learning.ab_report(db)), "lessons": learning.active_lessons(db),
                      "sleep": json.loads(db.get("sleep:last") or "null"), "calib": json.loads(db.get("calib") or "null"),
                      "nerve": json.loads(db.get("nerve:state") or "null"), "backup": json.loads(db.get("backup:last") or "null")},
