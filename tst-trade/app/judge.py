@@ -101,14 +101,12 @@ def score_due(db: DB, now: float | None = None) -> int:
         step = candles.TF[tf]
         sub = ("(SELECT {col} FROM candles c WHERE c.symbol=f.symbol AND c.tf=? AND c.t>=f.issued_t "
                "ORDER BY c.t LIMIT 1 OFFSET ?)")
-        cur = db.execute(
+        rows = db.iterate(
             "SELECT f.id, f.issued_t, f.target_t, f.price0, f.p_up, f.lo50, f.hi50, f.lo80, f.hi80, "
             f"{sub.format(col='c.c')} AS close1, {sub.format(col='c.t')} AS t1 "
             "FROM forecasts f WHERE f.horizon=? AND f.scored_ts IS NULL AND f.target_t <= ?",
             (tf, k - 1, tf, k - 1, h, now))
-        # Read in chunks: after a history replay there can be 100 000+ open rows and the server has 512 MB.
-        rows = iter(lambda: cur.fetchmany(5000), [])
-        rows = (r for chunk in rows for r in chunk)
+        # streamed through its own connection: after a history replay there can be 100 000+ open rows
         for r in rows:
             t1 = r["t1"]
             # The target is exactly the expected candle; for daily candles the expected weekday (weekends skipped),

@@ -32,6 +32,41 @@ CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
 """
 
 
+class Rows:
+    """A finished query: its rows were read while the lock was held. The one shared connection is used by the event
+    loop and by worker threads; a cursor read after the lock is released can be overwritten by another thread's
+    statement (seen 2026-11-24: «IndexError: tuple index out of range» inside fetchall). Behaves like a cursor for
+    fetchone / fetchall / iteration, and keeps rowcount and lastrowid of writes."""
+    __slots__ = ("rows", "rowcount", "lastrowid", "_i")
+
+    def __init__(self, rows: list, rowcount: int = -1, lastrowid: int | None = None):
+        self.rows, self.rowcount, self.lastrowid, self._i = rows, rowcount, lastrowid, 0
+
+    def fetchone(self):
+        if self._i < len(self.rows):
+            self._i += 1
+            return self.rows[self._i - 1]
+        return None
+
+    def fetchall(self) -> list:
+        out = self.rows[self._i:]
+        self._i = len(self.rows)
+        return out
+
+    def fetchmany(self, n: int = 1000) -> list:
+        out = self.rows[self._i:self._i + n]
+        self._i += len(out)
+        return out
+
+    def __iter__(self):
+        while self._i < len(self.rows):
+            self._i += 1
+            yield self.rows[self._i - 1]
+
+    def __getitem__(self, i):
+        return self.rows[i]
+
+
 class DB:
     def __init__(self, path: Path | str):
         if str(path) != ":memory:":
@@ -49,9 +84,31 @@ class DB:
         with self.lock:
             self.conn.executescript(sql)
 
-    def execute(self, sql: str, args: tuple | list = ()) -> sqlite3.Cursor:
+    def execute(self, sql: str, args: tuple | list = ()) -> Rows:
+        """Run one statement and read its rows while holding the lock (see Rows). For very large reads use iterate."""
         with self.lock:
-            return self.conn.execute(sql, args)
+            cur = self.conn.execute(sql, args)
+            rows = cur.fetchall() if cur.description is not None else []
+            return Rows(rows, cur.rowcount, cur.lastrowid)
+
+    def iterate(self, sql: str, args: tuple | list = (), size: int = 5000):
+        """Stream a large read (hundreds of thousands of rows) through its own short-lived connection: WAL lets it
+        read while others write, nothing is shared, and memory stays small. An in-memory database (tests) has no
+        second connection: it is read through execute."""
+        if self.path == ":memory:":
+            yield from self.execute(sql, args)
+            return
+        conn = sqlite3.connect(self.path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        try:
+            cur = conn.execute(sql, args)
+            while True:
+                chunk = cur.fetchmany(size)
+                if not chunk:
+                    break
+                yield from chunk
+        finally:
+            conn.close()
 
     def executemany(self, sql: str, rows) -> None:
         with self.lock:

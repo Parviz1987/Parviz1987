@@ -44,7 +44,7 @@ def _p_two(hits: int, n: int) -> float | None:
 
 def _load(db: DB, sym: str):
     ts, cs, vs = array("q"), array("d"), array("d")
-    for r in db.execute("SELECT t, c, v FROM fut_candles WHERE symbol=? ORDER BY t", (sym,)):
+    for r in db.iterate("SELECT t, c, v FROM fut_candles WHERE symbol=? ORDER BY t", (sym,)):
         ts.append(int(r["t"]))
         cs.append(float(r["c"]))
         vs.append(float(r["v"] or 0))
@@ -58,7 +58,7 @@ def check(db: DB, loaded: dict | None = None) -> dict:
     for sym in SYMBOLS:
         ts = (loaded or {}).get(sym)
         if ts is None:
-            ts = array("q", (int(r["t"]) for r in db.execute("SELECT t FROM fut_candles WHERE symbol=? ORDER BY t",
+            ts = array("q", (int(r["t"]) for r in db.iterate("SELECT t FROM fut_candles WHERE symbol=? ORDER BY t",
                                                                (sym,))))
         if not len(ts):
             out[sym] = {"n": 0}
