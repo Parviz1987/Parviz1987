@@ -29,7 +29,8 @@ async function load() {
   $("s-src").innerHTML = `<table><tr><th>Mənbə</th><th>Vəziyyət</th><th>Son yoxlama</th><th>Qeyd</th></tr>` +
     Object.entries(d.sources).map(([k, h]) => {
       if (h.ok === false) problems.push(`${SRC[k] || k}: ${h.message}`);
-      return `<tr><td>${SRC[k] || k}</td><td>${pill(h.ok, h.ok ? "işləyir" : h.ok === false ? "xəta" : "gözlənilir")}</td>
+      const word = h.off ? "istifadə olunmur" : h.ok ? "işləyir" : h.ok === false ? "xəta" : "gözlənilir";
+      return `<tr><td>${SRC[k] || k}</td><td>${h.off ? `<span class="pill next">${word}</span>` : pill(h.ok, word)}</td>
       <td>${ago(h.checked)}</td><td>${esc(h.message || "")}</td></tr>`;
     }).join("") + "</table>";
   $("s-keys").innerHTML = `<table><tr><th>Yer</th><th>Saxlanıb</th><th>Son yoxlama</th></tr>` +

@@ -82,3 +82,13 @@ def test_kalshi_price_in_cents_or_dollars():
     assert kalshi_prob({"last_price": 0, "yes_bid": 10, "yes_ask": 14}) == 0.12
     assert kalshi_prob({"yes_bid_dollars": "0.30", "yes_ask_dollars": "0.40"}) == 0.35
     assert kalshi_prob({}) is None
+
+
+def test_a_source_not_used_on_purpose_is_not_an_error():
+    db = DB(":memory:")
+    f = Feeds(db, KeyStore(db, "s" * 64))
+    f._health("fmp", None, "istifadə olunmur")
+    h = f.health("fmp")
+    assert h["ok"] is None and h["off"] is True
+    f._health("fmp", True, "işləyir")
+    assert f.health("fmp")["off"] is False

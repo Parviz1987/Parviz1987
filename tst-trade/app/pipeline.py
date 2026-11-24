@@ -38,6 +38,14 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     # e.g. Brent before the London open) is silent for minutes without anything being wrong. Missing = nothing for
     # RELATED_SILENT while the metals trade.
     ages = {c: now - engine.quotes[c]["recv_ts"] if c in engine.quotes else None for c in epics}
+    def last_candle(c):
+        r = db.execute("SELECT MAX(t) m FROM candles WHERE symbol=? AND tf='15m'", (c,)).fetchone()
+        return r["m"] if r and r["m"] else None
+    for c, a in list(ages.items()):
+        if a is None or a > RELATED_SILENT:        # nothing streamed: the broker's own bars may still be fresh
+            lc = last_candle(c)
+            if lc and now - lc < 2 * RELATED_SILENT:
+                ages[c] = min(a if a is not None else 1e9, RELATED_SILENT)
     missing = [c for c, a in ages.items() if a is None or a > RELATED_SILENT]
     quiet = [c for c, a in ages.items() if a is not None and 120 < a <= RELATED_SILENT]
     if open_ and epics:

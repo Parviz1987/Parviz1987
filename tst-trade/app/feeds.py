@@ -277,11 +277,14 @@ class Feeds:
         self.activity = None      # app.activity.Hub: where each collector reports its status
         db.script(surprise.SCHEMA)
 
-    def _health(self, sid: str, ok: bool, msg: str, rows: int = 0) -> None:
+    def _health(self, sid: str, ok: bool | None, msg: str, rows: int = 0) -> None:
+        """ok True: works; False: an error to fix; None: deliberately not used (shown grey, not as a problem)."""
         prev = json.loads(self.db.get(f"src:{sid}") or "{}")
         now = time.time()
-        h = {**prev, "checked": now, "message": msg[:300], "rows": rows}
-        if ok:
+        h = {**prev, "checked": now, "message": msg[:300], "rows": rows, "off": ok is None}
+        if ok is None:
+            h["ok"] = None
+        elif ok:
             h["ok_ts"] = now
             h["ok"] = True
         else:
@@ -573,9 +576,12 @@ class Feeds:
             except Exception as e:
                 errors.append(str(e).replace(key, "***")[:120])
                 if "HTTP 402" in str(e) or "HTTP 403" in str(e):
-                    errors[-1] = "FMP planınız iqtisadi təqvimi vermir (HTTP 402/403): faktiki rəqəmlər üçün plan lazımdır"
-                    self.next_run["fmp"] = time.time() + 6 * 3600   # the plan will not change in 5 minutes
-                    break
+                    # The owner decided not to buy the calendar plan (2026-11-24): the actuals come from BLS / FRED.
+                    # Not an error: the source is simply not used; asked again once a day in case the plan changes.
+                    self.next_run["fmp"] = time.time() + 86400
+                    self._health("fmp", None, "istifadə olunmur: FMP planında təqvim yoxdur. ABŞ rəqəmlərinin faktı "
+                                              "rəsmi mənbələrdən (BLS, FRED) gəlir; plan alınsa, özü qoşulacaq.", 0)
+                    return
                 if "HTTP 4" in str(e):
                     break          # a bad key or request: asking again changes nothing
         last = self.db.execute("SELECT raw_date, event FROM releases WHERE actual IS NOT NULL AND impact='High' "

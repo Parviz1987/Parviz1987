@@ -252,3 +252,4 @@ div.res span.sübut{background:var(--up-soft);color:var(--up)}div.res span.yox{c
 @media (max-width:800px){.hud{grid-template-columns:minmax(0,1fr)}.hgrid{grid-template-columns:72px repeat(6,minmax(0,1fr))}}
 /* simple mode: price, strip, flow and decisions only */
 body.simple .main,body.simple .split,body.simple .feeds,body.simple .box[data-fold],body.simple .jump{display:none}
+.pill.QUIET{background:var(--info-soft);color:var(--info)}

@@ -325,6 +325,20 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         finally:
             hub.subscribers.discard(q)
 
+    def related_quote(code: str, now: float) -> tuple[float | None, str, float | None]:
+        """A linked market's price for the panel: the live quote, or — when the stream has sent nothing for a while
+        (a quiet market sends a price only when it changes, e.g. the 10-year note at night) — the last candle's close,
+        marked QUIET with its time. OFFLINE only when nothing came for 2 hours."""
+        q = engine.quotes.get(code)
+        st = engine.status(code, now) if q else "OFFLINE"
+        if st in ("LIVE", "DELAYED"):
+            return q["price"], st, q["recv_ts"]
+        last = db.execute("SELECT t, c FROM candles WHERE symbol=? AND tf='1m' ORDER BY t DESC LIMIT 1", (code,)).fetchone() \
+            or db.execute("SELECT t, c FROM candles WHERE symbol=? AND tf='15m' ORDER BY t DESC LIMIT 1", (code,)).fetchone()
+        if last and now - last["t"] < 2 * 3600:
+            return last["c"], "QUIET", last["t"]
+        return (last["c"] if last else None), "OFFLINE", (last["t"] if last else None)
+
     @app.get("/api/signals")
     async def signals_api(symbol: str = "XAU", hours: float = 48):
         """The alarms of one metal (and the market-wide ones) for the chart's marks: when, what kind, why."""
@@ -345,11 +359,10 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         now = time.time()
         rows = []
         for code in mk.saved(db).get("epics", {}):
-            q = engine.quotes.get(code)
+            price, st, _ = related_quote(code, now)
             day = candles.get(db, code, "1d", limit=1)
             rows.append({"code": code, "name": mk.RELATED.get(code, {}).get("name", code),
-                         "price": q["price"] if q else None, "day_open": day[-1]["o"] if day else None,
-                         "status": engine.status(code, now) if q else "OFFLINE", "kind": "bazar"})
+                         "price": price, "day_open": day[-1]["o"] if day else None, "status": st, "kind": "bazar"})
         day0 = int(now // 86400 * 86400)
         for sym in ETF_SYMBOLS:
             last = candles.get(db, sym, "15m", limit=1)
@@ -515,7 +528,9 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             if row["live"]:
                 q = engine.quotes.get(code)
                 day = candles.get(db, code, "1d", limit=1)
-                row.update({"price": q["price"] if q else None, "status": engine.status(code, now) if q else "OFFLINE",
+                price, st, seen = related_quote(code, now) if code not in candles.METALS else \
+                    (q["price"] if q else None, engine.status(code, now) if q else "OFFLINE", None)
+                row.update({"price": price, "status": st, "seen": seen,
                             "day_open": day[-1]["o"] if day else None,
                             "spark": [c["c"] for c in candles.get(db, code, "1h", limit=48)]})
                 if code != metal:
