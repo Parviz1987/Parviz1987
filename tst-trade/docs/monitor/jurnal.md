@@ -69,3 +69,13 @@
   - Canlı yoxlama üçün **H13** kimi əvvəlcədən qeyd olundu (12:00 UTC-dən sayılır).
 
 **Diqqət:** verilənlər bazası böyüyür: fyuçers məlumatı, yeni üsulların tarixçəsi və qayda siqnalları. Disk yerinə həftəlik baxılmalıdır.
+
+## 2026-11-24 07:48 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** təmiz.
+  - Bloklanan ünvan yoxdur. 24 saatda 1 uğurlu giriş və 2 açar qeydi (Databento, BLS) olub, ikisi də tanış ünvandandır.
+  - Təhlükəsizlik başlıqları yerindədir.
+- **Server:** versiya 3f0f50e, xəta yoxdur. Sonuncu xəta 10:42 UTC-də olub, gecəki düzəldilmiş xətadır. Yaddaş: 161 MB istifadə olunur, 532 MB boşdur.
+- **Düzəldildi (iki yalançı xəbərdarlıq):**
+  - «Oxuyucu gözləyir»: eyni xəbərin surətləri də sayılırdı, halbuki onlar qəsdən oxunmur.
+  - «Vaxtı keçib yoxlanmayan 129»: bazarın gündəlik fasiləsinə və həftəsonuna düşən proqnozlar da sayılırdı, halbuki onların şamı yoxdur və Hakim onları bir gündən sonra təxmin etmədən buraxır.
+- **Bazanın ölçüsü:** 792 MB. Təklif `teklifler.md`-də yazılıb.

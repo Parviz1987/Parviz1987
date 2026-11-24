@@ -82,8 +82,13 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     out.append(_row("Xəbər mənbələri (RSS, Benzinga, Grok)", "Oxuyucu", "ok" if n1h else "warn",
                     f"son 1 saatda {n1h} başlıq", n1h))
     try:
-        stuck = db.execute("SELECT COUNT(*) FROM news n LEFT JOIN news_ai a ON a.uid=n.uid WHERE a.uid IS NULL "
-                           "AND n.ts BETWEEN ? AND ?", (now - 6 * 3600, now - 900)).fetchone()[0]
+        # Block 17: only the first headline of an event is read; its copies are not «waiting» (they never will be)
+        from . import newsevents
+        newsevents.ensure(db)
+        stuck = db.execute("SELECT COUNT(*) FROM news n LEFT JOIN news_ai a ON a.uid=n.uid "
+                           "LEFT JOIN news_event e ON e.uid=n.uid WHERE a.uid IS NULL AND n.ts BETWEEN ? AND ? "
+                           "AND (e.uid IS NULL OR e.uid = (SELECT e2.uid FROM news_event e2 WHERE e2.event_id=e.event_id "
+                           "ORDER BY e2.ts, e2.uid LIMIT 1))", (now - 6 * 3600, now - 900)).fetchone()[0]
     except Exception:
         stuck = 0
     labelled = db.execute("SELECT COUNT(*) FROM news_ai WHERE ts > ?", (now - 3600,)).fetchone()[0]
@@ -124,8 +129,13 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
         out.append(_row("Proqnoz masaları (15 dəq – 4 saat)", "Hakim", "ok" if not late else "warn",
                         "hamısı vaxtında" if not late else "gecikir: " + ", ".join(late), len(late)))
     # 9. Judge: overdue intraday forecasts not scored
-    overdue = db.execute("SELECT COUNT(*) FROM forecasts WHERE scored_ts IS NULL AND horizon IN ('15m','30m','1h','4h') "
-                         "AND target_t < ?", (now - 3 * 3600,)).fetchone()[0]
+    # a target that fell while the market was closed (daily break, weekend) has no candle and is dropped after a day
+    # by the Judge, never guessed: it is not «overdue». Only targets in open market hours count.
+    from .engine import market_open
+    overdue = sum(1 for r in db.execute("SELECT target_t FROM forecasts WHERE scored_ts IS NULL AND horizon IN "
+                                        "('15m','30m','1h','4h') AND target_t < ?", (now - 3 * 3600,)).fetchall()
+                  if market_open(r["target_t"] - 60)
+                  and time.gmtime(r["target_t"] - 60).tm_hour not in (21, 22))   # the metals' daily break (UTC)
     out.append(_row("Hakim (proqnozları yoxlayır)", "kartlar, dəqiqlik qrafikləri",
                     "ok" if overdue < 50 else "warn", f"vaxtı keçib yoxlanmayan {overdue}", overdue))
 
