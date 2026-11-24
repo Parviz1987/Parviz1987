@@ -51,7 +51,7 @@ def build(db: DB, sym: str) -> dict:
             cov = (hist.get("rw") or {}).get("cover80")
         out["range"] = {"lo50": rw["lo50"], "hi50": rw["hi50"], "lo80": rw["lo80"], "hi80": rw["hi80"], "cover80": cov}
     # voice 1: Strateq's latest 1-day card
-    card = next((c for c in cards.recent(db, sym, 40) if c["horizon"] == H), None)
+    card = next((c for c in cards.recent(db, sym, 80) if c["horizon"] == H and c["source"] == "strateq"), None)
     summ = cards.summary(db).get(f"strateq:{H}", {})
     if card:
         p = card["p_cal"] if card["p_cal"] is not None else card["p"]

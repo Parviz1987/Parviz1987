@@ -43,3 +43,7 @@ def test_build_keeps_own_ranges():
     m = fc["methods"]
     assert m["gvz"]["hi80"] != m["rw"]["hi80"] and m["garch"]["hi80"] != m["rw"]["hi80"]
     assert m["momentum"]["hi80"] == m["rw"]["hi80"]
+
+
+def test_every_family_has_a_name():
+    assert set(forecast.FAMILY.values()) <= set(forecast.FAMILY_NAMES)

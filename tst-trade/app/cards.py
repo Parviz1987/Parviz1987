@@ -32,8 +32,12 @@ _VERSION: str | None = None     # read at the first card; the server restarts on
 
 def ensure(db: DB) -> None:
     db.script(SCHEMA)
+    import sqlite3
     if "rules" not in {r[1] for r in db.execute("PRAGMA table_info(forecast_cards)").fetchall()}:
-        db.execute("ALTER TABLE forecast_cards ADD COLUMN rules TEXT")      # Block 27: the rules a view rests on
+        try:
+            db.execute("ALTER TABLE forecast_cards ADD COLUMN rules TEXT")  # Block 27: the rules a view rests on
+        except sqlite3.OperationalError:
+            pass                                                            # another thread added it first
 
 
 def version() -> str:
@@ -93,7 +97,7 @@ def freeze(db: DB, now: float, source: str, data: dict, how: str, facts_json: st
         facts = json.loads(facts_json)
     except ValueError:
         facts = {}
-    q = json.dumps(quality(facts), ensure_ascii=False)
+    q = json.dumps([] if source == "chartist" else quality(facts), ensure_ascii=False)   # charts only: own inputs
     try:
         bands = json.loads(db.get("calib") or "{}").get("bands", {})
     except ValueError:

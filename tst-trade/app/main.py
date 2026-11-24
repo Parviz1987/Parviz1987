@@ -599,13 +599,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return {"symbol": symbol, "horizons": forecast.HORIZON_NAMES, "methods": rows}
 
     def _where(symbol: str, horizon: str, mode: str) -> dict:
-        key = ("where", symbol, horizon, mode)
-        hit = _series_cache.get(key)
-        if hit and time.time() - hit[0] < 600:   # a heavy grouping; the picture changes slowly
-            return hit[1]
-        out = judge.where(db, symbol, horizon, mode)
-        _series_cache[key] = (time.time(), out)
-        return out
+        return judge.where_cached(db, symbol, horizon, mode)      # the Judge's shared cache
 
     @app.get("/api/judge/where")
     async def judge_where(symbol: str, horizon: str, mode: str = "history"):
@@ -787,7 +781,10 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 if '"vwap"' not in (db.get("futstudy:last") or ""):
                     from . import futstudy
                     await asyncio.sleep(90)
-                    await asyncio.to_thread(futstudy.run_and_store, db)
+                    try:          # a failed recompute never touches the finished download's record
+                        await asyncio.to_thread(futstudy.run_and_store, db)
+                    except Exception as e:
+                        log.warning("futures study: %s", e)
                 return
             if not appr or not key:
                 return

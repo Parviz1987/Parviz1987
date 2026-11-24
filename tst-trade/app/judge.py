@@ -373,6 +373,17 @@ def conditional(where_result: dict, session: str | None, width: float | None) ->
 _WHERE: dict = {}
 
 
+def where_cached(db: DB, symbol: str, horizon: str, mode: str, now: float | None = None, ttl: float = 1800) -> dict:
+    """One shared cache for the heavy session/mood grouping (the card, the decision strip and the page all use it)."""
+    now = time.time() if now is None else now
+    key = (id(db), symbol, horizon, mode)
+    hit = _WHERE.get(key)
+    if not hit or now - hit[0] > ttl:
+        hit = (now, where(db, symbol, horizon, mode))
+        _WHERE[key] = hit
+    return hit[1]
+
+
 def mode_of(live: list[dict], horizon: str) -> str:
     """Live once any direction method has MIN_N live forecasts with a view; history until then. One rule for all."""
     enough = any((r.get("nh") or 0) >= MIN_N[horizon] for r in live
@@ -391,16 +402,16 @@ def verdict(db: DB, symbol: str, horizon: str, now: float | None = None) -> dict
     v["by"] = mode
     if v["status"] == "sübut":
         return v
-    key = (id(db), symbol, horizon, mode)
-    hit = _WHERE.get(key)
-    if not hit or now - hit[0] > 600:
-        hit = (now, where(db, symbol, horizon, mode))
-        _WHERE[key] = hit
+    hit = (now, where_cached(db, symbol, horizon, mode, now))
     rw = db.execute("SELECT lo80, hi80, price0 FROM forecasts WHERE symbol=? AND horizon=? AND mode='live' AND "
                     "method='rw' ORDER BY issued_t DESC LIMIT 1", (symbol, horizon)).fetchone()
     width = (rw["hi80"] - rw["lo80"]) / rw["price0"] if rw and rw["price0"] else None
     cond = conditional(hit[1], session_of(now), width)
     if cond:
+        f = db.execute("SELECT p_up FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND mode='live' "
+                       "ORDER BY issued_t DESC LIMIT 1", (symbol, horizon, cond["method"])).fetchone()
+        if not f or f["p_up"] == 0.5:
+            return v                                  # proven in these conditions, but it has no view right now
         return {"method": cond["method"], "status": "sübut", "by": mode, "condition": cond["group"],
                 "cond_hit_rate": cond["hit_rate"], "cond_n": cond["n"]}
     return v

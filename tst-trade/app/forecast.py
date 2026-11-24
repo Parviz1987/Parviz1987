@@ -51,7 +51,8 @@ FAMILY = {"chartist": "chart", "sam": "revert", "ichimoku": "trend", "pair": "cr
           "news": "brain", "strateq": "brain", "brain2": "brain", "debate": "brain", "session": "time", "seans": "time", "trendmix": "trend", "cot": "position",
           "season": "calendar", "jewel": "calendar"}
 FAMILY_NAMES = {"trend": "trend", "revert": "geri dönüş", "cross": "bazarlar arası", "fund": "fundamental",
-                "brain": "beyinlər", "time": "vaxt", "position": "fond mövqeləri", "calendar": "təqvim"}
+                "brain": "beyinlər", "time": "vaxt", "position": "fond mövqeləri", "calendar": "təqvim",
+                "chart": "qrafik analitiki"}
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
                 "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)", "tsmom": "12 aylıq trend + istiqraz",
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "pullback": "Trend içində geri çəkilmə", "macro": "Makro (real faiz + dollar)",
