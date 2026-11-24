@@ -19,6 +19,7 @@ from .providers.twelvedata import TwelveDataHistory, TwelveDataPrices
 
 log = logging.getLogger("tst.engine")
 HISTORY_EVERY = 6 * 3600
+JOBS_EVERY = 15             # seconds between brain-job checks (reader, signals, alarms, scout, strategist)
 HISTORY_LIMIT = {"1m": 1500, "15m": 1500, "30m": 1500, "1h": 1500, "4h": 1500, "1d": 2000, "1w": 600}
 BACKTEST_MAX = 2000
 TICK_KEEP = 3 * 86400
@@ -517,8 +518,22 @@ class Engine:
         if scored:
             self._rep("judge", "done", note=f"{scored} proqnoz yoxlandı")
 
+    async def _jobs_loop(self) -> None:
+        """The brains in their own loop: an alarm must not wait behind a history reload (minutes after an update)."""
+        while not self._stop.is_set():
+            try:
+                await self.jobs.tick()
+            except Exception:
+                log.exception("brain jobs failed")
+            try:
+                await asyncio.wait_for(self._stop.wait(), JOBS_EVERY)
+            except asyncio.TimeoutError:
+                pass
+
     async def run(self) -> None:
         last_prune = 0.0
+        if self.jobs is not None:
+            self._jobs_task = asyncio.create_task(self._jobs_loop())
         try:
             # Off the event loop: a large one-time clean-up must not keep /healthz from answering after an update.
             await asyncio.to_thread(self.migrate)
@@ -537,8 +552,6 @@ class Engine:
                 if self.feeds is not None:
                     await self.feeds.tick()
                 await self.backfill()
-                if self.jobs is not None:
-                    await self.jobs.tick()
                 self._rep("orch", "done", note=f"dövr {time.time() - t_start:.1f} san")
             except Exception as e:   # the loop must survive one bad poll
                 log.exception("engine step failed")

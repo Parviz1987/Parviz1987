@@ -54,3 +54,25 @@ def test_alarm_runs_strategist_at_once_with_what_happened(monkeypatch):
     signals.emit(db, "x2", "news", "Another", 3, "XAU", NOW + 60)
     asyncio.run(jobs.tick(NOW + 60))
     assert len(seen) == 1                                 # 15-minute gap between alarms
+
+
+def test_brain_jobs_run_while_the_main_loop_is_busy():
+    """An alarm must not wait behind a slow history reload: the brains have their own loop."""
+    from app.engine import Engine
+
+    class Jobs:
+        n = 0
+
+        async def tick(self):
+            Jobs.n += 1
+
+    db = DB(":memory:")
+    eng = Engine(db, KeyStore(db, "s" * 64), "demo", 15, None, Jobs())
+
+    async def slow_backfill(force=False):
+        await asyncio.sleep(0.3)
+        eng._stop.set()
+        return {}
+    eng.backfill = slow_backfill
+    asyncio.run(eng.run())
+    assert Jobs.n >= 1

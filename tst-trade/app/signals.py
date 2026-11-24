@@ -86,7 +86,10 @@ def from_moves(db: DB, now: float, symbols: list[str]) -> int:
         rets = [abs(b["c"] / a["c"] - 1) for a, b in zip(rows, rows[1:]) if a["c"] and b["t"] - a["t"] == 900]
         if len(rets) < 40:
             continue
-        usual = sorted(rets[:-1])[len(rets[:-1]) // 2]
+        moved = sorted(r for r in rets[:-1] if r > 0)      # flat candles (market closed, holiday) are not «usual»
+        if len(moved) < 30:
+            continue
+        usual = moved[len(moved) // 2]
         last = rows[-1]["c"] / rows[-2]["c"] - 1 if rows[-2]["c"] else 0
         if abs(last) >= max(MOVE_X * usual, MOVE_MIN):
             n += emit(db, f"move:{sym}:{rows[-1]['t']}", "move",
