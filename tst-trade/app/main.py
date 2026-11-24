@@ -745,6 +745,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     db.put("futures:running", "0")       # a download cut by a restart is not «running»
 
+    # The owner approved the 8.76 $ quote in the chat with Claude (2026-11-24 ~08:50 UTC: «Təsdiq olundu 8.76 $ ... man
+    # təsdiq edim», then «işlədisə özün idarə elə») before the approval was stored here. Recorded once, with a 9 $ cap.
+    if db.get("futures:approved") is None and db.get("futures:quote"):
+        db.put("futures:approved", json.dumps({"limit_usd": 9.0, "ts": time.time(),
+                                               "by": "sahib, Claude ilə çatda 2026-11-24 (8.76 $ təsdiqi)"}))
+
     async def futures_resume():
         """A download the owner approved but a restart cut off goes on by itself (stored months are skipped, so
         nothing is paid twice; the approved limit still applies)."""
