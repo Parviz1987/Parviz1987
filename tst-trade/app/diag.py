@@ -12,7 +12,7 @@ import os
 import time
 import traceback
 
-from . import brains, candles, forecast, judge, registry
+from . import brains, candles, forecast, judge, registry, signals
 from .db import DB
 
 SCHEMA = """
@@ -219,6 +219,8 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "pipeline": _pipeline(db, keys, engine, feeds, jobs),
         "candle_check": _candle_check(db),
         "forecast_check": _forecast_check(db),
+        "signals": {"recent": signals.recent(db, 10),
+                    "alarms_today": db.get("alarm:count")},
         "security": _security(db),
         "related": {**json.loads(db.get("related:epics") or "{}"),
                     "quotes": {c: engine.status(c, now) for c in json.loads(db.get("related:epics") or "{}").get("epics", {})}},

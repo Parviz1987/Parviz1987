@@ -11,11 +11,13 @@ import logging
 import re
 import time
 
-from . import brains, brainviews, candles, forecast, judge, markets
+from . import brains, brainviews, candles, forecast, judge, markets, signals
 from .db import DB
 from .keys import KeyStore
 
 READER_EVERY, STRATEGIST_EVERY = 120, 3600
+ALARM_GAP, ALARMS_PER_DAY = 15 * 60, 12          # an alarm analysis at most every 15 minutes, 12 a day (cost cap)
+SCOUT_ALARMS_PER_DAY = 3                         # a fresh X search before the analysis, for news alarms only
 READER_BATCH = 15
 
 log = logging.getLogger("tst.brainjobs")
@@ -158,7 +160,7 @@ class BrainJobs:
         self._state("reader", f"{saved} başlıq qiymətləndirildi · {how}")
         return saved
 
-    def facts(self, now: float) -> str:
+    def facts(self, now: float, trigger: list[dict] | None = None) -> str:
         cards = []
         for sym in ("XAU", "XAG", "XPT", "XPD"):
             for h in forecast.HORIZONS:
@@ -182,7 +184,8 @@ class BrainJobs:
         released = [dict(r) for r in self.db.execute(
             "SELECT event, estimate, actual, ts FROM releases WHERE actual IS NOT NULL AND ts BETWEEN ? AND ? "
             "ORDER BY ts DESC LIMIT 6", (now - 12 * 3600, now)).fetchall()] if _has(self.db, "releases") else []
-        return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)), "moves_pct": moves,
+        return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)),
+                           "what_just_happened": [s["text"] for s in (trigger or [])], "moves_pct": moves,
                            "released_last_12h": released,
                            "cards": cards, "macro": self.feeds.macro_view(),
                            "calendar": [{k: e[k] for k in ("title", "impact", "forecast", "previous", "actual")}
@@ -193,9 +196,10 @@ class BrainJobs:
         if self.activity is not None:
             self.activity.report(task, status, *a, **k)
 
-    async def strategist(self, now: float) -> bool:
-        self._rep("strateq", "working", "W1 Faktlar", 0.1)
-        facts = self.facts(now)
+    async def strategist(self, now: float, trigger: list[dict] | None = None) -> bool:
+        """The hourly analysis, or at once after an alarm (trigger: the signals that woke it)."""
+        self._rep("strateq", "working", "W1 Faktlar", 0.1, ("Həyəcan: " + trigger[0]["text"]) if trigger else "")
+        facts = self.facts(now, trigger)
         self._rep("strateq", "working", "W2 Beyin", 0.35)
         data, how = await brains.run(self.db, self.keys, "strategist", STRATEGIST_SYSTEM,
                                      "Faktlar (JSON):\n" + facts, STRATEGIST_SCHEMA, max_tokens=3000)
@@ -220,7 +224,8 @@ class BrainJobs:
                     continue
                 if 0.0 <= p <= 1.0:
                     lean = 1 if p > 0.52 else -1 if p < 0.48 else 0
-                    rows.append((now, "strateq", m["symbol"], lean, f"{how} · {str(m.get('why', ''))[:200]}", h, p))
+                    tag = "həyəcan · " if trigger else ""
+                    rows.append((now, "strateq", m["symbol"], lean, f"{tag}{how} · {str(m.get('why', ''))[:200]}", h, p))
         brainviews.ensure(self.db)
         self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p) VALUES(?,?,?,?,?,?,?)",
                             rows)
@@ -294,7 +299,33 @@ class BrainJobs:
             self._rep("reader", "working", note="başlıqlar qiymətləndirilir")
             n = await self.reader(now)
             self._rep("reader", "done", note=f"{n} başlıq" if n else self.state("reader").get("message", "yeni başlıq yoxdur"))
-        if now >= self.next_strategist:
+        # the nerves: a strong headline, a confirmed US figure or a sharp move wakes the analysis at once
+        try:
+            syms = ["XAU", "XAG", "XPT", "XPD"] + list(markets.saved(self.db).get("epics", {}))
+            signals.scan(self.db, now, syms)
+            alarm = signals.pending(self.db, now)
+        except Exception:
+            log.exception("signals failed")
+            alarm = []
+        day = time.strftime("%Y-%m-%d", time.gmtime(now))
+        count = json.loads(self.db.get("alarm:count") or "{}")
+        if count.get("day") != day:
+            count = {"day": day, "n": 0, "scout": 0}
+        if alarm and now - float(self.db.get("alarm:last") or 0) >= ALARM_GAP and count["n"] < ALARMS_PER_DAY:
+            self.db.put("alarm:last", str(now))
+            count["n"] += 1
+            if any(a["kind"] in ("news", "flow") for a in alarm) and count["scout"] < SCOUT_ALARMS_PER_DAY \
+                    and self.keys.first("xai"):
+                count["scout"] += 1
+                self._rep("scout", "working", note="həyəcan: X-də dərhal axtarır")
+                await self.scout(now)
+                self._rep("scout", "done", note=self.state("scout").get("message", ""))
+            self.db.put("alarm:count", json.dumps(count))
+            signals.mark(self.db, [a["id"] for a in alarm], now)
+            ok = await self.strategist(now, alarm)
+            self.next_strategist = now + STRATEGIST_EVERY      # the hourly one restarts from here
+            self._rep("strateq", "done" if ok else "error", note="həyəcan təhlili: " + alarm[0]["text"][:100])
+        elif now >= self.next_strategist:
             self.next_strategist = now + STRATEGIST_EVERY
             ok = await self.strategist(now)
             self._rep("strateq", "done" if ok else "error", note=self.state("strategist").get("message", ""))
