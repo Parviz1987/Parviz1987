@@ -124,9 +124,9 @@ def test_trend_makes_momentum_proven():
     eng.backtest(rows[-1][0] + 2 * 3600)
     st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
     assert st["up"]["n"] > 1000
-    # In a pure up-drift «always up» is hard to beat; the Judge must not call momentum proven unless it beats it.
+    # The proof is money (audit 2026-11-24): proven only if the average result after the full cost is above zero.
     if st["momentum"]["status"] == "sübut":
-        assert st["momentum"]["hit_rate"] > st["momentum"]["bar"]
+        assert st["momentum"]["edge"] > st["momentum"]["cost"]
 
 
 def test_live_issue_and_score():
@@ -284,7 +284,7 @@ def _fake_scored(db, method, n, hits, move):
                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
 
 
-def test_always_long_in_a_rising_market_is_no_skill():
+def test_always_long_in_a_rising_market_is_no_skill_but_pays():
     db = mem()
     rows = [("XAU", "1h", "momentum", "history", i * 3600, i * 3600 + 3600, 100.0, 0.6, 99, 101, 98, 102, "",
              101.0 if i < 700 else 99.0, 1.0, int(i < 700), int(i < 700), 0.16, 1, 1) for i in range(1000)]
@@ -292,7 +292,9 @@ def test_always_long_in_a_rising_market_is_no_skill():
                    "lo80, hi80, basis, price1, scored_ts, outcome, hit, brier, in50, in80) "
                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
-    assert abs(st["momentum"]["bar"] - 0.7) < 1e-9 and st["momentum"]["status"] == "yox"   # 70 % = the drift
+    m = st["momentum"]
+    assert abs(m["bar"] - 0.7) < 1e-9 and m["p_hit"] > 0.05       # 70 % right = the drift: no direction skill
+    assert m["status"] == "sübut" and m["edge"] > m["cost"]          # but riding the drift paid after cost: money
 
 
 def test_judge_needs_bonferroni_and_a_move_bigger_than_the_spread():

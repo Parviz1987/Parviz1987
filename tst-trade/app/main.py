@@ -373,9 +373,11 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         """Block 8: the pre-registered hypotheses, judged only on live forecasts issued after their registration."""
         from . import hypotheses
         return {"registered": hypotheses.REGISTERED, "p_bar": hypotheses.P_BAR,
-                "items": await asyncio.to_thread(diag._slow, "hypotheses", lambda: hypotheses.evaluate(db)),
+                "items": await asyncio.to_thread(diag._slow, "hypotheses", lambda: hypotheses._close(hypotheses.evaluate(db))),
                 "focus_registered": hypotheses.FOCUS_REGISTERED, "focus_p_bar": hypotheses.FOCUS_P_BAR,
-                "focus": await asyncio.to_thread(diag._slow, "focus", lambda: hypotheses.evaluate_focus(db))}
+                "focus": await asyncio.to_thread(diag._slow, "focus", lambda: hypotheses._close(hypotheses.evaluate_focus(db))),
+                "v_registered": hypotheses.V_REGISTERED, "v_p_bar": hypotheses.V_P_BAR,
+                "v": await asyncio.to_thread(diag._slow, "vtests", lambda: hypotheses.evaluate_v(db))}
 
     @app.get("/api/outlook")
     async def outlook_api():

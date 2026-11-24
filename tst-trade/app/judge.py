@@ -169,7 +169,10 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
          "AVG(CASE WHEN p_up > 0.5 THEN price1 / price0 - 1 WHEN p_up < 0.5 THEN 1 - price1 / price0 END) edge, "
          # the method's own long share and the market's up share on the SAME forecasts: the no-skill null
          "SUM(CASE WHEN hit IS NOT NULL AND p_up > 0.5 THEN 1 ELSE 0 END) longs, "
-         "SUM(CASE WHEN hit IS NOT NULL THEN outcome ELSE 0 END) vups "
+         "SUM(CASE WHEN hit IS NOT NULL THEN outcome ELSE 0 END) vups, "
+         # the second moment of the move in the forecast's direction: the money test's spread
+         "AVG(CASE WHEN p_up > 0.5 THEN (price1 / price0 - 1) * (price1 / price0 - 1) "
+         "WHEN p_up < 0.5 THEN (1 - price1 / price0) * (1 - price1 / price0) END) edge2 "
          "FROM forecasts "
          "WHERE symbol=? AND horizon=? AND mode=? AND scored_ts IS NOT NULL GROUP BY method")
     rows = {r["method"]: dict(r) for r in db.execute(q, (symbol, horizon, mode)).fetchall()}
@@ -182,8 +185,13 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
     # The family: methods that give a DIRECTION (range-only methods — GARCH, GVZ — make no direction claim and are
     # judged on their ranges, not counted here). Holm's step-down (2026-11-24) instead of plain Bonferroni: the same
     # protection against luck across many methods, but the best method is not held to the bar of the worst.
-    tested = [m for m in methods_for(horizon) if m not in BASELINES and m not in RANGE_ONLY]
-    p_bar = P_MAX / max(1, len(tested))
+    # The family (audit 2026-11-24): methods carrying the same idea (FAMILY: momentum, trend, breakout… are one idea)
+    # count once in the multiple-testing bar; the combiners count once each. «Always up» is a candidate from one week
+    # on (holding gold has been the honest best answer there) — it is tested on money like every method.
+    from .forecast import FAMILY
+    tested = [m for m in methods_for(horizon) if is_candidate(m, horizon)]
+    fam_size = len({FAMILY.get(m, m) for m in tested})
+    p_bar = P_MAX / max(1, fam_size)
     cost = full_cost(symbol, horizon)
     parts = cost_parts(symbol, horizon)
     for m in methods_for(horizon):
@@ -191,40 +199,41 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
         n, nh, hits = r["n"] or 0, r["nh"] or 0, r["hits"] or 0
         hit_rate = hits / nh if nh else None
         bss = 1 - r["brier"] / 0.25 if r["brier"] is not None else None
-        # The no-skill null (audit 2026-11-24): a method that goes long a share q of the time, in a market that rose
-        # a share u of those times, is right q·u + (1−q)(1−u) of the time by luck alone. «Always up» (q = 1) must
-        # beat u; a method going long and short equally only 0.5. (Before: every method had to beat max(u, 1−u),
-        # which hid real two-sided skill behind the market's drift.)
+        # The no-skill null for the hit rate: q·u + (1−q)(1−u) (the method's own long share q, the market's up
+        # share u on the same forecasts). Shown, and used for «xərc» (right, but does not pay).
         if nh:
             qq, uu = (r.get("longs") or 0) / nh, (r.get("vups") or 0) / nh
             bar = qq * uu + (1 - qq) * (1 - uu)
         else:
             bar = 0.5
-        # Forecasts k candles ahead, issued every candle, overlap: k neighbours share most of their path, so they
-        # count as about one independent test. The p-value uses that effective number, not the raw count.
-        p = _p_one_sided(round(hits / k), round(nh / k), bar) if nh >= k else None
-        if m in BASELINES or m in RANGE_ONLY:
+        # Overlapping forecasts (k candles ahead, issued every candle) count as n / k independent tests.
+        p_hit = _p_one_sided(round(hits / k), round(nh / k), bar) if nh >= k else None
+        # THE proof is money (audit 2026-11-24): the average result in the forecast's direction minus the full cost,
+        # tested against zero with the overlap-corrected sample (one-sided t on n / k).
+        p_net = None
+        mean, m2 = r.get("edge"), r.get("edge2")
+        if mean is not None and m2 is not None and nh >= 2 * k:
+            var = max(m2 - mean * mean, 1e-18)
+            t = (mean - cost) / math.sqrt(var / (nh / k))
+            p_net = 1 - 0.5 * (1 + math.erf(t / math.sqrt(2)))
+        if not is_candidate(m, horizon):
             status = "bazis"
         elif nh < MIN_N[horizon]:
             status = "az"
-        elif p is not None and p < p_bar:
-            # Direction is what is proven (audit 2026-11-24: the Brier gate tested calibration and blocked real
-            # direction skill; the Brier skill is still shown). Is the average move bigger than the full cost?
-            status = "sübut" if (r.get("edge") or 0) > cost else "xərc"
         else:
-            status = "yox"
-        out.append({"method": m, "n": n, "hit_rate": hit_rate, "bar": bar, "p": p, "brier": r["brier"],
+            status = "yox"                 # decided by Holm below
+        out.append({"method": m, "n": n, "hit_rate": hit_rate, "bar": bar, "p": p_net, "p_hit": p_hit, "brier": r["brier"],
                     "bss": bss, "cover50": r["c50"], "cover80": r["c80"], "status": status, "nh": nh,
                     "min_n": MIN_N[horizon], "p_bar": p_bar, "edge": r.get("edge"), "cost": cost,
                     "cost_parts": parts})
-    _holm(out, P_MAX, len(tested))
+    _holm(out, P_MAX, fam_size)
     return out
 
 
 def _holm(rows: list[dict], alpha: float, m: int) -> None:
-    """Holm step-down over the direction methods that reached MIN_N: the k-th smallest p is
-    compared with alpha / (m - k + 1); once one fails, the rest fail. A method that passes with a move smaller than
-    the cost stays «xərc»."""
+    """Holm step-down on the money test: the k-th smallest p (net result after the full cost > 0) is compared with
+    alpha / (m - k + 1); once one fails, the rest fail. A method whose direction is significant (p_hit below the
+    first Holm bar) but whose result does not pay is «xərc»."""
     fam = [r for r in rows if r["status"] not in ("bazis", "az") and r["method"] not in RANGE_ONLY]
     m = max(m, 1)                      # the whole family counts, also methods that have too few forecasts yet
     cand = sorted((r for r in fam if r["p"] is not None), key=lambda r: r["p"])
@@ -233,11 +242,22 @@ def _holm(rows: list[dict], alpha: float, m: int) -> None:
         bar = alpha / max(1, m - k)
         r["p_bar"] = bar
         if passed and r["p"] < bar:
-            r["status"] = "sübut" if (r.get("edge") or 0) > r["cost"] else "xərc"
+            r["status"] = "sübut"
         else:
             passed = False
-            if r["status"] in ("sübut", "xərc"):
-                r["status"] = "yox"
+    for r in fam:
+        if r["status"] != "sübut" and r.get("p_hit") is not None and r["p_hit"] < alpha / m:
+            r["status"] = "xərc"
+
+
+def is_candidate(method: str, horizon: str) -> bool:
+    """Methods that may be proven on this desk: not the no-view baseline, not range-only methods; «always up» from
+    one week on (audit 2026-11-24)."""
+    if method == "rw" or method in RANGE_ONLY:
+        return False
+    if method == "up":
+        return horizon in ("1w", "10d", "1mo")
+    return True
 
 
 def official(stat_rows: list[dict]) -> dict:

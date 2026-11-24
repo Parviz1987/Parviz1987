@@ -55,3 +55,10 @@ def test_checker_allows_rounding_not_invention():
     given = '{"price": 4012.35, "rsi": 0.42}'
     assert checker.invented("Səviyyə 4012, RSI 0.4, 3 qayda", given) == []
     assert checker.invented("hədəf 4300", given) == ["4300"]
+
+
+def test_v_family_starts_empty(tmp_path):
+    from app import hypotheses
+    db = DB(str(tmp_path / "v.db"))
+    rows = hypotheses.evaluate_v(db)
+    assert [r["id"] for r in rows] == ["V1", "V2", "V3", "V4", "V5"] and all(r["status"] == "az" for r in rows)

@@ -146,6 +146,18 @@ def _method_row(db: DB, h: dict, registered: float, p_bar: float, cost_of) -> di
     return row
 
 
+CLOSED = {"H6": "bağlandı: platin və palladiumun xərci (audit 2026-11-24)",
+          "H11": "bağlandı: platin və palladiumun xərci; fyuçersdə də 45–47 % (audit 2026-11-24)"}
+
+
+def _close(rows: list[dict]) -> list[dict]:
+    for r in rows:
+        if r["id"] in CLOSED:
+            r["status"] = "bağlandı"
+            r["idea"] = r["idea"] + " — " + CLOSED[r["id"]]
+    return rows
+
+
 def evaluate_focus(db: DB, now: float | None = None) -> list[dict]:
     """The owner's focus targets, judged on live results after FOCUS_REGISTERED, net of the full cost."""
     from . import impulse
@@ -189,4 +201,90 @@ def evaluate_focus(db: DB, now: float | None = None) -> list[dict]:
             out.append(row)
         else:
             out.append(_method_row(db, h, FOCUS_REGISTERED, FOCUS_P_BAR, judge.full_cost))
+    return out
+
+
+# ---------- V family (audit 2026-11-24, re-registered): what the owner needs, measured the right way ----------
+# Every test is on MONEY: the average result in the forecast's direction minus the full cost (spread + slippage +
+# overnight financing), one-sided t against zero, on independent cases only (overlapping forecasts thinned to one
+# per horizon; several metals pooled as one portfolio per date). Gold-only where the broker's cost allows a profit;
+# the four metals pooled only at long horizons, where the cost is small against the move. H1–H13 stay visible as
+# the earlier registrations; H6 and H11 can never pass (platinum/palladium cost) and are closed.
+V_REGISTERED = 1795543200          # 2026-11-24 18:00 UTC (registered 15:30 UTC, before any of its data)
+V_P_BAR = 0.05 / 5
+V_TESTS = [
+    {"id": "V1", "name": "Qızıl, 1 gün: vahid proqnoz (pulla)", "method": "vahid", "horizon": "1d", "metals": ("XAU",),
+     "idea": "Sahibə göstərilən son söz pul qazandırırmı? Təxmini müddət: kiçik üstünlük üçün illər; böyük üçün aylar.",
+     "source": "sahibin vahid proqnoz tələbi"},
+    {"id": "V2", "name": "Qızıl, 1 həftə: çox sürətli trend (pulla)", "method": "trendmix", "horizon": "1w",
+     "metals": ("XAU",), "idea": "Həftəlik trend; canlı sübut uzun çəkir (həftədə 1 hal).",
+     "source": "Moskowitz-Ooi-Pedersen; Baltas-Kosowski"},
+    {"id": "V3", "name": "4 metal birlikdə, 1 həftə: 12 aylıq trend (portfel)", "method": "tsmom", "horizon": "1w",
+     "metals": ("XAU", "XAG", "XPT", "XPD"), "idea": "Trendin ən güclü sübutu portfeldədir: hər həftə 4 metalın orta "
+     "nəticəsi bir hal sayılır.", "source": "Moskowitz-Ooi-Pedersen"},
+    {"id": "V4", "name": "4 metal birlikdə, 1 ay: al və saxla (portfel)", "method": "up", "horizon": "1mo",
+     "metals": ("XAU", "XAG", "XPT", "XPD"), "idea": "Sadəcə saxlamaq tam xərcdən sonra qazandırırmı? Kölgə "
+     "ticarətində qızıl 1 ayda ən yaxşı nəticə budur.", "source": "öz kölgə ticarətimiz; audit"},
+    {"id": "V5", "name": "Qızıl: ABŞ rəqəmi dəqiqəsində impuls, 60 dəqiqə (pulla)", "kind": "news_impulse",
+     "idea": "Fyuçers sınağında 63,5 % davam (104 hal). Ildə ~50 hal: qərar üçün təxminən 1–2 il.",
+     "source": "öz fyuçers sınağımız"},
+]
+
+
+def _t_p(xs: list[float]) -> tuple[float | None, float | None]:
+    n = len(xs)
+    if n < 2:
+        return (sum(xs) / n if n else None), None
+    mu = sum(xs) / n
+    sd = math.sqrt(sum((x - mu) ** 2 for x in xs) / (n - 1)) or 1e-12
+    t = mu / (sd / math.sqrt(n))
+    return mu, 1 - 0.5 * (1 + math.erf(t / math.sqrt(2)))
+
+
+def evaluate_v(db: DB, now: float | None = None) -> list[dict]:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from . import impulse
+    now = time.time() if now is None else now
+    out = []
+    for h in V_TESTS:
+        row = {k: h[k] for k in ("id", "name", "idea", "source")}
+        if h.get("kind") == "news_impulse":
+            ny = ZoneInfo("America/New_York")
+            db.script("CREATE TABLE IF NOT EXISTS v_news_impulse (t INTEGER PRIMARY KEY, cont INTEGER, net REAL)")
+            db.executemany("INSERT OR IGNORE INTO v_news_impulse VALUES(?,?,?)",
+                           [(e["t"], e["cont"], e["net"]) for e in impulse.events(db, now)
+                            if e["t"] >= V_REGISTERED and e["symbol"] == "XAU" and e["K"] == 4.0 and e["H"] == 60
+                            and (datetime.fromtimestamp(e["t"], ny).hour, datetime.fromtimestamp(e["t"], ny).minute)
+                            in ((8, 30), (10, 0), (14, 0))])
+            evs = [dict(r) for r in db.execute("SELECT cont, net FROM v_news_impulse").fetchall()]
+            cases = [e["net"] for e in evs]
+            hits = sum(e["cont"] for e in evs)
+            nk = len(evs)
+        else:
+            _, k = HORIZON_SPEC[h["horizon"]]
+            ph = ",".join("?" * len(h["metals"]))
+            rows = db.execute(f"SELECT symbol, issued_t, price0, price1, p_up FROM forecasts WHERE mode='live' AND "
+                              f"method=? AND horizon=? AND symbol IN ({ph}) AND issued_t >= ? AND price1 IS NOT NULL "
+                              f"AND p_up != 0.5 ORDER BY issued_t",
+                              (h["method"], h["horizon"], *h["metals"], V_REGISTERED)).fetchall()
+            dates = sorted({r["issued_t"] for r in rows})[::k]      # one case per horizon: no overlap
+            keep = set(dates)
+            by: dict[int, list] = {}
+            hits = nk = 0
+            for r in rows:
+                if r["issued_t"] not in keep or not r["price0"]:
+                    continue
+                d = 1 if r["p_up"] > 0.5 else -1
+                ret = (r["price1"] / r["price0"] - 1) * d
+                hits += int(ret > 0)
+                nk += 1
+                by.setdefault(r["issued_t"], []).append(ret - judge.full_cost(r["symbol"], h["horizon"]))
+            cases = [sum(v) / len(v) for _, v in sorted(by.items())]   # several metals = one portfolio per date
+        mu, p = _t_p(cases)
+        n = len(cases)
+        status = "az" if n < 30 else ("sübut" if p is not None and p < V_P_BAR and mu > 0 else "yox")
+        row.update({"n": n, "hit_rate": hits / nk if nk else None, "net_avg": mu, "p": p, "status": status,
+                    "bar": None})
+        out.append(row)
     return out

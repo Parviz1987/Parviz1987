@@ -174,12 +174,19 @@ async function loadAnalysts() { adata = await api(`/api/analysts?symbol=${sym}`)
 async function loadHyp() {
   const d = await api("/api/hypotheses");
   $("hreg").textContent = "qeyd: " + dt(d.registered) + " NY";
-  const ST = { "sübut": "✅ sübut", yox: "❌ yox", az: "⏳ az məlumat" };
+  const ST = { "sübut": "✅ sübut", yox: "❌ yox", az: "⏳ az məlumat", "bağlandı": "⛔ bağlandı" };
   $("hyp").innerHTML = `<table class="sc"><tr><th></th><th>Fərziyyə</th><th>Düz</th><th>Hədd</th><th>Spreddən sonra (qeyd olunduğu kimi)</th><th>Say</th><th>Hökm</th></tr>` +
     d.items.map((h) => `<tr><td class="mut">${h.id}</td><td><b>${esc(h.name)}</b><br><span class="note">${esc(h.idea)} · Mənbə: ${esc(h.source)}</span></td>
       <td class="c">${pc(h.hit_rate)}</td><td class="c mut">${pc(h.bar)}</td>
       <td class="c">${h.net_avg == null ? "—" : usd(h.net_avg)}</td><td class="c mut">${h.n}</td><td class="c">${ST[h.status] || h.status}</td></tr>`).join("") +
     "</table><p class='note'>«Spreddən sonra»: 1000 $-lıq bir sövdələşmənin orta nəticəsi; H1–H8 qeyd olunduğu kimi yalnız spredlə ölçülür, əsas hədəflər isə tam xərclə. «Az məlumat»: sübut üçün hələ yetərli yeni proqnoz yoxdur.</p>";
+  if (d.v) {
+    $("vreg").textContent = "qeyd: " + dt(d.v_registered) + " NY · hədd p < " + d.v_p_bar.toFixed(3) + " · hamısı pulla, tam xərcdən sonra";
+    $("vtests").innerHTML = `<table class="sc"><tr><th></th><th>Sınaq</th><th>Düz</th><th>Tam xərcdən sonra</th><th>Hal</th><th>p</th><th>Hökm</th></tr>` +
+      d.v.map((h) => `<tr><td class="mut">${h.id}</td><td><b>${esc(h.name)}</b><br><span class="note">${esc(h.idea)}</span></td>
+        <td class="c">${pc(h.hit_rate)}</td><td class="c">${h.net_avg == null ? "—" : usd(h.net_avg)}</td><td class="c mut">${h.n}</td>
+        <td class="c mut">${h.p == null ? "—" : h.p.toFixed(3)}</td><td class="c">${ST[h.status] || h.status}</td></tr>`).join("") + "</table>";
+  }
   if (d.focus) {
     $("freg").textContent = "qeyd: " + dt(d.focus_registered) + " NY · hədd p < " + d.focus_p_bar.toFixed(4);
     $("focus").innerHTML = `<table class="sc"><tr><th></th><th>Hədəf</th><th>Düz</th><th>Hədd</th><th>Tam xərcdən sonra</th><th>Say</th><th>Hökm</th></tr>` +

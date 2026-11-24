@@ -188,7 +188,7 @@ function renderJudge(fc) {
   $("jh").innerHTML = fc.cards.map((c) => `<button data-h="${c.horizon}" class="${c.horizon === jh ? "on" : ""}">${c.name}</button>`).join("");
   document.querySelectorAll("#jh button").forEach((b) => b.onclick = () => { jh = b.dataset.h; try { localStorage.setItem("tst_jh", jh); } catch (e) {} renderJudge(fc); });
   const card = fc.cards.find((c) => c.horizon === jh) || fc.cards[0];
-  let html = `<table><tr><th>Üsul</th><th>Yoxlama</th><th>Düz çıxıb</th><th>Keçməli hədd</th><th>p</th>
+  let html = `<table><tr><th>Üsul</th><th>Yoxlama</th><th>Düz çıxıb</th><th title="Şansla düz çıxma səviyyəsi: üsulun öz alış payı ilə bazarın qalxma payından">Şans səviyyəsi</th><th title="Pul sınağı: xərcdən sonra orta nəticə sıfırdan böyükdürmü (kiçik p = sübut)">p (pul)</th>
     <th title="Tam xərc: spred + sürüşmə + gecəlik saxlama haqqı (swap)">Orta qazanc / tam xərc</th><th>Brier bal</th><th>50 % aralıq tutdu</th><th>80 % aralıq tutdu</th><th>Status</th></tr>`;
   for (const r of card[key]) {
     const cnt = r.method === "rw" || r.method === "up" ? r.n : r.nh;
