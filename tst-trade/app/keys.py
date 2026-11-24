@@ -154,6 +154,14 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
             body = r.json() if r.status_code == 200 else {}
             ok = body.get("status") == "REQUEST_SUCCEEDED"
             msg = "işləyir" if ok else f"açar qəbul olunmadı: {'; '.join(body.get('message', []))[:120] or r.status_code}"
+        elif slot == "databento":
+            # metadata only: costs nothing (no data is downloaded); the key is the user name, the password is empty
+            async with httpx.AsyncClient(timeout=CHECK_TIMEOUT) as c:
+                r = await c.get("https://hist.databento.com/v0/metadata.list_datasets", auth=(key, ""))
+            ok = r.status_code == 200 and "GLBX.MDP3" in r.text
+            msg = ("işləyir: CME/COMEX məlumatı (GLBX.MDP3) əlçatandır" if ok else
+                   f"açar qəbul olunmadı: HTTP {r.status_code}" if r.status_code in (401, 403) else
+                   f"cavab gözlənilən deyil: HTTP {r.status_code}")
         elif slot == "r2":
             from . import backup
             ok, msg = await backup.check(v)

@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS events (uid TEXT PRIMARY KEY, title TEXT, country TEX
   forecast TEXT, previous TEXT, actual TEXT);
 CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
 CREATE TABLE IF NOT EXISTS macro (series TEXT NOT NULL, d TEXT NOT NULL, v REAL NOT NULL, PRIMARY KEY (series, d));
+CREATE TABLE IF NOT EXISTS macro_first (series TEXT NOT NULL, d TEXT NOT NULL, v REAL NOT NULL, PRIMARY KEY (series, d));
 CREATE TABLE IF NOT EXISTS cot (symbol TEXT NOT NULL, d TEXT NOT NULL, oi REAL, mm_long REAL, mm_short REAL,
   pm_long REAL, pm_short REAL, PRIMARY KEY (symbol, d));
 """
@@ -352,6 +353,33 @@ class Feeds:
             except Exception as e:
                 errors.append(f"{sid}: {str(e).replace(key, '***')}")
         self._health("fred", n > 0, f"{n} müşahidə" + (f"; xəta: {'; '.join(errors)}" if errors else ""), n)
+        await self.first_releases(client, key)
+
+    FIRST_SERIES = ("DTWEXBGS",)            # the revisable series the history replay reads (DFII10 is not revised)
+
+    async def first_releases(self, client, key: str) -> None:
+        """Arxivçi (Block 18): ALFRED's «initial release only» values — what was first published for each day, before
+        later revisions — so the history replay never uses a figure that was not known yet. Once a day."""
+        if time.time() - float(self.db.get("alfred:ts") or 0) < 86400:
+            return
+        got, errors = 0, []
+        for sid in self.FIRST_SERIES:
+            try:
+                data = await self._get(client, "https://api.stlouisfed.org/fred/series/observations",
+                                       params={"series_id": sid, "api_key": key, "file_type": "json",
+                                               "output_type": 4, "realtime_start": "1776-07-04",
+                                               "realtime_end": "9999-12-31"})
+                obs = parse_fred(data)
+                self.db.executemany("INSERT OR REPLACE INTO macro_first(series, d, v) VALUES(?,?,?)",
+                                    [(sid, d, v) for d, v in obs])
+                got += len(obs)
+            except Exception as e:
+                errors.append(f"{sid}: {str(e).replace(key, '***')}"[:120])
+        self.db.put("alfred:ts", str(time.time()))
+        self.db.put("alfred:last", json.dumps({"ts": time.time(), "n": got, "errors": errors}, ensure_ascii=False))
+        if self.activity is not None:
+            self.activity.report("archivist", "done" if got else "error",
+                                 note=f"ALFRED ilk dərc: {got} dəyər" + (f"; xəta: {errors[0]}" if errors else ""))
 
     def _recent_release(self, now: float) -> bool:
         return self.db.execute("SELECT 1 FROM events WHERE country='USD' AND impact IN ('High','Medium') AND ts BETWEEN "

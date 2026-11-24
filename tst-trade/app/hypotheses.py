@@ -40,11 +40,29 @@ HYPOTHESES = [
 ]
 
 
-def _verdict(n_eff: float, hits_eff: float, bar: float, net: float | None, n: int, need: int) -> tuple[float | None, str]:
+# Əsas hədəflər (Block 18, owner's focus 2026-11-24): a SECOND small family, registered later with its own time and
+# bar, judged net of the FULL cost (spread + slippage + overnight financing). The first family is left as registered.
+FOCUS_REGISTERED = 1795608000      # 2026-11-25 12:00 UTC
+FOCUS_P_BAR = 0.05 / 3
+FOCUS = [
+    {"id": "H9", "name": "Qızıl, 1 gün: tərəzi", "method": "terazi", "horizon": "1d", "symbol": "XAU",
+     "idea": "Hakimin çəkdiyi analitiklərin birləşmiş fikri, sahibin əsas hədəfi olan gün üfüqündə.",
+     "source": "sahibin fokusu; ansambl araşdırmaları"},
+    {"id": "H10", "name": "Qızıl, 1 həftə: çox sürətli trend", "method": "trendmix", "horizon": "1w", "symbol": "XAU",
+     "idea": "1 həftədən 1 aya qədər trendlərin dəyişkənliyə görə çəkili qarışığı.",
+     "source": "Moskowitz-Ooi-Pedersen; Baltas-Kosowski"},
+    {"id": "H11", "name": "Platin və palladium impulsu (15 dəqiqə)", "kind": "impulse",
+     "idea": "Böyük oyunçu tərpədəndən 1 dəqiqə sonra hərəkət 15 dəqiqə davam edir (sahibin fikri; ilk 2 gündə "
+             "67-83 %, amma spreddən sonra mənfi idi).", "source": "sahibin fikri; öz impuls araşdırmamız"},
+]
+
+
+def _verdict(n_eff: float, hits_eff: float, bar: float, net: float | None, n: int, need: int,
+             p_bar: float = P_BAR) -> tuple[float | None, str]:
     if n < need:
         return None, "az"
     p = judge._p_one_sided(round(hits_eff), round(n_eff), bar)
-    if p < P_BAR and (net is None or net > 0):
+    if p < p_bar and (net is None or net > 0):
         return p, "sübut"
     return p, "yox"
 
@@ -90,4 +108,51 @@ def evaluate(db: DB, now: float | None = None) -> list[dict]:
         p, st = _verdict(n_eff, hits_eff, bar, net, n, 30 * k)
         row.update({"n": n, "hit_rate": hits / n, "bar": bar, "net_avg": net, "p": p, "status": st})
         out.append(row)
+    return out
+
+
+def _method_row(db: DB, h: dict, registered: float, p_bar: float, cost_of) -> dict:
+    row = {k: h[k] for k in ("id", "name", "idea", "source")}
+    tf, k = HORIZON_SPEC[h["horizon"]]
+    sql = ("SELECT symbol, price0, price1, p_up FROM forecasts WHERE mode='live' AND method=? AND horizon=? "
+           "AND issued_t >= ? AND price1 IS NOT NULL AND p_up != 0.5")
+    args: list = [h["method"], h["horizon"], registered]
+    if h.get("symbol"):
+        sql += " AND symbol=?"
+        args.append(h["symbol"])
+    rows = db.execute(sql, args).fetchall()
+    n = len(rows)
+    if not n:
+        row.update({"n": 0, "hit_rate": None, "bar": None, "net_avg": None, "p": None, "status": "az"})
+        return row
+    hits = sum((r["price1"] > r["price0"]) == (r["p_up"] > 0.5) for r in rows)
+    ups = sum(r["price1"] > r["price0"] for r in rows) / n
+    bar = max(0.5, ups, 1 - ups)
+    net = sum(((r["price1"] / r["price0"] - 1) * (1 if r["p_up"] > 0.5 else -1)) - cost_of(r["symbol"], h["horizon"])
+              for r in rows) / n
+    metals = 1 if h.get("symbol") else 4
+    n_eff, hits_eff = n / k / math.sqrt(metals), hits / k / math.sqrt(metals)
+    p, st = _verdict(n_eff, hits_eff, bar, net, n, 30 * k, p_bar)
+    row.update({"n": n, "hit_rate": hits / n, "bar": bar, "net_avg": net, "p": p, "status": st})
+    return row
+
+
+def evaluate_focus(db: DB, now: float | None = None) -> list[dict]:
+    """The owner's focus targets, judged on live results after FOCUS_REGISTERED, net of the full cost."""
+    from . import impulse
+    now = time.time() if now is None else now
+    out = []
+    for h in FOCUS:
+        if h.get("kind") == "impulse":
+            row = {k: h[k] for k in ("id", "name", "idea", "source")}
+            evs = [e for e in impulse.events(db, now) if e["t"] >= FOCUS_REGISTERED and e["symbol"] in ("XPT", "XPD")
+                   and e["K"] == 4.0 and e["H"] == 15]
+            n = len(evs)
+            hits = sum(e["cont"] for e in evs)
+            net = sum(e["net"] for e in evs) / n if n else None
+            p, st = _verdict(n, hits, 0.5, net, n, 60, FOCUS_P_BAR)
+            row.update({"n": n, "hit_rate": hits / n if n else None, "bar": 0.5, "net_avg": net, "p": p, "status": st})
+            out.append(row)
+        else:
+            out.append(_method_row(db, h, FOCUS_REGISTERED, FOCUS_P_BAR, judge.full_cost))
     return out

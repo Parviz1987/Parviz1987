@@ -59,6 +59,8 @@ NODES = {
                  "Hər proqnozu dondurur: ssenari, əks ssenari, zəifləmə şərti, məlumat keyfiyyəti, versiya"),
     "checker":  (19, "Mənbə yoxlayıcısı",  "strateq",  [],
                  "Beyin cavabında ona verilməyən rəqəmləri sayır (uydurma göstərilmir)"),
+    "archivist": (20, "Arxivçi",           "macro",    [],
+                  "ALFRED: rəqəmin ilk dərc olunmuş dəyəri, sonrakı düzəlişlər keçmiş sınağa qarışmasın"),
 }
 
 # Block 17: where each task's input comes FROM (the data flow, not the call tree). The panel draws a courier from
@@ -66,7 +68,7 @@ NODES = {
 FLOW = {"prices": None, "liquidity": "prices", "forecast": "prices", "judge": "forecast", "history": "orch",
         "news": None, "events": "news", "reader": "events", "calendar": None, "hunter": "calendar", "macro": None,
         "scout": None, "signals": "reader", "strateq": "signals", "debate": "strateq", "cards": "strateq",
-        "checker": "strateq", "risk": "liquidity", "decision": "risk", "orch": None}
+        "checker": "strateq", "risk": "liquidity", "decision": "risk", "orch": None, "archivist": "macro"}
 
 
 class Hub:

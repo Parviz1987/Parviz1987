@@ -53,9 +53,12 @@ class MacroLookup:
         for sid in ("DFII10", "DTWEXBGS"):
             try:
                 rows = db.execute("SELECT d, v FROM macro WHERE series=? ORDER BY d", (sid,)).fetchall()
+                # Block 18: where ALFRED gave the first published value of a day, it replaces the revised one
+                first = {r["d"]: r["v"] for r in db.execute("SELECT d, v FROM macro_first WHERE series=?",
+                                                            (sid,)).fetchall()}
             except Exception:
-                rows = []
-            self.series[sid] = ([r["d"] for r in rows], [r["v"] for r in rows])
+                rows, first = [], {}
+            self.series[sid] = ([r["d"] for r in rows], [first.get(r["d"], r["v"]) for r in rows])
 
     def first_day(self) -> str | None:
         firsts = [ds[0] for ds, _ in self.series.values() if ds]

@@ -42,3 +42,10 @@ def test_hub_sequence_and_source(tmp_path):
     assert [e["seq"] for e in ev] == [1, 2]
     assert ev[0]["src"] == "events" and ev[1]["src"] == "signals"
     assert activity.Hub(db).seq == 2                               # numbering continues after a restart
+
+
+def test_focus_hypotheses_start_empty(tmp_path):
+    from app import hypotheses
+    db = DB(str(tmp_path / "t.db"))
+    rows = hypotheses.evaluate_focus(db)
+    assert [r["id"] for r in rows] == ["H9", "H10", "H11"] and all(r["status"] == "az" for r in rows)

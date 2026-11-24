@@ -32,7 +32,14 @@ def _p_two(hits: int, n: int) -> float | None:
     return round(1 - math.erf(abs(z) / math.sqrt(2)), 4)
 
 
-def study(db: DB, now: float | None = None) -> dict:
+def events(db: DB, now: float | None = None) -> list[dict]:
+    """Every impulse one by one (time, metal, K, H, continued, net), for the pre-registered focus test H11."""
+    keep: list[dict] = []
+    study(db, now, keep)
+    return keep
+
+
+def study(db: DB, now: float | None = None, keep: list | None = None) -> dict:
     from .judge import full_cost
     now = time.time() if now is None else now
     out = {"computed": now, "metals": {}}
@@ -83,6 +90,9 @@ def study(db: DB, now: float | None = None) -> dict:
                     cont = (move > 0) == (r > 0) and move != 0
                     for key in ((K, H, "hamısı"),) + (((K, H, busy),) if busy else ()):
                         res.setdefault(key, []).append((cont, net))
+                    if keep is not None:
+                        keep.append({"t": ts[i], "symbol": sym, "K": K, "H": H, "group": busy, "cont": int(cont),
+                                     "net": net})
         rows_out = []
         for (K, H, grp), v in sorted(res.items()):
             n = len(v)

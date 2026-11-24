@@ -23,6 +23,13 @@ KEY_SLOTS: list[dict] = [
      "cost": "Pulsuz (Capital.com hesabı ilə).", "url": "https://capital.com/trading/platform/",
      "fields": ["api_key", "login", "password"], "used_by": "Canlı qiymət (açar işləyəndə özü qoşulur)",
      "stage": LIVE},
+    {"id": "databento", "category": "price", "name": "Databento (COMEX fyuçersləri)",
+     "purpose": "Qızıl, gümüş, platin və palladium fyuçerslərinin (GC, MGC, SI, PL, PA) illərlə dəqiqəlik şamları və hər "
+                "əməliyyatı: real həcm və alanın/satanın tərəfi. Sahibin impuls fikri və «xəbərdən sonra» sınağı "
+                "bununla yoxlanır (Mərhələ 2). Heç nə sahibin təsdiqi olmadan alınmır: əvvəl qiymət göstərilir.",
+     "cost": "Tarixi məlumat istifadəyə görə; yeni hesaba $125 pulsuz kredit. Canlı axın ayrıca abunədir (alınmayıb).",
+     "url": "https://databento.com/portal/keys", "fields": ["key"],
+     "used_by": "Mərhələ 2 sınaqları (impuls, xəbərdən sonra hərəkət, platin spredi)", "stage": NEXT},
     {"id": "twelvedata", "category": "price", "name": "Twelve Data açarı",
      "purpose": "Canlı qiymət və keçmiş şamlar (tarixçə). Tarixçə olmadan 1 günlük və 1 həftəlik proqnoz yoxlanmır.",
      "cost": "Pulsuz plan: ancaq qızıl. Pullu plan (Grow, ayda 29–79 $): 4 metal.",
