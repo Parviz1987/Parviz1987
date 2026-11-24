@@ -202,13 +202,14 @@ def parse_gld(data: bytes) -> list[tuple[str, float]]:
     import io
     from datetime import datetime as _dt
     lines = data.decode("utf-8-sig", "replace").splitlines()
-    head_i = next((i for i, ln in enumerate(lines[:30]) if "date" in ln.lower() and "tonnes" in ln.lower()), None)
+    head_i = next((i for i, ln in enumerate(lines[:60]) if "date" in ln.lower() and "tonne" in ln.lower()), None)
     if head_i is None:
-        raise ValueError("GLD faylında «Date» və «Tonnes» sütunları tapılmadı")
+        start = " ".join(ln.strip() for ln in lines[:4])[:160]
+        raise ValueError(f"GLD faylında «Date» və «Tonnes» sütunları tapılmadı; faylın başı: {start!r}")
     rows = list(csv.reader(io.StringIO("\n".join(lines[head_i:])), skipinitialspace=True))
     head = [h.strip().lower() for h in rows[0]]
     di = next(i for i, h in enumerate(head) if h.startswith("date"))
-    ti = next(i for i, h in enumerate(head) if "tonnes" in h)
+    ti = next(i for i, h in enumerate(head) if "tonne" in h)
     out = []
     for row in rows[1:]:
         if len(row) <= max(di, ti):
