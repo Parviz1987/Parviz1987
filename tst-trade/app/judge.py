@@ -409,7 +409,7 @@ def verdict(db: DB, symbol: str, horizon: str, now: float | None = None) -> dict
     cond = conditional(hit[1], session_of(now), width)
     if cond:
         f = db.execute("SELECT p_up FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND mode='live' "
-                       "ORDER BY issued_t DESC LIMIT 1", (symbol, horizon, cond["method"])).fetchone()
+                       "AND target_t > ? ORDER BY issued_t DESC LIMIT 1", (symbol, horizon, cond["method"], now)).fetchone()
         if not f or f["p_up"] == 0.5:
             return v                                  # proven in these conditions, but it has no view right now
         return {"method": cond["method"], "status": "sübut", "by": mode, "condition": cond["group"],

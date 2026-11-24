@@ -298,7 +298,7 @@ class CapitalHistory(HistoryProvider):
 
 
 def parse_overnight(data: object) -> float | None:
-    """instrument.overnightFee {longRate, shortRate} in % per day; negative = the trader pays."""
+    """instrument.overnightFee {longRate, shortRate} in % per day; negative = the trader pays. The dearer side."""
     try:
         fee = data["instrument"]["overnightFee"]
         rates = [float(fee[k]) for k in ("longRate", "shortRate") if fee.get(k) is not None]
@@ -307,4 +307,4 @@ def parse_overnight(data: object) -> float | None:
     if not rates:
         return None
     paid = [max(0.0, -x) / 100 for x in rates]
-    return sum(paid) / len(paid)
+    return max(paid)            # the dearer side: our forecasts go long and short (audit 2026-11-24: not the average)

@@ -21,6 +21,6 @@ def test_broker_swap_replaces_estimate():
 
 
 def test_parse_overnight():
-    assert abs(parse_overnight({"instrument": {"overnightFee": {"longRate": -0.02, "shortRate": 0.005}}}) - 0.0001) < 1e-12
+    assert abs(parse_overnight({"instrument": {"overnightFee": {"longRate": -0.02, "shortRate": 0.005}}}) - 0.0002) < 1e-12
     assert parse_overnight({"instrument": {}}) is None
     assert parse_overnight(None) is None

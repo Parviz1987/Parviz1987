@@ -33,13 +33,14 @@ P_MAX = 0.05
 
 
 def _path(fine: tuple[list[int], list[dict]] | None, coarse: tuple[list[int], list[dict]], t0: int, t1: int,
-          step_fine: int, step_coarse: int) -> tuple[list[dict], bool]:
-    """Candles covering [t0, t1): the finer ones if they cover the whole window, else the coarse ones."""
+          step_fine: int, step_coarse: int, shift: int = 0) -> tuple[list[dict], bool]:
+    """Candles covering [t0, t1): the finer ones if they cover the whole window, else the coarse ones. shift: a daily
+    candle labelled D really runs from 22:00 UTC the evening before, so the finer candles are read shift earlier."""
     if fine:
         ts, rows = fine
-        i, j = bisect.bisect_left(ts, t0), bisect.bisect_left(ts, t1)
+        i, j = bisect.bisect_left(ts, t0 - shift), bisect.bisect_left(ts, t1 - shift)
         part = rows[i:j]
-        if part and part[0]["t"] <= t0 + step_fine and part[-1]["t"] + step_fine >= t1 - step_fine:
+        if part and part[0]["t"] <= t0 - shift + step_fine and part[-1]["t"] + step_fine >= t1 - shift - step_fine:
             return part, True
     ts, rows = coarse
     i, j = bisect.bisect_left(ts, t0), bisect.bisect_left(ts, t1)
@@ -116,7 +117,7 @@ def simulate(db: DB, symbol: str, horizon: str, mode: str = "history") -> dict:
 
     def load(t: str):
         cs = [dict(c) for c in db.execute("SELECT t, o, h, l, c FROM candles WHERE symbol=? AND tf=? AND t>=? AND t<? "
-                                          "ORDER BY t", (symbol, t, t0 - candles.TF[t], t1)).fetchall()]
+                                          "ORDER BY t", (symbol, t, t0 - candles.TF[t] - candles.SESSION_SHIFT, t1)).fetchall()]
         return ([c["t"] for c in cs], cs)
     coarse = load(tf)
     fine_tf = FINER.get(tf)
@@ -125,7 +126,7 @@ def simulate(db: DB, symbol: str, horizon: str, mode: str = "history") -> dict:
     finer_used = 0
     for f in rows:
         path, used = _path(fine, coarse, f["issued_t"], f["target_t"], candles.TF.get(fine_tf, step) if fine_tf
-                           else step, step)
+                           else step, step, candles.SESSION_SHIFT if tf in ("1d", "1w") else 0)
         res = play(f, path, cost)
         if res is None:
             continue

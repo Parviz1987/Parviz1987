@@ -63,7 +63,8 @@ def decision(db: DB, engine, symbol: str, now: float | None = None) -> dict:
             row["why"] = "Hakimin sübutu yoxdur: istiqamət göstərilmir"
         else:
             f = db.execute("SELECT p_up, issued_t FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND "
-                           "mode='live' ORDER BY issued_t DESC LIMIT 1", (symbol, h, verdict["method"])).fetchone()
+                           "mode='live' AND target_t > ? ORDER BY issued_t DESC LIMIT 1",
+                           (symbol, h, verdict["method"], now)).fetchone()     # an expired forecast says nothing
             row["method"] = forecast.METHOD_NAMES.get(verdict["method"], verdict["method"]) + (
                 f" ({verdict['condition']} şəraitində)" if verdict.get("condition") else "")
             if not f or f["p_up"] == 0.5:

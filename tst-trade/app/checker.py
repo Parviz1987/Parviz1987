@@ -32,8 +32,28 @@ def _strings(x) -> list[str]:
 
 
 def invented(text: str, given: str) -> list[str]:
-    known = {n.replace(",", ".") for n in NUM.findall(given)}
-    return [n for n in (m.replace(",", ".") for m in NUM.findall(text)) if n not in known]
+    """Numbers in the text that are not in the input — allowing rounding (4012 for 4012.35, 0.4 for 0.42) and a
+    fraction written as a percent (1.2 for 0.012): rounding is not invention (audit 2026-11-24: the strict check
+    counted rounded levels as invented)."""
+    known = []
+    for n in NUM.findall(given):
+        try:
+            known.append(float(n.replace(",", ".")))
+        except ValueError:
+            pass
+    ks = sorted(set(known))
+    out = []
+    for m in NUM.findall(text):
+        try:
+            x = float(m.replace(",", "."))
+        except ValueError:
+            continue
+        if x < 10 and x == int(x):
+            continue                      # small whole numbers: counts, days, «3 qayda» — not facts to check
+        tol = max(abs(x) * 0.002, 0.5 * 10 ** -(len(m.split(".")[1]) if "." in m else 0))
+        if not any(abs(x - k) <= tol or abs(x - 100 * k) <= tol for k in ks):
+            out.append(m)
+    return out
 
 
 def record(db: DB, slot: str, data: dict | None, given: str, now: float | None = None) -> int:

@@ -46,6 +46,12 @@ target_time = forecast.target_time   # kept here for older imports
 UNIFIED_EVERY = 6 * 3600       # the unified forecast's walk-forward self-simulation
 
 
+def decision_time(issued_t: int, tf: str) -> int:
+    """When a forecast for the candle labelled issued_t is really made: daily and weekly candles open at 22:00 UTC
+    the evening before their label (candles.SESSION_SHIFT); intraday candles at their label."""
+    return issued_t - candles.SESSION_SHIFT if tf in ("1d", "1w") else issued_t
+
+
 class MacroLookup:
     """FRED values as they were known when a daily forecast was issued (22:00 UTC the evening before its candle).
     DFII10 for a day is published the next afternoon; the broad dollar index (H.10) comes out weekly on Monday for the
@@ -152,6 +158,7 @@ class Engine:
         self.last_poll: float | None = None
         self.last_ok: float | None = None
         self._weights_cache: dict = {}
+        self._issued: set = set()          # (horizon, metal, issued_t) already issued live
         from .liquidity import Liquidity
         self.liquidity = Liquidity()           # the liquidity agent: spread and activity per metal, from the stream
         from .nerve import Reflex
@@ -230,6 +237,8 @@ class Engine:
         for q in quotes:
             self.quotes[q.symbol] = {"price": q.price, "source_ts": q.source_ts, "recv_ts": now,
                                      "ts_missing": q.source_ts_missing}
+            if not market_open(now):
+                continue                  # a closed market's repeated price is not a candle (no weekend candles)
             self.db.execute("INSERT INTO ticks(symbol, ts, price, source, source_ts) VALUES(?,?,?,?,?)",
                             (q.symbol, now, q.price, self.provider_name, q.source_ts))
             candles.add_tick(self.db, q.symbol, now, q.price)
@@ -281,6 +290,25 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:audit_1124"):
+            # Audit 2026-11-24, honest history: (1) daily-candle forecasts used news and brain views up to 2 h after
+            # they were made — those methods are replayed with the right time; (2) the replay issued intraday
+            # forecasts right after the daily break, which live never does — those moments are removed.
+            daily = ("1d", "3d", "10d", "1mo", "1w")
+            self.db.execute(f"DELETE FROM forecasts WHERE mode='history' AND horizon IN ({','.join('?' * len(daily))}) "
+                            "AND method IN ('news','strateq','brain2','debate','chartist','consensus')", daily)
+            for h, tf in forecast.HORIZONS.items():
+                if tf in ("1d", "1w"):
+                    continue
+                step = candles.TF[tf]
+                for sym in candles.METALS:
+                    ts = [r["t"] for r in self.db.execute("SELECT t FROM candles WHERE symbol=? AND tf=? ORDER BY t",
+                                                          (sym, tf)).fetchall()]
+                    bad = [(sym, h, b) for a, b in zip(ts, ts[1:]) if b - a != step]
+                    self.db.executemany("DELETE FROM forecasts WHERE mode='history' AND symbol=? AND horizon=? "
+                                        "AND issued_t=?", bad)
+            self.history_state["ts"] = 0          # the replay refills what was removed, the honest way
+            self.db.put("migr:audit_1124", "1")
         if not self.db.get("migr:alarm_count_reset_1124"):
             # 9 of the 12 alarms of 2026-11-24 (UTC) went to ordinary moves before the move cap existed (9f897e5):
             # the day's count starts again once, so today's news and figures still get their alarms.
@@ -367,17 +395,29 @@ class Engine:
                 monday = tf == "1d" and datetime.fromtimestamp(issued_t, timezone.utc).weekday() == 0
                 if gap != step and not (monday and gap == 3 * step):
                     continue
-                linked_now = {**self.related_closes(past, tf, now, sym=sym), "bond": bonds.at(issued_t),
-                              "gvz": gvz.at(issued_t) if tf in ("1d", "1w") and sym == "XAU" else None}
-                fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
-                                    rel.window(issued_t, h), linked_now,
-                                    {**bv.views(sym, issued_t, h), **sv.views(sym, issued_t, h),
-                                     "_weights": self.weights(sym, h, now) if mode == "live" else None,
-                                     "_unified": unified.models(self.db).get(f"{sym}:{h}") if mode == "live" else None},
-                                    ev.near(issued_t))
+                if (h, sym, issued_t) in self._issued:
+                    continue                     # already issued this candle (INSERT OR IGNORE would drop it anyway)
+                # a daily candle labelled D starts at 22:00 UTC the evening before: that is when the forecast is made
+                # and the latest moment whose news and brain views it may use (audit 2026-11-24: 2 h look-ahead)
+                known = decision_time(issued_t, tf)
+                try:
+                    linked_now = {**self.related_closes(past, tf, now, sym=sym), "bond": bonds.at(issued_t),
+                                  "gvz": gvz.at(issued_t) if tf in ("1d", "1w") and sym == "XAU" else None}
+                    fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
+                                        rel.window(issued_t, h), linked_now,
+                                        {**bv.views(sym, known, h), **sv.views(sym, issued_t, h),
+                                         "_weights": self.weights(sym, h, now) if mode == "live" else None,
+                                         "_unified": unified.models(self.db).get(f"{sym}:{h}") if mode == "live" else None},
+                                        ev.near(known))
+                except Exception:        # one desk failing must never stop the others or the rest of the cycle
+                    log.exception("forecast %s %s failed", sym, h)
+                    continue
                 if fc is None:
                     continue
                 n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
+                self._issued.add((h, sym, issued_t))
+                if len(self._issued) > 5000:
+                    self._issued = {x for x in self._issued if x[2] >= issued_t - 40 * 86400}
         return n
 
     def weights(self, symbol: str, horizon: str, now: float | None = None) -> dict[str, float]:
@@ -532,18 +572,25 @@ class Engine:
                 done = {r["issued_t"] for r in self.db.execute(
                     "SELECT issued_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='history' "
                     "GROUP BY issued_t HAVING COUNT(*) >= ?", (sym, h, len(forecast.methods_for(h)))).fetchall()}
+                live_ts = {r["issued_t"] for r in self.db.execute(
+                    "SELECT DISTINCT issued_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='live'",
+                    (sym, h)).fetchall()}
                 for i in range(forecast.MIN_CANDLES, len(rows)):
                     t = rows[i]["t"]
                     if t in done:
                         continue   # replayed before: forecasts never change once issued
-                    if rows[i]["t"] - rows[i - 1]["t"] > 3 * step and tf not in ("1d", "1w"):
-                        continue   # a gap (weekend): the candle after it is not "the next one"
+                    gap = rows[i]["t"] - rows[i - 1]["t"]
+                    monday = tf == "1d" and datetime.fromtimestamp(t, timezone.utc).weekday() == 0
+                    if gap != step and not (monday and gap == 3 * step):
+                        continue   # the same rule as live: only right after a real candle (audit 2026-11-24)
+                    if t in live_ts:
+                        continue   # this moment has live forecasts: no history copy of it
                     window = rows[max(0, i - forecast.history_need(h)):i]
                     fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
                                         {**self.related_closes(window, tf, now, linked, sym), "bond": bonds.at(t),
                                          "gvz": gvz.at(t) if tf in ("1d", "1w") and sym == "XAU" else None},
-                                        {**bv.views(sym, t, h), **sv.views(sym, t, h)},
-                                        ev.near(t))
+                                        {**bv.views(sym, decision_time(t, tf), h), **sv.views(sym, t, h)},
+                                        ev.near(decision_time(t, tf)))
                     if fc is None:
                         continue
                     target = rows[i + k - 1]["t"] + step if i + k - 1 < len(rows) else target_time(t, h)
@@ -647,12 +694,20 @@ class Engine:
         await self.poll_once(now)
         live = sum(self.status(s, now) in ("LIVE", "DEMO") for s in candles.METALS)
         self._rep("prices", "done" if live else "error", note=f"{live}/4 metal canlı")
-        n = self.issue_due(now)
-        if n:
-            self._rep("forecast", "done", note=f"{n} proqnoz verildi")
-        scored = judge.score_due(self.db, now)
-        if scored:
-            self._rep("judge", "done", note=f"{scored} proqnoz yoxlandı")
+        try:
+            n = self.issue_due(now)
+            if n:
+                self._rep("forecast", "done", note=f"{n} proqnoz verildi")
+        except Exception as e:           # issuing failing must not stop scoring (audit 2026-11-24)
+            log.exception("issue_due failed")
+            self._rep("forecast", "error", note=f"{type(e).__name__}: {str(e)[:100]}")
+        try:
+            scored = judge.score_due(self.db, now)
+            if scored:
+                self._rep("judge", "done", note=f"{scored} proqnoz yoxlandı")
+        except Exception as e:
+            log.exception("score_due failed")
+            self._rep("judge", "error", note=f"{type(e).__name__}: {str(e)[:100]}")
 
     def refresh_decisions(self) -> None:
         """Off the event loop (a thread), every minute: the liquidity view, the risk gate and the decision per metal."""

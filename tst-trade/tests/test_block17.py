@@ -49,3 +49,9 @@ def test_focus_hypotheses_start_empty(tmp_path):
     db = DB(str(tmp_path / "t.db"))
     rows = hypotheses.evaluate_focus(db)
     assert [r["id"] for r in rows] == ["H9", "H10", "H12", "H13", "H11"] and all(r["status"] == "az" for r in rows)
+
+
+def test_checker_allows_rounding_not_invention():
+    given = '{"price": 4012.35, "rsi": 0.42}'
+    assert checker.invented("Səviyyə 4012, RSI 0.4, 3 qayda", given) == []
+    assert checker.invented("hədəf 4300", given) == ["4300"]

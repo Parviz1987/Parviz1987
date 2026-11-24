@@ -36,8 +36,12 @@ def hedge(db: DB, symbol: str, horizon: str, now: float | None = None) -> dict[s
     now = time.time() if now is None else now
     since = now - WINDOW.get(horizon, 365) * 86400
     # the newest MAX_ROWS results only (newest first from the index, then replayed oldest first): bounded memory
+    live0 = db.execute("SELECT MIN(issued_t) t FROM forecasts WHERE symbol=? AND horizon=? AND mode='live'",
+                       (symbol, horizon)).fetchone()["t"]
+    # history only before the live record starts: the same moment is never counted twice (audit 2026-11-24)
     rows = db.execute("SELECT method, hit, outcome FROM forecasts WHERE symbol=? AND horizon=? AND hit IS NOT NULL "
-                      "AND issued_t > ? ORDER BY issued_t DESC LIMIT ?", (symbol, horizon, since, MAX_ROWS)).fetchall()
+                      "AND issued_t > ? AND (mode='live' OR issued_t < ?) ORDER BY issued_t DESC LIMIT ?",
+                      (symbol, horizon, since, live0 if live0 is not None else 1e18, MAX_ROWS)).fetchall()
     rows.reverse()
     if not rows:
         return {}
