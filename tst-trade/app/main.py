@@ -395,6 +395,23 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         from . import outlook
         return await asyncio.to_thread(diag._slow, "outlook", lambda: outlook.all_metals(db), 120)
 
+    @app.get("/bilik")
+    async def bilik_page():
+        return FileResponse(STATIC / "bilik.html")
+
+    @app.get("/api/bilik")
+    async def bilik_api():
+        """Block 25/28: the Bilik kitabı (our rules) with each rule's measured record and what fires right now."""
+        from . import playbook, rules
+
+        def build():
+            return {"version": playbook.VERSION, "rules": playbook.RULES, "areas": playbook.AREAS,
+                    "records": rules.records(db), "active": {s: rules.active_now(db, s) for s in candles.METALS},
+                    "proposals": [dict(r) for r in db.execute(
+                        "SELECT * FROM rule_proposals ORDER BY ts DESC LIMIT 30").fetchall()]
+                    if db.execute("SELECT 1 FROM sqlite_master WHERE name='rule_proposals'").fetchone() else []}
+        return await asyncio.to_thread(diag._slow, "bilik", build, 300)
+
     @app.get("/api/futstudy")
     async def futstudy_api():
         """Block 21: the futures tests (impulse with real volume, after US releases, both years, futures vs Capital cost)."""

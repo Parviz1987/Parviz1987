@@ -4,7 +4,7 @@
   "use strict";
   const el = document.getElementById("mainnav");
   if (!el) return;
-  const PAGES = [["/", "Panel"], ["/results", "Nəticələr"], ["/agents", "Agentlər"], ["/status", "Sistem"], ["/admin", "Admin"]];
+  const PAGES = [["/", "Panel"], ["/results", "Nəticələr"], ["/bilik", "Bilik"], ["/agents", "Agentlər"], ["/status", "Sistem"], ["/admin", "Admin"]];
   const OWNER_ONLY = ["/agents", "/status", "/admin"];
   const here = location.pathname.replace(/\/$/, "") || "/";
   el.innerHTML = PAGES.map(([href, name]) =>

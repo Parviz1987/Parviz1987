@@ -280,3 +280,10 @@ body.simple .main,body.simple .split,body.simple .feeds,body.simple .box[data-fo
 @media (max-width:560px){.olgrid{grid-template-columns:1fr}.olr{grid-template-columns:104px 1fr}}
 .olv{display:grid;gap:2px;padding:6px 8px;border-radius:8px;background:var(--acc-soft);border:1px solid var(--line)}
 .olv>span:first-child{color:var(--muted);font-size:12px}.olv b{font-size:16px}.olv b.up{color:#3ee08f}.olv b.down{color:#ff5d6c}.olv b.mut{color:var(--muted)}
+/* Bilik kitabı */
+.rule{border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;background:var(--panel2);display:grid;gap:4px}
+.rule .rh{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+.rule .rr{display:grid;grid-template-columns:70px 1fr;gap:8px;font-size:13px}
+.rule .rr>span:first-child{color:var(--muted)}
+.rule .rtf{display:block}
+@media (max-width:560px){.rule .rr{grid-template-columns:1fr;gap:0}}

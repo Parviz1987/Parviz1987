@@ -729,6 +729,12 @@ class Engine:
                 if time.time() - self._weights_ts > 600:
                     self._weights_ts = time.time()
                     await asyncio.to_thread(self.refresh_weights)
+                if time.time() - float(self.db.get("rules:ts") or 0) > 900:
+                    self.db.put("rules:ts", str(time.time()))
+                    from . import rules
+                    res = await asyncio.to_thread(rules.run, self.db)
+                    self._rep("judge", "done", note=f"qaydalar: {res['added']} yeni siqnal"
+                                                    + (" (tarixçə sınağı)" if res["replay"] else ""))
                 if time.time() - float(self.db.get("unified:ts") or 0) > UNIFIED_EVERY:
                     self.db.put("unified:ts", str(time.time()))
                     self._rep("judge", "working", note="vahid proqnoz: öz-özünü sınaq")
