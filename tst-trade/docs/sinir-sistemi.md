@@ -67,4 +67,9 @@ Hakim yoxlayır. Həyəcan fikirləri ayrıca da hesablanır ki, «hadisədən s
 - Ətraflı: `docs/acarlar.md`. Məcburi heç nə yoxdur; FMP Starter yalnız istəyə görə.
 
 ## Gözləmə siyahısı (yeni istəklər, sırası gələndə)
-- (boş)
+- 2026-11-24 «Radar Gold texniki arayış» (sahibin PDF-i). Götürülə bilənlər, sahibin qərarı ilə:
+  1) hadisə zənciri: hər hadisəyə ümumi id (siqnal → beyin → proqnoz → Hakim), Agentlər panelində «niyə» izi;
+  2) risk mühərriki (maks. mövqe, gündəlik zərər limiti, köhnə qiymət bloku, təcili dayandırma) — yalnız sübut
+     tapılandan sonra, kağız ticarətindən əvvəl;
+  3) «yuxarı / aşağı tərəfdarı» beyin müzakirəsi (TradingAgents ideyası) — həyəcanlarda sınaq üsulu kimi.
+  Götürülmür: React/Next, PostgreSQL/Redis, LangGraph, 3D WebGL (sadə stek qaydası; dəqiqliyə təsiri yoxdur).
