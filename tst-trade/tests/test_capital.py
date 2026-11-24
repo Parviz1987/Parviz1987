@@ -67,6 +67,8 @@ def test_history_walks_back_page_by_page():
             if "to" not in params:
                 return Resp(page(t_last, 1000))
             to = int(datetime.strptime(params["to"], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc).timestamp())
+            frm = int(datetime.strptime(params["from"], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc).timestamp())
+            assert (to - frm) // 900 + 1 <= 1000                   # never wider than 1000 candle slots
             return Resp(page(to, 1000))
 
     h = cap.CapitalHistory({"identifier": "x", "password": "y", "api_key": "z"})

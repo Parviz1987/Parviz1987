@@ -176,7 +176,7 @@ def _weekday_open(ts: float) -> bool:
 RESOLUTION = {"1m": "MINUTE", "5m": "MINUTE_5", "15m": "MINUTE_15", "30m": "MINUTE_30", "1h": "HOUR", "4h": "HOUR_4", "1d": "DAY",
               "1w": "WEEK"}
 MAX_ROWS = 1000             # the broker returns at most 1000 candles per request
-PAGES_MAX = 6               # older pages walked back by date range (history up to ~7000 candles)
+PAGES_MAX = 10              # older pages walked back by date range (weekends make a page hold fewer candles)
 
 
 def _mid(p: dict | None) -> float | None:
@@ -251,11 +251,13 @@ class CapitalHistory(HistoryProvider):
         from datetime import datetime, timezone
         from ..candles import TF
         step = TF.get(tf, 60)
+        cursor = rows[0][0] if rows else None        # walk back from here
+        empty_ok = 2                                   # a page that is all weekend or holiday is stepped over
         for _ in range(PAGES_MAX):
-            if len(rows) >= limit or not rows:
+            if len(rows) >= limit or cursor is None:
                 break
-            to = rows[0][0] - step
-            frm = to - int(MAX_ROWS * step * 1.45)      # trading hours and weekends: ~1000 candles in 1.45x the span
+            to = cursor - step
+            frm = to - (MAX_ROWS - 1) * step            # never more than 1000 candle slots: a wider range is refused
             fmt = lambda t: datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
             if self.request_gap:
                 await asyncio.sleep(self.request_gap)
@@ -267,9 +269,14 @@ class CapitalHistory(HistoryProvider):
                 break
             older = [x for x in parse_prices(r.json(), tf) if x[0] < rows[0][0]]
             if not older:
+                if empty_ok > 0:
+                    empty_ok -= 1
+                    cursor = frm
+                    continue
                 self.page_note = "köhnə səhifə boş gəldi"
                 break
             rows = older + rows
+            cursor = rows[0][0]
         return rows[-limit:]
 
     async def aclose(self) -> None:

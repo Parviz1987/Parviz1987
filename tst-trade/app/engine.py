@@ -241,6 +241,10 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:history_pages_v2"):
+            # Capital's older pages are now asked within 1000 candle slots: loaded and replayed once now.
+            self.history_state["ts"] = 0
+            self.db.put("migr:history_pages_v2", "1")
         if not self.db.get("migr:history_4000"):
             # Longer history (pages walked back at the broker): loaded and replayed once now, not in 6 hours.
             self.history_state["ts"] = 0
