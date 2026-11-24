@@ -293,16 +293,22 @@ def records(db: DB) -> dict:
     for r in db.execute("SELECT metal, tf, t, rule, dir, price0, price1 FROM rule_signals WHERE price1 IS NOT NULL "
                         "AND price0 > 0 ORDER BY t").fetchall():
         ret = (r["price1"] / r["price0"] - 1) * r["dir"]
-        cells.setdefault((r["rule"], r["tf"]), []).append((r["t"], ret, ret - full_cost(r["metal"], r["tf"])))
+        cells.setdefault((r["rule"], r["tf"]), []).append((r["t"], ret, ret - full_cost(r["metal"], r["tf"]), r["metal"]))
     bar = 0.05 / max(1, len(cells))
     out = {}
     for (rule, tf), v in cells.items():
         n = len(v)
-        hits = sum(1 for _, ret, _ in v if ret > 0)
-        net = sum(x for _, _, x in v) / n
+        hits = sum(1 for _, ret, _, _ in v if ret > 0)
+        net = sum(x for _, _, x, _ in v) / n
         half = n // 2
-        h1 = sum(x for _, _, x in v[:half]) / half if half else None
-        h2 = sum(x for _, _, x in v[half:]) / (n - half) if n - half else None
+        h1 = sum(x for _, _, x, _ in v[:half]) / half if half else None
+        h2 = sum(x for _, _, x, _ in v[half:]) / (n - half) if n - half else None
+        by_metal: dict[str, list] = {}
+        for _, ret, x, m in v:                     # each metal on its own: platinum's spread must not hide gold's result
+            b = by_metal.setdefault(m, [0, 0, 0.0])
+            b[0] += 1
+            b[1] += int(ret > 0)
+            b[2] += x
         p = _p_one_sided(hits, n, 0.5) if n >= 30 else None
         st = ("az" if n < 100 else
               "sübut" if p is not None and p < bar and net > 0 and h1 and h2 and h1 > 0 and h2 > 0 else
@@ -310,7 +316,9 @@ def records(db: DB) -> dict:
         out.setdefault(rule, {})[tf] = {"n": n, "hit_rate": round(hits / n, 4), "net_avg": round(net, 6),
                                         "halves": [None if h1 is None else round(h1, 6),
                                                    None if h2 is None else round(h2, 6)],
-                                        "p": None if p is None else round(p, 5), "status": st}
+                                        "p": None if p is None else round(p, 5), "status": st,
+                                        "by_metal": {m: {"n": b[0], "hit_rate": round(b[1] / b[0], 4),
+                                                         "net_avg": round(b[2] / b[0], 6)} for m, b in by_metal.items()}}
     return {"bar": bar, "rules": out}
 
 

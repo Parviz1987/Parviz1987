@@ -17,7 +17,8 @@
     $("rules").innerHTML = data.rules.filter((r) => r.area === area).map((r) => {
       const rr = rec[r.id] || {};
       const cells = ["1h", "4h", "1d"].map((tf) => rr[tf]
-        ? `<span class="rtf"><b>${tf}</b> ${Math.round(rr[tf].hit_rate * 100)} % · ${rr[tf].n} dəfə · xərcdən sonra ${(rr[tf].net_avg * 100).toFixed(3)} % · ${ST[rr[tf].status] || rr[tf].status}</span>` : "").join("");
+        ? `<span class="rtf"><b>${tf}</b> ${Math.round(rr[tf].hit_rate * 100)} % · ${rr[tf].n} dəfə · xərcdən sonra ${(rr[tf].net_avg * 100).toFixed(3)} % · ${ST[rr[tf].status] || rr[tf].status}
+            <span class="note">· ${Object.entries(rr[tf].by_metal || {}).map(([m, b]) => `${esc(m)} ${Math.round(b.hit_rate * 100)} %, ${(b.net_avg * 100).toFixed(3)} %`).join(" · ")}</span></span>` : "").join("");
       return `<div class="rule"><div class="rh"><b>${esc(r.id)}</b> ${esc(r.name)}
           <span class="note">${r.detector ? "kod özü tapır, Hakim ölçür" : "analitik faktlardan tətbiq edir"}</span></div>
         <div class="rr"><span>Üsul</span><span>${esc(r.how)}</span></div>
