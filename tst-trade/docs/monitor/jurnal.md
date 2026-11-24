@@ -7,3 +7,11 @@
 - Diqqət: qızılın 30 dəqiqəlik tarixində «geri dönüş» 64,9 % düz çıxır, digər metallarda 44-54 %. Şübhəli: iki mənbənin şamları qarışmış ola bilər, yoxlanmalıdır.
 - Uzun müddətlərdə (10 gün, 1 ay) qızıl və gümüşün aralıqları bir az dardır.
 - Problem: bu yoxlama GitHub-a yaza bilmədi (403). Həll: 23:28 NY-dən yoxlama sahibin söhbətinə bağlandı, köhnə tapşırıq dayandırıldı.
+
+## 2026-11-23, 19:48 NY (növbətçi yoxlama, bu söhbətdə)
+- Təhlükəsizlik: sakit. 24 saatda 1 uğurlu giriş, uğursuz və bloklanmış yoxdur. CSP və HSTS yerindədir.
+  Qeyd: buradan tokensiz /api/diag 200 qaytardı, çünki bu mühitin proksisi tokeni özü əlavə edir. Kod tokensiz 401 verir (test_diag yoxlayır).
+- Sağlamlıq: versiya 965283b (budaqla eyni), /healthz 200, xəta yoxdur. Boş yaddaş 182 MB, DB 210 MB, açıq proqnoz 2000.
+- Xəbərdarlıq: əlaqəli bazarlardan 3-ü gəlmir. Bu dəfə Dollar indeksi, Brent, VIX (əvvəlki yoxlamada VIX gəlirdi, istiqraz gəlmirdi): siyahı dəyişir, səbəb Blok 2-də araşdırılacaq.
+- «Hadisə sürprizi»nin girişi yoxdur (FMP planında təqvim yoxdur, HTTP 402).
+- Bu gün edilən: Strateq artıq 1 saat, 4 saat, 1 gün üçün ehtimal verir və Hakim onu yoxlayır (965283b).
