@@ -125,6 +125,8 @@ async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema:
     if spent(db, slot) >= float(cfg["month_usd"]):
         return None, f"aylıq limit doldu ({cfg['month_usd']} $)"
     errors = []
+    from .registry import MISSION
+    system = MISSION + system           # every brain serves the same goal, in the same words
     for provider, model in ((cfg["provider"], cfg["model"]), (cfg.get("fallback"), cfg.get("fallback_model"))):
         if not provider or not model:
             continue

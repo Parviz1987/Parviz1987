@@ -7,7 +7,7 @@ For each metal, one honest picture of the next day (the 1-day desk), from what t
      renew (the frozen forecast card), and how its 1-day cards turned out so far;
   2. Tərəzi: the analysts weighted by the Judge (empty when the Judge trusts none yet);
   3. the analysts' vote: how many of the methods lean up / down right now;
-- one line: «yuxarı meyl» / «aşağı meyl» only when the voices that have a view agree, otherwise «aydın deyil»;
+- one line, ONE answer: the unified forecast's direction (the voices explain it; how many agree is shown);
 - the proof status from the Judge for the 1-day desk. A lean is NOT a proven forecast: the page says so plainly.
 Nothing here is invented: every number comes from the forecasts, the Judge or the cards."""
 from __future__ import annotations
@@ -98,17 +98,25 @@ def build(db: DB, sym: str) -> dict:
             down += 1
             names_down.append(METHOD_NAMES.get(m, m))
     out["vote"] = {"up": up, "down": down, "up_names": names_up[:8], "down_names": names_down[:8]}
-    # one line: only when the voices that have a view agree
-    dirs = [d for d in (_dir((out.get("strateq") or {}).get("p")), _dir((out.get("terazi") or {}).get("p")),
-                        _dir((out.get("chartist") or {}).get("p")),
-                        (1 if up > down * 1.5 and up >= 3 else -1 if down > up * 1.5 and down >= 3 else 0)) if d]
-    lean = 0 if not dirs or len(set(dirs)) > 1 else dirs[0]
-    weak = lean != 0 and len(dirs) < 2           # one voice alone is a weak lean, not an agreement
+    # ONE answer (2026-11-24, no contradiction): the line is the unified forecast's direction; the voices are its
+    # explanation — how many of them agree with it is shown, but they never give a second «final» answer.
+    vp = (out.get("vahid") or {}).get("p")
+    lean = _dir(vp) if vp is not None else 0
+    if vp is not None and lean == 0 and abs(vp - 0.5) >= 0.01:
+        lean = 1 if vp > 0.5 else -1
+        weak = True                                  # the unified view leans, but only a little
+    else:
+        weak = False
+    voices = [d for d in (_dir((out.get("strateq") or {}).get("p")), _dir((out.get("terazi") or {}).get("p")),
+                          _dir((out.get("chartist") or {}).get("p")),
+                          (1 if up > down * 1.5 and up >= 3 else -1 if down > up * 1.5 and down >= 3 else 0)) if d]
     out["lean"] = ({1: "zəif yuxarı meyl", -1: "zəif aşağı meyl"} if weak else
                    {1: "yuxarı meyl", -1: "aşağı meyl", 0: "aydın deyil"})[lean]
     out["lean_dir"] = 0 if weak else lean
     out["weak_dir"] = lean if weak else 0
-    out["agree"] = f"{len(dirs)} səsdən {len(dirs) if lean else 0} razı" if dirs else "heç bir səsin fikri yoxdur"
+    out["agree"] = ("vahid proqnoz hələ yoxdur" if vp is None else
+                    f"səslərdən {sum(1 for d in voices if d == lean)} razı, {sum(1 for d in voices if d == -lean)} əks"
+                    if lean else f"{len(voices)} səsin fikri var, vahid nəticə: aydın deyil")
     verdict = judge.official(list(st.values()) if max((r.get("n") or 0) for r in st.values()) >= judge.MIN_N[H]
                              else list(hist.values())) if st else {"status": "az"}
     out["proof"] = verdict.get("status")

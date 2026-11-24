@@ -58,6 +58,7 @@ def cost_parts(symbol: str, horizon: str | None = None) -> dict:
             "total": full_cost(symbol, horizon)}
 MIN_N = {"15m": 300, "30m": 250, "1h": 200, "4h": 200, "1d": 250, "3d": 250, "1w": 100, "10d": 250, "1mo": 250}
 P_MAX = 0.05
+RANGE_ONLY = ("garch", "gvz")
 
 
 def issue_rows(symbol: str, horizon: str, issued_t: int, target_t: int, fc: dict, mode: str = "live") -> list:
@@ -173,7 +174,10 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
     k = steps_of(horizon)
     # Many methods are tried on the same data: by chance one in twenty passes p < 0.05. Bonferroni: the bar is
     # divided by the number of methods competing on this card.
-    tested = [m for m in methods_for(horizon) if m not in BASELINES]
+    # The family: methods that give a DIRECTION (range-only methods — GARCH, GVZ — make no direction claim and are
+    # judged on their ranges, not counted here). Holm's step-down (2026-11-24) instead of plain Bonferroni: the same
+    # protection against luck across many methods, but the best method is not held to the bar of the worst.
+    tested = [m for m in methods_for(horizon) if m not in BASELINES and m not in RANGE_ONLY]
     p_bar = P_MAX / max(1, len(tested))
     cost = full_cost(symbol, horizon)
     parts = cost_parts(symbol, horizon)
@@ -187,7 +191,7 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
         # Forecasts k candles ahead, issued every candle, overlap: k neighbours share most of their path, so they
         # count as about one independent test. The p-value uses that effective number, not the raw count.
         p = _p_one_sided(round(hits / k), round(nh / k), bar) if nh >= k else None
-        if m in BASELINES:
+        if m in BASELINES or m in RANGE_ONLY:
             status = "bazis"
         elif nh < MIN_N[horizon]:
             status = "az"
@@ -200,7 +204,28 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
                     "bss": bss, "cover50": r["c50"], "cover80": r["c80"], "status": status, "nh": nh,
                     "min_n": MIN_N[horizon], "p_bar": p_bar, "edge": r.get("edge"), "cost": cost,
                     "cost_parts": parts})
+    _holm(out, P_MAX, len(tested))
     return out
+
+
+def _holm(rows: list[dict], alpha: float, m: int) -> None:
+    """Holm step-down over the direction methods that reached MIN_N with Brier skill > 0: the k-th smallest p is
+    compared with alpha / (m - k + 1); once one fails, the rest fail. A method that passes with a move smaller than
+    the cost stays «xərc»."""
+    fam = [r for r in rows if r["status"] not in ("bazis", "az") and r["method"] not in RANGE_ONLY]
+    m = max(m, 1)                      # the whole family counts, also methods that have too few forecasts yet
+    cand = sorted((r for r in fam if r["p"] is not None and r["bss"] is not None and r["bss"] > 0),
+                  key=lambda r: r["p"])
+    passed = True
+    for k, r in enumerate(cand):
+        bar = alpha / max(1, m - k)
+        r["p_bar"] = bar
+        if passed and r["p"] < bar:
+            r["status"] = "sübut" if (r.get("edge") or 0) > r["cost"] else "xərc"
+        else:
+            passed = False
+            if r["status"] in ("sübut", "xərc"):
+                r["status"] = "yox"
 
 
 def official(stat_rows: list[dict]) -> dict:

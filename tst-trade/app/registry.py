@@ -145,5 +145,14 @@ BRAIN_SLOTS: list[dict] = [
      "why": "Sahibin istəyi (2026-11-24): analitik qrafikə özü baxıb texniki analiz etsin. Saatda bir çağırış: ucuz model "
             "ayda təxminən 5-10 $; Hakim faydasını ölçür, fayda yoxdursa, söndürülür."},
 ]
+# One goal for every brain (owner 2026-11-24: «all agents serve one main goal»). Prepended to every brain's
+# instructions by brains.run. No digits in it: the source checker counts numbers a brain was not given.
+MISSION = (
+    "ANA MƏQSƏD (bütün agentlər üçün eynidir): qızıl, gümüş, platin və palladiumun qalxıb-düşəcəyini və gözlənilən "
+    "aralığını əvvəlcədən demək; bunun düz olduğunu Hakim real qiymətlə, xərcdən sonra yoxlayır. Sənin işin bu "
+    "məqsədin bir hissəsidir: yalnız verilən faktlardan istifadə et, rəqəm uydurma, bilmədiyin yerdə «fikir yoxdur» de "
+    "(ehtimal yarıya yaxın), əminliyini şişirtmə — kalibrlənmiş, dürüst ehtimal ən faydalıdır. Sənin fikrin vahid "
+    "proqnozda digər analitiklərlə birləşir və çəkisi yalnız Hakimin ölçdüyü nəticədən asılıdır.\n\n")
+
 BRAIN_IDS = {b["id"] for b in BRAIN_SLOTS}
 BRAIN_PROVIDERS = ("anthropic", "openai", "xai", "gemini")
