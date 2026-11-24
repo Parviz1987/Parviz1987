@@ -79,3 +79,24 @@
   - «Oxuyucu gözləyir»: eyni xəbərin surətləri də sayılırdı, halbuki onlar qəsdən oxunmur.
   - «Vaxtı keçib yoxlanmayan 129»: bazarın gündəlik fasiləsinə və həftəsonuna düşən proqnozlar da sayılırdı, halbuki onların şamı yoxdur və Hakim onları bir gündən sonra təxmin etmədən buraxır.
 - **Bazanın ölçüsü:** 792 MB. Təklif `teklifler.md`-də yazılıb.
+
+## 2026-11-24 13:30 NY — ikinci audit (iki müstəqil yoxlayıcı) və düzəlişlər
+- **Kod xətaları düzəldildi:**
+  - günlük proqnozlarda 2 saatlıq «gələcəyə baxma» (tarixçə yenidən hesablandı);
+  - bir masanın xətası bütün dövrü dayandırırdı;
+  - vaxtı keçmiş proqnozdan AL/SAT çıxa bilirdi;
+  - tarixçə canlıdan fərqli qaydayla verilirdi;
+  - kölgə ticarəti günlük sessiyanı səhv oxuyurdu;
+  - Hedge eyni anı iki dəfə sayırdı;
+  - mənbə yoxlayıcısı yuvarlaqlaşdırmanı «uydurma» sayırdı.
+- **Metodologiya (sahibin təsdiqi ilə):**
+  - **Şans səviyyəsi:** hər üsul öz şans səviyyəsi ilə ölçülür.
+  - **Sübut pulla ölçülür:** tam xərcdən sonrakı orta nəticə; eyni fikri ölçən üsullar bir ailə sayılır.
+  - **Xərc:** ödənilməsi mümkün olmayan masalar göstərilir.
+  - **Al və saxla:** 1 həftədən uzun üfüqdə namizəddir.
+  - **Yeni sınaq ailəsi:** V1–V5, 18:00 UTC-dən sayılır.
+  - **Bağlanan hipotezlər:** H6 və H11 (xərc səbəbindən).
+- **Yoxlama:**
+  - 153 test keçir;
+  - 6 səhifə kompüterdə və telefonda xətasızdır;
+  - server sağlamdır: yeni xəta yoxdur, xəbərdarlıq yoxdur.
