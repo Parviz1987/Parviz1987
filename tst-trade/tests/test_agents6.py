@@ -54,3 +54,18 @@ def test_gate_closed_when_price_not_live_and_decision_waits_without_proof():
     assert not g["open"] and "canlı deyil" in g["reasons"][0]
     d = risk.decision(db, eng, "XAU")
     assert all(x["call"] == "GÖZLƏ" for x in d["desks"]) and "sübutu yoxdur" in d["desks"][0]["why"]
+
+
+def test_hypotheses_count_only_forecasts_after_registration():
+    from app import hypotheses
+    from app.judge import insert
+    db = DB(":memory:")
+    Engine(db, KeyStore(db, "s" * 64), "demo", 15)
+    t_old, t_new = hypotheses.REGISTERED - 86400, hypotheses.REGISTERED + 3600
+    rows = []
+    for i, t in enumerate([t_old] * 50 + [t_new + j * 900 for j in range(10)]):
+        rows.append(("XAU", "30m", "reversal", "live", t + i, t + i + 1800, 100.0, 0.6, 0, 0, 0, 0, "b"))
+    insert(db, rows)
+    db.execute("UPDATE forecasts SET price1=101.0")
+    h8 = next(h for h in hypotheses.evaluate(db, hypotheses.REGISTERED + 86400) if h["id"] == "H8")
+    assert h8["n"] == 10 and h8["hit_rate"] == 1.0 and h8["status"] == "az"     # the 50 old ones never count

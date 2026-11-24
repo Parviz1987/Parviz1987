@@ -29,6 +29,10 @@ def ensure(db: DB) -> None:
         db.execute("ALTER TABLE brain_views ADD COLUMN horizon TEXT")
     if "p" not in cols:
         db.execute("ALTER TABLE brain_views ADD COLUMN p REAL")
+    if "known_ts" not in cols:
+        # When the answer actually arrived (a brain call takes seconds to minutes). Rows from before 2026-11-24 only
+        # have the time the call started: they count from 10 minutes later and are left out of the report card.
+        db.execute("ALTER TABLE brain_views ADD COLUMN known_ts REAL")
 NEWS_WINDOW = {"15m": 3600, "30m": 3600, "1h": 2 * 3600, "4h": 6 * 3600, "1d": 86400}
 STRATEQ_FOR = {"1h": 75 * 60, "4h": 3 * 3600, "1d": 6 * 3600}   # horizon -> how old the Strategist's note may be
 
@@ -50,8 +54,8 @@ class Lookup:
                 vs.append(v)
         # (metal, horizon) -> times and probabilities; a lean-only note maps to 0.6 / 0.4 / 0.5 for 4 h and 1 day
         self.strat: dict[tuple[str, str, str], tuple[list[float], list[float]]] = {}
-        for r in db.execute("SELECT ts, source, metal, lean, horizon, p FROM brain_views "
-                            "WHERE source IN ('strateq', 'brain2', 'debate') ORDER BY ts").fetchall():
+        for r in db.execute("SELECT COALESCE(known_ts, ts + 600) AS ts, source, metal, lean, horizon, p FROM brain_views "
+                            "WHERE source IN ('strateq', 'brain2', 'debate') ORDER BY 1").fetchall():
             if r["horizon"]:
                 targets = [(r["horizon"], r["p"])]
             else:
@@ -97,27 +101,58 @@ H_SEC = {"1h": 3600, "4h": 4 * 3600, "1d": 86400}
 
 
 def score(db: DB, now: float, days: int = 30) -> list[dict]:
-    """The brains' own report card: every probability a brain gave (not 50 %), checked against the price that
-    followed (one-minute closes: the last minute ended by the time). Split by brain, by alarm versus the hourly
-    run, and by horizon. Views given minutes apart about one event are not independent: a first look, not proof."""
+    """The brains' own report card, measured honestly (Block 8):
+    - from the moment the answer ARRIVED (known_ts), at the last price available then — never from a price before the
+      brain had spoken (a move that had already happened is not a forecast);
+    - net of the bid/ask spread (judge.COST): «net» = average result in the brain's direction after cost;
+    - against a free rival: «continue the move that already happened» (for an alarm: the move from the alarm to the
+      answer; otherwise the last 15 minutes). A brain earns trust only by beating it.
+    Views minutes apart about one event are not independent: a first look, not proof. Rows without known_ts (before
+    the fix of 2026-11-24) are left out."""
+    from .judge import COST
     ensure(db)
-    rows = db.execute("SELECT ts, source, metal, horizon, p, note FROM brain_views WHERE horizon IS NOT NULL "
-                      "AND p IS NOT NULL AND ABS(p - 0.5) >= 0.02 AND ts > ?", (now - days * 86400,)).fetchall()
+    sig = {}
+    try:
+        sig = {r["id"]: r["ts"] for r in db.execute("SELECT id, ts FROM signals WHERE ts > ?",
+                                                    (now - days * 86400 - 86400,)).fetchall()}
+    except Exception:
+        pass
+    rows = db.execute("SELECT known_ts, source, metal, horizon, p, note FROM brain_views WHERE horizon IS NOT NULL "
+                      "AND p IS NOT NULL AND ABS(p - 0.5) >= 0.02 AND known_ts IS NOT NULL AND known_ts > ?",
+                      (now - days * 86400,)).fetchall()
 
     def px(sym: str, t: float) -> float | None:
+        """Close of the last minute that had ENDED by time t."""
         r = db.execute("SELECT c FROM candles WHERE symbol=? AND tf='1m' AND t<=? AND t>? ORDER BY t DESC LIMIT 1",
                        (sym, t - 60, t - 1800)).fetchone()
         return r["c"] if r else None
-    agg: dict[tuple, list[int]] = {}
+    agg: dict[tuple, dict] = {}
     for r in rows:
-        end = r["ts"] + H_SEC.get(r["horizon"], 0)
+        t0 = r["known_ts"]
+        end = t0 + H_SEC.get(r["horizon"], 0)
         if end > now:
             continue
-        a, b = px(r["metal"], r["ts"]), px(r["metal"], end)
+        a, b = px(r["metal"], t0), px(r["metal"], end)
         if not a or not b or a == b:
             continue
-        hit = int((b > a) == (r["p"] > 0.5))
-        key = (r["source"], "həyəcan" if (r["note"] or "").startswith("həyəcan") else "saatlıq", r["horizon"])
-        agg.setdefault(key, []).append(hit)
-    return [{"brain": k[0], "when": k[1], "horizon": k[2], "n": len(v), "hit_rate": sum(v) / len(v)}
-            for k, v in sorted(agg.items())]
+        up = r["p"] > 0.5
+        note = r["note"] or ""
+        alarm = note.startswith("həyəcan")
+        ids = [int(x) for x in note.split("#", 1)[1].split(" ", 1)[0].split(",") if x.isdigit()] if "#" in note else []
+        t_ev = min((sig[i] for i in ids if i in sig), default=t0 - 900)
+        before = px(r["metal"], t_ev if alarm else t0 - 900)
+        ret = b / a - 1
+        k = (r["source"], "həyəcan" if alarm else "saatlıq", r["horizon"])
+        g = agg.setdefault(k, {"n": 0, "hits": 0, "net": 0.0, "base_n": 0, "base_hits": 0})
+        g["n"] += 1
+        g["hits"] += int((ret > 0) == up)
+        g["net"] += (ret if up else -ret) - COST.get(r["metal"], 0.0)
+        if before and before != a:
+            g["base_n"] += 1
+            g["base_hits"] += int((ret > 0) == (a > before))      # «the move goes on»
+    out = []
+    for (src, when, h), g in sorted(agg.items()):
+        out.append({"brain": src, "when": when, "horizon": h, "n": g["n"], "hit_rate": g["hits"] / g["n"],
+                    "net_avg": g["net"] / g["n"],
+                    "baseline_hit": g["base_hits"] / g["base_n"] if g["base_n"] else None, "baseline_n": g["base_n"]})
+    return out

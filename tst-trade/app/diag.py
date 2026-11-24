@@ -12,7 +12,7 @@ import os
 import time
 import traceback
 
-from . import brains, brainviews, candles, forecast, judge, registry, signals
+from . import brains, brainviews, candles, forecast, hypotheses, judge, registry, signals
 from . import feeds as feeds_mod
 from .db import DB
 
@@ -221,6 +221,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "candle_check": _candle_check(db),
         "forecast_check": _forecast_check(db),
         "brain_score": brainviews.score(db, time.time()),
+        "hypotheses": hypotheses.evaluate(db),
         "weights": {f"{s}/{h}": engine.weights(s, h, time.time()) for s in candles.METALS
                     for h in forecast.HORIZONS} if engine is not None else {},
         "signals": {"recent": signals.recent(db, 10),

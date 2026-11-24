@@ -51,7 +51,7 @@ Ana hədəf dəyişmir: qiymətin qalxacağını və ya düşəcəyini əvvəlc�
 
 | Blok | Nə | Niyə birinci / sonra | Sizdən |
 |---|---|---|---|
-| **8. Dürüst ölçmə** | Beyin fikrini yazıldığı andan sonrakı ilk real qiymətdən saymaq, spred daxil; «ilk 1–5 dəqiqənin istiqaməti» rəqibi; əvvəlcədən seçilmiş 5–10 əsas fərziyyə ayrıca; dəyişməz canlı yoxlama dəsti | Yanlış ümiddən qorunmaq: bütün sonrakı qərarlar bu ölçüyə əsaslanır | heç nə |
+| **8. Dürüst ölçmə** ✅ | Beyin fikrini yazıldığı andan sonrakı ilk real qiymətdən saymaq, spred daxil; «ilk 1–5 dəqiqənin istiqaməti» rəqibi; əvvəlcədən seçilmiş 5–10 əsas fərziyyə ayrıca; dəyişməz canlı yoxlama dəsti | Yanlış ümiddən qorunmaq: bütün sonrakı qərarlar bu ölçüyə əsaslanır | heç nə |
 | **9. Gözlər (pulsuz məlumat)** | BLS / BEA / DOL rəsmi API-ləri (ABŞ rəqəmlərinin faktı 8:30-da, beyinsiz); Kalshi və Polymarket (Fed qərarı ehtimalları, açarsız); ALFRED (ilk dərc olunmuş dəyərlər: keçmişdə gələcəyə baxmasın); Alpaca ilə gün içi GLD, SLV, TIP, IEF, UUP, GDX; GLD-nin XLSX arxivi; Atlanta Fed ehtimal izləyicisi | Ən böyük məlumat boşluqları pulsuz bağlanır | **BLS və BEA açarı** (pulsuz, e-poçtla qeydiyyat) |
 | **10. Refleks, talamus, xəta həyəcanı, vəziyyət** | Refleks qatı; əhəmiyyət balı və təkrara öyrəşmə; koridordan çıxma həyəcanı; SAKİT / DİQQƏT / HƏYƏCAN; 3 ümumi göstərici | Sinir sisteminin özü | heç nə |
 | **11. Öyrənmə və yuxu** | Öyrənən tərəzi (rejimə görə, sıfıra düşmədən); ehtimalların kalibrlənməsi; gecə yoxlaması və kölgədə sınanan dərslər | Sistem öz səhvindən öyrənsin | heç nə |
@@ -66,6 +66,13 @@ Ana hədəf dəyişmir: qiymətin qalxacağını və ya düşəcəyini əvvəlc�
 - Server +2 $/ay.
 
 ---
+
+## Vəziyyət
+- **Blok 8 bitdi.** Tapılan xəta: beyin fikri sorğunun **başladığı** anla qeyd olunurdu, cavab isə dəqiqələr sonra
+  gəlirdi. Fikir artıq baş vermiş hərəkətə görə «düz» sayılırdı. İndi hər fikir cavabın gəldiyi anla qeyd olunur.
+  Köhnə fikirlər 10 dəqiqə sonradan sayılır və hesabata düşmür. Beyinlərin hesabında indi spreddən sonrakı nəticə və
+  «artıq olan hərəkət davam edir» rəqibi də var. 8 əsas fərziyyə 2026-11-24 12:00 UTC-də qeydə alındı (Nəticələr,
+  6-cı bölmə).
 
 ## 4. Görünüş təklifləri (PDF üslubunda, hədəfdən yayındırmadan)
 

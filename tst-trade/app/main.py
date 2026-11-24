@@ -325,6 +325,13 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         finally:
             hub.subscribers.discard(q)
 
+    @app.get("/api/hypotheses")
+    async def hypotheses_api():
+        """Block 8: the pre-registered hypotheses, judged only on live forecasts issued after their registration."""
+        from . import hypotheses
+        return {"registered": hypotheses.REGISTERED, "p_bar": hypotheses.P_BAR,
+                "items": await asyncio.to_thread(hypotheses.evaluate, db)}
+
     @app.get("/api/decision")
     async def decision_api():
         """Block 6: per metal the risk gate (with the liquidity view) and the decision per horizon (indication only)."""

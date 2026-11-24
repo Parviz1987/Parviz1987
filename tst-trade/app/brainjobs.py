@@ -186,7 +186,7 @@ class BrainJobs:
             if it.get("id") not in ids:
                 continue   # a brain may only label the headlines it was given
             self.db.execute("INSERT OR REPLACE INTO news_ai VALUES(?,?,?,?,?,?,?)",
-                            (it["id"], now, str(it.get("event", ""))[:40], ",".join(it.get("metals", [])),
+                            (it["id"], time.time(), str(it.get("event", ""))[:40], ",".join(it.get("metals", [])),
                              it.get("direction", "neutral"), int(it.get("strength", 0)), how))
             saved += 1
         self._state("reader", f"{saved} başlıq qiymətləndirildi · {how}")
@@ -248,7 +248,7 @@ class BrainJobs:
         self.db.put("strategist:last", json.dumps(out, ensure_ascii=False))
         rows = self._prob_rows(now, "strateq", data, how, trigger)
         brainviews.ensure(self.db)
-        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p) VALUES(?,?,?,?,?,?,?)",
+        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p, known_ts) VALUES(?,?,?,?,?,?,?,?)",
                             rows)
         await self.second_brain(now, facts, trigger)
         await self.debate(now, facts, trigger)
@@ -268,7 +268,8 @@ class BrainJobs:
                 if 0.0 <= p <= 1.0:
                     lean = 1 if p > 0.52 else -1 if p < 0.48 else 0
                     tag = (self._chain(trigger) + " · ") if trigger else ""
-                    rows.append((now, source, m["symbol"], lean, f"{tag}{how} · {str(m.get('why', ''))[:200]}", h, p))
+                    rows.append((now, source, m["symbol"], lean, f"{tag}{how} · {str(m.get('why', ''))[:200]}", h, p,
+                                 max(now, time.time())))   # known_ts: when the answer arrived, not when it was asked
         return rows
 
     async def debate(self, now: float, facts: str, trigger) -> bool:
@@ -294,7 +295,7 @@ class BrainJobs:
             self._rep("debate", "error", note="hakim beyin cavab vermədi: " + how)
             return False
         rows = self._prob_rows(now, "debate", data, how, trigger)
-        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p) VALUES(?,?,?,?,?,?,?)",
+        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p, known_ts) VALUES(?,?,?,?,?,?,?,?)",
                             rows)
         self.db.put("debate:last", json.dumps({"ts": now, "bull": bull, "bear": bear, "judge": data, "brain": how},
                                               ensure_ascii=False))
@@ -315,7 +316,7 @@ class BrainJobs:
             self._state("analyst2", "alınmadı: " + how)
             return False
         rows = self._prob_rows(now, "brain2", data, how, trigger)
-        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p) VALUES(?,?,?,?,?,?,?)",
+        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p, known_ts) VALUES(?,?,?,?,?,?,?,?)",
                             rows)
         self._state("analyst2", f"{len(rows)} ehtimal yazıldı · {how}")
         return True

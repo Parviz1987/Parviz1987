@@ -15,7 +15,7 @@ def test_news_mood_and_strategist_lean_use_only_the_past():
         db.execute("INSERT INTO news_ai VALUES(?,?,?,?,?,?,?)", (f"n{i}", t - 1800 + i * 60, "x", "XAU", d, s, "b"))
     db.execute("INSERT INTO news_ai VALUES('late', ?, 'x', 'XAU', 'down', 3, 'b')", (t + 30,))   # after the forecast
     db.execute("INSERT INTO brain_views(ts, source, metal, lean, note) VALUES(?, 'strateq', 'XAU', -1, 'b')",
-               (t - 600,))    # an old lean-only note: still counts for 4 h and 1 day
+               (t - 900,))    # an old lean-only note: still counts for 4 h and 1 day, from 10 minutes after its ts
     v = Lookup(db).views("XAU", t, "4h")
     assert v["news"][0] > 0.5 and "+4" in v["news"][1]
     assert v["strateq"][0] == 0.4
@@ -91,3 +91,21 @@ def test_second_brain_answers_alone_and_is_stored_apart(monkeypatch):
     assert slots == ["strategist", "analyst2"]
     v = Lookup(db).views("XAG", now + 600, "1h")
     assert v["strateq"][0] == 0.6 and v["brain2"][0] == 0.4
+
+
+def test_report_card_starts_when_the_answer_arrived_and_beats_the_rival():
+    """A view is scored from the price when its answer ARRIVED; the move before it belongs to the rival."""
+    from app import brainviews, candles
+    db = DB(":memory:")
+    brainviews.ensure(db)
+    t0 = 1_800_000_000 // 60 * 60
+    # price jumps 100 -> 101 before the answer arrives, then drifts down to 100.5 over the next hour
+    rows = [(t0 - 1800 + i * 60, 100.0, 100.0, 100.0, 100.0) for i in range(25)]
+    rows += [(t0 - 300 + i * 60, 101.0, 101.0, 101.0, 101.0) for i in range(6)]
+    rows += [(t0 + i * 60, 100.5, 100.5, 100.5, 100.5) for i in range(1, 62)]
+    candles.store_history(db, "XAU", "1m", rows)
+    db.execute("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p, known_ts) "
+               "VALUES(?, 'strateq', 'XAU', 1, 'saatlıq', '1h', 0.7, ?)", (t0 - 400, t0))
+    card = brainviews.score(db, t0 + 7200)[0]
+    assert card["n"] == 1 and card["hit_rate"] == 0.0        # said up at 101: the price fell to 100.5
+    assert card["net_avg"] < 0 and card["baseline_hit"] == 0.0
