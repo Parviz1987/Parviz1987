@@ -89,6 +89,19 @@ def _month_start(now: float) -> float:
     return float(calendar.timegm((t.tm_year, t.tm_mon, 1, 0, 0, 0)))
 
 
+def pace(db: DB, slot: str, now: float | None = None) -> float:
+    """Cost thermostat (Block 12): if this month's spend, projected to the month's end, would pass 90 % of the slot's
+    limit, the slot's regular jobs run half as often (factor 2); otherwise 1. Alarms are capped separately."""
+    import calendar
+    from datetime import datetime, timezone
+    now = _time.time() if now is None else now
+    d = datetime.fromtimestamp(now, timezone.utc)
+    days = calendar.monthrange(d.year, d.month)[1]
+    elapsed = max(0.5, (now - _month_start(now)) / 86400)
+    projected = spent(db, slot, now) / elapsed * days
+    return 2.0 if projected > 0.9 * float(config(db, slot)["month_usd"]) else 1.0
+
+
 def spent(db: DB, slot: str, now: float | None = None) -> float:
     now = _time.time() if now is None else now
     db.conn.executescript(CALLS_SCHEMA)

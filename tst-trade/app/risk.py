@@ -23,6 +23,9 @@ def gate(db: DB, engine, symbol: str, now: float | None = None) -> dict:
     now = time.time() if now is None else now
     reasons = []
     status = engine.status(symbol, now) if engine is not None else "OFFLINE"
+    reflex = engine.reflex.closed(symbol, now) if engine is not None and hasattr(engine, "reflex") else None
+    if reflex:
+        reasons.append(reflex)
     if status not in ("LIVE", "DEMO"):
         reasons.append(f"qiymət canlı deyil ({status})")
     try:

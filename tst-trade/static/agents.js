@@ -12,6 +12,7 @@ const POS = {
   calendar: [58, 91], hunter: [79, 92],
 };
 let NODES = [], live = {}, shown = {}, skew = 0, events = [], mode = "live";
+let nerveState = "SAKİT";
 let winH = 1, speed = 10, playT = null, lastPulse = 0, frozenT = 0;
 let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;   // the user asked the system for less motion
 const cards = {};
@@ -130,7 +131,8 @@ function draw(tms) {
   const R = phone() ? 44 : Math.min(w, h) * 0.13;
   const spin = t * (0.15 + busy * 0.08), tilt = 0.35;
   const pulse = Math.max(0, 1 - (performance.now() - lastPulse) / 900);
-  const base = err ? [255, 93, 108] : [56, 200, 255];
+  // the sphere shows the system's state: calm blue, attention amber, alarm red (and it pulses in alarm)
+  const base = err || nerveState === "HƏYƏCAN" ? [255, 93, 108] : nerveState === "DİQQƏT" ? [232, 185, 74] : [56, 200, 255];
   const g = cx.createRadialGradient(ox, oy, R * 0.1, ox, oy, R * 1.6);
   g.addColorStop(0, `rgba(${base},${0.18 + pulse * 0.25})`); g.addColorStop(1, "rgba(0,0,0,0)");
   cx.fillStyle = g; cx.beginPath(); cx.arc(ox, oy, R * 1.6, 0, 7); cx.fill();
@@ -259,6 +261,15 @@ async function loadDecision() {
     const r = await fetch("/api/decision", { credentials: "same-origin" });
     if (!r.ok) return;
     const d = await r.json(), ms = d.metals || {};
+    if (d.state) {
+      nerveState = d.state.state || "SAKİT";
+      const m = d.state.mod || {};
+      $("nstate").className = "nstate " + nerveState;
+      $("nstate").textContent = nerveState;
+      $("nstate").title = `${d.state.why || ""} · oyanıqlıq ${m.arousal == null ? "—" : Math.round(m.arousal * 100) + " %"}` +
+        ` · beyinlərin fikir ayrılığı ${m.uncertainty == null ? "—" : Math.round(m.uncertainty * 100) + " bənd"}`;
+      if (nerveState === "HƏYƏCAN") lastPulse = performance.now();
+    }
     const syms = Object.keys(ms);
     if (!syms.length) { $("decision").innerHTML = "<p class='note'>Hesablanır (dəqiqədə bir)…</p>"; return; }
     $("gates").innerHTML = syms.map((s) => {
@@ -335,7 +346,7 @@ async function loadTop() {
 }
 setInterval(() => { $("clock").textContent = ny(now(), true) + " NY"; if (mode === "live") render(); }, 1000);
 setInterval(loadTop, 15000);
-setInterval(loadMarkets, 20000); setInterval(loadDecision, 60000);
+setInterval(loadMarkets, 20000); setInterval(loadDecision, 30000);
 loadMarkets(); loadDecision();
 loadEvents().then(connect);
 loadTop();

@@ -52,12 +52,12 @@ Ana hədəf dəyişmir: qiymətin qalxacağını və ya düşəcəyini əvvəlc�
 | Blok | Nə | Niyə birinci / sonra | Sizdən |
 |---|---|---|---|
 | **8. Dürüst ölçmə** ✅ | Beyin fikrini yazıldığı andan sonrakı ilk real qiymətdən saymaq, spred daxil; «ilk 1–5 dəqiqənin istiqaməti» rəqibi; əvvəlcədən seçilmiş 5–10 əsas fərziyyə ayrıca; dəyişməz canlı yoxlama dəsti | Yanlış ümiddən qorunmaq: bütün sonrakı qərarlar bu ölçüyə əsaslanır | heç nə |
-| **9. Gözlər (pulsuz məlumat)** | BLS / BEA / DOL rəsmi API-ləri (ABŞ rəqəmlərinin faktı 8:30-da, beyinsiz); Kalshi və Polymarket (Fed qərarı ehtimalları, açarsız); ALFRED (ilk dərc olunmuş dəyərlər: keçmişdə gələcəyə baxmasın); Alpaca ilə gün içi GLD, SLV, TIP, IEF, UUP, GDX; GLD-nin XLSX arxivi; Atlanta Fed ehtimal izləyicisi | Ən böyük məlumat boşluqları pulsuz bağlanır | **BLS və BEA açarı** (pulsuz, e-poçtla qeydiyyat) |
-| **10. Refleks, talamus, xəta həyəcanı, vəziyyət** | Refleks qatı; əhəmiyyət balı və təkrara öyrəşmə; koridordan çıxma həyəcanı; SAKİT / DİQQƏT / HƏYƏCAN; 3 ümumi göstərici | Sinir sisteminin özü | heç nə |
-| **11. Öyrənmə və yuxu** | Öyrənən tərəzi (rejimə görə, sıfıra düşmədən); ehtimalların kalibrlənməsi; gecə yoxlaması və kölgədə sınanan dərslər | Sistem öz səhvindən öyrənsin | heç nə |
-| **12. Xərc termostatı** | Oxuyucu → Claude Haiku (~40 dəfə ucuz); Strateq → Sonnet + 1 saatlıq yaddaş keşi; Opus yalnız müzakirənin hakimi; təcili olmayan işlər yarı qiymətinə (Batch/Flex); Grok X axtarışında nəticə sayı məhdud (indi hər posta görə ödənir) | Eyni limitlə 2–5 dəfə çox beyin işi | heç nə |
-| **13. Yeni sınaqlar** | 4 metal üçün birlikdə trend portfeli (1 həftə – 1 ay); Asiya/ABŞ seansı üsulu; ABŞ rəqəmindən sonra +2/+5/+15 dəqiqədə giriş; fərqli şirkətlərin beyinlərindən kalibrlənmiş ansambl | Sübutu ən çox olan fikirlər | heç nə |
-| **14. Server** | 1 GB yaddaş (indi 512 MB, baza böyüdü); gecəlik baza ehtiyatı Cloudflare R2-yə (pulsuz) | Sabitlik və ehtiyat | **DigitalOcean-da ölçünü 1 GB-a qaldırmaq (+~2 $/ay)**; istəyə görə Cloudflare R2 açarı |
+| **9. Gözlər (pulsuz məlumat)** ✅ | BLS / BEA / DOL rəsmi API-ləri (ABŞ rəqəmlərinin faktı 8:30-da, beyinsiz); Kalshi və Polymarket (Fed qərarı ehtimalları, açarsız); ALFRED (ilk dərc olunmuş dəyərlər: keçmişdə gələcəyə baxmasın); Alpaca ilə gün içi GLD, SLV, TIP, IEF, UUP, GDX; GLD-nin XLSX arxivi; Atlanta Fed ehtimal izləyicisi | Ən böyük məlumat boşluqları pulsuz bağlanır | **BLS və BEA açarı** (pulsuz, e-poçtla qeydiyyat) |
+| **10. Refleks, talamus, xəta həyəcanı, vəziyyət** ✅ | Refleks qatı; əhəmiyyət balı və təkrara öyrəşmə; koridordan çıxma həyəcanı; SAKİT / DİQQƏT / HƏYƏCAN; 3 ümumi göstərici | Sinir sisteminin özü | heç nə |
+| **11. Öyrənmə və yuxu** ✅ | Öyrənən tərəzi (rejimə görə, sıfıra düşmədən); ehtimalların kalibrlənməsi; gecə yoxlaması və kölgədə sınanan dərslər | Sistem öz səhvindən öyrənsin | heç nə |
+| **12. Xərc termostatı** ✅ | Oxuyucu → Claude Haiku (~40 dəfə ucuz); Strateq → Sonnet + 1 saatlıq yaddaş keşi; Opus yalnız müzakirənin hakimi; təcili olmayan işlər yarı qiymətinə (Batch/Flex); Grok X axtarışında nəticə sayı məhdud (indi hər posta görə ödənir) | Eyni limitlə 2–5 dəfə çox beyin işi | heç nə |
+| **13. Yeni sınaqlar** ✅ | 4 metal üçün birlikdə trend portfeli (1 həftə – 1 ay); Asiya/ABŞ seansı üsulu; ABŞ rəqəmindən sonra +2/+5/+15 dəqiqədə giriş; fərqli şirkətlərin beyinlərindən kalibrlənmiş ansambl | Sübutu ən çox olan fikirlər | heç nə |
+| **14. Server** ✅ | 1 GB yaddaş (indi 512 MB, baza böyüdü); gecəlik baza ehtiyatı Cloudflare R2-yə (pulsuz) | Sabitlik və ehtiyat | **DigitalOcean-da ölçünü 1 GB-a qaldırmaq (+~2 $/ay)**; istəyə görə Cloudflare R2 açarı |
 
 **Pul baxımından:**
 - Məcburi alış yoxdur.
@@ -73,6 +73,20 @@ Ana hədəf dəyişmir: qiymətin qalxacağını və ya düşəcəyini əvvəlc�
   Köhnə fikirlər 10 dəqiqə sonradan sayılır və hesabata düşmür. Beyinlərin hesabında indi spreddən sonrakı nəticə və
   «artıq olan hərəkət davam edir» rəqibi də var. 8 əsas fərziyyə 2026-11-24 12:00 UTC-də qeydə alındı (Nəticələr,
   6-cı bölmə).
+
+- **Blok 9–14 bitdi (kod, testlər).** Nə edildi:
+  - 9: ABŞ rəqəmlərinin faktı BLS/FRED-dən (beyinsiz, dövrü yoxlanılaraq); Kalshi Fed ehtimalları; Alpaca ilə GLD, SLV,
+    GDX, UUP, TIP, IEF gün içi şamları — hamısı beyinlərin faktlarına düşür. ALFRED, GLD XLSX və Atlanta Fed izləyicisi
+    götürülmədi: ünvan və ya format bu mühitdən yoxlanıla bilmədi, kor kod yazılmadı.
+  - 10: refleks (1 dəqiqədə sıçrayış → həmin metal dərhal GÖZLƏ, 5 dəq); diqqət süzgəci (eyni növ siqnal bir saatda bir
+    dəfə); xəta həyəcanı (qiymət öz 1 saatlıq koridorumuzdan çıxanda); SAKİT/DİQQƏT/HƏYƏCAN; oyanıqlıq, fikir
+    ayrılığı, sürpriz göstəriciləri; HƏYƏCANDA Strateq 30 dəqiqədə bir.
+  - 11: öyrənən tərəzi (Hedge + uzunmüddətli veto); beyin ehtimallarının kalibrlənməsi; gecə yoxlaması (01:00 NY):
+    ən çox 3 dərs, ikinci analitikə yalnız cüt günlərdə verilir (A/B).
+  - 12: Oxuyucu → Claude Haiku, Strateq → Claude Sonnet (sahibin limiti saxlanır); xərc termostatı: ay sonuna limiti
+    keçəcəksə, işlər iki dəfə seyrəlir.
+  - 13: «Seans: Asiya ↑ / ABŞ ↓» (1 saat, 4 saat) və «Çoxsürətli trend» (1 həftə – 1 ay).
+  - 14: gecəlik ehtiyat nüsxə Cloudflare R2-yə (02:00 NY), açar kartı Admin-də.
 
 ## 4. Görünüş təklifləri (PDF üslubunda, hədəfdən yayındırmadan)
 

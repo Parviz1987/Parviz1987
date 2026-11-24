@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from . import brainviews, candles, forecast, judge, markets, slowviews, surprise
+from . import brainviews, candles, registry, forecast, judge, markets, slowviews, surprise
 from .db import DB
 from .keys import KeyStore
 from .providers.base import NotServed, ProviderError, Quote
@@ -19,6 +19,7 @@ from .providers.twelvedata import TwelveDataHistory, TwelveDataPrices
 
 log = logging.getLogger("tst.engine")
 HISTORY_EVERY = 6 * 3600
+BACKUP_HOUR_UTC = 7         # 02:00 New York: the quietest hour
 JOBS_EVERY = 15             # seconds between brain-job checks (reader, signals, alarms, scout, strategist)
 HISTORY_LIMIT = {"1m": 1500, "15m": 4000, "30m": 4000, "1h": 4000, "4h": 3000, "1d": 2000, "1w": 600}
 BACKTEST_MAX = 4000
@@ -126,6 +127,8 @@ class Engine:
         self._weights_cache: dict = {}
         from .liquidity import Liquidity
         self.liquidity = Liquidity()           # the liquidity agent: spread and activity per metal, from the stream
+        from .nerve import Reflex
+        self.reflex = Reflex()                 # the reflex: a sudden jump closes the metal at once, no brain asked
         self._weights_ts = 0.0
         self.decisions: dict = {}
         self.history_state: dict = json.loads(db.get("history_state") or "{}")
@@ -183,6 +186,7 @@ class Engine:
                         (q.symbol, now, q.price, "capital", q.source_ts))
         candles.add_tick(self.db, q.symbol, now, q.price)
         self.liquidity.add(q.symbol, now, q.bid, q.ask)
+        self.reflex.feel(q.symbol, now, q.price)
         self.last_ok = now
 
     async def poll_once(self, now: float | None = None) -> None:
@@ -246,6 +250,17 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:cheaper_brains_v1"):
+            # Block 12: a slot still on the old default moves to the new, cheaper default (an owner's own choice stays).
+            for slot, old in (("reader", ("openai", "gpt-5.4-nano")), ("strategist", ("anthropic", "claude-opus-5-5"))):
+                raw = self.db.get(f"brain:{slot}")
+                if raw:
+                    cfg = json.loads(raw)
+                    if (cfg.get("provider"), cfg.get("model")) == old:
+                        base = next(b for b in registry.BRAIN_SLOTS if b["id"] == slot)
+                        cfg.update({k: base[k] for k in ("provider", "model", "fallback", "fallback_model")})
+                        self.db.put(f"brain:{slot}", json.dumps(cfg))        # the owner's limit is kept
+            self.db.put("migr:cheaper_brains_v1", "1")
         if not self.db.get("migr:history_pages_v2"):
             # Capital's older pages are now asked within 1000 candle slots: loaded and replayed once now.
             self.history_state["ts"] = 0
@@ -343,7 +358,10 @@ class Engine:
                 for r in live:
                     if (r.get("nh") or 0) >= judge.MIN_N[horizon]:
                         by[r["method"]] = r             # enough live forecasts: the live record decides
-                self._weights_cache[(symbol, horizon)] = judge.weights(list(by.values()), forecast.steps_of(horizon))
+                # Block 11: recent reward-prediction error (Hedge) decides, the long record (z >= 0) vetoes
+                from . import learning
+                self._weights_cache[(symbol, horizon)] = learning.combine(
+                    learning.hedge(self.db, symbol, horizon), list(by.values()), forecast.steps_of(horizon))
 
     # ---------- history and backtest ----------
     def _history_names(self) -> list[str]:
@@ -558,8 +576,10 @@ class Engine:
 
     def refresh_decisions(self) -> None:
         """Off the event loop (a thread), every minute: the liquidity view, the risk gate and the decision per metal."""
-        from . import risk
+        from . import nerve, risk
         now = time.time()
+        st = nerve.update(self.db, now)
+        self._rep("signals", "done", note=f"{st['state']}: {st['why']}")
         out = {s: risk.decision(self.db, self, s, now) for s in candles.METALS}
         self.decisions = out
         thin = [s for s in out if (out[s]["gate"]["liquidity"] or {}).get("state") == "nazik"]
@@ -570,6 +590,27 @@ class Engine:
                   if closed else "4 metalda açıq")
         self._rep("decision", "done", note=", ".join(calls) if calls else "hamısı GÖZLƏ: sübut yoxdur")
 
+    def nightly_backup(self) -> None:
+        """Block 14, in a thread: the database copied, compressed and sent to Cloudflare R2 (if the R2 key is saved)."""
+        from . import backup
+        creds = self.keys.get("r2")
+        if not creds:
+            self.db.put("backup:last", json.dumps({"ts": time.time(), "ok": False, "msg": "R2 açarı saxlanmayıb"}))
+            return
+        if self.db.path == ":memory:":
+            return
+        import os
+        try:
+            gz = backup.make_copy(self.db.path, os.path.join(os.path.dirname(self.db.path), "backup"))
+            size = os.path.getsize(gz)
+            name = backup.upload(creds, gz)
+            os.remove(gz)
+            msg = {"ts": time.time(), "ok": True, "msg": f"{name} ({size / 1e6:.0f} MB)"}
+        except Exception as e:
+            msg = {"ts": time.time(), "ok": False, "msg": f"{type(e).__name__}: {str(e)[:200]}"}
+        self.db.put("backup:last", json.dumps(msg))
+        self._rep("history", "done" if msg["ok"] else "error", note="ehtiyat nüsxə: " + msg["msg"])
+
     async def _jobs_loop(self) -> None:
         """The brains in their own loop: an alarm must not wait behind a history reload (minutes after an update)."""
         last_dec = 0.0
@@ -578,6 +619,13 @@ class Engine:
                 await self.jobs.tick()
             except Exception:
                 log.exception("brain jobs failed")
+            day = time.strftime("%Y-%m-%d", time.gmtime())
+            if time.gmtime().tm_hour == BACKUP_HOUR_UTC and self.db.get("backup:day") != day:
+                self.db.put("backup:day", day)
+                try:
+                    await asyncio.to_thread(self.nightly_backup)
+                except Exception:
+                    log.exception("backup failed")
             if time.time() - last_dec > 60:
                 last_dec = time.time()
                 try:

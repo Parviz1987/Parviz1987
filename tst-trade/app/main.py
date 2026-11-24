@@ -335,7 +335,16 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.get("/api/decision")
     async def decision_api():
         """Block 6: per metal the risk gate (with the liquidity view) and the decision per horizon (indication only)."""
-        return {"metals": engine.decisions, "ts": time.time()}
+        from . import nerve
+        now = time.time()
+        out = {}
+        for sym, d in (engine.decisions or {}).items():
+            why = engine.reflex.closed(sym, now)
+            if why:      # the reflex acts at once, not at the next minute's recomputation
+                d = {**d, "gate": {**d["gate"], "open": False, "reasons": [why] + d["gate"]["reasons"]},
+                     "desks": [{**x, "call": "GÖZLƏ", "why": why} if x["call"] != "GÖZLƏ" else x for x in d["desks"]]}
+            out[sym] = d
+        return {"metals": out, "state": nerve.state(db), "ts": now}
 
     @app.get("/api/analysts")
     async def analysts(symbol: str = "XAU"):

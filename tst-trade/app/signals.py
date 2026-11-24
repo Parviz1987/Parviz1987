@@ -6,6 +6,7 @@ away with «what happened» in its facts (an alarm). Kinds:
 - flow     2+ headlines of strength 2+ on the same metal and direction within 15 minutes
 - release  a US figure whose actual was confirmed (two brains agreed, or the calendar had it)
 - move     a 15-minute move of a metal or a linked market 4x bigger than its usual move of the last 2 days
+- band     the price left our own 1-hour 80 % range: our prediction failed (nerve.py, prediction-error alarm)
 Every signal has a unique id, so the same event never alarms twice. See docs/sinir-sistemi.md."""
 from __future__ import annotations
 
@@ -93,7 +94,8 @@ def from_moves(db: DB, now: float, symbols: list[str]) -> int:
         usual = moved[int(len(moved) * 0.75)]       # the upper quartile: quiet night hours must not make
                                                      # an ordinary day-time move look like a shock
         last = rows[-1]["c"] / rows[-2]["c"] - 1 if rows[-2]["c"] else 0
-        if abs(last) >= max(MOVE_X * usual, MOVE_MIN):
+        from .nerve import move_factor
+        if abs(last) >= max(MOVE_X * usual * move_factor(db), MOVE_MIN):
             n += emit(db, f"move:{sym}:{rows[-1]['t']}", "move",
                       f"{NAMES.get(sym, sym)} 15 dəqiqədə {last * 100:+.2f} % tərpəndi (adi hərəkət {usual * 100:.2f} %)",
                       3 if abs(last) >= 2 * MOVE_X * usual else 2, sym, now)
@@ -105,10 +107,24 @@ def scan(db: DB, now: float, symbols: list[str]) -> int:
     return from_news(db, now) + from_releases(db, now) + from_moves(db, now, symbols)
 
 
+REFRACTORY = 60 * 60     # the same kind on the same metal alarms at most once an hour (habituation)
+
+
 def pending(db: DB, now: float) -> list[dict]:
+    """Unhandled fresh signals, after the attention filter (thalamus): a signal of the same kind on the same metal as
+    one handled in the last hour is let go quietly (marked handled, no alarm) — repeated news on one story does not
+    wake the brains again and again. A strong one (strength 3) always passes."""
     ensure(db)
-    return [dict(r) for r in db.execute("SELECT * FROM signals WHERE handled_ts IS NULL AND ts > ? ORDER BY ts",
-                                        (now - FRESH,)).fetchall()]
+    out = []
+    for r in db.execute("SELECT * FROM signals WHERE handled_ts IS NULL AND ts > ? ORDER BY ts", (now - FRESH,)).fetchall():
+        r = dict(r)
+        if r["strength"] < 3 and db.execute(
+                "SELECT 1 FROM signals WHERE kind=? AND IFNULL(metal,'')=IFNULL(?,'') AND handled_ts > ? AND id != ?",
+                (r["kind"], r["metal"], now - REFRACTORY, r["id"])).fetchone():
+            db.execute("UPDATE signals SET handled_ts=? WHERE id=?", (now, r["id"]))
+            continue
+        out.append(r)
+    return out
 
 
 def mark(db: DB, ids: list[int], now: float) -> None:

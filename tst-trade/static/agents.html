@@ -36,6 +36,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .mainnav a:hover,.mainnav button:hover{color:var(--fg);border-color:var(--line)}
 .mainnav a.on{color:var(--work);border-color:rgba(56,200,255,.45);background:rgba(56,200,255,.12)}
 .mainnav form{margin:0}
+.nstate{font-size:.72rem;font-weight:800;letter-spacing:.06em;padding:3px 10px;border-radius:999px;border:1px solid var(--line)}
+.nstate.SAKİT{color:var(--work);border-color:rgba(56,200,255,.45)}
+.nstate.DİQQƏT{color:var(--gold);border-color:rgba(232,185,74,.5)}
+.nstate.HƏYƏCAN{color:var(--err);border-color:rgba(255,93,108,.6);box-shadow:0 0 12px rgba(255,93,108,.35)}
 /* top bar */
 .top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:8px 16px;background:rgba(5,10,22,.7);
   border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
@@ -135,6 +139,7 @@ button{font:inherit;color:inherit;cursor:pointer}
   <header class="top">
     <div class="brand">TST <b>Agentlər</b></div>
     <span class="conn" id="conn">Bağlantı yoxdur</span>
+    <span class="nstate" id="nstate" title="Sistemin vəziyyəti (sinir sistemi)">…</span>
     <div class="limits"><span class="lbl">Limit (bu ay)</span><span id="limits" class="limits"></span></div>
     <div class="sync"><span class="lbl">Son sinxron</span><span id="sync" class="sync"></span></div>
     <span class="sp"></span>

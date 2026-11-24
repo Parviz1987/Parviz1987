@@ -41,14 +41,14 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
                  "1w": "1 həftə", "10d": "10 gün",
                  "1mo": "1 ay"}
 METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "tsmom", "rsi", "fib", "pullback", "macro",
-           "session", "surprise", "dollar", "oil", "news", "strateq", "brain2", "debate", "cot", "season", "jewel", "consensus",
+           "session", "surprise", "dollar", "oil", "news", "strateq", "brain2", "debate", "cot", "season", "jewel", "seans", "trendmix", "consensus",
            "terazi")
 # Families: methods that carry the SAME idea (momentum and trend are both "the move continues"). The consensus gives
 # each family one voice, so one idea measured three ways cannot outvote two independent ideas.
 FAMILY = {"momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
           "reversal": "revert", "rsi": "revert", "fib": "revert", "pullback": "revert",
           "dollar": "cross", "oil": "cross", "macro": "fund", "surprise": "fund",
-          "news": "brain", "strateq": "brain", "brain2": "brain", "debate": "brain", "session": "time", "cot": "position",
+          "news": "brain", "strateq": "brain", "brain2": "brain", "debate": "brain", "session": "time", "seans": "time", "trendmix": "trend", "cot": "position",
           "season": "calendar", "jewel": "calendar"}
 FAMILY_NAMES = {"trend": "trend", "revert": "geri dönüş", "cross": "bazarlar arası", "fund": "fundamental",
                 "brain": "beyinlər", "time": "vaxt", "position": "fond mövqeləri", "calendar": "təqvim"}
@@ -58,7 +58,8 @@ METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", 
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
                 "dollar": "Dollar impulsu", "oil": "Neft impulsu",
                 "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)", "debate": "Müzakirə (yuxarı ↔ aşağı)",
-                "cot": "COT: fond mövqeləri", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
+                "cot": "COT: fond mövqeləri", "seans": "Seans: Asiya ↑ / ABŞ ↓",
+                "trendmix": "Çoxsürətli trend (dalğalanmaya görə)", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
                 "terazi": "Tərəzi (Hakimin çəkisi ilə)",
                 "consensus": "Seçici konsensus (müstəqil ailələr)"}
 BASELINES = ("rw", "up")
@@ -100,7 +101,10 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("strateq")
         out.remove("brain2")
         out.remove("debate")
+    if h not in ("1h", "4h"):
+        out.remove("seans")      # the overnight/day pattern lives inside a day
     if h not in ("1w", "10d", "1mo"):
+        out.remove("trendmix")
         out.remove("cot")        # weekly positions, monthly seasons, festival seasons: weeks-to-months effects
         out.remove("season")
         out.remove("jewel")
@@ -280,6 +284,48 @@ def tsmom_view(longer: list[dict], tf: str, bond: float | None) -> tuple[float, 
     return 0.5, f"qızıl 12 ayda {g * 100:+.1f} %, istiqraz {bond * 100:+.1f} %: razı deyil"
 
 
+ASIA_HOURS, US_HOURS = set(range(22, 24)) | set(range(0, 7)), set(range(14, 20))   # UTC
+
+
+def seans_view(next_t: int | None, horizon: str) -> tuple[float, str]:
+    """Overnight (Asian hours) gold has tended to rise and US-day gold to fall (Blose, Gondhalekar & Kort 2018; WGC
+    2024 session attribution). Fixed in advance, never tuned: a window that starts in Asian hours leans up, one in US
+    hours leans down, a little; London hours: no view."""
+    if next_t is None:
+        return 0.5, "vaxt məlumatı yoxdur"
+    hour = (next_t // 3600) % 24
+    if hour in ASIA_HOURS:
+        return 0.53, f"{hour:02d}:00 UTC Asiya saatlarıdır: tarixən qızıl bu saatlarda qalxmağa meyllidir"
+    if hour in US_HOURS:
+        return 0.47, f"{hour:02d}:00 UTC ABŞ saatlarıdır: tarixən qızıl bu saatlarda zəifləməyə meyllidir"
+    return 0.5, f"{hour:02d}:00 UTC London saatları: bu üsulun fikri yoxdur"
+
+
+def trendmix_view(longer: list[dict], tf: str) -> tuple[float, str]:
+    """Multi-speed, volatility-scaled trend (EWMAC, as in Carver's pysystemtrade; Hurst-Ooi-Pedersen): three pairs of
+    exponential averages, each difference divided by the price's own volatility, averaged; scaled so a strong trend
+    leans about 0.56. Fixed spans, never tuned on our data."""
+    spans = ((8, 32), (16, 64), (32, 128)) if tf == "1d" else ((2, 8), (4, 16), (8, 32))
+    closes = [c["c"] for c in longer]
+    if len(closes) < spans[-1][1] + 20:
+        return 0.5, f"tarixçə azdır ({len(closes)} şam)"
+
+    def ema(xs, n):
+        a, e = 2 / (n + 1), xs[0]
+        for x in xs[1:]:
+            e = a * x + (1 - a) * e
+        return e
+    rets = [b / a - 1 for a, b in zip(closes[-61:], closes[-60:]) if a]
+    vol = (sum(r * r for r in rets) / len(rets)) ** 0.5 * closes[-1] if rets else 0
+    if not vol:
+        return 0.5, "dalğalanma ölçülmədi"
+    sig = [(ema(closes, f) - ema(closes, s_)) / vol for f, s_ in spans]
+    score = max(-2.0, min(2.0, sum(sig) / len(sig) / 2))       # about -2..+2 for a strong trend
+    if abs(score) < 0.25:
+        return 0.5, f"trend zəifdir ({score:+.2f})"
+    return round(0.5 + 0.03 * score, 4), f"üç sürətin orta trendi {score:+.2f} ({'yuxarı' if score > 0 else 'aşağı'})"
+
+
 def _as_candles(seq) -> list[dict]:
     if seq and not isinstance(seq[0], dict):
         return [{"o": c, "h": c, "l": c, "c": c} for c in seq]
@@ -415,6 +461,12 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
     if "tsmom" in methods_for(horizon):
         p, basis = tsmom_view(longer, tf, (related or {}).get("bond"))
         out["tsmom"] = {"p_up": p, "basis": basis}
+    if "trendmix" in methods_for(horizon):
+        p, basis = trendmix_view(longer, tf)
+        out["trendmix"] = {"p_up": p, "basis": basis}
+    if "seans" in methods_for(horizon):
+        p, basis = seans_view(next_t, horizon)
+        out["seans"] = {"p_up": p, "basis": basis}
 
     if "session" in methods_for(horizon):
         last_t = cands[-1].get("t")
@@ -524,6 +576,12 @@ PASSPORT = {
                       "faktlarla tutuşdurub ehtimal verir (TradingAgents ideyası, Radar Gold arayışı).",
                "expect": "1 saat – 1 gün; xüsusən həyəcan anlarında tək beyindən yaxşı.",
                "else": "Tək beyinlərdən yaxşı deyilsə söndürülür (3 sorğu: xərc azalır)."},
+    "seans": {"why": "Araşdırma: gecə (Asiya saatları) qızıl qalxmağa, ABŞ gündüzü zəifləməyə meyllidir (Blose və b. 2018; "
+                     "WGC 2024). Əvvəlcədən sabitlənib, bizim məlumata uyğunlaşdırılmayıb.",
+              "expect": "1 saat və 4 saat; kiçik, amma tez-tez.", "else": "Spred qazancı yeyirsə və ya sübut yoxdursa söndürülür."},
+    "trendmix": {"why": "Ən güclü sübutu olan fikir (trend) daha dürüst formada: üç sürət, dalğalanmaya görə ölçülür "
+                        "(Carver pysystemtrade; Hurst-Ooi-Pedersen). Əsas fərziyyə: 4 metal birlikdə.",
+                 "expect": "1 həftə – 1 ay; tək metalda 51–53 %.", "else": "12 aylıq trenddən yaxşı deyilsə, çıxarılır."},
     "cot": {"why": "Böyük fondlar həddən çox alanda (3 ilin 80 %-dən yuxarı) mövqe adətən açılır və qiymət geri çəkilir; "
                    "həddən çox satanda əksinə. Dostun 31 agentli layihəsindən (#15) ideya.",
             "expect": "1 həftə – 1 ay; nadir siqnal.", "else": "Çıxarılır; COT «Fundamental» bölməsində ölçü kimi qalır."},

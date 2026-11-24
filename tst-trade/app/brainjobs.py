@@ -18,7 +18,8 @@ from .keys import KeyStore
 
 READER_EVERY, STRATEGIST_EVERY = 120, 3600
 ALARM_GAP, ALARMS_PER_DAY = 15 * 60, 12          # an alarm analysis at most every 15 minutes, 12 a day (cost cap)
-SCOUT_ALARMS_PER_DAY = 3                         # a fresh X search before the analysis, for news alarms only
+SCOUT_ALARMS_PER_DAY = 3
+SLEEP_HOUR_UTC = 6                               # 01:00 New York: the nightly review (calibration and lessons)                         # a fresh X search before the analysis, for news alarms only
 READER_BATCH = 15
 
 log = logging.getLogger("tst.brainjobs")
@@ -209,7 +210,8 @@ class BrainJobs:
             "SELECT n.title, a.metals, a.direction, a.strength FROM news n JOIN news_ai a ON a.uid=n.uid "
             "WHERE n.ts > ? AND a.strength >= 2 ORDER BY n.ts DESC LIMIT 10", (now - 24 * 3600,)).fetchall()]
         moves = {}
-        for sym in ("XAU", "XAG", "XPT", "XPD") + tuple(markets.saved(self.db).get("epics", {})):
+        from .feeds import ETF_SYMBOLS
+        for sym in ("XAU", "XAG", "XPT", "XPD") + tuple(markets.saved(self.db).get("epics", {})) + ETF_SYMBOLS:
             m = _moves(self.db, sym, now)
             if m:
                 moves[sym] = m
@@ -219,6 +221,7 @@ class BrainJobs:
         return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)),
                            "what_just_happened": [s["text"] for s in (trigger or [])], "moves_pct": moves,
                            "released_last_12h": released,
+                           "fed_odds_kalshi": self.feeds.fed_odds() if self.feeds is not None else [],
                            "cards": cards, "macro": self.feeds.macro_view(),
                            "calendar": [{k: e[k] for k in ("title", "impact", "forecast", "previous", "actual")}
                                         for e in self.feeds.upcoming(now)[:8]],
@@ -272,6 +275,27 @@ class BrainJobs:
                                  max(now, time.time())))   # known_ts: when the answer arrived, not when it was asked
         return rows
 
+    async def sleep(self, now: float) -> int:
+        """The nightly review (Block 11): calibration, then at most 3 lessons from the day's biggest brain errors."""
+        from . import learning
+        await asyncio.to_thread(learning.calibrate, self.db, now)
+        errors = await asyncio.to_thread(learning.day_errors, self.db, now)
+        self.db.conn.executescript(learning.LESSONS_SCHEMA)
+        self.db.execute("UPDATE lessons SET active=0 WHERE ts < ?", (now - 7 * 86400,))
+        if len(errors) < 2:
+            self.db.put("sleep:last", json.dumps({"ts": now, "errors": len(errors), "lessons": 0}))
+            return 0
+        data, how = await brains.run(self.db, self.keys, "reviewer", learning.LESSON_SYSTEM,
+                                     "Errors (JSON):\n" + json.dumps(errors, ensure_ascii=False),
+                                     learning.LESSON_SCHEMA_JSON, max_tokens=800)
+        lessons = [str(x)[:240] for x in (data or {}).get("lessons", [])][:3]
+        facts = json.dumps(errors, ensure_ascii=False)
+        lessons = [guard_numbers(x, facts) for x in lessons]
+        self.db.executemany("INSERT INTO lessons(ts, text) VALUES(?,?)", [(now, x) for x in lessons if x.strip()])
+        self.db.put("sleep:last", json.dumps({"ts": now, "errors": len(errors), "lessons": len(lessons), "brain": how}))
+        self._rep("strateq", "done", note=f"gecə yoxlaması: {len(errors)} səhv → {len(lessons)} dərs")
+        return len(lessons)
+
     async def debate(self, now: float, facts: str, trigger) -> bool:
         """Bull and bear argue (the second analyst's brain, cheap), the reviewer brain judges (another company)."""
         if not (self.keys.first(brains.config(self.db, "analyst2")["provider"])
@@ -310,7 +334,11 @@ class BrainJobs:
         """The same facts to a brain of another company, which never sees the Strategist's answer."""
         if not self.keys.first(brains.config(self.db, "analyst2")["provider"]):
             return False
-        data, how = await brains.run(self.db, self.keys, "analyst2", ANALYST2_SYSTEM, "Facts (JSON):\n" + facts,
+        from . import learning
+        lessons = learning.active_lessons(self.db, now) if learning.lessons_today(self.db, now) else []
+        extra = ("\n\nLessons from this desk's past errors (consider them, they are not facts):\n- " +
+                 "\n- ".join(lessons)) if lessons else ""
+        data, how = await brains.run(self.db, self.keys, "analyst2", ANALYST2_SYSTEM, "Facts (JSON):\n" + facts + extra,
                                      ANALYST2_SCHEMA, max_tokens=1500)
         if data is None:
             self._state("analyst2", "alınmadı: " + how)
@@ -388,6 +416,14 @@ class BrainJobs:
             self._rep("reader", "working", note="başlıqlar qiymətləndirilir")
             n = await self.reader(now)
             self._rep("reader", "done", note=f"{n} başlıq" if n else self.state("reader").get("message", "yeni başlıq yoxdur"))
+        # the nightly review (sleep): 06:00 UTC, once a day
+        day = time.strftime("%Y-%m-%d", time.gmtime(now))
+        if time.gmtime(now).tm_hour == SLEEP_HOUR_UTC and self.db.get("sleep:day") != day:
+            self.db.put("sleep:day", day)
+            try:
+                await self.sleep(now)
+            except Exception:
+                log.exception("sleep review failed")
         # the nerves: a strong headline, a confirmed US figure or a sharp move wakes the analysis at once
         try:
             syms = ["XAU", "XAG", "XPT", "XPD"] + list(markets.saved(self.db).get("epics", {}))
@@ -423,7 +459,10 @@ class BrainJobs:
             self._rep("strateq", "done" if ok else "error", note="həyəcan təhlili: " + alarm[0]["text"][:100])
             self._rep("signals", "done", note=self._chain(alarm) + " işləndi")
         elif now >= self.next_strategist:
-            self.next_strategist = now + STRATEGIST_EVERY
+            from . import nerve
+            alarmed = nerve.state(self.db).get("state") == "HƏYƏCAN"
+            every = (STRATEGIST_EVERY // 2 if alarmed else STRATEGIST_EVERY) * brains.pace(self.db, "strategist", now)
+            self.next_strategist = now + every
             ok = await self.strategist(now)
             self._rep("strateq", "done" if ok else "error", note=self.state("strategist").get("message", ""))
 

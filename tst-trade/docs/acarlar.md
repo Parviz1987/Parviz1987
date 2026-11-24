@@ -13,6 +13,8 @@ brauzer koduna yazılmır.
 | FRED | real faiz, dollar, VIX, neft (gündəlik) | ✅ işləyir | heç nə |
 | Alpaca | Benzinga xəbər lenti | ✅ işləyir | heç nə |
 | FMP | ABŞ rəqəmlərinin keçmiş faktları | ⚠️ açar işləyir, amma planda təqvim yoxdur (HTTP 402) | **istəyə görə**: Starter planı (~29 $/ay). Açar dəyişmir: alandan sonra Admin → FMP → «Yoxla» |
+| **BLS** | ABŞ rəqəmlərinin rəsmi faktı dərhal (CPI, iş yerləri, işsizlik, PPI) | açarsız da işləyir (gündə 25 sorğu) | **Tövsiyə**: pulsuz açar → https://data.bls.gov/registrationEngine/ → Admin → BLS → «Saxla» → «Yoxla» |
+| **Cloudflare R2** | Gecəlik ehtiyat nüsxə serverdən kənarda | kart hazırdır, açar yoxdur | **Tövsiyə**: Cloudflare-də R2 bucket və API token → Admin → R2 kartına 4 sahə (account_id, access_key_id, secret_access_key, bucket) → «Yoxla» |
 | Google (Gemini) | yalnız ehtiyat beyin (əsas beyin cavab verməyəndə) | lazım deyil | heç nə |
 
 ## Nəticə
@@ -20,6 +22,10 @@ brauzer koduna yazılmır.
 - Canlı ABŞ rəqəmlərini FMP-siz Rəqəm ovçusu tapır (iki beyin vebdə, ikisi eyni deyəndə).
 - FMP yalnız keçmişi verir: «Hadisə sürprizi» üsulunu 2 illik keçmişdə dərhal yoxlamaq üçün. Almasanız, bu üsul
   canlı rəqəmlər yığıldıqca (ayda ~15-20 mühüm ABŞ rəqəmi) yavaş-yavaş yoxlanır.
+
+## Server
+- **DigitalOcean: 512 MB → 1 GB** (ayda ~+2 $). Baza 500 MB-ı keçib, yaddaş dardır. DigitalOcean → Droplets → tst →
+  **Resize** → 1 GB (CPU and RAM only) → Resize. Server bir neçə dəqiqə dayanır, sonra özü qalxır.
 
 ## Aylıq beyin xərci (hər yuvanın öz limiti var, Admin → Beyinlər)
 Kəşfiyyatçı, Rəqəm ovçusu, Oxuyucu, Strateq, İkinci analitik: hər biri ayda 20 $ limit. Limit dolanda yuva dayanır,

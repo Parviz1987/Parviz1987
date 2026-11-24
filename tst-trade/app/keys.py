@@ -147,6 +147,16 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
         elif slot == "fred":
             ok, msg = await _http_check("https://api.stlouisfed.org/fred/series",
                                         params={"series_id": "DFII10", "api_key": key, "file_type": "json"})
+        elif slot == "bls":
+            async with httpx.AsyncClient(timeout=CHECK_TIMEOUT) as c:
+                r = await c.post("https://api.bls.gov/publicAPI/v2/timeseries/data/",
+                                 json={"seriesid": ["CUUR0000SA0"], "registrationkey": key, "latest": True})
+            body = r.json() if r.status_code == 200 else {}
+            ok = body.get("status") == "REQUEST_SUCCEEDED"
+            msg = "işləyir" if ok else f"açar qəbul olunmadı: {'; '.join(body.get('message', []))[:120] or r.status_code}"
+        elif slot == "r2":
+            from . import backup
+            ok, msg = await backup.check(v)
         else:
             # No check exists yet for this provider: the key is saved, nothing is known about it (not an error).
             ok, msg = None, "açar saxlanıb; bu açarın yoxlaması növbəti mərhələdə qoşulacaq"

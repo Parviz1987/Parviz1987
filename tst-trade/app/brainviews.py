@@ -40,6 +40,8 @@ STRATEQ_FOR = {"1h": 75 * 60, "4h": 3 * 3600, "1d": 6 * 3600}   # horizon -> how
 class Lookup:
     def __init__(self, db: DB):
         ensure(db)
+        import json as _json
+        self.calib = (_json.loads(db.get("calib") or "{}")).get("bands", {})     # Block 11: calibration bands
         self.news: dict[str, tuple[list[float], list[int]]] = {}
         try:
             rows = db.execute("SELECT ts, metals, direction, strength FROM news_ai WHERE direction IN ('up', 'down') "
@@ -92,8 +94,11 @@ class Lookup:
                 elif abs(vs[i] - 0.5) < 0.02:
                     out[src] = (0.5, f"{who} bilmir deyir (50 %)")
                 else:
-                    p = round(min(max(vs[i], P_CLIP[0]), P_CLIP[1]), 4)
-                    out[src] = (p, f"{who}: yuxarı ehtimalı {round(vs[i] * 100)} %")
+                    from .learning import apply_calibration
+                    pc = apply_calibration(self.calib, src, horizon, vs[i])
+                    p = round(min(max(pc, P_CLIP[0]), P_CLIP[1]), 4)
+                    out[src] = (p, f"{who}: yuxarı ehtimalı {round(vs[i] * 100)} %" +
+                                (f" (kalibrlənmiş {round(pc * 100)} %)" if pc != vs[i] else ""))
         return out
 
 

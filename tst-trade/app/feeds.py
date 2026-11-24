@@ -62,7 +62,14 @@ MACRO_SERIES = {
     "SP500": "S&P 500 səhm indeksi",
     "DCOILWTICO": "Neft WTI (gündəlik), $",
 }
-SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp")   # every collector that reports health
+SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf")
+# Block 9. Kalshi: market-implied odds of the next Fed decisions (public market data, no key).
+KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
+KALSHI_SERIES = ("KXFEDDECISION", "KXFED")
+# Intraday ETF proxies through the Alpaca key (IEX feed, US hours): gold and silver funds, miners, the dollar fund and
+# Treasury funds (TIP = inflation-protected: an intraday stand-in for real yields, IEF = 7-10 year Treasuries).
+ETF_SYMBOLS = ("GLD", "SLV", "GDX", "UUP", "TIP", "IEF")
+ETF_URL = "https://data.alpaca.markets/v2/stocks/bars"
 # CFTC Commitments of Traders (disaggregated, futures only; public, no key): weekly positions on COMEX / NYMEX.
 COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
 COT_CODES = {"088691": "XAU", "084691": "XAG", "076651": "XPT", "075651": "XPD"}
@@ -241,7 +248,8 @@ class Feeds:
         self.db = db
         self.keys = keys
         db.conn.executescript(SCHEMA)
-        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0}
+        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0,
+                         "official": 0.0, "kalshi": 0.0, "etf": 0.0}
         self.activity = None      # app.activity.Hub: where each collector reports its status
         db.conn.executescript(surprise.SCHEMA)
 
@@ -318,6 +326,132 @@ class Feeds:
                 errors.append(f"{sid}: {str(e).replace(key, '***')}")
         self._health("fred", n > 0, f"{n} müşahidə" + (f"; xəta: {'; '.join(errors)}" if errors else ""), n)
 
+    def _recent_release(self, now: float) -> bool:
+        return self.db.execute("SELECT 1 FROM events WHERE country='USD' AND impact IN ('High','Medium') AND ts BETWEEN "
+                               "? AND ?", (now - 2400, now + 60)).fetchone() is not None
+
+    async def official(self, client) -> None:
+        """US release actuals straight from BLS / FRED for releases of the last 3 days that have no actual yet."""
+        from . import official as off, surprise
+        surprise.ensure(self.db)
+        now = time.time()
+        due = []
+        for r in self.db.execute("SELECT title, ts, impact, forecast FROM events WHERE country='USD' AND impact IN "
+                                 "('High','Medium') AND ts BETWEEN ? AND ? AND forecast IS NOT NULL",
+                                 (now - 3 * 86400, now - 30)).fetchall():
+            p = off.plan(r["title"])
+            uid = off.uid_of(r["title"], r["ts"])
+            if p and not self.db.execute("SELECT 1 FROM releases WHERE uid=? AND actual IS NOT NULL", (uid,)).fetchone():
+                due.append((dict(r), p, uid))
+        if not due:
+            self._health("official", True, "gözlənilən rəsmi rəqəm yoxdur", 0)
+            return
+        series: dict[str, list] = {}
+        errors = []
+        bls = sorted({p[1] for _, p, _ in due if p[0] == "bls"})
+        if bls:
+            year = datetime.now(timezone.utc).year
+            body = {"seriesid": bls, "startyear": str(year - 1), "endyear": str(year)}
+            if self.keys.first("bls"):
+                body["registrationkey"] = self.keys.first("bls")
+            try:
+                rr = await client.post("https://api.bls.gov/publicAPI/v2/timeseries/data/", json=body, headers=UA)
+                series.update(off.parse_bls(rr.json()))
+            except Exception as e:
+                errors.append(f"BLS: {e}"[:120])
+        fred_key = self.keys.first("fred")
+        for sid in sorted({p[1] for _, p, _ in due if p[0] == "fred"}):
+            if not fred_key:
+                errors.append("FRED açarı yoxdur")
+                break
+            try:
+                data = await self._get(client, "https://api.stlouisfed.org/fred/series/observations",
+                                       params={"series_id": sid, "api_key": fred_key, "file_type": "json",
+                                               "sort_order": "desc", "limit": 15})
+                series[sid] = sorted((d, v) for d, v in parse_fred(data))
+            except Exception as e:
+                errors.append(f"{sid}: {str(e).replace(fred_key, '***')}"[:120])
+        found = 0
+        for ev, (src, sid, unit), uid in due:
+            res = off.compute(unit, series.get(sid, []))
+            if not res or not off.period_ok(unit, sid, res[0], ev["ts"]):
+                continue                                   # the agency has not published this period yet
+            surprise.store(self.db, [{"uid": uid, "ts": ev["ts"], "event": ev["title"], "impact": ev["impact"],
+                                      "estimate": surprise._num(ev["forecast"]), "previous": None, "actual": res[1],
+                                      "raw_date": datetime.fromtimestamp(ev["ts"], timezone.utc).strftime(
+                                          "%Y-%m-%d %H:%M:%S"), "known_ts": now}])
+            found += 1
+        self._health("official", not errors, f"{found}/{len(due)} rəsmi rəqəm" +
+                     (f"; xəta: {'; '.join(errors)}" if errors else ""), found)
+
+    async def kalshi(self, client) -> None:
+        """Market-implied odds of the next Fed decisions: each open market's last price (cents) = probability."""
+        self.db.conn.executescript("CREATE TABLE IF NOT EXISTS fed_odds (ts REAL, ticker TEXT, title TEXT, "
+                                   "prob REAL, close_ts REAL, PRIMARY KEY (ticker, ts));")
+        now = time.time()
+        rows, errors = [], []
+        for series in KALSHI_SERIES:
+            try:
+                data = json.loads(await self._get(client, KALSHI_URL, params={"series_ticker": series,
+                                                                              "status": "open", "limit": 100}))
+                for m in data.get("markets", []):
+                    price = m.get("last_price") if m.get("last_price") else m.get("yes_bid")
+                    if price is None:
+                        continue
+                    close = m.get("close_time") or ""
+                    try:
+                        close_ts = datetime.fromisoformat(close.replace("Z", "+00:00")).timestamp()
+                    except ValueError:
+                        close_ts = None
+                    title = (m.get("title") or "") + (" — " + m["yes_sub_title"] if m.get("yes_sub_title") else "")
+                    rows.append((now, m.get("ticker", ""), title[:200], float(price) / 100, close_ts))
+            except Exception as e:
+                errors.append(f"{series}: {e}"[:120])
+        if rows:
+            self.db.executemany("INSERT OR REPLACE INTO fed_odds VALUES(?,?,?,?,?)", rows)
+            self.db.execute("DELETE FROM fed_odds WHERE ts < ?", (now - 30 * 86400,))
+        self._health("kalshi", bool(rows), f"{len(rows)} Fed bazarı" + (f"; xəta: {'; '.join(errors)}" if errors else ""),
+                     len(rows))
+
+    def fed_odds(self, limit: int = 8) -> list[dict]:
+        """The latest odds of the nearest Fed decision markets (for the brains' facts and the panel)."""
+        try:
+            last = self.db.execute("SELECT MAX(ts) FROM fed_odds").fetchone()[0]
+        except Exception:
+            return []
+        if not last:
+            return []
+        return [dict(r) for r in self.db.execute(
+            "SELECT title, prob, close_ts FROM fed_odds WHERE ts=? ORDER BY close_ts, prob DESC LIMIT ?",
+            (last, limit)).fetchall()]
+
+    async def etf(self, client) -> None:
+        """15-minute bars of the ETF proxies into the candles table (symbols GLD, SLV, ...): the brains see their moves."""
+        creds = self.keys.get("alpaca")
+        if not creds:
+            self._health("etf", False, "Alpaca açarı yoxdur")
+            return
+        from . import candles
+        start = datetime.fromtimestamp(time.time() - 5 * 86400, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            data = json.loads(await self._get(client, ETF_URL, params={
+                "symbols": ",".join(ETF_SYMBOLS), "timeframe": "15Min", "start": start, "feed": "iex", "limit": 10000},
+                headers={"APCA-API-KEY-ID": creds.get("key_id", ""), "APCA-API-SECRET-KEY": creds.get("secret", "")}))
+            n = 0
+            for sym, bars in (data.get("bars") or {}).items():
+                rows = []
+                for b in bars:
+                    t = int(datetime.fromisoformat(b["t"].replace("Z", "+00:00")).timestamp())
+                    rows.append((t, float(b["o"]), float(b["h"]), float(b["l"]), float(b["c"])))
+                n += candles.store_history(self.db, sym, "15m", rows, replace=True)
+            self._health("etf", n > 0, f"{n} şam ({', '.join(ETF_SYMBOLS)}; yalnız ABŞ saatları)", n)
+        except Exception as e:
+            msg = str(e)
+            for v in creds.values():
+                if v:
+                    msg = msg.replace(v, "***")
+            self._health("etf", False, f"ETF: {msg}"[:300])
+
     async def cot(self, client) -> None:
         codes = ",".join(f"'{c}'" for c in COT_CODES)
         data = await self._get(client, COT_URL, params={
@@ -338,13 +472,17 @@ class Feeds:
                 "macro": (self.macro, MACRO_EVERY), "cot": (self._cot_safe, COT_EVERY),
                 "alpaca": (self.alpaca, ALPACA_EVERY),
                 # every 5 minutes; every minute around a high-impact release so the surprise is seen at once
-                "fmp": (self.fmp, 60 if self.event_mode(now) else 300)}
+                "fmp": (self.fmp, 60 if self.event_mode(now) else 300),
+                # official actuals: every minute around a release (the agencies publish at the minute)
+                "official": (self.official, 60 if self._recent_release(now) else 900),
+                "kalshi": (self.kalshi, 900), "etf": (self.etf, 300)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
                     self.next_run[name] = now + every
                     task = {"news": "news", "alpaca": "news", "calendar": "calendar", "fmp": "calendar",
-                            "macro": "macro", "cot": "macro"}[name]
+                            "macro": "macro", "cot": "macro", "official": "calendar", "kalshi": "macro",
+                            "etf": "macro"}[name]
                     if self.activity:
                         self.activity.report(task, "working", note=name)
                     try:
