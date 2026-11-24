@@ -65,7 +65,7 @@ MACRO_SERIES = {
 SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf")
 # Block 9. Kalshi: market-implied odds of the next Fed decisions (public market data, no key).
 KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
-KALSHI_SERIES = ("KXFEDDECISION", "KXFED")
+KALSHI_SERIES = ("KXFEDDECISION", "KXFED", "FEDDECISION", "FED")
 # Intraday ETF proxies through the Alpaca key (IEX feed, US hours): gold and silver funds, miners, the dollar fund and
 # Treasury funds (TIP = inflation-protected: an intraday stand-in for real yields, IEF = 7-10 year Treasuries).
 ETF_SYMBOLS = ("GLD", "SLV", "GDX", "UUP", "TIP", "IEF")
@@ -390,11 +390,21 @@ class Feeds:
                                    "prob REAL, close_ts REAL, PRIMARY KEY (ticker, ts));")
         now = time.time()
         rows, errors = [], []
+        seen = []
         for series in KALSHI_SERIES:
             try:
                 data = json.loads(await self._get(client, KALSHI_URL, params={"series_ticker": series,
                                                                               "status": "open", "limit": 100}))
-                for m in data.get("markets", []):
+                markets = data.get("markets", [])
+                if not markets:
+                    # some series list their markets under events: ask the events endpoint with the markets nested
+                    ev = json.loads(await self._get(client, KALSHI_URL.replace("/markets", "/events"), params={
+                        "series_ticker": series, "status": "open", "with_nested_markets": "true", "limit": 50}))
+                    markets = [m for e in ev.get("events", []) for m in (e.get("markets") or [])]
+                    seen.append(f"{series}: {len(ev.get('events', []))} hadisə")
+                else:
+                    seen.append(f"{series}: {len(markets)} bazar")
+                for m in markets:
                     price = m.get("last_price") if m.get("last_price") else m.get("yes_bid")
                     if price is None:
                         continue
@@ -410,8 +420,8 @@ class Feeds:
         if rows:
             self.db.executemany("INSERT OR REPLACE INTO fed_odds VALUES(?,?,?,?,?)", rows)
             self.db.execute("DELETE FROM fed_odds WHERE ts < ?", (now - 30 * 86400,))
-        self._health("kalshi", bool(rows), f"{len(rows)} Fed bazarı" + (f"; xəta: {'; '.join(errors)}" if errors else ""),
-                     len(rows))
+        self._health("kalshi", bool(rows), f"{len(rows)} Fed bazarı ({'; '.join(seen)})" +
+                     (f"; xəta: {'; '.join(errors)}" if errors else ""), len(rows))
 
     def fed_odds(self, limit: int = 8) -> list[dict]:
         """The latest odds of the nearest Fed decision markets (for the brains' facts and the panel)."""
