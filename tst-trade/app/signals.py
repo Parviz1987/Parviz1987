@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS signals (id INTEGER PRIMARY KEY, uid TEXT UNIQUE, ts 
 CREATE INDEX IF NOT EXISTS signals_ts ON signals(ts);
 """
 FRESH = 1800            # a signal older than this is history, not an alarm
-MOVE_X, MOVE_MIN = 4.0, 0.0015   # x usual move, and at least 0.15 %
+MOVE_X, MOVE_MIN = 4.0, 0.0025   # x usual move, and at least 0.25 %
+MOVE_ALARMS_PER_DAY = 4          # price moves may use at most this many of the day's alarms: news and figures keep the rest
 NAMES = {"XAU": "Qızıl", "XAG": "Gümüş", "XPT": "Platin", "XPD": "Palladium", "DXY": "Dollar indeksi",
          "EURUSD": "EUR/USD", "USDJPY": "USD/JPY", "OIL": "Neft (WTI)", "BRENT": "Neft (Brent)", "US500": "S&P 500",
          "VIX": "VIX", "US10Y": "ABŞ 10 illik istiqraz"}
@@ -89,7 +90,8 @@ def from_moves(db: DB, now: float, symbols: list[str]) -> int:
         moved = sorted(r for r in rets[:-1] if r > 0)      # flat candles (market closed, holiday) are not «usual»
         if len(moved) < 30:
             continue
-        usual = moved[len(moved) // 2]
+        usual = moved[int(len(moved) * 0.75)]       # the upper quartile: quiet night hours must not make
+                                                     # an ordinary day-time move look like a shock
         last = rows[-1]["c"] / rows[-2]["c"] - 1 if rows[-2]["c"] else 0
         if abs(last) >= max(MOVE_X * usual, MOVE_MIN):
             n += emit(db, f"move:{sym}:{rows[-1]['t']}", "move",

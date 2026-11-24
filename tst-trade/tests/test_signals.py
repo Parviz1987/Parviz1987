@@ -76,3 +76,23 @@ def test_brain_jobs_run_while_the_main_loop_is_busy():
     eng.backfill = slow_backfill
     asyncio.run(eng.run())
     assert Jobs.n >= 1
+
+
+def test_moves_alone_use_only_their_share_of_alarms(monkeypatch):
+    db, jobs = _jobs()
+    jobs.next_strategist = jobs.next_reader = jobs.next_scout = NOW + 10 ** 6
+    signals.ensure(db)
+    calls = []
+
+    async def fake(db_, keys, slot, system, user, schema, max_tokens=2000, search=False):
+        calls.append(user)
+        return {"summary": "s", "watch": [], "metals": []}, "test · m"
+    monkeypatch.setattr(brains, "run", fake)
+    for i in range(6):
+        t = NOW + i * 1000
+        signals.emit(db, f"m{i}", "move", "Qızıl tərpəndi", 2, "XAU", t)
+        asyncio.run(jobs.tick(t))
+    assert len(calls) == signals.MOVE_ALARMS_PER_DAY
+    signals.emit(db, "n1", "news", "War", 3, "XAU", NOW + 7000)
+    asyncio.run(jobs.tick(NOW + 7000))
+    assert len(calls) == signals.MOVE_ALARMS_PER_DAY + 1          # a strong headline still gets its alarm

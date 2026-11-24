@@ -345,10 +345,15 @@ class BrainJobs:
         count = json.loads(self.db.get("alarm:count") or "{}")
         if count.get("day") != day:
             count = {"day": day, "n": 0, "scout": 0}
+        if alarm and all(a["kind"] == "move" for a in alarm) and count.get("move", 0) >= signals.MOVE_ALARMS_PER_DAY:
+            signals.mark(self.db, [a["id"] for a in alarm], now)    # moves alone: today's share is used up
+            alarm = []
         if alarm and now - float(self.db.get("alarm:last") or 0) >= ALARM_GAP and count["n"] < ALARMS_PER_DAY:
             self.db.put("alarm:last", str(now))
             count["n"] += 1
-            if any(a["kind"] in ("news", "flow") for a in alarm) and count["scout"] < SCOUT_ALARMS_PER_DAY \
+            if all(a["kind"] == "move" for a in alarm):
+                count["move"] = count.get("move", 0) + 1
+            if any(a["kind"] == "news" for a in alarm) and count["scout"] < SCOUT_ALARMS_PER_DAY \
                     and self.keys.first("xai"):
                 count["scout"] += 1
                 self._rep("scout", "working", note="həyəcan: X-də dərhal axtarır")

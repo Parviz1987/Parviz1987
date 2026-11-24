@@ -15,3 +15,14 @@
 - Xəbərdarlıq: əlaqəli bazarlardan 3-ü gəlmir. Bu dəfə Dollar indeksi, Brent, VIX (əvvəlki yoxlamada VIX gəlirdi, istiqraz gəlmirdi): siyahı dəyişir, səbəb Blok 2-də araşdırılacaq.
 - «Hadisə sürprizi»nin girişi yoxdur (FMP planında təqvim yoxdur, HTTP 402).
 - Bu gün edilən: Strateq artıq 1 saat, 4 saat, 1 gün üçün ehtimal verir və Hakim onu yoxlayır (965283b).
+
+## 2026-11-23, 22:48 NY (növbətçi yoxlama)
+- Təhlükəsizlik: sakit. 24 saatda 1 uğurlu giriş, uğursuz və bloklanan yoxdur. CSP və HSTS yerindədir.
+- Sağlamlıq: versiya c9a3bc0, /healthz 200, xəta yoxdur. Boş yaddaş 209 MB. **DB 525 MB** (500 həddini keçib):
+  səbəb 4000 şamlıq yeni tarixçənin yenidən hesablanmasıdır; izlənir.
+- Düzəldildi: qiymət sıçrayışı həyəcanı çox işləyirdi (bu gün 9/12, qızılın 0,2 %-lik adi hərəkətləri). İndi
+  «adi hərəkət» yuxarı kvartil (gecə sakitliyi onu kiçiltmir), ən az 0,25 %; sıçrayışlar gündə ən çox 4 həyəcan
+  işlədir, qalanı xəbər və rəqəmlər üçün qalır; həyəcanda X axtarışı yalnız güclü xəbər üçündür (Grok xərci).
+- Xəbərdarlıq: ABŞ 10 illik istiqraz 1 saatdan çoxdur yeni qiymət vermir (axın).
+- Beyinlərin ilk canlı hesabı (1 saat): həyəcandan sonra Strateq 88 % (17), İkinci beyin 100 % (12); saatlıq 38 % (8)
+  və 55 % (11). 2-4 hadisədən gəlir: sübut deyil, izlənir.
