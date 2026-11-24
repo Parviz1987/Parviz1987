@@ -330,7 +330,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         """Block 8: the pre-registered hypotheses, judged only on live forecasts issued after their registration."""
         from . import hypotheses
         return {"registered": hypotheses.REGISTERED, "p_bar": hypotheses.P_BAR,
-                "items": await asyncio.to_thread(hypotheses.evaluate, db)}
+                "items": await asyncio.to_thread(diag._slow, "hypotheses", lambda: hypotheses.evaluate(db))}
 
     @app.get("/api/decision")
     async def decision_api():
@@ -371,7 +371,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                                  "history": {k: hv.get(k) for k in ("nh", "hit_rate", "bar", "status")},
                                  "weight": w.get(m, 0.0)})
                 out.append({"horizon": h, "name": forecast.HORIZON_NAMES[h], "rows": rows})
-            return {"symbol": symbol, "desks": out, "brains": brainviews.score(db, now)}
+            return {"symbol": symbol, "desks": out, "brains": diag._slow("brain_score", lambda: brainviews.score(db, now))}
         return await asyncio.to_thread(build)
 
     @app.get("/results")

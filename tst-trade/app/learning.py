@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from .db import DB
 
 ETA, FLOOR = 0.05, 0.05
+MAX_ROWS = 20000
 WINDOW = {"15m": 20, "30m": 30, "1h": 60, "4h": 180, "1d": 1100, "3d": 1100, "1w": 1100, "10d": 1100, "1mo": 1100}
 SKIP = ("rw", "up", "consensus", "terazi")
 BANDS = [(0.0, 0.40), (0.40, 0.48), (0.52, 0.60), (0.60, 1.01)]
@@ -34,8 +35,10 @@ def hedge(db: DB, symbol: str, horizon: str, now: float | None = None) -> dict[s
     """Relative weights (mean 1) after replaying the recent resolved forecasts of this desk, oldest first."""
     now = time.time() if now is None else now
     since = now - WINDOW.get(horizon, 365) * 86400
+    # the newest MAX_ROWS results only (newest first from the index, then replayed oldest first): bounded memory
     rows = db.execute("SELECT method, hit, outcome FROM forecasts WHERE symbol=? AND horizon=? AND hit IS NOT NULL "
-                      "AND issued_t > ? ORDER BY issued_t", (symbol, horizon, since)).fetchall()
+                      "AND issued_t > ? ORDER BY issued_t DESC LIMIT ?", (symbol, horizon, since, MAX_ROWS)).fetchall()
+    rows.reverse()
     if not rows:
         return {}
     ups = [r["outcome"] for r in rows if r["outcome"] is not None]

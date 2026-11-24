@@ -50,32 +50,3 @@ def test_error_journal_groups_and_masks(tmp_path):
     assert len(mine) == 1 and mine[0]["count"] == 3
     assert "fred-very-secret" not in mine[0]["message"] + mine[0]["trace"]
 
-
-def test_candle_check_spots_two_interleaved_sources():
-    """Two sources a few dollars apart, alternating: the zig-zag shows as strongly negative lag1 and big jumps."""
-    import time as _t
-    from app import diag
-    from tests.test_core import mem
-    db = mem()
-    t0 = (int(_t.time()) // 1800 - 400) * 1800
-    rows = []
-    for i in range(300):
-        px = 4000 + i * 0.1 + (3.0 if i % 2 else 0.0)        # every other candle from a source $3 higher
-        rows.append(("XAU", "30m", t0 + i * 1800, px, px, px, px))
-    db.executemany("INSERT INTO candles(symbol, tf, t, o, h, l, c, origin) VALUES(?,?,?,?,?,?,?,'history')", rows)
-    r = diag._candle_check(db)["XAU/30m"]
-    assert r["lag1"] < -0.5 and r["jumps"] == 0          # opens equal closes here: the zig-zag is close to close
-
-
-def test_forecast_check_finds_forecasts_issued_on_replaced_prices():
-    from app import diag
-    from tests.test_core import mem
-    db = mem()
-    db.executemany("INSERT INTO candles(symbol, tf, t, o, h, l, c, origin) VALUES(?,?,?,?,?,?,?,'history')",
-                   [("XAU", "30m", 1800 * i, 100, 100, 100, 100) for i in range(1, 5)])
-    for i, p0 in ((2, 100.0), (3, 103.0)):     # the second one was issued on a price no longer in the series
-        db.execute("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50, "
-                   "lo80, hi80, basis, hit) VALUES('XAU','30m','reversal','history',?,?,?,0.6,0,0,0,0,'',?)",
-                   (1800 * i, 1800 * (i + 1), p0, 1))
-    r = diag._forecast_check(db)["XAU/30m"]
-    assert r["n"] == 2 and r["differ"] == 1

@@ -83,62 +83,17 @@ def _shadow(db: DB) -> dict:
     return out
 
 
-def _candle_check(db: DB) -> dict:
-    """Are the stored candles one consistent series? Per metal and timeframe (last 60 days):
-    - lag1: correlation of each candle's move with the next one. Real metal prices sit near 0; strongly negative
-      means a zig-zag (e.g. two sources at different price levels interleaved), which fakes a «reversal» skill;
-    - jumps: candles whose open is far (>0.15 %) from the previous close, outside weekends;
-    - vs_15m: share of candles whose close differs (>0.05 %) from the 15-minute candle ending at the same time."""
-    out: dict = {}
-    since = int(time.time()) - 60 * 86400
-    for sym in ("XAU", "XAG", "XPT", "XPD"):
-        fine = {r["t"]: r["c"] for r in db.execute(
-            "SELECT t, c FROM candles WHERE symbol=? AND tf='15m' AND t>=?", (sym, since)).fetchall()}
-        for tf, step in (("15m", 900), ("30m", 1800), ("1h", 3600), ("4h", 14400)):
-            rows = db.execute("SELECT t, o, c FROM candles WHERE symbol=? AND tf=? AND t>=? ORDER BY t",
-                              (sym, tf, since)).fetchall()
-            if len(rows) < 50:
-                continue
-            rets, jumps, diff, cmp = [], 0, 0, 0
-            for a, b in zip(rows, rows[1:]):
-                if b["t"] - a["t"] == step:
-                    rets.append(b["c"] / a["c"] - 1)
-                    if abs(b["o"] / a["c"] - 1) > 0.0015:
-                        jumps += 1
-            for r in rows:
-                f = fine.get(r["t"] + step - 900)
-                if f and tf != "15m":
-                    cmp += 1
-                    diff += abs(r["c"] / f - 1) > 0.0005
-            lag1 = None
-            if len(rets) > 30:
-                m = sum(rets) / len(rets)
-                v = sum((x - m) ** 2 for x in rets)
-                lag1 = round(sum((x - m) * (y - m) for x, y in zip(rets, rets[1:])) / v, 3) if v else None
-            out[f"{sym}/{tf}"] = {"n": len(rows), "lag1": lag1, "jumps": jumps,
-                                  "vs_15m": round(diff / cmp, 3) if cmp else None}
-    return out
+_SLOW: dict = {}
 
 
-def _forecast_check(db: DB) -> dict:
-    """Do the stored history forecasts still match today's candles? price0 is fixed when a forecast is issued; if the
-    candles were later replaced by another source, the forecast was judged on prices that are no longer the series.
-    Per metal and short horizon: share of issues whose price0 differs (>0.05 %) from the close of the candle before
-    the issue time, and the «reversal» hit rate on matching vs differing issues."""
-    out: dict = {}
-    for sym in ("XAU", "XAG", "XPT", "XPD"):
-        for h, tf in (("15m", "15m"), ("30m", "30m"), ("1h", "1h")):
-            r = db.execute(
-                "SELECT COUNT(*) n, SUM(bad) nbad, AVG(CASE WHEN bad=0 THEN hit END) hit_ok, "
-                "AVG(CASE WHEN bad=1 THEN hit END) hit_bad, MIN(CASE WHEN bad=1 THEN issued_t END) t0, "
-                "MAX(CASE WHEN bad=1 THEN issued_t END) t1 FROM ("
-                " SELECT f.issued_t, f.hit, ABS(f.price0 / (SELECT c.c FROM candles c WHERE c.symbol=f.symbol "
-                "   AND c.tf=? AND c.t < f.issued_t ORDER BY c.t DESC LIMIT 1) - 1) > 0.0005 AS bad"
-                " FROM forecasts f WHERE f.symbol=? AND f.horizon=? AND f.mode='history' AND f.method='reversal' "
-                "   AND f.hit IS NOT NULL)", (tf, sym, h)).fetchone()
-            if r["n"]:
-                out[f"{sym}/{h}"] = {"n": r["n"], "differ": r["nbad"], "rev_hit_match": r["hit_ok"],
-                                     "rev_hit_differ": r["hit_bad"], "differ_from": r["t0"], "differ_to": r["t1"]}
+def _slow(key: str, fn, ttl: float = 600):
+    """Heavy sections (they read weeks of forecasts and candles) are computed at most every 10 minutes: a diagnostics
+    request must never keep the database busy long enough to slow the site."""
+    hit = _SLOW.get(key)
+    if hit and time.time() - hit[0] < ttl:
+        return hit[1]
+    out = fn()
+    _SLOW[key] = (time.time(), out)
     return out
 
 
@@ -218,11 +173,9 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "memory_mb": _memory(),
         "shadow_trading": _shadow(db),
         "pipeline": _pipeline(db, keys, engine, feeds, jobs),
-        "candle_check": _candle_check(db),
-        "forecast_check": _forecast_check(db),
-        "brain_score": brainviews.score(db, time.time()),
-        "hypotheses": hypotheses.evaluate(db),
-        "learning": {"ab_lessons": learning.ab_report(db), "lessons": learning.active_lessons(db),
+        "brain_score": _slow("brain_score", lambda: brainviews.score(db, time.time())),
+        "hypotheses": _slow("hypotheses", lambda: hypotheses.evaluate(db)),
+        "learning": {"ab_lessons": _slow("ab", lambda: learning.ab_report(db)), "lessons": learning.active_lessons(db),
                      "sleep": json.loads(db.get("sleep:last") or "null"), "calib": json.loads(db.get("calib") or "null"),
                      "nerve": json.loads(db.get("nerve:state") or "null"), "backup": json.loads(db.get("backup:last") or "null")},
         "weights": {f"{s}/{h}": engine.weights(s, h, time.time()) for s in candles.METALS
