@@ -44,6 +44,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         hub.attach_loop(asyncio.get_running_loop())
         if start_engine:
             engine.start()
+            asyncio.get_running_loop().create_task(app.state.futures_resume())
         yield
         if start_engine:
             await engine.stop()
@@ -742,6 +743,29 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     async def me(request: Request):
         return {"role": auth.role(request.cookies.get(auth.COOKIE), s.session_secret)}
 
+    db.put("futures:running", "0")       # a download cut by a restart is not «running»
+
+    async def futures_resume():
+        """A download the owner approved but a restart cut off goes on by itself (stored months are skipped, so
+        nothing is paid twice; the approved limit still applies)."""
+        from . import futures
+        try:
+            appr = json.loads(db.get("futures:approved") or "null")
+            last = json.loads(db.get("futures:last") or "null")
+            key = store.first("databento")
+            if not appr or not key or (last and last.get("ok")):
+                return
+            await asyncio.sleep(60)
+            db.put("futures:running", "1")
+            res = await futures.download(db, key, float(appr["limit_usd"]), hub.report)
+            if not res.get("ok"):
+                db.put("futures:last", json.dumps(res, ensure_ascii=False))
+        except Exception as e:
+            db.put("futures:last", json.dumps({"ok": False, "msg": f"{type(e).__name__}: {str(e)[:200]}"}))
+        finally:
+            db.put("futures:running", "0")
+    app.state.futures_resume = futures_resume
+
     @app.get("/api/admin/futures/quote")
     async def futures_quote():
         """Stage 2: what the Databento futures history would cost (a free metadata call; nothing is bought)."""
@@ -767,6 +791,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             raise HTTPException(400, "yanlış məbləğ")
         if db.get("futures:running") == "1":
             return {"msg": "yükləmə artıq gedir"}
+
+        db.put("futures:approved", json.dumps({"limit_usd": limit, "ts": time.time()}))   # the owner's decision
 
         async def job():
             db.put("futures:running", "1")

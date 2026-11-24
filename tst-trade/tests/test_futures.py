@@ -12,3 +12,8 @@ def test_parse_csv_pretty():
 def test_window_is_two_years_ending_yesterday():
     s, e = futures._window(1795507725)
     assert e == "2026-11-23" and s.startswith("2024-11")
+
+
+def test_months_cover_window():
+    ms = futures._months("2024-11-23", "2026-11-23")
+    assert ms[0] == ("2024-11-23", "2024-12-01") and ms[-1][1] == "2026-11-23" and len(ms) == 25

@@ -74,6 +74,16 @@ async def quote_saved(db: DB, key: str) -> dict:
     return q
 
 
+def _months(start: str, end: str) -> list[tuple[str, str]]:
+    out, d = [], datetime.fromisoformat(start)
+    stop = datetime.fromisoformat(end)
+    while d < stop:
+        nxt = (d.replace(day=1) + timedelta(days=32)).replace(day=1)
+        out.append((d.strftime("%Y-%m-%d"), min(nxt, stop).strftime("%Y-%m-%d")))
+        d = nxt
+    return out
+
+
 def parse_ohlcv_csv(text: str) -> list[tuple]:
     """Databento CSV with pretty prices and times -> (t, o, h, l, c, v)."""
     rows = []
@@ -95,23 +105,46 @@ async def download(db: DB, key: str, limit_usd: float, report=None, now: float |
         return {"ok": False, "msg": "qiymət alınmadı: " + json.dumps(q["items"], ensure_ascii=False)[:300]}
     if q["total_usd"] > limit_usd:
         return {"ok": False, "msg": f"qiymət {q['total_usd']} $ təsdiq olunan {limit_usd} $-dan çoxdur: alınmadı"}
-    got = {}
-    async with httpx.AsyncClient(timeout=600.0) as c:
+    # One month per request (a two-year request timed out on 2026-11-24): small answers, little memory, and a month
+    # already stored is never asked (and paid) for again — a broken download resumes where it stopped.
+    start, end = _window(now or time.time())
+    months = _months(start, end)
+    got: dict[str, int] = {}
+    errors: list[str] = []
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=300.0)) as c:
         for i, sym in enumerate(SYMBOLS):
-            if report:
-                report("history", "working", "W5 Fyuçers", i / len(SYMBOLS), f"Databento {SYMBOLS[sym]}")
-            p = {**_params(sym, "ohlcv-1m", now or time.time()), "encoding": "csv", "pretty_px": "true",
-                 "pretty_ts": "true", "map_symbols": "true", "compression": "none"}
-            r = await c.get(f"{BASE}/timeseries.get_range", params=p, auth=(key, ""))
-            if r.status_code != 200:
-                got[sym] = f"xəta HTTP {r.status_code}: {r.text[:120]}"
-                continue
-            rows = parse_ohlcv_csv(r.text)
-            db.executemany("INSERT OR REPLACE INTO fut_candles(symbol, t, o, h, l, c, v) VALUES(?,?,?,?,?,?,?)",
-                           [(sym, *x) for x in rows])
-            got[sym] = f"{len(rows)} şam"
-    res = {"ok": True, "ts": time.time(), "cost_usd": q["total_usd"], "loaded": got}
+            got[sym] = 0
+            for j, (a, b) in enumerate(months):
+                ta = datetime.fromisoformat(a).replace(tzinfo=timezone.utc).timestamp()
+                tb = datetime.fromisoformat(b).replace(tzinfo=timezone.utc).timestamp()
+                if db.execute("SELECT 1 FROM fut_candles WHERE symbol=? AND t>=? AND t<? LIMIT 1",
+                              (sym, ta, tb)).fetchone():
+                    continue
+                if report and j % 3 == 0:
+                    report("history", "working", "W5 Fyuçers", (i + j / len(months)) / len(SYMBOLS),
+                           f"Databento {SYMBOLS[sym]} {a[:7]}")
+                p = {"dataset": DATASET, "symbols": SYMBOLS[sym], "stype_in": "continuous", "schema": "ohlcv-1m",
+                     "start": a, "end": b, "encoding": "csv", "pretty_px": "true", "pretty_ts": "true",
+                     "map_symbols": "true", "compression": "none"}
+                try:
+                    r = await c.get(f"{BASE}/timeseries.get_range", params=p, auth=(key, ""))
+                except httpx.HTTPError as e:
+                    errors.append(f"{sym} {a[:7]}: {type(e).__name__}")
+                    continue
+                if r.status_code != 200:
+                    errors.append(f"{sym} {a[:7]}: HTTP {r.status_code} {r.text[:80]}")
+                    continue
+                rows = parse_ohlcv_csv(r.text)
+                db.executemany("INSERT OR REPLACE INTO fut_candles(symbol, t, o, h, l, c, v) VALUES(?,?,?,?,?,?,?)",
+                               [(sym, *x) for x in rows])
+                got[sym] += len(rows)
+    total = {sym: db.execute("SELECT COUNT(*) n FROM fut_candles WHERE symbol=?", (sym,)).fetchone()["n"]
+             for sym in SYMBOLS}
+    res = {"ok": not errors, "ts": time.time(), "cost_usd": q["total_usd"], "loaded_now": got, "stored": total,
+           "errors": errors[:12]}
     db.put("futures:last", json.dumps(res, ensure_ascii=False))
     if report:
-        report("history", "done", note="Databento fyuçers: " + ", ".join(f"{k} {v}" for k, v in got.items()))
+        report("history", "done" if not errors else "error",
+               note="Databento fyuçers: " + ", ".join(f"{k} {v} şam" for k, v in total.items()) +
+                    (f"; {len(errors)} ay alınmadı" if errors else ""))
     return res
