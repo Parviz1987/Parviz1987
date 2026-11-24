@@ -615,6 +615,8 @@ class Engine:
         self._rep("risk", "done", note=("bağlı: " + ", ".join(f"{s} ({out[s]['gate']['reasons'][0]})" for s in closed))
                   if closed else "4 metalda açıq")
         self._rep("decision", "done", note=", ".join(calls) if calls else "hamısı GÖZLƏ: sübut yoxdur")
+        from . import cards
+        cards.score(self.db, now)          # Block 16: what really happened, added to the frozen forecast cards
 
     def nightly_backup(self) -> None:
         """Block 14, in a thread: the database copied, compressed and sent to Cloudflare R2 (if the R2 key is saved)."""

@@ -253,3 +253,16 @@ div.res span.sübut{background:var(--up-soft);color:var(--up)}div.res span.yox{c
 /* simple mode: price, strip, flow and decisions only */
 body.simple .main,body.simple .split,body.simple .feeds,body.simple .box[data-fold],body.simple .jump{display:none}
 .pill.QUIET{background:var(--info-soft);color:var(--info)}
+
+/* Block 16: forecast card */
+.card-dlg{max-width:min(720px,calc(100vw - 32px));width:100%;background:#0b1428;color:var(--fg);border:1px solid var(--line);
+  border-radius:12px;padding:16px;box-shadow:0 0 40px rgba(56,200,255,.18)}
+.card-dlg::backdrop{background:rgba(2,5,12,.72)}
+.card-dlg h3{margin:0 0 10px;color:var(--acc)}
+.card-dlg .cgrid{display:grid;gap:6px}
+.card-dlg .cr{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.card-dlg .cr>span:first-child{color:var(--muted)}
+.card-dlg .chist{font-size:12px;color:var(--muted);display:grid;gap:2px;margin:8px 0}
+.card-dlg form{text-align:right;margin-top:10px}
+.hg[data-m]{cursor:pointer}
+@media (max-width:560px){.card-dlg .cr{grid-template-columns:1fr;gap:2px}}

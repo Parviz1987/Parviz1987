@@ -386,6 +386,15 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return {"registered": hypotheses.REGISTERED, "p_bar": hypotheses.P_BAR,
                 "items": await asyncio.to_thread(diag._slow, "hypotheses", lambda: hypotheses.evaluate(db))}
 
+    @app.get("/api/cards")
+    async def cards_api(symbol: str | None = None, limit: int = 20):
+        """Block 16: the frozen forecast cards (newest first) and the right/wrong summary of the scored ones."""
+        from . import cards
+        if symbol is not None and symbol not in candles.METALS:
+            raise HTTPException(400, "naməlum metal")
+        limit = max(1, min(limit, 100))
+        return await asyncio.to_thread(lambda: {"cards": cards.recent(db, symbol, limit), "summary": cards.summary(db)})
+
     @app.get("/api/decision")
     async def decision_api():
         """Block 6: per metal the risk gate (with the liquidity view) and the decision per horizon (indication only)."""

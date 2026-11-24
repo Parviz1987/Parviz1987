@@ -12,7 +12,7 @@ import logging
 import re
 import time
 
-from . import brains, brainviews, candles, forecast, judge, markets, signals
+from . import brains, brainviews, candles, cards, forecast, judge, markets, signals
 from .db import DB
 from .keys import KeyStore
 
@@ -55,16 +55,23 @@ STRATEGIST_SYSTEM = (
     "olma ehtimalı (0..1). 0.5 «bilmirəm» deməkdir; yalnız faktlarda səbəb görəndə ondan uzaqlaş (adətən 0.4-0.6). "
     "Faktlar: hər metalın son hərəkətləri (moves, %), əlaqəli bazarlar (dollar, neft, səhm, VIX, istiqraz), son və "
     "gələn ABŞ rəqəmləri, xəbər etiketləri, makro. «why» sahəsində bir cümlə ilə əsas səbəbi yaz. Bu proqnozları Hakim "
-    "sonra real qiymətlə yoxlayır: düz çıxmasa, etibar qazanmır.")
+    "sonra real qiymətlə yoxlayır: düz çıxmasa, etibar qazanmır. Hər metal üçün həmçinin: «counter» — əks ssenari, yəni "
+    "qiyməti əks tərəfə apara biləcək hadisə (bir cümlə); «invalidation» — hansı müşahidə sənin fikrini zəiflədər (bir "
+    "cümlə, faktlardakı göstəricilərlə); «next_update» — bu fikir nə vaxt yenilənməlidir: vaxt və ya konkret hadisə "
+    "(təqvimdən). Bunlar proqnoz kartında dondurulur və sonra nəticə ilə müqayisə olunur.")
 STRATEGIST_SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["summary", "metals", "watch"],
     "properties": {
         "summary": {"type": "string"},
         "metals": {"type": "array", "items": {"type": "object", "additionalProperties": False,
-                                              "required": ["symbol", "text", "p1h", "p4h", "p1d", "why"],
+                                              "required": ["symbol", "text", "p1h", "p4h", "p1d", "why", "counter",
+                                                           "invalidation", "next_update"],
                                               "properties": {"symbol": {"type": "string"}, "text": {"type": "string"},
                                                              "p1h": {"type": "number"}, "p4h": {"type": "number"},
-                                                             "p1d": {"type": "number"}, "why": {"type": "string"}}}},
+                                                             "p1d": {"type": "number"}, "why": {"type": "string"},
+                                                             "counter": {"type": "string"},
+                                                             "invalidation": {"type": "string"},
+                                                             "next_update": {"type": "string"}}}},
         "watch": {"type": "array", "items": {"type": "string"}}}}
 
 ANALYST2_SYSTEM = (
@@ -253,6 +260,11 @@ class BrainJobs:
         brainviews.ensure(self.db)
         self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p, known_ts) VALUES(?,?,?,?,?,?,?,?)",
                             rows)
+        try:     # Block 16: the frozen forecast card (scenario, counter-scenario, invalidation, data quality, version)
+            cards.freeze(self.db, max(now, time.time()), "strateq", data, how, facts, STRATEGIST_SYSTEM,
+                         self._chain(trigger) if trigger else "saatlıq")
+        except Exception as e:   # a card that cannot be written never loses the forecast itself
+            log.warning("forecast card: %s", e)
         await self.second_brain(now, facts, trigger)
         await self.debate(now, facts, trigger)
         self._state("strategist", f"izah yazıldı · {how}")

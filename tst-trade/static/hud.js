@@ -95,7 +95,7 @@
         const row = DESKS.map(([h]) => {
           const c = x.desks.find((k) => k.horizon === h) || { call: "GÖZLƏ", why: "hesablanır" };
           if (c.call !== "GÖZLƏ") calls.push(`${s}:${h}:${c.call}`);
-          return `<div class="hg ${c.call}" title="${esc(NAMES[s] + " · " + (c.name || h) + ": " + (c.why || ""))}">${c.call === "GÖZLƏ" ? "·" : c.call}</div>`;
+          return `<div class="hg ${c.call}" data-m="${s}" data-h="${h}" role="button" tabindex="0" title="${esc(NAMES[s] + " · " + (c.name || h) + ": " + (c.why || "") + " · toxun: proqnoz kartı")}">${c.call === "GÖZLƏ" ? "·" : c.call}</div>`;
         }).join("");
         const gt = x.gate.open ? "açıq" : "bağlı: " + (x.gate.reasons[0] || "");
         return `<div class="hg-m" title="Risk qapısı ${esc(gt)}"><i class="${x.gate.open ? "ok" : "shut"}"></i>${NAMES[s]}</div>${row}`;
@@ -104,6 +104,48 @@
     if ((prev !== "HƏYƏCAN" && state === "HƏYƏCAN" && lastCalls !== null) || newCall) { pulseAt = performance.now(); chime(!newCall); }
     lastCalls = calls;
   }
+
+  // ---------- Block 16: the frozen forecast card (opens on a decision cell) ----------
+  const CARD_H = { "15m": "1h", "1h": "1h", "4h": "4h", "1d": "1d", "1w": "1d", "1mo": "1d" };
+  const HN = { "1h": "1 saat", "4h": "4 saat", "1d": "1 gün" };
+  const nyTime = (t) => new Date(t * 1000).toLocaleString("az-Latn-AZ", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+  const RES = { "düz": "✅ düz çıxdı", "səhv": "❌ səhv çıxdı", "istiqamətsiz": "· istiqamət yox idi", "ölçülmədi": "· ölçülmədi (bazar bağlı)" };
+  async function openCard(sym, desk) {
+    const h = CARD_H[desk] || "1h";
+    let d;
+    try { const r = await fetch(`/api/cards?symbol=${sym}&limit=60`, { credentials: "same-origin" }); if (!r.ok) return; d = await r.json(); } catch (e) { return; }
+    const mine = d.cards.filter((c) => c.horizon === h);
+    const c = mine[0];
+    const pct = (p) => (p == null ? "—" : Math.round(p * 100) + " %");
+    const row = (k, v) => `<div class="cr"><span>${k}</span><span>${v}</span></div>`;
+    let html = `<h3>${NAMES[sym]} · ${HN[h]} · proqnoz kartı</h3>`;
+    if (desk !== h) html += `<p class="note">Bu müddət (${esc(desk)}) üçün beyin kartı yoxdur; ən yaxın müddət göstərilir. Qərar lentindəki xana Hakimin metodlarından gəlir.</p>`;
+    if (!c) {
+      html += `<p class="note">Hələ kart yoxdur: Strateq növbəti dəfə işləyəndə yaranacaq.</p>`;
+    } else {
+      const dir = Math.abs(c.p - 0.5) < 0.02 ? "istiqamət yox (0.5)" : c.p > 0.5 ? "yuxarı" : "aşağı";
+      html += `<div class="cgrid">` +
+        row("Alət və an", `${sym} · Capital.com · ${nyTime(c.known_ts)} NY · qiymət ${c.price0 == null ? "—" : c.price0.toFixed(2)}`) +
+        row("Müddət", `${HN[h]} (${nyTime(c.known_ts + { "1h": 3600, "4h": 14400, "1d": 86400 }[h])} NY-dək)`) +
+        row("Əsas ssenari", `${esc(dir)} · ${esc(c.scenario || "—")}`) +
+        row("Ehtimal (yuxarı)", `${pct(c.p)} beyin · ${c.p_cal == null ? "kalibrlənməyib (ölçülməyib)" : pct(c.p_cal) + " kalibrlənmiş"}`) +
+        row("80 % aralıq", c.lo80 == null ? "—" : `${c.lo80.toFixed(2)} – ${c.hi80.toFixed(2)} · real tutma ${pct(c.cover80)}`) +
+        row("Əks ssenari", esc(c.counter || "—")) +
+        row("Zəifləmə şərti", esc(c.invalidation || "—")) +
+        row("Məlumat keyfiyyəti", c.quality.length ? esc(c.quality.join(" · ")) : "tam") +
+        row("Növbəti yenilənmə", esc(c.next_update || "—")) +
+        row("Versiya", `kod ${esc(c.version)} · ${esc(c.model)} · təlimat ${esc(c.prompt_hash)} · ${esc(c.chain || "")}`) +
+        row("Nəticə", c.result ? `${RES[c.result] || esc(c.result)}${c.price1 ? " · qiymət " + c.price1.toFixed(2) : ""}` : "gözlənilir") +
+        `</div>`;
+    }
+    const s = d.summary[`strateq:${h}`] || {};
+    html += `<p class="note">Strateq ${HN[h]} kartları (30 gün): düz ${s["düz"] || 0}, səhv ${s["səhv"] || 0}, istiqamətsiz ${s["istiqamətsiz"] || 0}. Bu, ilk baxışdır; sübut qaydaları Hakimdədir.</p>`;
+    if (mine.length > 1) html += `<div class="chist">` + mine.slice(1, 8).map((x) => `<div>${nyTime(x.known_ts)} · ${pct(x.p)} · ${x.result ? (RES[x.result] || esc(x.result)) : "gözlənilir"}</div>`).join("") + `</div>`;
+    $("cardBody").innerHTML = html;
+    $("cardDlg").showModal();
+  }
+  $("hgrid").addEventListener("click", (ev) => { const c = ev.target.closest(".hg[data-m]"); if (c) openCard(c.dataset.m, c.dataset.h); });
+  $("hgrid").addEventListener("keydown", (ev) => { const c = ev.target.closest(".hg[data-m]"); if (c && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); openCard(c.dataset.m, c.dataset.h); } });
 
   // ---------- simple mode and sound buttons ----------
   function setSimple(on) {
