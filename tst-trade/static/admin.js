@@ -160,6 +160,26 @@ $("hist").onclick = async () => {
   load();
 };
 
+// Stage 2: Databento futures — the quote first (free), the purchase only on the owner's confirmation
+let futQuote = null;
+$("f-quote").onclick = async () => {
+  $("f-msg").textContent = "Databento-dan qiymət soruşulur…";
+  try {
+    futQuote = await call("GET", "/api/admin/futures/quote");
+    const items = Object.entries(futQuote.items).map(([k, v]) => `${k}: ${v.usd != null ? v.usd.toFixed(2) + " $" : v.error}`).join(" · ");
+    $("f-msg").textContent = `${futQuote.plan}. Cəmi ${futQuote.total_usd.toFixed(2)} $ (${items}). Yeni hesaba verilən 125 $ kredit əvvəl istifadə olunur.`;
+    $("f-buy").disabled = !(futQuote.total_usd >= 0);
+  } catch (e) { $("f-msg").textContent = "Xəta: " + e.message; }
+};
+$("f-buy").onclick = async () => {
+  if (!futQuote || !confirm(`Databento-dan ${futQuote.total_usd.toFixed(2)} $ dəyərində məlumat alınsın?`)) return;
+  $("f-buy").disabled = true;
+  try {
+    const r = await call("POST", "/api/admin/futures/buy", { limit_usd: futQuote.total_usd });
+    $("f-msg").textContent = r.msg;
+  } catch (e) { $("f-msg").textContent = "Xəta: " + e.message; }
+};
+
 $("d-new").onclick = async () => {
   try {
     const r = await call("POST", "/api/admin/diag-token");

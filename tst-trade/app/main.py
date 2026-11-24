@@ -742,6 +742,46 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     async def me(request: Request):
         return {"role": auth.role(request.cookies.get(auth.COOKIE), s.session_secret)}
 
+    @app.get("/api/admin/futures/quote")
+    async def futures_quote():
+        """Stage 2: what the Databento futures history would cost (a free metadata call; nothing is bought)."""
+        from . import futures
+        key = store.first("databento")
+        if not key:
+            raise HTTPException(400, "Databento açarı saxlanmayıb")
+        return await futures.quote(key)
+
+    @app.post("/api/admin/futures/buy")
+    async def futures_buy(body: dict):
+        """Stage 2: the owner confirmed the shown price. Runs in the background; refuses above the confirmed price and
+        above the free credit (125 $) — a larger purchase needs a new decision."""
+        from . import futures
+        key = store.first("databento")
+        if not key:
+            raise HTTPException(400, "Databento açarı saxlanmayıb")
+        try:
+            limit = min(float(body.get("limit_usd")), 125.0)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "yanlış məbləğ")
+        if limit < 0:
+            raise HTTPException(400, "yanlış məbləğ")
+        if db.get("futures:running") == "1":
+            return {"msg": "yükləmə artıq gedir"}
+
+        async def job():
+            db.put("futures:running", "1")
+            try:
+                res = await futures.download(db, key, limit, hub.report)
+                if not res.get("ok"):
+                    db.put("futures:last", json.dumps(res, ensure_ascii=False))
+            except Exception as e:
+                db.put("futures:last", json.dumps({"ok": False, "msg": f"{type(e).__name__}: {str(e)[:200]}"}))
+            finally:
+                db.put("futures:running", "0")
+        asyncio.create_task(job())
+        return {"msg": f"Təsdiq qəbul olundu: ən çox {limit:.2f} $. Yükləmə başladı; Agentlər səhifəsində «Tarixçə» "
+                       "agentində görünür, bitəndə nəticə buradadır və Claude-a hesabat gedir."}
+
     @app.post("/api/admin/history")
     async def history():
         return await engine.backfill(force=True)
