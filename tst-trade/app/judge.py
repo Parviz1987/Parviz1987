@@ -4,8 +4,9 @@ Per forecast: outcome (1 up / 0 down; an unchanged close is not scored), hit (di
 direction and gets no hit), Brier score, and whether the close fell inside the 50 % and 80 % ranges.
 Per method: hit rate against «Həmişə yuxarı», Brier skill against a coin (0.25), range coverage, and a status:
 - "az"      fewer scored forecasts than MIN_N: no verdict yet
-- "sübut"   beats the better baseline on hit rate with one-sided p passing Holm's step-down over the direction methods
-            (alpha 0.05) AND Brier skill > 0 AND its average move in the forecast's direction is larger than the full cost
+- "sübut"   beats its no-skill null (q·u + (1−q)(1−u): its own long share q, the market's up share u) on hit rate
+            with one-sided p passing Holm's step-down over the direction methods (alpha 0.05) AND its average move in
+            the forecast's direction is larger than the full cost
             (spread + slippage + overnight financing)
 - "xərc"    statistically real but smaller than the full cost: no use for trading
 - "yox"     enough forecasts, no proof of skill"""
@@ -165,7 +166,10 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
     q = ("SELECT method, COUNT(outcome) n, SUM(outcome) ups, COUNT(hit) nh, SUM(hit) hits, AVG(brier) brier, "
          "AVG(in50) c50, AVG(in80) c80, COUNT(price1) ncov, "
          # average move in the forecast's direction (only forecasts with a view), as a fraction of the price
-         "AVG(CASE WHEN p_up > 0.5 THEN price1 / price0 - 1 WHEN p_up < 0.5 THEN 1 - price1 / price0 END) edge "
+         "AVG(CASE WHEN p_up > 0.5 THEN price1 / price0 - 1 WHEN p_up < 0.5 THEN 1 - price1 / price0 END) edge, "
+         # the method's own long share and the market's up share on the SAME forecasts: the no-skill null
+         "SUM(CASE WHEN hit IS NOT NULL AND p_up > 0.5 THEN 1 ELSE 0 END) longs, "
+         "SUM(CASE WHEN hit IS NOT NULL THEN outcome ELSE 0 END) vups "
          "FROM forecasts "
          "WHERE symbol=? AND horizon=? AND mode=? AND scored_ts IS NOT NULL GROUP BY method")
     rows = {r["method"]: dict(r) for r in db.execute(q, (symbol, horizon, mode)).fetchall()}
@@ -187,8 +191,15 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
         n, nh, hits = r["n"] or 0, r["nh"] or 0, r["hits"] or 0
         hit_rate = hits / nh if nh else None
         bss = 1 - r["brier"] / 0.25 if r["brier"] is not None else None
-        # Beat the better of a coin (0.5) and «always up» on the same forecasts.
-        bar = max(0.5, up_rate if up_rate is not None else 0.5, 1 - (up_rate or 0.5))
+        # The no-skill null (audit 2026-11-24): a method that goes long a share q of the time, in a market that rose
+        # a share u of those times, is right q·u + (1−q)(1−u) of the time by luck alone. «Always up» (q = 1) must
+        # beat u; a method going long and short equally only 0.5. (Before: every method had to beat max(u, 1−u),
+        # which hid real two-sided skill behind the market's drift.)
+        if nh:
+            qq, uu = (r.get("longs") or 0) / nh, (r.get("vups") or 0) / nh
+            bar = qq * uu + (1 - qq) * (1 - uu)
+        else:
+            bar = 0.5
         # Forecasts k candles ahead, issued every candle, overlap: k neighbours share most of their path, so they
         # count as about one independent test. The p-value uses that effective number, not the raw count.
         p = _p_one_sided(round(hits / k), round(nh / k), bar) if nh >= k else None
@@ -196,8 +207,9 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
             status = "bazis"
         elif nh < MIN_N[horizon]:
             status = "az"
-        elif p is not None and p < p_bar and bss is not None and bss > 0:
-            # Real statistically, but is the average move bigger than the spread? If not, it cannot pay.
+        elif p is not None and p < p_bar:
+            # Direction is what is proven (audit 2026-11-24: the Brier gate tested calibration and blocked real
+            # direction skill; the Brier skill is still shown). Is the average move bigger than the full cost?
             status = "sübut" if (r.get("edge") or 0) > cost else "xərc"
         else:
             status = "yox"
@@ -210,13 +222,12 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
 
 
 def _holm(rows: list[dict], alpha: float, m: int) -> None:
-    """Holm step-down over the direction methods that reached MIN_N with Brier skill > 0: the k-th smallest p is
+    """Holm step-down over the direction methods that reached MIN_N: the k-th smallest p is
     compared with alpha / (m - k + 1); once one fails, the rest fail. A method that passes with a move smaller than
     the cost stays «xərc»."""
     fam = [r for r in rows if r["status"] not in ("bazis", "az") and r["method"] not in RANGE_ONLY]
     m = max(m, 1)                      # the whole family counts, also methods that have too few forecasts yet
-    cand = sorted((r for r in fam if r["p"] is not None and r["bss"] is not None and r["bss"] > 0),
-                  key=lambda r: r["p"])
+    cand = sorted((r for r in fam if r["p"] is not None), key=lambda r: r["p"])
     passed = True
     for k, r in enumerate(cand):
         bar = alpha / max(1, m - k)
@@ -337,12 +348,12 @@ def where(db: DB, symbol: str, horizon: str, mode: str) -> dict:
         out[m] = {}
         for g, (n, hits, brier, edge) in d.items():
             hr = hits / n if n else None
-            p = _p_one_sided(round(hits / k), round(n / k), bar) if n >= k else None
-            bss = 1 - (brier / n) / 0.25 if n else None
+            mbar = (base.get(m) or {}).get("bar", bar)          # the method's own no-skill null
+            p = _p_one_sided(round(hits / k), round(n / k), mbar) if n >= k else None
             e = edge / n if n else None
             if n < MIN_N[horizon]:
                 st = "az"
-            elif p is not None and p < p_bar and bss is not None and bss > 0:
+            elif p is not None and p < p_bar:
                 st = "sübut" if (e or 0) > cost else "xərc"
             else:
                 st = "yox"
@@ -389,6 +400,21 @@ def mode_of(live: list[dict], horizon: str) -> str:
     enough = any((r.get("nh") or 0) >= MIN_N[horizon] for r in live
                  if r["method"] not in BASELINES and r["method"] not in RANGE_ONLY)
     return "live" if enough else "history"
+
+
+BREAKEVEN_MAX = 0.60
+
+
+def breakeven(db: DB, symbol: str, horizon: str) -> float | None:
+    """The hit rate a forecast must reach just to cover the full cost on this desk (audit 2026-11-24): with typical
+    move m (from our 50 % range: half-width / 0.6745 = sigma, mean |move| ≈ 0.8 sigma), being right a share h earns
+    (2h − 1)·m, so h* = 0.5 + cost / (2m). Above BREAKEVEN_MAX the desk is untradeable at this broker's cost."""
+    r = db.execute("SELECT price0, hi50 FROM forecasts WHERE symbol=? AND horizon=? AND method='rw' AND mode='live' "
+                   "ORDER BY issued_t DESC LIMIT 1", (symbol, horizon)).fetchone()
+    if not r or not r["price0"] or r["hi50"] <= r["price0"]:
+        return None
+    m = 0.8 * (r["hi50"] / r["price0"] - 1) / 0.6745
+    return round(0.5 + full_cost(symbol, horizon) / (2 * m), 4) if m > 0 else None
 
 
 def verdict(db: DB, symbol: str, horizon: str, now: float | None = None) -> dict:

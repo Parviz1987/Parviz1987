@@ -160,7 +160,7 @@ function renderAnalysts() {
   $("brainscore").innerHTML = d.brains.length
     ? `<table class="sc"><tr><th>Beyin</th><th>Nə vaxt</th><th>Üfüq</th><th>Düz</th><th>Say</th></tr>` +
       d.brains.map((b) => `<tr><td>${esc(BRAIN_NAMES[b.brain] || b.brain)}</td><td>${esc(b.when)}</td><td>${esc(b.horizon)}</td>
-        <td class="c">${pc(b.hit_rate)}</td><td class="c mut">${b.n}</td></tr>`).join("") + "</table>"
+        <td class="c" title="${esc(Object.entries(b.by_metal || {}).map(([m, x]) => m + ": " + Math.round(x.hit_rate * 100) + " % düz, " + x.n + " dəfə, xərcdən sonra " + (x.net_avg * 100).toFixed(3) + " %").join(" · "))}">${pc(b.hit_rate)}</td><td class="c mut">${b.n}</td></tr>`).join("") + "</table>"
     : "<p class='note'>Hələ yoxlanmış beyin fikri yoxdur: ilk nəticələr fikir verildikdən 1 saat sonra gəlir.</p>";
   // Block 17: the source checker — numbers a brain wrote that it was not given (30 days)
   const ck = d.checks || [];

@@ -123,6 +123,7 @@ def build(db: DB, sym: str) -> dict:
     if out.get("vahid"):            # the headline's own record decides its badge, not the best other method
         out["vahid"]["proof"] = (st.get("vahid") or {}).get("status")
     out["cost"] = judge.full_cost(sym, H)
+    out["breakeven"] = judge.breakeven(db, sym, H)
     return out
 
 

@@ -270,15 +270,29 @@ def test_guest_sees_panel_not_admin(tmp_path):
 
 
 def _fake_scored(db, method, n, hits, move):
+    """A two-sided method (long on even moments, short on odd), right `hits` times: the market itself is half up."""
     rows = []
     for i in range(n):
         hit = i < hits
-        p1 = 100 * (1 + move) if hit else 100 * (1 - move)
-        rows.append(("XAU", "1h", method, "history", i * 3600, i * 3600 + 3600, 100.0, 0.6, 99, 101, 98, 102, "",
-                     p1, 1.0, int(p1 > 100), int(hit), (0.6 - int(p1 > 100)) ** 2, 1, 1))
+        p_up = 0.6 if i % 2 == 0 else 0.4
+        up = (p_up > 0.5) == hit
+        p1 = 100 * (1 + move) if up else 100 * (1 - move)
+        rows.append(("XAU", "1h", method, "history", i * 3600, i * 3600 + 3600, 100.0, p_up, 99, 101, 98, 102, "",
+                     p1, 1.0, int(up), int(hit), (p_up - int(up)) ** 2, 1, 1))
     db.executemany("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50, "
                    "lo80, hi80, basis, price1, scored_ts, outcome, hit, brier, in50, in80) "
                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+
+
+def test_always_long_in_a_rising_market_is_no_skill():
+    db = mem()
+    rows = [("XAU", "1h", "momentum", "history", i * 3600, i * 3600 + 3600, 100.0, 0.6, 99, 101, 98, 102, "",
+             101.0 if i < 700 else 99.0, 1.0, int(i < 700), int(i < 700), 0.16, 1, 1) for i in range(1000)]
+    db.executemany("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50, "
+                   "lo80, hi80, basis, price1, scored_ts, outcome, hit, brier, in50, in80) "
+                   "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
+    assert abs(st["momentum"]["bar"] - 0.7) < 1e-9 and st["momentum"]["status"] == "yox"   # 70 % = the drift
 
 
 def test_judge_needs_bonferroni_and_a_move_bigger_than_the_spread():

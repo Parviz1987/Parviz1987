@@ -59,7 +59,12 @@ def decision(db: DB, engine, symbol: str, now: float | None = None) -> dict:
     for h in forecast.HORIZONS:
         verdict = judge.verdict(db, symbol, h, now)          # the one verdict shared with the card and outlook
         row = {"horizon": h, "name": forecast.HORIZON_NAMES[h], "call": "GÖZLƏ", "method": None, "p_up": None}
-        if verdict["status"] != "sübut":
+        be = judge.breakeven(db, symbol, h)
+        row["breakeven"] = be
+        if be is not None and be > judge.BREAKEVEN_MAX:
+            row["why"] = (f"bu masada xərc çox böyükdür: sadəcə xərci ödəmək üçün {round(be * 100)} % düz çıxmaq "
+                          "lazımdır (Capital spredi); proqnoz göstərici kimi qalır")
+        elif verdict["status"] != "sübut":
             row["why"] = "Hakimin sübutu yoxdur: istiqamət göstərilmir"
         else:
             f = db.execute("SELECT p_up, issued_t FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND "

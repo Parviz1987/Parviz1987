@@ -149,10 +149,15 @@ def score(db: DB, now: float, days: int = 30) -> list[dict]:
         before = px(r["metal"], t_ev if alarm else t0 - 900)
         ret = b / a - 1
         k = (r["source"], "həyəcan" if alarm else "saatlıq", r["horizon"])
-        g = agg.setdefault(k, {"n": 0, "hits": 0, "net": 0.0, "base_n": 0, "base_hits": 0})
+        g = agg.setdefault(k, {"n": 0, "hits": 0, "net": 0.0, "base_n": 0, "base_hits": 0, "by": {}})
         g["n"] += 1
         g["hits"] += int((ret > 0) == up)
-        g["net"] += (ret if up else -ret) - full_cost(r["metal"], r["horizon"])
+        x = (ret if up else -ret) - full_cost(r["metal"], r["horizon"])
+        g["net"] += x
+        bm = g["by"].setdefault(r["metal"], [0, 0, 0.0])      # per metal: costs differ ~40x between metals
+        bm[0] += 1
+        bm[1] += int((ret > 0) == up)
+        bm[2] += x
         if before and before != a:
             g["base_n"] += 1
             g["base_hits"] += int((ret > 0) == (a > before))      # «the move goes on»
@@ -160,5 +165,7 @@ def score(db: DB, now: float, days: int = 30) -> list[dict]:
     for (src, when, h), g in sorted(agg.items()):
         out.append({"brain": src, "when": when, "horizon": h, "n": g["n"], "hit_rate": g["hits"] / g["n"],
                     "net_avg": g["net"] / g["n"],
-                    "baseline_hit": g["base_hits"] / g["base_n"] if g["base_n"] else None, "baseline_n": g["base_n"]})
+                    "baseline_hit": g["base_hits"] / g["base_n"] if g["base_n"] else None, "baseline_n": g["base_n"],
+                    "by_metal": {m: {"n": b[0], "hit_rate": b[1] / b[0], "net_avg": b[2] / b[0]}
+                                 for m, b in g["by"].items()}})
     return out
