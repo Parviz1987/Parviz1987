@@ -131,15 +131,15 @@ async function loadSim() {
       const r = h.methods[m];
       if (!r || !r.n) return `<td class="c mut">·</td>`;
       const cls = r.status === "sübut" ? "sübut" : r.status === "az" ? "az" : r.avg > 0 ? "" : "yox";
-      return `<td class="cell ${cls}" title="${r.n} sövdələşmə · uduş ${pc(r.win)} · stop ${pc(r.stops)} · hədəf ${pc(r.targets)}">${usd(r.avg)}${r.status === "sübut" ? " ✓" : ""}<br><span class="note">${r.n}</span></td>`;
+      return `<td class="cell ${cls}" title="${r.n} sövdələşmə · uduş ${pc(r.win)} · stop ${pc(r.stops)} · hədəf ${pc(r.targets)} · risk-gəlir ${r.ratio == null ? "—" : r.ratio.toFixed(2)} · yarılar: ${r.halves ? r.halves.map(usd).join(" / ") : "—"}${r.steady ? " (hər iki yarıda müsbət)" : ""}">${usd(r.avg)}${r.status === "sübut" ? " ✓" : ""}${r.steady && r.status !== "sübut" ? " ◐" : ""}<br><span class="note">${r.n}</span></td>`;
     }).join("") + "</tr>").join("") + `</table><p class="note">Xanadakı kiçik rəqəm: sövdələşmə sayı. Qırmızı = zərər, sarı = hələ az sövdələşmə (100-dən az),
-      ✓ = qazanc sübut olunub. «Almaq və saxlamaq»: heç bir proqnoz olmadan sadəcə almaq — müqayisə üçün.</p>`;
+      ✓ = qazanc sübut olunub, ◐ = dövrün hər iki yarısında müsbət (dayanıqlı, amma hələ sübut deyil). Hamısı tam xərcdən sonra. «Almaq və saxlamaq»: heç bir proqnoz olmadan sadəcə almaq — müqayisə üçün.</p>`;
   const proven = [];
   d.horizons.forEach((h) => Object.entries(h.methods).forEach(([m, r]) => { if (r.status === "sübut") proven.push({ h, m, r }); }));
   $("simbest").innerHTML = proven.length
     ? "<h3 class='sub'>Pul qazandırdığı sübut olunanlar</h3>" + proven.map(({ h, m, r }) =>
         `<div class="prow"><span class="ic">✅</span><span><b>${esc(d.method_names[m])}</b> · ${esc(h.name)} · ${r.n} sövdələşmə<br>
-        1000 $-lıq sövdələşmədə orta ${usd(r.avg)} · uduş ${pc(r.win)} · ən böyük düşüş ${usd(r.max_dd)}</span></div>`).join("")
+        1000 $-lıq sövdələşmədə orta ${usd(r.avg)} · uduş ${pc(r.win)} · ən böyük düşüş ${usd(r.max_dd)} · risk-gəlir ${r.ratio == null ? "—" : r.ratio.toFixed(2)} · ${r.steady ? "hər iki yarıda müsbət" : "yarılardan birində mənfi"}</span></div>`).join("")
     : `<p class="note"><b>Hələ heç bir üsul pul qazandırdığını sübut etməyib.</b> Bu o deməkdir ki, indi ticarət açmaq üçün əsas yoxdur.
        Sübut gələndə burada yaşıl ✓ ilə görünəcək.</p>`;
 }
@@ -180,6 +180,13 @@ async function loadHyp() {
       <td class="c">${pc(h.hit_rate)}</td><td class="c mut">${pc(h.bar)}</td>
       <td class="c">${h.net_avg == null ? "—" : usd(h.net_avg)}</td><td class="c mut">${h.n}</td><td class="c">${ST[h.status] || h.status}</td></tr>`).join("") +
     "</table><p class='note'>«Spreddən sonra»: 1000 $-lıq bir sövdələşmənin orta nəticəsi. «Az məlumat»: sübut üçün hələ yetərli yeni proqnoz yoxdur.</p>";
+  if (d.focus) {
+    $("freg").textContent = "qeyd: " + dt(d.focus_registered) + " NY · hədd p < " + d.focus_p_bar.toFixed(4);
+    $("focus").innerHTML = `<table class="sc"><tr><th></th><th>Hədəf</th><th>Düz</th><th>Hədd</th><th>Tam xərcdən sonra</th><th>Say</th><th>Hökm</th></tr>` +
+      d.focus.map((h) => `<tr><td class="mut">${h.id}</td><td><b>${esc(h.name)}</b><br><span class="note">${esc(h.idea)}</span></td>
+        <td class="c">${pc(h.hit_rate)}</td><td class="c mut">${pc(h.bar)}</td>
+        <td class="c">${h.net_avg == null ? "—" : usd(h.net_avg)}</td><td class="c mut">${h.n}</td><td class="c">${ST[h.status] || h.status}</td></tr>`).join("") + "</table>";
+  }
 }
 
 async function load() {

@@ -141,6 +141,17 @@ def simulate(db: DB, symbol: str, horizon: str, mode: str = "history") -> dict:
         if m not in by:
             continue
         s = _summary(by[m], k)
+        # Block 18, full report: risk-return per trade (mean / spread of results) and robustness — does the result
+        # hold in BOTH halves of the period? One lucky stretch cannot make a method look steady.
+        rs = [t["ret"] for t in by[m]]
+        if len(rs) >= 2:
+            mu = sum(rs) / len(rs)
+            sd = math.sqrt(sum((r - mu) ** 2 for r in rs) / (len(rs) - 1))
+            s["ratio"] = mu / sd if sd else None
+            half = len(rs) // 2
+            a, b = rs[:half], rs[half:]
+            s["halves"] = [sum(a) / len(a) if a else None, sum(b) / len(b) if b else None]
+            s["steady"] = bool(a and b and s["halves"][0] > 0 and s["halves"][1] > 0)
         s["status"] = ("bazis" if m in BASELINES else "az" if s["n"] < MIN_TRADES else
                        "sübut" if s["avg"] > 0 and s["p"] is not None and s["p"] < p_bar else "yox")
         groups = {}
