@@ -43,7 +43,7 @@ RELATED = {
               "why": "Faiz qalxanda bu istiqrazın qiyməti düşür və qızıl saxlamağın «itirilmiş gəliri» artır: "
                      "istiqraz qiyməti qalxanda (faiz enəndə) qızıl üçün adətən müsbətdir.", "sign": +1},
 }
-HISTORY_TF = {"15m": 1000, "30m": 1000, "1h": 1000, "4h": 1000, "1d": 1000}
+HISTORY_TF = {"15m": 4000, "30m": 4000, "1h": 4000, "4h": 3000, "1d": 2000}   # the same depth as the metals
 RESOLVE_EVERY = 86400
 
 
