@@ -124,6 +124,7 @@ class Engine:
         self.last_poll: float | None = None
         self.last_ok: float | None = None
         self._weights_cache: dict = {}
+        self._weights_ts = 0.0
         self.history_state: dict = json.loads(db.get("history_state") or "{}")
         self._macro_cache = None
         self.activity = None      # app.activity.Hub, set by the app: where this agent reports its status
@@ -317,22 +318,23 @@ class Engine:
                 n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
         return n
 
-    def weights(self, symbol: str, horizon: str, now: float) -> dict[str, float]:
-        """The scale (tərəzi): each analyst's weight on this desk from the Judge's live record once it is long enough
-        (MIN_N), otherwise from the history replay. Recomputed at most every 10 minutes."""
-        key = (symbol, horizon)
-        hit = self._weights_cache.get(key)
-        if hit and now - hit[0] < 600:
-            return hit[1]
-        live = judge.stats(self.db, symbol, horizon, "live", ttl=600)
-        hist = judge.stats(self.db, symbol, horizon, "history", ttl=600)
-        by = {r["method"]: r for r in hist}
-        for r in live:
-            if (r.get("nh") or 0) >= judge.MIN_N[horizon]:
-                by[r["method"]] = r                     # enough live forecasts: the live record decides
-        w = judge.weights(list(by.values()), forecast.steps_of(horizon))
-        self._weights_cache[key] = (now, w)
-        return w
+    def weights(self, symbol: str, horizon: str, now: float | None = None) -> dict[str, float]:
+        """The scale (tərəzi): the weights last computed by refresh_weights (empty until the first run). Only reads:
+        the Judge's queries are heavy and must never run on the event loop (the server must keep answering)."""
+        return self._weights_cache.get((symbol, horizon), {})
+
+    def refresh_weights(self) -> None:
+        """Off the event loop (a thread), every 10 minutes: each analyst's weight on each desk from the Judge's live
+        record once it is long enough (MIN_N), otherwise from the history replay."""
+        for symbol in candles.METALS:
+            for horizon in forecast.HORIZONS:
+                live = judge.stats(self.db, symbol, horizon, "live", ttl=600)
+                hist = judge.stats(self.db, symbol, horizon, "history", ttl=600)
+                by = {r["method"]: r for r in hist}
+                for r in live:
+                    if (r.get("nh") or 0) >= judge.MIN_N[horizon]:
+                        by[r["method"]] = r             # enough live forecasts: the live record decides
+                self._weights_cache[(symbol, horizon)] = judge.weights(list(by.values()), forecast.steps_of(horizon))
 
     # ---------- history and backtest ----------
     def _history_names(self) -> list[str]:
@@ -391,7 +393,8 @@ class Engine:
                     try:
                         rows = await src.candles(sym, tf, limit)
                         candles.store_history(self.db, sym, tf, rows, replace=replace)
-                        line[tf] = (line.get(tf, "") + f" {src.name}: {len(rows)} şam").strip()
+                        note = getattr(src, "page_note", "")
+                        line[tf] = (line.get(tf, "") + f" {src.name}: {len(rows)} şam" + (f" ({note})" if note else "")).strip()
                     except NotServed as e:
                         line[tf] = (line.get(tf, "") + f" {src.name}: planda yoxdur ({str(e)[:60]})").strip()
                         if src.name == "twelvedata":
@@ -578,6 +581,9 @@ class Engine:
                 if self.feeds is not None:
                     await self.feeds.tick()
                 await self.backfill()
+                if time.time() - self._weights_ts > 600:
+                    self._weights_ts = time.time()
+                    await asyncio.to_thread(self.refresh_weights)
                 self._rep("orch", "done", note=f"dövr {time.time() - t_start:.1f} san")
             except Exception as e:   # the loop must survive one bad poll
                 log.exception("engine step failed")

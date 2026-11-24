@@ -245,6 +245,7 @@ class CapitalHistory(HistoryProvider):
         if r.status_code != 200:
             raise ProviderError(f"Capital.com tarixçə: HTTP {r.status_code}")
         rows = parse_prices(r.json(), tf)
+        self.page_note = ""
         # More than one page: walk back by date range (the broker gives at most 1000 candles per request). A page
         # that fails ends the walk; what was loaded is kept.
         from datetime import datetime, timezone
@@ -262,9 +263,11 @@ class CapitalHistory(HistoryProvider):
                                       params={"resolution": RESOLUTION[tf], "max": MAX_ROWS, "from": fmt(frm),
                                               "to": fmt(to)}, headers=self.tokens)
             if r.status_code != 200:
+                self.page_note = f"köhnə səhifə: HTTP {r.status_code} {r.text[:120]}"
                 break
             older = [x for x in parse_prices(r.json(), tf) if x[0] < rows[0][0]]
             if not older:
+                self.page_note = "köhnə səhifə boş gəldi"
                 break
             rows = older + rows
         return rows[-limit:]

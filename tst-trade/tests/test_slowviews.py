@@ -62,3 +62,12 @@ def test_scale_weighs_only_analysts_above_the_bar():
     assert forecast.weighted_view({"momentum": {"p_up": 0.6}}, None)["p_up"] == 0.5
     assert {"cot", "season", "jewel"} <= set(forecast.methods_for("1mo"))
     assert "brain2" in forecast.methods_for("1h") and "cot" not in forecast.methods_for("1h")
+
+
+def test_engine_weights_only_read_a_cache_filled_off_the_loop():
+    from app.engine import Engine
+    db = DB(":memory:")
+    eng = Engine(db, KeyStore(db, "s" * 64), "demo", 15)
+    assert eng.weights("XAU", "1h") == {}            # nothing computed yet: no heavy query on the event loop
+    eng.refresh_weights()
+    assert eng.weights("XAU", "1h") == {}            # no record: nobody weighs anything

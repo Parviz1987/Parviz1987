@@ -5,6 +5,7 @@ Strategist (Strateq): once an hour, the forecast cards, macro, calendar and labe
 Azerbaijani. A sentence with a number that is not in the facts is dropped (a brain never writes a price)."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -212,7 +213,7 @@ class BrainJobs:
     async def strategist(self, now: float, trigger: list[dict] | None = None) -> bool:
         """The hourly analysis, or at once after an alarm (trigger: the signals that woke it)."""
         self._rep("strateq", "working", "W1 Faktlar", 0.1, ("Həyəcan: " + trigger[0]["text"]) if trigger else "")
-        facts = self.facts(now, trigger)
+        facts = await asyncio.to_thread(self.facts, now, trigger)    # the Judge's numbers: heavy, off the loop
         self._rep("strateq", "working", "W2 Beyin", 0.35)
         data, how = await brains.run(self.db, self.keys, "strategist", STRATEGIST_SYSTEM,
                                      "Faktlar (JSON):\n" + facts, STRATEGIST_SCHEMA, max_tokens=3000)
