@@ -749,7 +749,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         key = store.first("databento")
         if not key:
             raise HTTPException(400, "Databento açarı saxlanmayıb")
-        return await futures.quote(key)
+        return await futures.quote_saved(db, key)
 
     @app.post("/api/admin/futures/buy")
     async def futures_buy(body: dict):

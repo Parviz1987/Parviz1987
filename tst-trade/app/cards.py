@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS forecast_cards (id INTEGER PRIMARY KEY, known_ts REAL
 CREATE INDEX IF NOT EXISTS forecast_cards_m ON forecast_cards(metal, known_ts);
 """
 H_SEC = {"1h": 3600, "4h": 4 * 3600, "1d": 86400}
-_VERSION: str | None = None
+_VERSION: str | None = None     # read at the first card; the server restarts on every update, so it is the running code
 
 
 def ensure(db: DB) -> None:

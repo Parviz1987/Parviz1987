@@ -129,7 +129,9 @@ def _plan_v3(db) -> dict:
             "cost_1d": {s: judge.cost_parts(s, "1d") for s in candles.METALS},
             "cards": {"last": last, "summary": cards.summary(db)},
             "checker": checker.report(db), "news_events": newsevents.day_counts(db),
-            "focus": hypotheses.evaluate_focus(db), "alfred": json.loads(db.get("alfred:last") or "null")}
+            "focus": hypotheses.evaluate_focus(db), "alfred": json.loads(db.get("alfred:last") or "null"),
+            "futures": {"quote": json.loads(db.get("futures:quote") or "null"),
+                        "last": json.loads(db.get("futures:last") or "null"), "running": db.get("futures:running")}}
 
 
 def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:

@@ -171,8 +171,19 @@ $("f-quote").onclick = async () => {
     $("f-buy").disabled = !(futQuote.total_usd >= 0);
   } catch (e) { $("f-msg").textContent = "Xəta: " + e.message; }
 };
+// no confirm() popup: phone and in-app browsers may block it silently. The button asks once more on the page itself.
+let futArmed = false;
 $("f-buy").onclick = async () => {
-  if (!futQuote || !confirm(`Databento-dan ${futQuote.total_usd.toFixed(2)} $ dəyərində məlumat alınsın?`)) return;
+  if (!futQuote) return;
+  if (!futArmed) {
+    futArmed = true;
+    $("f-buy").textContent = `Bir də bas: ${futQuote.total_usd.toFixed(2)} $ təsdiq edirəm`;
+    $("f-msg").textContent = `Alış ${futQuote.total_usd.toFixed(2)} $ (pulsuz kreditdən). Təsdiq üçün düyməni bir də basın.`;
+    setTimeout(() => { futArmed = false; $("f-buy").textContent = "Təsdiq edirəm, al"; }, 30000);
+    return;
+  }
+  futArmed = false;
+  $("f-buy").textContent = "Təsdiq edirəm, al";
   $("f-buy").disabled = true;
   try {
     const r = await call("POST", "/api/admin/futures/buy", { limit_usd: futQuote.total_usd });

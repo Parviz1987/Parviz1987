@@ -68,6 +68,12 @@ async def quote(key: str, now: float | None = None) -> dict:
     return out
 
 
+async def quote_saved(db: DB, key: str) -> dict:
+    q = await quote(key)
+    db.put("futures:quote", json.dumps(q, ensure_ascii=False))
+    return q
+
+
 def parse_ohlcv_csv(text: str) -> list[tuple]:
     """Databento CSV with pretty prices and times -> (t, o, h, l, c, v)."""
     rows = []
