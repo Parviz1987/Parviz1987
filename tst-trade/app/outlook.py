@@ -59,6 +59,16 @@ def build(db: DB, sym: str) -> dict:
                           "scenario": card["scenario"], "counter": card["counter"], "invalidation": card["invalidation"],
                           "next_update": card["next_update"], "quality": card["quality"],
                           "record": {"right": summ.get("düz", 0), "wrong": summ.get("səhv", 0)}}
+    # voice 1b: the Chartist (AI reading the charts itself)
+    import json as _json
+    try:
+        ch = _json.loads(db.get("chartist:last") or "null")
+    except ValueError:
+        ch = None
+    cm = next((m for m in (ch or {}).get("metals", []) if m.get("symbol") == sym), None)
+    if cm:
+        out["chartist"] = {"p": cm.get("p1d"), "trend": cm.get("trend"), "levels": cm.get("levels"),
+                           "pattern": cm.get("pattern"), "why": cm.get("why"), "ts": ch.get("ts")}
     # voice 2: the scale
     ter = fc.get("terazi")
     if ter:
@@ -90,6 +100,7 @@ def build(db: DB, sym: str) -> dict:
     out["vote"] = {"up": up, "down": down, "up_names": names_up[:8], "down_names": names_down[:8]}
     # one line: only when the voices that have a view agree
     dirs = [d for d in (_dir((out.get("strateq") or {}).get("p")), _dir((out.get("terazi") or {}).get("p")),
+                        _dir((out.get("chartist") or {}).get("p")),
                         (1 if up > down * 1.5 and up >= 3 else -1 if down > up * 1.5 and down >= 3 else 0)) if d]
     lean = 0 if not dirs or len(set(dirs)) > 1 else dirs[0]
     weak = lean != 0 and len(dirs) < 2           # one voice alone is a weak lean, not an agreement

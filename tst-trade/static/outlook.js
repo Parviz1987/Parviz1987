@@ -31,6 +31,8 @@
         <div class="olw"><b>Əks ssenari:</b> ${esc(s.counter || "—")}</div>
         <div class="olw"><b>Fikri zəiflədər:</b> ${esc(s.invalidation || "—")}</div>
         <div class="olw note">Növbəti yenilənmə: ${esc(s.next_update || "—")} · ${ny(s.ts)} NY</div>` : ""}
+        <div class="olr"><span>Qrafik analitiki</span><span>${m.chartist ? `${dirWord(m.chartist.p)} ${pct(m.chartist.p)}` : "fikir hələ yoxdur"}</span></div>
+        ${m.chartist ? `<div class="olw"><b>Qrafik:</b> ${esc(m.chartist.trend || "")}${m.chartist.levels ? " · " + esc(m.chartist.levels) : ""}${m.chartist.pattern ? " · " + esc(m.chartist.pattern) : ""}</div>` : ""}
         <div class="olr"><span>Tərəzi (Hakim)</span><span>${t ? (String(t.basis || "").startsWith("çəkilər yoxdur") ? `<span class="note">Hakim hələ heç bir analitikə güvənmir</span>` : `${dirWord(t.p)} ${pct(t.p)} <span class="note">· ${esc(t.basis || "")}</span>`) : "—"}</span></div>
         <div class="olr"><span>Analitiklərin səsi</span><span>▲ ${v.up} · ▼ ${v.down}</span></div>
       </div>`;

@@ -31,7 +31,7 @@ def test_debate_bull_bear_then_judge(monkeypatch):
     now = 1_800_000_000
     assert asyncio.run(jobs.strategist(now))
     slots = [x[0] for x in seen]
-    assert slots == ["strategist", "analyst2", "analyst2", "analyst2", "reviewer"]
+    assert slots == ["strategist", "analyst2", "analyst2", "analyst2", "reviewer", "chartist"]
     assert Lookup(db).views("XAU", now + 600, "1h")["debate"][0] == 0.58
 
 

@@ -105,7 +105,75 @@ DEBATE_JUDGE_SYSTEM = (
     "and give the probability (0..1) that the price is HIGHER than now in 1 hour (p1h), 4 hours (p4h) and 1 day (p1d), "
     "and one sentence why. 0.5 = the cases balance. Your answers are checked later against real prices.")
 
+CHARTIST_SYSTEM = (
+    "You are a professional technical analyst of precious metals. You get, for each of XAU, XAG, XPT, XPD, recent "
+    "candles on three timeframes (1 hour, 4 hours, 1 day: time, open, high, low, close) and computed indicators (EMA "
+    "20/50/200, RSI 14, MACD histogram, recent highs and lows, Fibonacci levels of the recent swing). Read the charts "
+    "like a trader: trend on each timeframe and whether they agree, support and resistance, chart and candle patterns, "
+    "momentum and divergences. Then give the probability (0..1) that the price is HIGHER than the last close in 1 hour "
+    "(p1h), 4 hours (p4h) and 1 day (p1d). 0.5 = no edge; move away from it only when the chart gives a reason (usually "
+    "0.4-0.6). Write 'trend', 'levels' and 'why' in Azerbaijani, short. Use ONLY prices that appear in the data; never "
+    "invent levels. No news, no macro: charts only. Your answers are checked later against real prices.")
+CHARTIST_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["metals"],
+    "properties": {"metals": {"type": "array", "items": {
+        "type": "object", "additionalProperties": False,
+        "required": ["symbol", "trend", "levels", "pattern", "p1h", "p4h", "p1d", "why"],
+        "properties": {"symbol": {"type": "string"}, "trend": {"type": "string"}, "levels": {"type": "string"},
+                       "pattern": {"type": "string"}, "p1h": {"type": "number"}, "p4h": {"type": "number"},
+                       "p1d": {"type": "number"}, "why": {"type": "string"}}}}}}
+CHART_BARS = {"1h": 48, "4h": 30, "1d": 40}
+
 NUM = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def _ema(xs: list[float], n: int) -> float | None:
+    if len(xs) < n:
+        return None
+    k, e = 2 / (n + 1), sum(xs[:n]) / n
+    for x in xs[n:]:
+        e = e + k * (x - e)
+    return e
+
+
+def _rsi(xs: list[float], n: int = 14) -> float | None:
+    if len(xs) <= n:
+        return None
+    gains = [max(0.0, b - a) for a, b in zip(xs, xs[1:])]
+    losses = [max(0.0, a - b) for a, b in zip(xs, xs[1:])]
+    g, l = sum(gains[:n]) / n, sum(losses[:n]) / n
+    for i in range(n, len(gains)):
+        g, l = (g * (n - 1) + gains[i]) / n, (l * (n - 1) + losses[i]) / n
+    return 100.0 if l == 0 else 100 - 100 / (1 + g / l)
+
+
+def chart_facts(db: DB, now: float) -> str:
+    """The charts as text for the Chartist: candles on three timeframes and the indicators computed by code."""
+    out = {}
+    for sym in ("XAU", "XAG", "XPT", "XPD"):
+        d = {}
+        for tf, n in CHART_BARS.items():
+            rows = candles.closed(db, sym, tf, now, limit=260)
+            if len(rows) < 30:
+                continue
+            closes = [r["c"] for r in rows]
+            dec = 2 if closes[-1] >= 100 else 3
+            r_ = lambda v: None if v is None else round(v, dec)
+            e12, e26 = _ema(closes, 12), _ema(closes, 26)
+            seg = rows[-100:]
+            hi, lo = max(r["h"] for r in seg), min(r["l"] for r in seg)
+            d[tf] = {"candles": [[time.strftime("%m-%d %H:%M", time.gmtime(r["t"])), r_(r["o"]), r_(r["h"]), r_(r["l"]),
+                                  r_(r["c"])] for r in rows[-n:]],
+                     "ema20": r_(_ema(closes, 20)), "ema50": r_(_ema(closes, 50)), "ema200": r_(_ema(closes, 200)),
+                     "rsi14": None if _rsi(closes) is None else round(_rsi(closes), 1),
+                     "macd": None if e12 is None or e26 is None else r_(e12 - e26),
+                     "high_100": r_(hi), "low_100": r_(lo),
+                     "fib_382": r_(hi - 0.382 * (hi - lo)), "fib_500": r_(hi - 0.5 * (hi - lo)),
+                     "fib_618": r_(hi - 0.618 * (hi - lo))}
+        if d:
+            out[sym] = d
+    return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)), "charts": out},
+                      ensure_ascii=False)
 
 
 SCOUT_EVERY, SCOUT_EVENT_EVERY = 4 * 3600, 30 * 60   # one search cost ~0.9 $ (counted high): the monthly cap lasts
@@ -284,6 +352,7 @@ class BrainJobs:
                 f"{chk['invented']} uydurma rəqəm (göstərilmədi)" if chk["invented"] else "uydurma rəqəm yoxdur"))
         await self.second_brain(now, facts, trigger)
         await self.debate(now, facts, trigger)
+        await self.chartist(now, trigger)
         self._state("strategist", f"izah yazıldı · {how}")
         return True
 
@@ -353,6 +422,30 @@ class BrainJobs:
         self.db.put("debate:last", json.dumps({"ts": now, "bull": bull, "bear": bear, "judge": data, "brain": how},
                                               ensure_ascii=False))
         self._rep("debate", "done", note=f"{len(rows)} ehtimal · {how}")
+        return True
+
+    async def chartist(self, now: float, trigger=None) -> bool:
+        """Block 23: the Chartist reads the charts itself (three timeframes, levels, indicators) and gives its own
+        1 h / 4 h / 1 day probabilities; stored apart (source «chartist») and judged like every analyst."""
+        if not self.keys.first(brains.config(self.db, "chartist")["provider"]):
+            return False
+        self._rep("chartist", "working", "W1 Şamlar", 0.1, self._chain(trigger))
+        charts = await asyncio.to_thread(chart_facts, self.db, now)
+        self._rep("chartist", "working", "W2 Beyin", 0.4)
+        data, how = await brains.run(self.db, self.keys, "chartist", CHARTIST_SYSTEM, "Charts (JSON):\n" + charts,
+                                     CHARTIST_SCHEMA, max_tokens=2000)
+        if data is None:
+            self._rep("chartist", "error", note="cavab gəlmədi: " + how)
+            return False
+        rows = self._prob_rows(now, "chartist", data, how, trigger)
+        brainviews.ensure(self.db)
+        self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p, known_ts) "
+                            "VALUES(?,?,?,?,?,?,?,?)", rows)
+        clean = [{k: (guard_numbers(str(m.get(k, "")), charts) if k in ("trend", "levels", "pattern", "why") else m.get(k))
+                  for k in ("symbol", "trend", "levels", "pattern", "p1h", "p4h", "p1d", "why")}
+                 for m in data.get("metals", []) if m.get("symbol") in ("XAU", "XAG", "XPT", "XPD")]
+        self.db.put("chartist:last", json.dumps({"ts": now, "brain": how, "metals": clean}, ensure_ascii=False))
+        self._rep("chartist", "done", note=f"{len(rows)} ehtimal · {how}")
         return True
 
     @staticmethod

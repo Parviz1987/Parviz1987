@@ -136,6 +136,14 @@ BRAIN_SLOTS: list[dict] = [
      "requirements": [("Özünə həddən artıq güvənməmək", 50), ("Sərt cavab forması", 25), ("Sabitlik", 25)],
      "provider": "anthropic", "model": "claude-sonnet-5-5", "fallback": "gemini", "fallback_model": "gemini-4-argon",
      "why": "KalshiBench: Claude ailəsi ən az özünə güvənən (xəta 0.120), OpenAI ən çox (0.395)."},
+    {"id": "chartist", "name": "Qrafik analitiki",
+     "job": "Treyder kimi qrafikə özü baxır: 1 saat, 4 saat və 1 günlük şamlar, səviyyələr, göstəricilər; trendi, dəstək "
+            "və müqaviməti, fiqurları yazır və 1 saat, 4 saat, 1 gün ehtimalı verir. Hakim onu ayrıca ölçür.",
+     "may_not": "Şamlarda olmayan qiyməti yazmaq; xəbər və makro haqqında danışmaq (bu, başqa analitiklərin işidir).",
+     "requirements": [("Qrafik oxuma", 50), ("Qiymət (saatda bir)", 30), ("Sərt cavab forması", 20)],
+     "provider": "anthropic", "model": "claude-haiku-5-5", "fallback": "openai", "fallback_model": "gpt-5.4-nano",
+     "why": "Sahibin istəyi (2026-11-24): analitik qrafikə özü baxıb texniki analiz etsin. Saatda bir çağırış: ucuz model "
+            "ayda təxminən 5-10 $; Hakim faydasını ölçür, fayda yoxdursa, söndürülür."},
 ]
 BRAIN_IDS = {b["id"] for b in BRAIN_SLOTS}
 BRAIN_PROVIDERS = ("anthropic", "openai", "xai", "gemini")

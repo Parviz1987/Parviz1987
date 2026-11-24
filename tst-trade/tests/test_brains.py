@@ -52,7 +52,8 @@ def test_fallback_and_cap(monkeypatch):
         return {"summary": "ok", "metals": [], "watch": []}, 10, 10
     monkeypatch.setattr(llm, "ask", fake_ask)
     assert asyncio.run(jobs.strategist(1795400000.0))
-    assert calls == ["anthropic", "gemini"]
+    assert calls[:2] == ["anthropic", "gemini"]       # the Strategist falls back to its second brain
+    assert calls[2:] == ["anthropic"]                  # then the Chartist (its fallback has no key here)
     assert jobs.last_explanation()["brain"].startswith("gemini")
     brains.save(db, "strategist", {"month_usd": 0})
     data, why = asyncio.run(brains.run(db, ks, "strategist", "s", "u", {}))
