@@ -266,3 +266,15 @@ body.simple .main,body.simple .split,body.simple .feeds,body.simple .box[data-fo
 .card-dlg form{text-align:right;margin-top:10px}
 .hg[data-m]{cursor:pointer}
 @media (max-width:560px){.card-dlg .cr{grid-template-columns:1fr;gap:2px}}
+
+/* Sabah üçün proqnoz */
+.olgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.olc{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:5px;font-size:13px;min-width:0}
+.olh{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.ol-lean{font-weight:700}
+.ol-lean.up{color:#3ee08f}.ol-lean.down{color:#ff5d6c}.ol-lean.mut{color:var(--muted)}
+.olr{display:grid;grid-template-columns:118px 1fr;gap:6px}
+.olr>span:first-child{color:var(--muted)}
+.olw{font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+@media (max-width:1100px){.olgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.olgrid{grid-template-columns:1fr}.olr{grid-template-columns:104px 1fr}}

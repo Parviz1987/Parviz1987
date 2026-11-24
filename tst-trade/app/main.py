@@ -389,6 +389,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 "focus_registered": hypotheses.FOCUS_REGISTERED, "focus_p_bar": hypotheses.FOCUS_P_BAR,
                 "focus": await asyncio.to_thread(diag._slow, "focus", lambda: hypotheses.evaluate_focus(db))}
 
+    @app.get("/api/outlook")
+    async def outlook_api():
+        """Sabah üçün proqnoz: per metal the 1-day range, the three voices on direction with their records, the proof."""
+        from . import outlook
+        return await asyncio.to_thread(diag._slow, "outlook", lambda: outlook.all_metals(db), 120)
+
     @app.get("/api/futstudy")
     async def futstudy_api():
         """Block 21: the futures tests (impulse with real volume, after US releases, both years, futures vs Capital cost)."""

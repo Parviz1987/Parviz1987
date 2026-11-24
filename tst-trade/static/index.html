@@ -30,6 +30,12 @@
   <dialog class="card-dlg" id="cardDlg" aria-label="Proqnoz kartı"><div id="cardBody"></div>
     <form method="dialog"><button class="btn sm">Bağla</button></form></dialog>
   <div class="tiles" id="tiles"></div>
+  <section class="box outlook" id="sec-outlook" data-fold="outlook">
+    <h2>Sabah üçün proqnoz (1 gün) <span class="sp"></span><span class="note" id="olnote"></span></h2>
+    <p class="note">Hər metal üçün: gözlənilən aralıq (sübut olunmuş bacarıq), istiqamət üzrə üç səs və hər birinin indiyə qədərki nəticəsi.
+      <b>Meyl sübut deyil:</b> Hakim 1 günlük masada istiqamət sübutu görəndə burada ✅ yazılacaq.</p>
+    <div class="olgrid" id="outlook"></div>
+  </section>
   <div class="ticker" id="ticker" aria-label="Analizdə istifadə olunan bazarlar"></div>
   <nav class="flow" id="flow" aria-label="Sistemin canlı axını" hidden></nav>
   <div class="main">
@@ -93,4 +99,5 @@
 <script src="/static/nav.js"></script>
 <script src="/static/flow.js"></script>
 <script src="/static/hud.js"></script>
+<script src="/static/outlook.js"></script>
 </body></html>
