@@ -89,17 +89,3 @@ def test_parse_alpaca_maps_fund_symbols_to_metals():
     assert a["uid"] == "alp:7" and a["metals"] == "XAU" and a["url"].startswith("https://")
     assert b["metals"] == "XAG,XPD" and b["url"] == ""
 
-
-def test_parse_gld_finds_columns_by_name_and_skips_holidays():
-    from app.feeds import parse_gld
-    raw = ("SPDR Gold Trust\r\n\r\n"
-           "Date, GLD Close, LBMA Gold Price, NAV per GLD in Gold, Daily Share Volume, "
-           "Total Net Asset Value Ounces in the Trust as at 4.15 p.m. NYT, "
-           "Total Net Asset Value Tonnes in the Trust as at 4.15 p.m. NYT, Total Net Asset Value in the Trust\r\n"
-           '21-Nov-2026, 335.1, 3600.5, 0.093, 8000000, 31000000, "964.32", 100000000000\r\n'
-           "24-Nov-2026, HOLIDAY\r\n"
-           "25-Nov-2026, 336.0, 3610.0, 0.093, 7000000, 31100000, 967.10, 100500000000\r\n").encode()
-    assert parse_gld(raw) == [("2026-11-21", 964.32), ("2026-11-25", 967.10)]
-    import pytest
-    with pytest.raises(ValueError):
-        parse_gld(b"no header here")

@@ -631,10 +631,10 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     @app.post("/api/admin/feeds/{name}")
     async def refresh_feed(name: str):
-        if name not in ("news", "calendar", "macro", "cot", "gld"):
+        if name not in ("news", "calendar", "macro", "cot"):
             raise HTTPException(404, "naməlum mənbə")
         await feeds.tick(force=name)
-        return {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot", "gld")}
+        return {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot")}
 
     @app.post("/api/admin/guest")
     async def set_guest(request: Request):

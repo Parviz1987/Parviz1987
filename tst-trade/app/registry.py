@@ -71,9 +71,6 @@ FREE_SOURCES: list[dict] = [
     {"id": "cot", "category": "macro", "name": "CFTC COT hesabatı",
      "purpose": "Böyük fondların (managed money) qızıl, gümüş, platin, palladium fyuçerslərində mövqeyi; həftədə bir "
                 "(cümə axşamı çərşənbə axşamının vəziyyəti dərc olunur).", "cost": "Pulsuz", "stage": LIVE},
-    {"id": "gld", "category": "macro", "name": "SPDR GLD ehtiyatı",
-     "purpose": "Ən böyük qızıl fondunun saxladığı qızıl (ton), gündəlik: böyük investorların alıb-satması.",
-     "cost": "Pulsuz", "stage": LIVE},
 ]
 
 # Brain slots: the job comes first, the brain second. requirements = what the job needs and its weight (sum 100).

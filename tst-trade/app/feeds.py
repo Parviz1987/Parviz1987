@@ -62,12 +62,7 @@ MACRO_SERIES = {
     "SP500": "S&P 500 səhm indeksi",
     "DCOILWTICO": "Neft WTI (gündəlik), $",
 }
-# Not from FRED, shown with the macro data: the gold held by the biggest gold ETF (SPDR GLD), in tonnes, daily.
-# Big investors buying or selling gold shows here within a day. Public CSV, no key.
-EXTRA_SERIES = {"GLD_T": "GLD fondundakı qızıl, ton"}
-GLD_URL = "https://www.spdrgoldshares.com/assets/dynamic/GLD/GLD_US_archive_EN.csv"
-GLD_EVERY = 6 * 3600
-SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "gld", "alpaca", "fmp")   # every collector that reports health
+SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp")   # every collector that reports health
 # CFTC Commitments of Traders (disaggregated, futures only; public, no key): weekly positions on COMEX / NYMEX.
 COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
 COT_CODES = {"088691": "XAU", "084691": "XAG", "076651": "XPT", "075651": "XPD"}
@@ -195,35 +190,6 @@ def parse_fred(data) -> list[tuple[str, float]]:
     return out
 
 
-def parse_gld(data: bytes) -> list[tuple[str, float]]:
-    """SPDR's daily archive -> (YYYY-MM-DD, tonnes). The columns are found by name (the header row has «Date» and a
-    column with «Tonnes»), so a moved column does not silently read the wrong number. Dates like 18-Nov-2004."""
-    import csv
-    import io
-    from datetime import datetime as _dt
-    lines = data.decode("utf-8-sig", "replace").splitlines()
-    head_i = next((i for i, ln in enumerate(lines[:60]) if "date" in ln.lower() and "tonne" in ln.lower()), None)
-    if head_i is None:
-        start = " ".join(ln.strip() for ln in lines[:4])[:160]
-        raise ValueError(f"GLD faylında «Date» və «Tonnes» sütunları tapılmadı; faylın başı: {start!r}")
-    rows = list(csv.reader(io.StringIO("\n".join(lines[head_i:])), skipinitialspace=True))
-    head = [h.strip().lower() for h in rows[0]]
-    di = next(i for i, h in enumerate(head) if h.startswith("date"))
-    ti = next(i for i, h in enumerate(head) if "tonne" in h)
-    out = []
-    for row in rows[1:]:
-        if len(row) <= max(di, ti):
-            continue
-        try:
-            d = _dt.strptime(row[di].strip(), "%d-%b-%Y").strftime("%Y-%m-%d")
-            v = float(row[ti].strip().replace(",", ""))
-        except ValueError:
-            continue                     # holiday rows say «HOLIDAY» or are empty
-        if v > 0:
-            out.append((d, v))
-    return out
-
-
 def parse_cot(data) -> list[tuple]:
     """Socrata rows -> (symbol, date, open interest, managed money long, short, producer long, short)."""
     rows = json.loads(data) if isinstance(data, (bytes, str)) else data
@@ -275,7 +241,7 @@ class Feeds:
         self.db = db
         self.keys = keys
         db.conn.executescript(SCHEMA)
-        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0, "gld": 0.0}
+        self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0}
         self.activity = None      # app.activity.Hub: where each collector reports its status
         db.conn.executescript(surprise.SCHEMA)
 
@@ -352,17 +318,6 @@ class Feeds:
                 errors.append(f"{sid}: {str(e).replace(key, '***')}")
         self._health("fred", n > 0, f"{n} müşahidə" + (f"; xəta: {'; '.join(errors)}" if errors else ""), n)
 
-    async def gld(self, client) -> None:
-        try:
-            rows = parse_gld(await self._get(client, GLD_URL))
-        except Exception as e:
-            self._health("gld", False, f"GLD: {e}"[:300])
-            return
-        self.db.executemany("INSERT OR REPLACE INTO macro(series, d, v) VALUES('GLD_T',?,?)", rows)
-        last = rows[-1] if rows else None
-        self._health("gld", bool(rows), f"{len(rows)} gün" + (f", sonuncu {last[0]}: {last[1]:.1f} ton" if last else ""),
-                     len(rows))
-
     async def cot(self, client) -> None:
         codes = ",".join(f"'{c}'" for c in COT_CODES)
         data = await self._get(client, COT_URL, params={
@@ -381,7 +336,7 @@ class Feeds:
         now = time.time() if now is None else now
         jobs = {"news": (self.news, NEWS_EVERY), "calendar": (self.calendar, CAL_EVERY),
                 "macro": (self.macro, MACRO_EVERY), "cot": (self._cot_safe, COT_EVERY),
-                "alpaca": (self.alpaca, ALPACA_EVERY), "gld": (self.gld, GLD_EVERY),
+                "alpaca": (self.alpaca, ALPACA_EVERY),
                 # every 5 minutes; every minute around a high-impact release so the surprise is seen at once
                 "fmp": (self.fmp, 60 if self.event_mode(now) else 300)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
@@ -389,7 +344,7 @@ class Feeds:
                 if force == name or (force is None and now >= self.next_run[name]):
                     self.next_run[name] = now + every
                     task = {"news": "news", "alpaca": "news", "calendar": "calendar", "fmp": "calendar",
-                            "macro": "macro", "cot": "macro", "gld": "macro"}[name]
+                            "macro": "macro", "cot": "macro"}[name]
                     if self.activity:
                         self.activity.report(task, "working", note=name)
                     try:
@@ -505,7 +460,7 @@ class Feeds:
 
     def macro_view(self) -> list[dict]:
         out = []
-        for sid, name in {**MACRO_SERIES, **EXTRA_SERIES}.items():
+        for sid, name in MACRO_SERIES.items():
             rows = self.db.execute("SELECT d, v FROM macro WHERE series=? ORDER BY d DESC LIMIT 6", (sid,)).fetchall()
             if not rows:
                 out.append({"series": sid, "name": name, "value": None})
