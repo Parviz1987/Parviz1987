@@ -47,9 +47,9 @@ Hakim yoxlayır. Həyəcan fikirləri ayrıca da hesablanır ki, «hadisədən s
 
 | Blok | Nə | Bitdi meyarı | Vəziyyət |
 |---|---|---|---|
-| 1 | Beyin proqnozçu: Strateq 1s/4s/1g ehtimal verir, Hakim yoxlayır | Hakimdə «Strateqin fikri» canlı istiqamət sayır | ✅ kod (965283b), canlı nəticə gözlənilir |
-| A | Sinirlər: siqnal lenti + həyəcan təhlili (yuxarıdakı cədvəl) | güclü xəbər/rəqəm/sıçrayışdan sonra 15 dəqiqəyə qədər Strateq fikri yazılır; Agentlər panelində görünür | ✅ kod; canlıda ilk həyəcan gözlənilir |
-| 2 | Gözlər tam: 8/8 əlaqəli bazar; pulsuz uzun tarixçə | Sistem səhifəsində zəncir yaşıl | növbədə |
+| 1 | Beyin proqnozçu: Strateq 1s/4s/1g ehtimal verir, Hakim yoxlayır | Hakimdə «Strateqin fikri» canlı istiqamət sayır | ✅ işləyir (965283b): Hakimdə ilk canlı istiqamət sayıldı |
+| A | Sinirlər: siqnal lenti + həyəcan təhlili (yuxarıdakı cədvəl) | güclü xəbər/rəqəm/sıçrayışdan sonra 15 dəqiqəyə qədər Strateq fikri yazılır; Agentlər panelində görünür | ✅ işləyir: ilk həyəcan 2026-11-23 20:07 NY (qızıl sıçrayışı + Fed xəbərləri) → Grok axtardı → 20:12 NY Strateq fikri (f4f1709) |
+| 2 | Gözlər tam: 8/8 əlaqəli bazar; pulsuz uzun tarixçə | Sistem səhifəsində zəncir yaşıl | növbəti |
 | 3 | Tərəzi: Hakim hər analitikin (üsul, beyin, həyəcan fikri) çəkisini nəticəyə görə verir; konsensus çəki ilə | Nəticələr səhifəsində analitik cədvəli | növbədə |
 | 4 | Yeni üsullar: COT, mövsümilik, zərgərlik təqvimi; ikinci beyin (OpenAI) ehtimalı | hər biri Hakimdə | növbədə |
 | 5 | Ölçmə 2-4 həftə, həftəlik hesabat, sübut olan yerdə kağız ticarəti | «harada işləyir» siyahısı | növbədə |
