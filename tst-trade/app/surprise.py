@@ -83,7 +83,7 @@ def parse_fmp(data) -> list[dict]:
 def ensure(db: DB) -> None:
     """Schema, plus known_ts: when a figure became known here (a figure found by the brains minutes after the release
     must not be used by a forecast issued before it was found)."""
-    db.conn.executescript(SCHEMA)
+    db.script(SCHEMA)
     cols = {r[1] for r in db.execute("PRAGMA table_info(releases)").fetchall()}
     if "known_ts" not in cols:
         db.execute("ALTER TABLE releases ADD COLUMN known_ts REAL")

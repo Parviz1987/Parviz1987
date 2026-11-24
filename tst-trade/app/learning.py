@@ -140,7 +140,7 @@ def day_errors(db: DB, now: float) -> list[dict]:
 
 
 def active_lessons(db: DB, now: float | None = None) -> list[str]:
-    db.conn.executescript(LESSONS_SCHEMA)
+    db.script(LESSONS_SCHEMA)
     now = time.time() if now is None else now
     return [r["text"] for r in db.execute("SELECT text FROM lessons WHERE active=1 AND ts > ? ORDER BY ts DESC LIMIT 3",
                                           (now - 7 * 86400,)).fetchall()]

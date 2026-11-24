@@ -18,6 +18,15 @@
 <main class="wrap">
   <div class="evbanner" id="offline" hidden>İnternet yoxdur: qiymətlər yenilənmir. Əlaqə gələndə panel özü davam edəcək.</div>
   <div class="evbanner" id="evbanner" hidden></div>
+  <section class="hud" id="hud" aria-label="Sistemin vəziyyəti və qərar lenti">
+    <div class="hud-core"><canvas id="core" aria-hidden="true"></canvas>
+      <div class="hud-st"><span class="hstate" id="hstate">…</span><span class="hwhy" id="hwhy"></span><span class="hmod" id="hmod"></span></div></div>
+    <div class="hud-dec">
+      <div class="hud-top"><b>Qərar lenti</b><span class="note">yalnız göstərici · AL / SAT yalnız Hakimin sübutu və açıq risk qapısı ilə</span>
+        <span class="sp"></span><button class="btn sm" id="bsound" type="button" aria-pressed="false">🔕 Səs</button>
+        <button class="btn sm" id="bsimple" type="button" aria-pressed="false">Sadə rejim</button></div>
+      <div class="hgrid" id="hgrid"></div></div>
+  </section>
   <div class="tiles" id="tiles"></div>
   <div class="ticker" id="ticker" aria-label="Analizdə istifadə olunan bazarlar"></div>
   <nav class="flow" id="flow" aria-label="Sistemin canlı axını" hidden></nav>
@@ -81,4 +90,5 @@
 <script src="/static/pwa.js"></script>
 <script src="/static/nav.js"></script>
 <script src="/static/flow.js"></script>
+<script src="/static/hud.js"></script>
 </body></html>

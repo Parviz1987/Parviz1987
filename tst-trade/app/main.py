@@ -325,6 +325,17 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         finally:
             hub.subscribers.discard(q)
 
+    @app.get("/api/signals")
+    async def signals_api(symbol: str = "XAU", hours: float = 48):
+        """The alarms of one metal (and the market-wide ones) for the chart's marks: when, what kind, why."""
+        from . import signals as sg
+        sg.ensure(db)
+        since = time.time() - min(max(hours, 1), 24 * 14) * 3600
+        rows = db.execute("SELECT ts, kind, metal, strength, text FROM signals WHERE ts > ? AND "
+                          "(metal IS NULL OR metal = ? OR metal LIKE ? OR metal LIKE ?) ORDER BY ts",
+                          (since, symbol, symbol + ",%", "%," + symbol + "%")).fetchall()
+        return {"symbol": symbol, "signals": [dict(r) for r in rows]}
+
     @app.get("/api/ticker")
     async def ticker():
         """The strip under the metal tiles: every market our analysis reads, with its price and today's change —

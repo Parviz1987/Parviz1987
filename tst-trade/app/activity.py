@@ -59,7 +59,7 @@ NODES = {
 class Hub:
     def __init__(self, db: DB):
         self.db = db
-        db.conn.executescript(SCHEMA)
+        db.script(SCHEMA)
         self.state: dict[str, dict] = {k: {"task": k, "status": "waiting", "stage": None, "progress": None,
                                            "note": "", "ts": None, "done_ts": None} for k in NODES}
         self.subscribers: set[asyncio.Queue] = set()

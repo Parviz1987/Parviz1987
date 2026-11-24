@@ -28,7 +28,7 @@ class ErrorJournal(logging.Handler):
         super().__init__(level=logging.ERROR)
         self.db = db
         self.secrets_fn = secrets_fn
-        db.conn.executescript(SCHEMA)
+        db.script(SCHEMA)
 
     def _scrub(self, text: str) -> str:
         try:
@@ -124,7 +124,7 @@ def _bid_ask(engine, sym: str):
 
 def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
     now = time.time()
-    db.conn.executescript(SCHEMA)
+    db.script(SCHEMA)
     metals = {}
     for sym in candles.METALS:
         q = engine.quotes.get(sym)

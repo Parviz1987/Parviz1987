@@ -41,7 +41,7 @@ class Hunter:
     def __init__(self, db: DB, keys):
         self.db = db
         self.keys = keys
-        db.conn.executescript(SCHEMA)
+        db.script(SCHEMA)
         surprise.ensure(db)
         self.activity = None
         if not db.get("hunter:since"):

@@ -23,7 +23,7 @@ P_CLIP = (0.3, 0.7)          # a brain's probability is capped: one hour's view 
 
 
 def ensure(db: DB) -> None:
-    db.conn.executescript(SCHEMA)
+    db.script(SCHEMA)
     cols = {r[1] for r in db.execute("PRAGMA table_info(brain_views)").fetchall()}
     if "horizon" not in cols:
         db.execute("ALTER TABLE brain_views ADD COLUMN horizon TEXT")

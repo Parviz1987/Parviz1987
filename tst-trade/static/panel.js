@@ -84,7 +84,9 @@ async function loadChart() {
   const name = (lastState?.metals.find((m) => m.symbol === sym) || {}).name || sym;
   $("ctitle").textContent = `${name} · ${TF_NAMES[tf]} şamlar`;
   $("ovnote").textContent = ov ? `Aralıq: ${ov.name} proqnozu` : "Bu zaman çərçivəsi üçün proqnoz yoxdur (15 dəq, 30 dəq, 1 saat, 4 saat, 1 gün, 1 həftə seçin)";
-  drawChart($("cv"), $("tip"), d.candles, ov, tf, { ...ta, day });
+  let marks = [];
+  try { marks = (await api(`/api/signals?symbol=${sym}&hours=${tf === "1d" || tf === "1w" ? 336 : 48}`)).signals; } catch (e) { /* no marks */ }
+  drawChart($("cv"), $("tip"), d.candles, ov, tf, { ...ta, day, marks });
   renderTaSummary(d.candles);
 }
 

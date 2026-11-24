@@ -151,14 +151,14 @@ class BrainJobs:
         self.db = db
         self.keys = keys
         self.feeds = feeds
-        db.conn.executescript(SCHEMA)
+        db.script(SCHEMA)
         self.next_reader = 0.0
         self.next_strategist = 0.0
         from .hunter import Hunter
         self.hunter = Hunter(db, keys)
         self.activity = None      # app.activity.Hub, set by the app
         from .brainviews import SCHEMA as BV
-        db.conn.executescript(BV)
+        db.script(BV)
         # A restart (every update) must not buy an extra search: the next one follows the last one's time.
         last = json.loads(db.get("scout:last") or "{}")
         self.next_scout = float(last.get("ts", 0)) + SCOUT_EVERY
@@ -280,7 +280,7 @@ class BrainJobs:
         from . import learning
         await asyncio.to_thread(learning.calibrate, self.db, now)
         errors = await asyncio.to_thread(learning.day_errors, self.db, now)
-        self.db.conn.executescript(learning.LESSONS_SCHEMA)
+        self.db.script(learning.LESSONS_SCHEMA)
         self.db.execute("UPDATE lessons SET active=0 WHERE ts < ?", (now - 7 * 86400,))
         if len(errors) < 2:
             self.db.put("sleep:last", json.dumps({"ts": now, "errors": len(errors), "lessons": 0}))

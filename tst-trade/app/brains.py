@@ -104,14 +104,14 @@ def pace(db: DB, slot: str, now: float | None = None) -> float:
 
 def spent(db: DB, slot: str, now: float | None = None) -> float:
     now = _time.time() if now is None else now
-    db.conn.executescript(CALLS_SCHEMA)
+    db.script(CALLS_SCHEMA)
     r = db.execute("SELECT COALESCE(SUM(usd), 0) s FROM brain_calls WHERE slot=? AND ts>=?",
                    (slot, _month_start(now))).fetchone()
     return float(r["s"])
 
 
 def last_call(db: DB, slot: str) -> dict | None:
-    db.conn.executescript(CALLS_SCHEMA)
+    db.script(CALLS_SCHEMA)
     r = db.execute("SELECT ts, provider, model, ok, error FROM brain_calls WHERE slot=? ORDER BY ts DESC LIMIT 1",
                    (slot,)).fetchone()
     return dict(r) if r else None
@@ -120,7 +120,7 @@ def last_call(db: DB, slot: str) -> dict | None:
 async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema: dict,
               max_tokens: int = 2000, search: bool = False) -> tuple[dict | None, str]:
     """Ask the slot's brain, then its fallback. Returns (answer or None, a line for the panel). Never raises."""
-    db.conn.executescript(CALLS_SCHEMA)
+    db.script(CALLS_SCHEMA)
     cfg = config(db, slot)
     if spent(db, slot) >= float(cfg["month_usd"]):
         return None, f"aylıq limit doldu ({cfg['month_usd']} $)"
@@ -153,7 +153,7 @@ async def run_both(db: DB, keys: KeyStore, slot: str, system: str, user: str,
                    max_tokens: int = 2000) -> list[tuple[dict | None, str]]:
     """Ask the slot's main brain AND its second brain independently, both with live web search: for jobs where two
     independent answers must agree before anything is used (a figure found on the web). Never raises."""
-    db.conn.executescript(CALLS_SCHEMA)
+    db.script(CALLS_SCHEMA)
     cfg = config(db, slot)
     if spent(db, slot) >= float(cfg["month_usd"]):
         return [(None, f"aylıq limit doldu ({cfg['month_usd']} $)")]

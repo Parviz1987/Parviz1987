@@ -29,7 +29,7 @@ NAMES = {"XAU": "Qızıl", "XAG": "Gümüş", "XPT": "Platin", "XPD": "Palladium
 
 
 def ensure(db: DB) -> None:
-    db.conn.executescript(SCHEMA)
+    db.script(SCHEMA)
 
 
 def emit(db: DB, uid: str, kind: str, text: str, strength: int = 2, metal: str | None = None,

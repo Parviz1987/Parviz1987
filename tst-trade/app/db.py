@@ -42,6 +42,13 @@ class DB:
         self.lock = threading.RLock()
         self.conn.executescript(SCHEMA)
 
+    def script(self, sql: str) -> None:
+        """Schema statements under the same lock as every write. sqlite's executescript COMMITs first: run unlocked
+        from another thread it would end a running executemany transaction halfway («cannot commit - no
+        transaction is active»), so nothing may call conn.executescript directly."""
+        with self.lock:
+            self.conn.executescript(sql)
+
     def execute(self, sql: str, args: tuple | list = ()) -> sqlite3.Cursor:
         with self.lock:
             return self.conn.execute(sql, args)

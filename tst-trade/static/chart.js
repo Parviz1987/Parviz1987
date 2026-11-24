@@ -194,6 +194,25 @@
       g.globalAlpha = 1; g.strokeStyle = gold; g.setLineDash([4, 3]);
       g.beginPath(); g.moveTo(0, y(ov.price0)); g.lineTo(x0 + w, y(ov.price0)); g.stroke(); g.setLineDash([]);
     }
+    // ---- alarm marks (opts.marks: [{ts, kind, text}]): a glowing triangle above the candle it happened in ----
+    const marksAt = {};
+    if (o.marks && o.marks.length && n > 1) {
+      const span = cs[1].t - cs[0].t;
+      o.marks.forEach((m) => {
+        const i = Math.floor((m.ts - cs[0].t) / span);
+        if (i < 0 || i >= n) return;
+        (marksAt[i] = marksAt[i] || []).push(m);
+      });
+      const MC = { band: "#f0b54a", news: "#38c8ff", flow: "#38c8ff", release: "#a98bff", move: "#ff5d6c" };
+      Object.entries(marksAt).forEach(([i, ms]) => {
+        const c = cs[+i], X = x(+i), Y = Math.max(padT + 8, y(c.h) - 12), col = MC[ms[ms.length - 1].kind] || gold;
+        g.save(); g.shadowColor = col; g.shadowBlur = 10; g.fillStyle = col;
+        g.beginPath(); g.moveTo(X, Y + 6); g.lineTo(X - 5, Y - 3); g.lineTo(X + 5, Y - 3); g.closePath(); g.fill();
+        if (ms.length > 1) { g.shadowBlur = 0; g.font = "9px " + css("--mono"); g.fillText(String(ms.length), X + 6, Y - 2); }
+        g.restore();
+      });
+    }
+
     const last = cs[n - 1];
     g.fillStyle = gold; g.fillRect(W - padR, y(last.c) - 8, padR, 16);
     g.fillStyle = "#1b1505"; g.fillText(fmt(last.c), W - padR + 6, y(last.c) + 4);
@@ -225,8 +244,9 @@
       g.strokeStyle = fg; g.globalAlpha = .4;
       g.beginPath(); g.moveTo(x(state.hover), padT); g.lineTo(x(state.hover), H - padB); g.stroke(); g.globalAlpha = 1;
     }
+    const hm = state.hover >= 0 ? marksAt[state.hover] : null;
     tip.textContent = tlabel(hcan.t, "1m") + " NY  Açılış " + fmt(hcan.o) + "  Max " + fmt(hcan.h) + "  Min " + fmt(hcan.l) +
-      "  Bağlanış " + fmt(hcan.c);
+      "  Bağlanış " + fmt(hcan.c) + (hm ? "   ⚡ " + hm.map((m) => m.text).join(" · ") : "");
     state.cw = cw;
   }
 

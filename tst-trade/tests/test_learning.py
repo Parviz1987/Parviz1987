@@ -89,3 +89,26 @@ def test_session_and_multispeed_trend_methods():
     assert p > 0.5 and "yuxarı" in why
     assert {"seans"} <= set(forecast.methods_for("1h")) and "trendmix" in forecast.methods_for("1mo")
     assert "seans" not in forecast.methods_for("1d") and "trendmix" not in forecast.methods_for("1h")
+
+
+def test_schema_scripts_never_break_a_running_write_in_another_thread():
+    """A schema check from one thread must wait for another thread's write transaction (it used to COMMIT it
+    halfway: «cannot commit - no transaction is active» in the history replay)."""
+    import threading
+    db = DB(":memory:")
+    db.script("CREATE TABLE IF NOT EXISTS x (a INTEGER)")
+    errors = []
+
+    def writer():
+        try:
+            for _ in range(30):
+                db.executemany("INSERT INTO x VALUES(?)", [(i,) for i in range(2000)])
+        except Exception as e:
+            errors.append(e)
+
+    def checker():
+        for _ in range(300):
+            db.script("CREATE TABLE IF NOT EXISTS y (b INTEGER);")
+    t1, t2 = threading.Thread(target=writer), threading.Thread(target=checker)
+    t1.start(); t2.start(); t1.join(); t2.join()
+    assert not errors and db.execute("SELECT COUNT(*) FROM x").fetchone()[0] == 60000

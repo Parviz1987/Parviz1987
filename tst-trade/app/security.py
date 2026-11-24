@@ -29,7 +29,7 @@ ALERT = ("login_blocked", "login_new_ip", "key_deleted", "password_changed", "di
 class Guard:
     def __init__(self, db: DB):
         self.db = db
-        db.conn.executescript(SCHEMA)
+        db.script(SCHEMA)
         self.fails: dict[str, list[float]] = {}
         self.blocked: dict[str, float] = {}
 

@@ -271,11 +271,11 @@ class Feeds:
     def __init__(self, db: DB, keys: KeyStore):
         self.db = db
         self.keys = keys
-        db.conn.executescript(SCHEMA)
+        db.script(SCHEMA)
         self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0,
                          "official": 0.0, "kalshi": 0.0, "etf": 0.0}
         self.activity = None      # app.activity.Hub: where each collector reports its status
-        db.conn.executescript(surprise.SCHEMA)
+        db.script(surprise.SCHEMA)
 
     def _health(self, sid: str, ok: bool, msg: str, rows: int = 0) -> None:
         prev = json.loads(self.db.get(f"src:{sid}") or "{}")
@@ -410,7 +410,7 @@ class Feeds:
 
     async def kalshi(self, client) -> None:
         """Market-implied odds of the next Fed decisions: each open market's last price (cents) = probability."""
-        self.db.conn.executescript("CREATE TABLE IF NOT EXISTS fed_odds (ts REAL, ticker TEXT, title TEXT, "
+        self.db.script("CREATE TABLE IF NOT EXISTS fed_odds (ts REAL, ticker TEXT, title TEXT, "
                                    "prob REAL, close_ts REAL, PRIMARY KEY (ticker, ts));")
         now = time.time()
         rows, errors = [], []
