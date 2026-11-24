@@ -12,7 +12,8 @@ const POS = {
   calendar: [58, 91], hunter: [79, 92],
 };
 let NODES = [], live = {}, shown = {}, skew = 0, events = [], mode = "live";
-let winH = 1, speed = 10, playT = null, lastPulse = 0;
+let winH = 1, speed = 10, playT = null, lastPulse = 0, frozenT = 0;
+let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;   // the user asked the system for less motion
 const cards = {};
 const now = () => Date.now() / 1000 + skew;
 const ny = (t, sec) => new Date(t * 1000).toLocaleTimeString("en-GB",
@@ -97,7 +98,8 @@ function draw(tms) {
   if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = w * dpr; cv.height = h * dpr; }
   cx.setTransform(dpr, 0, 0, dpr, 0, 0);
   cx.clearRect(0, 0, w, h);
-  const t = tms / 1000, st = mode === "live" ? live : shown;
+  if (!paused) frozenT = tms;
+  const t = frozenT / 1000, st = mode === "live" ? live : shown;
   const busy = Object.values(st).filter((s) => s.status === "working").length;
   const err = (st.orch || {}).status === "error";     // red only when the main loop itself fails; others show on their cards
   const ox = w / 2, oy = h / 2;
@@ -225,6 +227,58 @@ $("speed").onclick = (ev) => {
   speed = +b.dataset.x; [...$("speed").children].forEach((x) => x.classList.toggle("on", x === b));
 };
 
+// ---------- side panels: market, risk gate, decision, event log ----------
+const NAME = (id) => (NODES.find((n) => n.id === id) || { name: id }).name;
+function logEvent(e) {
+  const ul = $("log");
+  if (!ul || e.task === "orch") return;            // the main loop beats every 15 s: not news
+  const li = document.createElement("li");
+  li.innerHTML = `<span style="color:${COLOR[e.status]}">●</span> ${ny(e.ts, true)} <b>${esc(NAME(e.task))}</b> ${WORD[e.status]}` +
+    (e.stage || e.note ? ` · ${esc(e.stage || e.note)}` : "");
+  ul.prepend(li);
+  while (ul.children.length > 40) ul.lastChild.remove();
+}
+const MKT_SHOW = ["XAU", "XAG", "XPT", "XPD", "DXY", "US10Y", "OIL", "VIX"];
+async function loadMarkets() {
+  try {
+    const r = await fetch("/api/markets?metal=XAU", { credentials: "same-origin" });
+    if (!r.ok) return;
+    const d = await r.json();
+    $("mkts").innerHTML = d.markets.filter((m) => MKT_SHOW.includes(m.code)).map((m) => {
+      const ch = m.price && m.day_open ? (m.price / m.day_open - 1) * 100 : null;
+      const col = ch == null ? "var(--muted)" : ch >= 0 ? "var(--done)" : "var(--err)";
+      return `<div class="mk"><b>${esc(m.name)}</b><span class="v">${m.price != null ? m.price.toFixed(m.price > 100 ? 2 : 3) : "—"}</span>
+        <span class="s">${esc(m.status || "")} · <span style="color:${col}">${ch == null ? "—" : (ch >= 0 ? "+" : "") + ch.toFixed(2) + " %"}</span> gün</span></div>`;
+    }).join("");
+  } catch (e) { /* keep the last view */ }
+}
+const DESK_SHOW = ["15m", "1h", "4h", "1d", "1w", "1mo"];
+const SHORT = { "15m": "15d", "1h": "1s", "4h": "4s", "1d": "1g", "1w": "1h", "1mo": "1a" };
+async function loadDecision() {
+  try {
+    const r = await fetch("/api/decision", { credentials: "same-origin" });
+    if (!r.ok) return;
+    const d = await r.json(), ms = d.metals || {};
+    const syms = Object.keys(ms);
+    if (!syms.length) { $("decision").innerHTML = "<p class='note'>Hesablanır (dəqiqədə bir)…</p>"; return; }
+    $("gates").innerHTML = syms.map((s) => {
+      const g = ms[s].gate;
+      return `<div class="gate ${g.open ? "open" : "shut"}" title="${esc((g.reasons || []).join("; "))}">${s}: ${g.open ? "açıq" : "bağlı — " + esc(g.reasons[0])}</div>`;
+    }).join("");
+    $("decision").innerHTML = `<table class="dec"><tr><th></th>${DESK_SHOW.map((h) => `<th title="${h}">${SHORT[h]}</th>`).join("")}</tr>` +
+      syms.map((s) => `<tr><th>${s}</th>${DESK_SHOW.map((h) => {
+        const x = ms[s].desks.find((k) => k.horizon === h) || {};
+        return `<td class="${x.call || ""}" title="${esc(x.name || h)}: ${esc(x.why || "")}">${x.call === "GÖZLƏ" ? "·" : esc(x.call || "·")}</td>`;
+      }).join("")}</tr>`).join("") + "</table><p class='note'>· = GÖZLƏ (sübut yoxdur və ya risk qapısı bağlıdır). Xanaya toxun: səbəb.</p>";
+  } catch (e) { /* keep the last view */ }
+}
+$("pause").onclick = () => { paused = !paused; $("pause").textContent = paused ? "▶ Animasiya" : "⏸ Animasiya"; };
+$("reset").onclick = () => {
+  $("detail").classList.remove("open"); winH = 1;
+  [...$("win").children].forEach((x) => x.classList.toggle("on", x.dataset.h === "1"));
+  goLive();
+};
+
 // ---------- data: live WebSocket + history ----------
 let ws = null, retry = 1;
 function setConn(on) {
@@ -242,7 +296,7 @@ function connect() {
       if (!NODES.length) build(d.nodes);
       live = d.state; render();
     } else if (d.type === "event") {
-      apply(live, d.event); events.push(d.event);
+      apply(live, d.event); events.push(d.event); logEvent(d.event);
       if (mode === "live") { lastPulse = performance.now(); render(); }
     }
   };
@@ -259,6 +313,7 @@ async function loadEvents() {
     const d = await r.json();
     if (!NODES.length) build(d.nodes);
     events = d.events;
+    events.slice(-30).forEach(logEvent);
   } catch (e) { /* the live stream still works */ }
 }
 async function loadTop() {
@@ -280,6 +335,8 @@ async function loadTop() {
 }
 setInterval(() => { $("clock").textContent = ny(now(), true) + " NY"; if (mode === "live") render(); }, 1000);
 setInterval(loadTop, 15000);
+setInterval(loadMarkets, 20000); setInterval(loadDecision, 60000);
+loadMarkets(); loadDecision();
 loadEvents().then(connect);
 loadTop();
 requestAnimationFrame(draw);

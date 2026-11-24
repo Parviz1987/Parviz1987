@@ -443,8 +443,7 @@ setInterval(() => {
 renderTfs();
 renderTa();
 refreshAll();
-// A guest has no admin page: the link is hidden for them.
-api("/api/me").then((m) => { if (m.role === "guest") document.querySelectorAll('a[href="/admin"],a[href="/status"],a[href="/agents"]').forEach((a) => a.hidden = true); }).catch(() => {});
+
 setInterval(() => refreshState().catch(() => {}), 5000);
 setInterval(() => loadChart().catch(() => {}), 10000);
 setInterval(() => { refreshFc().catch(() => {}); loadJournal().catch(() => {}); }, 20000);
