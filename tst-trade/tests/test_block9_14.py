@@ -73,3 +73,12 @@ def test_backup_copy_and_signature(tmp_path):
     assert url == "https://acc.r2.cloudflarestorage.com/b/backups/x.gz"
     assert h["Authorization"].startswith("AWS4-HMAC-SHA256 Credential=AK/20261124/auto/s3/aws4_request")
     assert h["Authorization"] == backup._headers(creds, "PUT", "/b/backups/x.gz", "abc", now=now)[1]["Authorization"]
+
+
+def test_kalshi_price_in_cents_or_dollars():
+    from app.feeds import kalshi_prob
+    assert kalshi_prob({"last_price": 45}) == 0.45
+    assert kalshi_prob({"last_price_dollars": "0.6200"}) == 0.62
+    assert kalshi_prob({"last_price": 0, "yes_bid": 10, "yes_ask": 14}) == 0.12
+    assert kalshi_prob({"yes_bid_dollars": "0.30", "yes_ask_dollars": "0.40"}) == 0.35
+    assert kalshi_prob({}) is None

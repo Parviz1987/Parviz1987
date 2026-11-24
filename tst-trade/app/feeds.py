@@ -197,6 +197,30 @@ def parse_fred(data) -> list[tuple[str, float]]:
     return out
 
 
+def kalshi_prob(m: dict) -> float | None:
+    """A Kalshi market's implied probability: the last trade, else the middle of bid and ask. Kalshi sends prices in
+    cents (last_price: 45) or, in newer replies, in dollars as text (last_price_dollars: "0.4500")."""
+    def val(key):
+        if m.get(key + "_dollars") not in (None, ""):
+            try:
+                return float(m[key + "_dollars"])
+            except (TypeError, ValueError):
+                return None
+        if m.get(key) is not None:
+            try:
+                return float(m[key]) / 100
+            except (TypeError, ValueError):
+                return None
+        return None
+    last = val("last_price")
+    if last and 0 < last < 1:
+        return round(last, 4)
+    bid, ask = val("yes_bid"), val("yes_ask")
+    if bid is not None and ask and 0 <= bid <= ask <= 1 and ask > 0:
+        return round((bid + ask) / 2, 4)
+    return None
+
+
 def parse_cot(data) -> list[tuple]:
     """Socrata rows -> (symbol, date, open interest, managed money long, short, producer long, short)."""
     rows = json.loads(data) if isinstance(data, (bytes, str)) else data
@@ -405,8 +429,8 @@ class Feeds:
                 else:
                     seen.append(f"{series}: {len(markets)} bazar")
                 for m in markets:
-                    price = m.get("last_price") if m.get("last_price") else m.get("yes_bid")
-                    if price is None:
+                    prob = kalshi_prob(m)
+                    if prob is None:
                         continue
                     close = m.get("close_time") or ""
                     try:
@@ -414,7 +438,7 @@ class Feeds:
                     except ValueError:
                         close_ts = None
                     title = (m.get("title") or "") + (" — " + m["yes_sub_title"] if m.get("yes_sub_title") else "")
-                    rows.append((now, m.get("ticker", ""), title[:200], float(price) / 100, close_ts))
+                    rows.append((now, m.get("ticker", ""), title[:200], prob, close_ts))
             except Exception as e:
                 errors.append(f"{series}: {e}"[:120])
         if rows:
