@@ -20,8 +20,8 @@ from .providers.twelvedata import TwelveDataHistory, TwelveDataPrices
 log = logging.getLogger("tst.engine")
 HISTORY_EVERY = 6 * 3600
 JOBS_EVERY = 15             # seconds between brain-job checks (reader, signals, alarms, scout, strategist)
-HISTORY_LIMIT = {"1m": 1500, "15m": 1500, "30m": 1500, "1h": 1500, "4h": 1500, "1d": 2000, "1w": 600}
-BACKTEST_MAX = 2000
+HISTORY_LIMIT = {"1m": 1500, "15m": 4000, "30m": 4000, "1h": 4000, "4h": 3000, "1d": 2000, "1w": 600}
+BACKTEST_MAX = 4000
 TICK_KEEP = 3 * 86400
 MINUTE_KEEP = 30 * 86400
 
@@ -239,6 +239,10 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:history_4000"):
+            # Longer history (pages walked back at the broker): loaded and replayed once now, not in 6 hours.
+            self.history_state["ts"] = 0
+            self.db.put("migr:history_4000", "1")
         if not self.db.get("migr:selective_v1"):
             # The consensus became selective (families, event and volatility gates): its history is replayed once.
             self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='consensus'")

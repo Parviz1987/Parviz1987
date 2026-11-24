@@ -176,6 +176,7 @@ def _weekday_open(ts: float) -> bool:
 RESOLUTION = {"1m": "MINUTE", "5m": "MINUTE_5", "15m": "MINUTE_15", "30m": "MINUTE_30", "1h": "HOUR", "4h": "HOUR_4", "1d": "DAY",
               "1w": "WEEK"}
 MAX_ROWS = 1000             # the broker returns at most 1000 candles per request
+PAGES_MAX = 6               # older pages walked back by date range (history up to ~7000 candles)
 
 
 def _mid(p: dict | None) -> float | None:
@@ -243,7 +244,30 @@ class CapitalHistory(HistoryProvider):
             self.stream = None
         if r.status_code != 200:
             raise ProviderError(f"Capital.com tarixçə: HTTP {r.status_code}")
-        return parse_prices(r.json(), tf)
+        rows = parse_prices(r.json(), tf)
+        # More than one page: walk back by date range (the broker gives at most 1000 candles per request). A page
+        # that fails ends the walk; what was loaded is kept.
+        from datetime import datetime, timezone
+        from ..candles import TF
+        step = TF.get(tf, 60)
+        for _ in range(PAGES_MAX):
+            if len(rows) >= limit or not rows:
+                break
+            to = rows[0][0] - step
+            frm = to - int(MAX_ROWS * step * 1.45)      # trading hours and weekends: ~1000 candles in 1.45x the span
+            fmt = lambda t: datetime.fromtimestamp(t, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+            if self.request_gap:
+                await asyncio.sleep(self.request_gap)
+            r = await self.client.get(f"{base}/prices/{self.epics[symbol]}",
+                                      params={"resolution": RESOLUTION[tf], "max": MAX_ROWS, "from": fmt(frm),
+                                              "to": fmt(to)}, headers=self.tokens)
+            if r.status_code != 200:
+                break
+            older = [x for x in parse_prices(r.json(), tf) if x[0] < rows[0][0]]
+            if not older:
+                break
+            rows = older + rows
+        return rows[-limit:]
 
     async def aclose(self) -> None:
         await self.client.aclose()

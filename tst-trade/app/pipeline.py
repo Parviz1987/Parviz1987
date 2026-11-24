@@ -13,6 +13,9 @@ from . import brains, candles, forecast, markets
 from .db import DB
 
 
+RELATED_SILENT = 3600      # a linked market silent for an hour while metals trade: really missing
+
+
 def _row(stage, feeds_into, status, msg, n=None):
     return {"stage": stage, "into": feeds_into, "status": status, "msg": msg, "n": n}
 
@@ -31,13 +34,21 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
         out.append(_row("Qiymət axını (4 metal)", "şamlar", "ok" if len(live) == 4 else "bad" if not live else "warn",
                         f"{len(live)}/4 canlı", len(live)))
     epics = markets.saved(db).get("epics", {})
-    rel_live = [c for c in epics if engine.status(c, now) == "LIVE"]
+    # The stream sends a price only when it changes: a quiet market at night (or one closed for its own hours,
+    # e.g. Brent before the London open) is silent for minutes without anything being wrong. Missing = nothing for
+    # RELATED_SILENT while the metals trade.
+    ages = {c: now - engine.quotes[c]["recv_ts"] if c in engine.quotes else None for c in epics}
+    missing = [c for c, a in ages.items() if a is None or a > RELATED_SILENT]
+    quiet = [c for c, a in ages.items() if a is not None and 120 < a <= RELATED_SILENT]
     if open_ and epics:
+        msg = f"{len(epics) - len(missing)}/{len(epics)} gəlir"
+        if quiet:
+            msg += "; sakit (qiymət az dəyişir): " + ", ".join(
+                f"{markets.RELATED[c]['name']} {ages[c] / 60:.0f} dəq" for c in quiet)
+        if missing:
+            msg += "; gəlməyən: " + ", ".join(markets.RELATED[c]["name"] for c in missing)
         out.append(_row("Əlaqəli bazarlar (dollar, neft...)", "dollar/neft impulsu, «Bazarlar»",
-                        "ok" if len(rel_live) == len(epics) else "warn",
-                        f"{len(rel_live)}/{len(epics)} canlı" + ("" if len(rel_live) == len(epics) else
-                        "; gəlməyən: " + ", ".join(markets.RELATED[c]["name"] for c in epics if c not in rel_live)),
-                        len(rel_live)))
+                        "ok" if not missing else "warn", msg, len(epics) - len(missing)))
     # source clock against ours (a source far behind or ahead makes LIVE a lie)
     skews = [abs(q["recv_ts"] - q["source_ts"]) for s, q in engine.quotes.items()
              if s in candles.METALS and not q.get("ts_missing") and now - q["recv_ts"] < 120]
