@@ -122,6 +122,18 @@ def _bid_ask(engine, sym: str):
     return [q.bid, q.ask] if q is not None and q.bid is not None else None
 
 
+def _futures_now(db) -> dict:
+    """The Databento download right now (not cached): bars and months stored per metal, running or not."""
+    try:
+        rows = db.execute("SELECT symbol, COUNT(*) n, MIN(t) a, MAX(t) b, COUNT(DISTINCT CAST(t / 2592000 AS INTEGER)) m "
+                          "FROM fut_candles GROUP BY symbol").fetchall()
+    except Exception:
+        rows = []
+    return {"running": db.get("futures:running"), "approved": json.loads(db.get("futures:approved") or "null"),
+            "stored": {r["symbol"]: {"bars": r["n"], "months": r["m"], "from": time.strftime("%Y-%m-%d", time.gmtime(r["a"])),
+                                     "to": time.strftime("%Y-%m-%d", time.gmtime(r["b"]))} for r in rows}}
+
+
 def _plan_v3(db) -> dict:
     from . import cards, checker, futstudy, judge, newsevents
     last = cards.recent(db, None, 4)
@@ -191,6 +203,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "impulse_study": _slow("impulse", lambda: impulse.study(db), ttl=3600),
         # Plan v3 (Blocks 15-18): full cost, forecast cards, source checker, news events, focus targets, ALFRED
         "plan_v3": _slow("plan_v3", lambda: _plan_v3(db)),
+        "futures_now": _futures_now(db),
         "learning": {"ab_lessons": _slow("ab", lambda: learning.ab_report(db)), "lessons": learning.active_lessons(db),
                      "sleep": json.loads(db.get("sleep:last") or "null"), "calib": json.loads(db.get("calib") or "null"),
                      "nerve": json.loads(db.get("nerve:state") or "null"), "backup": json.loads(db.get("backup:last") or "null")},
