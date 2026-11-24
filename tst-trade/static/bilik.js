@@ -24,7 +24,9 @@
         <div class="rr"><span>Siqnal</span><span>${esc(r.signal)}</span></div>
         <div class="rr"><span>Ləğv</span><span>${esc(r.void)}</span></div>
         <div class="rr"><span>Mənbə</span><span>${esc(r.source)}</span></div>
-        ${cells ? `<div class="rr"><span>Hakim</span><span>${cells}</span></div>` : ""}</div>`;
+        ${cells ? `<div class="rr"><span>Hakim</span><span>${cells}</span></div>` : ""}
+        ${(data.brain_rules || {})[r.id] ? `<div class="rr"><span>Beyinlər</span><span>${Object.entries(data.brain_rules[r.id]).map(([src, [ok, bad]]) =>
+          `${esc(src === "strateq" ? "Strateq" : src === "chartist" ? "Qrafik analitiki" : src)}: düz ${ok}, səhv ${bad}`).join(" · ")}</span></div>` : ""}</div>`;
     }).join("");
     const act = [];
     Object.entries(data.active).forEach(([s, xs]) => xs.forEach((x) => act.push({ s, ...x })));

@@ -23,7 +23,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS forecast_cards (id INTEGER PRIMARY KEY, known_ts REAL NOT NULL, metal TEXT NOT NULL,
   horizon TEXT NOT NULL, source TEXT NOT NULL, price0 REAL, p REAL, p_cal REAL, lo80 REAL, hi80 REAL, cover80 REAL,
   scenario TEXT, counter TEXT, invalidation TEXT, next_update TEXT, quality TEXT, version TEXT, model TEXT,
-  prompt_hash TEXT, chain TEXT, price1 REAL, result TEXT, scored_ts REAL);
+  prompt_hash TEXT, chain TEXT, price1 REAL, result TEXT, scored_ts REAL, rules TEXT);
 CREATE INDEX IF NOT EXISTS forecast_cards_m ON forecast_cards(metal, known_ts);
 """
 H_SEC = {"1h": 3600, "4h": 4 * 3600, "1d": 86400}
@@ -32,6 +32,8 @@ _VERSION: str | None = None     # read at the first card; the server restarts on
 
 def ensure(db: DB) -> None:
     db.script(SCHEMA)
+    if "rules" not in {r[1] for r in db.execute("PRAGMA table_info(forecast_cards)").fetchall()}:
+        db.execute("ALTER TABLE forecast_cards ADD COLUMN rules TEXT")      # Block 27: the rules a view rests on
 
 
 def version() -> str:
@@ -119,11 +121,13 @@ def freeze(db: DB, now: float, source: str, data: dict, how: str, facts_json: st
             lo80, hi80 = _rw_range(db, sym, h)
             st = {r["method"]: r for r in judge.stats(db, sym, h, "live", ttl=600)}
             cover = (st.get("rw") or {}).get("cover80")
+            from .playbook import BY_ID
+            cited = ",".join(r for r in (m.get("rules") or []) if isinstance(r, str) and r in BY_ID)
             rows.append((now, sym, h, source, _price(db, sym, now), p, cal, lo80, hi80, cover, g("why"), g("counter"),
-                         g("invalidation"), g("next_update"), q, ver, model, ph, chain))
+                         g("invalidation"), g("next_update"), q, ver, model, ph, chain, cited))
     db.executemany("INSERT INTO forecast_cards(known_ts, metal, horizon, source, price0, p, p_cal, lo80, hi80, cover80, "
-                   "scenario, counter, invalidation, next_update, quality, version, model, prompt_hash, chain) "
-                   "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+                   "scenario, counter, invalidation, next_update, quality, version, model, prompt_hash, chain, rules) "
+                   "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     return len(rows)
 
 
@@ -171,4 +175,17 @@ def summary(db: DB, days: int = 30) -> dict:
                         "AND known_ts > ? GROUP BY source, horizon, result", (time.time() - days * 86400,)).fetchall():
         d = out.setdefault(f"{r['source']}:{r['horizon']}", {})
         d[r["result"]] = r["n"]
+    return out
+
+
+def rule_record(db: DB, days: int = 90) -> dict:
+    """Block 28: how the brains' forecasts turned out per rule they cited: {rule: {source: [right, wrong]}}."""
+    ensure(db)
+    out: dict = {}
+    for r in db.execute("SELECT source, rules, result FROM forecast_cards WHERE scored_ts IS NOT NULL AND rules != '' "
+                        "AND result IN ('düz', 'səhv') AND known_ts > ?", (time.time() - days * 86400,)).fetchall():
+        for rule in (r["rules"] or "").split(","):
+            if rule:
+                c = out.setdefault(rule, {}).setdefault(r["source"], [0, 0])
+                c[0 if r["result"] == "düz" else 1] += 1
     return out

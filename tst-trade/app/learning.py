@@ -155,6 +155,7 @@ def lessons_today(db: DB, now: float | None = None) -> bool:
 def ab_report(db: DB, now: float | None = None) -> dict:
     """The second analyst's 1-hour hit rate on lesson days vs other days (honest scoring)."""
     from . import brainviews
+    brainviews.ensure(db)
     now = time.time() if now is None else now
     out = {"with": [0, 0], "without": [0, 0]}
     for r in db.execute("SELECT known_ts, metal, p FROM brain_views WHERE source='brain2' AND horizon='1h' AND "
@@ -172,3 +173,41 @@ def ab_report(db: DB, now: float | None = None) -> dict:
         g[0] += 1
         g[1] += int((b["c"] > a["c"]) == (r["p"] > 0.5))
     return {k: {"n": v[0], "hit_rate": v[1] / v[0] if v[0] else None} for k, v in out.items()}
+
+
+# ---------- Block 29: rule proposals (a lesson is a proposed rule; it must pass a test before it counts) ----------
+PROPOSALS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS rule_proposals (id INTEGER PRIMARY KEY, ts REAL NOT NULL, text TEXT NOT NULL,
+  status TEXT NOT NULL, decided_ts REAL, evidence TEXT);
+"""
+MIN_AB = 60
+
+
+def judge_proposals(db: DB, now: float | None = None) -> int:
+    """After 7 days a proposal is decided by the A/B test it ran in: the second analyst with the lessons (even days)
+    against without (odd days), on its honestly scored 1-hour views. Accepted only if «with» beats «without» by at
+    least 3 points on 60+ views each; otherwise rejected (and the reason is kept)."""
+    db.script(PROPOSALS_SCHEMA)
+    now = time.time() if now is None else now
+    ab = ab_report(db, now)
+    w, wo = ab["with"], ab["without"]
+    n = 0
+    for r in db.execute("SELECT id FROM rule_proposals WHERE decided_ts IS NULL AND ts < ?", (now - 7 * 86400,)).fetchall():
+        if w["n"] >= MIN_AB and wo["n"] >= MIN_AB and w["hit_rate"] is not None and wo["hit_rate"] is not None:
+            ok = w["hit_rate"] - wo["hit_rate"] >= 0.03
+            status = "qəbul (A/B-də daha yaxşı)" if ok else "rədd (A/B-də fayda yoxdur)"
+        else:
+            status = "rədd (sınaq üçün məlumat azdır)"
+        db.execute("UPDATE rule_proposals SET status=?, decided_ts=?, evidence=? WHERE id=?",
+                   (status, now, json.dumps(ab), r["id"]))
+        n += 1
+    return n
+
+
+def accepted_rules(db: DB) -> list[dict]:
+    """Proposals that passed their test become house rules («Öyrənilmiş»), given to the brains with the rulebook."""
+    db.script(PROPOSALS_SCHEMA)
+    return [{"id": f"LRN-{r['id']}", "area": "Öyrənilmiş", "name": "Sınaqdan keçmiş dərs", "how": r["text"],
+             "signal": "dərsdə yazıldığı kimi", "void": "yeni sınaq pisləşsə", "source": "öz gecə yoxlamamız + A/B sınağı",
+             "detector": False}
+            for r in db.execute("SELECT id, text FROM rule_proposals WHERE status LIKE 'qəbul%' ORDER BY ts").fetchall()]

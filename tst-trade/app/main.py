@@ -402,11 +402,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.get("/api/bilik")
     async def bilik_api():
         """Block 25/28: the Bilik kitabı (our rules) with each rule's measured record and what fires right now."""
-        from . import playbook, rules
+        from . import cards as cards_mod, playbook, rules
 
         def build():
             return {"version": playbook.VERSION, "rules": playbook.RULES, "areas": playbook.AREAS,
                     "records": rules.records(db), "active": {s: rules.active_now(db, s) for s in candles.METALS},
+                    "brain_rules": cards_mod.rule_record(db),
                     "proposals": [dict(r) for r in db.execute(
                         "SELECT * FROM rule_proposals ORDER BY ts DESC LIMIT 30").fetchall()]
                     if db.execute("SELECT 1 FROM sqlite_master WHERE name='rule_proposals'").fetchone() else []}

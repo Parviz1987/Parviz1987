@@ -58,20 +58,23 @@ STRATEGIST_SYSTEM = (
     "sonra real qiymətlə yoxlayır: düz çıxmasa, etibar qazanmır. Hər metal üçün həmçinin: «counter» — əks ssenari, yəni "
     "qiyməti əks tərəfə apara biləcək hadisə (bir cümlə); «invalidation» — hansı müşahidə sənin fikrini zəiflədər (bir "
     "cümlə, faktlardakı göstəricilərlə); «next_update» — bu fikir nə vaxt yenilənməlidir: vaxt və ya konkret hadisə "
-    "(təqvimdən). Bunlar proqnoz kartında dondurulur və sonra nəticə ilə müqayisə olunur.")
+    "(təqvimdən). Bunlar proqnoz kartında dondurulur və sonra nəticə ilə müqayisə olunur. Faktlarla birlikdə «BİLİK "
+    "KİTABI» verilir: onun fundamental və bazarlar arası qaydaları ilə işlə, fikrinin əsaslandığı qaydaların id-lərini "
+    "«rules» sahəsinə yaz; Hakimin «zəif» və ya «yox» dediyi qaydaya az çəki ver.")
 STRATEGIST_SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["summary", "metals", "watch"],
     "properties": {
         "summary": {"type": "string"},
         "metals": {"type": "array", "items": {"type": "object", "additionalProperties": False,
                                               "required": ["symbol", "text", "p1h", "p4h", "p1d", "why", "counter",
-                                                           "invalidation", "next_update"],
+                                                           "invalidation", "next_update", "rules"],
                                               "properties": {"symbol": {"type": "string"}, "text": {"type": "string"},
                                                              "p1h": {"type": "number"}, "p4h": {"type": "number"},
                                                              "p1d": {"type": "number"}, "why": {"type": "string"},
                                                              "counter": {"type": "string"},
                                                              "invalidation": {"type": "string"},
-                                                             "next_update": {"type": "string"}}}},
+                                                             "next_update": {"type": "string"},
+                                                             "rules": {"type": "array", "items": {"type": "string"}}}}},
         "watch": {"type": "array", "items": {"type": "string"}}}}
 
 ANALYST2_SYSTEM = (
@@ -113,15 +116,22 @@ CHARTIST_SYSTEM = (
     "momentum and divergences. Then give the probability (0..1) that the price is HIGHER than the last close in 1 hour "
     "(p1h), 4 hours (p4h) and 1 day (p1d). 0.5 = no edge; move away from it only when the chart gives a reason (usually "
     "0.4-0.6). Write 'trend', 'levels' and 'why' in Azerbaijani, short. Use ONLY prices that appear in the data; never "
-    "invent levels. No news, no macro: charts only. Your answers are checked later against real prices.")
+    "invent levels. No news, no macro: charts only. Your answers are checked later against real prices. "
+    "Work by the house rulebook (BİLİK KİTABI) given with the data: apply its rules, list the ids of the rules your "
+    "view rests on in 'rules', give weight according to each rule's measured record (a rule marked 'zəif' or 'yox' "
+    "deserves little weight), and fill 'counter' (what would turn the market the other way) and 'invalidation' "
+    "(which price or observation cancels your view). 'rules_firing_now' lists what our own code detected.")
 CHARTIST_SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["metals"],
     "properties": {"metals": {"type": "array", "items": {
         "type": "object", "additionalProperties": False,
-        "required": ["symbol", "trend", "levels", "pattern", "p1h", "p4h", "p1d", "why"],
+        "required": ["symbol", "trend", "levels", "pattern", "p1h", "p4h", "p1d", "why", "rules", "counter",
+                     "invalidation"],
         "properties": {"symbol": {"type": "string"}, "trend": {"type": "string"}, "levels": {"type": "string"},
                        "pattern": {"type": "string"}, "p1h": {"type": "number"}, "p4h": {"type": "number"},
-                       "p1d": {"type": "number"}, "why": {"type": "string"}}}}}}
+                       "p1d": {"type": "number"}, "why": {"type": "string"},
+                       "rules": {"type": "array", "items": {"type": "string"}},
+                       "counter": {"type": "string"}, "invalidation": {"type": "string"}}}}}}
 CHART_BARS = {"1h": 48, "4h": 30, "1d": 40}
 
 NUM = re.compile(r"\d+(?:[.,]\d+)?")
@@ -172,7 +182,14 @@ def chart_facts(db: DB, now: float) -> str:
                      "fib_618": r_(hi - 0.618 * (hi - lo))}
         if d:
             out[sym] = d
-    return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)), "charts": out},
+    from . import learning, playbook, rules
+    rec = rules.short_records(rules.records(db))
+    firing = {sym: [f"{x['tf']} {x['rule']} {'yuxarı' if x['dir'] > 0 else 'aşağı'}: {x['note']}"
+                    for x in rules.active_now(db, sym)] for sym in out}
+    return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)), "charts": out,
+                       "rules_firing_now": firing,
+                       "rulebook": playbook.text_for(("Texniki", "Fibonacci", "Bazarlar arası", "Öyrənilmiş"), rec,
+                                                     learning.accepted_rules(db))},
                       ensure_ascii=False)
 
 
@@ -302,7 +319,10 @@ class BrainJobs:
         released = [dict(r) for r in self.db.execute(
             "SELECT event, estimate, actual, ts FROM releases WHERE actual IS NOT NULL AND ts BETWEEN ? AND ? "
             "ORDER BY ts DESC LIMIT 6", (now - 12 * 3600, now)).fetchall()] if _has(self.db, "releases") else []
+        from . import learning, playbook
         return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)),
+                           "rulebook": playbook.text_for(("Fundamental", "Bazarlar arası", "Öyrənilmiş"), None,
+                                                         learning.accepted_rules(self.db)),
                            "what_just_happened": [s["text"] for s in (trigger or [])], "moves_pct": moves,
                            "released_last_12h": released,
                            "fed_odds_kalshi": self.feeds.fed_odds() if self.feeds is not None else [],
@@ -390,6 +410,11 @@ class BrainJobs:
         facts = json.dumps(errors, ensure_ascii=False)
         lessons = [guard_numbers(x, facts) for x in lessons]
         self.db.executemany("INSERT INTO lessons(ts, text) VALUES(?,?)", [(now, x) for x in lessons if x.strip()])
+        # Block 29: each lesson is also a rule proposal — tested (A/B by day on the second analyst) before it counts
+        self.db.script(learning.PROPOSALS_SCHEMA)
+        self.db.executemany("INSERT INTO rule_proposals(ts, text, status) VALUES(?,?,?)",
+                            [(now, x, "sınaqda (A/B, 7 gün)") for x in lessons if x.strip()])
+        await asyncio.to_thread(learning.judge_proposals, self.db, now)
         self.db.put("sleep:last", json.dumps({"ts": now, "errors": len(errors), "lessons": len(lessons), "brain": how}))
         self._rep("strateq", "done", note=f"gecə yoxlaması: {len(errors)} səhv → {len(lessons)} dərs")
         return len(lessons)
@@ -445,6 +470,11 @@ class BrainJobs:
                   for k in ("symbol", "trend", "levels", "pattern", "p1h", "p4h", "p1d", "why")}
                  for m in data.get("metals", []) if m.get("symbol") in ("XAU", "XAG", "XPT", "XPD")]
         self.db.put("chartist:last", json.dumps({"ts": now, "brain": how, "metals": clean}, ensure_ascii=False))
+        try:      # its forecasts are frozen as cards too (with the rules it cited), so its record is kept per rule
+            await asyncio.to_thread(cards.freeze, self.db, max(now, time.time()), "chartist", data, how, charts,
+                                    CHARTIST_SYSTEM, self._chain(trigger))
+        except Exception as e:
+            log.warning("chartist card: %s", e)
         self._rep("chartist", "done", note=f"{len(rows)} ehtimal · {how}")
         return True
 
