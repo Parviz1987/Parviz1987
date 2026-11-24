@@ -27,7 +27,7 @@
     <div class="tbl" id="score"></div>
   </section>
 
-  <section class="box">
+  <section class="box" data-fold="res3" data-fold-default="closed">
     <h2>3. Nə dedik və nə oldu <span class="sp"></span><span class="seg" id="hz"></span></h2>
     <div class="lc big"><canvas id="cv"></canvas></div>
     <div class="legend">
@@ -39,7 +39,7 @@
     </div>
     <div id="past"></div>
   </section>
-  <section class="box">
+  <section class="box" data-fold="res4" data-fold-default="closed">
     <h2>4. Uğur xəritəsi: kölgə ticarəti <span class="sp"></span><span class="seg" id="smode"></span></h2>
     <p class="note">Hər proqnoz kağız üzərində real sövdələşmə kimi oynanılır: giriş proqnoz anındakı qiymət, stop 80 % koridorun
       əks kənarı, hədəf 50 % koridorun kənarı, vaxt bitəndə bağlanır, spread çıxılır. Xanada: <b>1000 $-lıq bir sövdələşmənin orta nəticəsi</b>.
@@ -47,7 +47,7 @@
     <div class="tbl" id="simmap"></div>
     <div id="simbest"></div>
   </section>
-  <section class="box">
+  <section class="box" data-fold="res5" data-fold-default="closed">
     <h2>5. Analitiklər və tərəzi <span class="sp"></span><span class="seg" id="ahz"></span></h2>
     <p class="note">Hər analitik (hesab üsulu və ya beyin) ayrıca yoxlanır. «Düz» — istiqaməti neçə faiz düz deyib; «hədd» — keçməli
       olduğu səviyyə (həmişə «yuxarı» deməklə alınan nəticə). Həddən yaxşı olan analitik <b>çəki</b> alır və «Tərəzi» onun sözünü
@@ -57,7 +57,7 @@
     <p class="note">Hər beyin fikri sonrakı real qiymətlə yoxlanır: həyəcandan (güclü xəbər, rəqəm, sıçrayış) sonra verilən və saatlıq fikirlər ayrıca.</p>
     <div class="tbl" id="brainscore"></div>
   </section>
-  <section class="box">
+  <section class="box" data-fold="res6" data-fold-default="closed">
     <h2>6. Əsas fərziyyələr <span class="sp"></span><span class="note" id="hreg"></span></h2>
     <p class="note">Araşdırmadan seçilib və <b>əvvəlcədən</b> qeydə alınıb. Yalnız qeyd vaxtından sonrakı yeni canlı proqnozlarla ölçülür
       (məlumata baxıb seçmə yoxdur). Sübut üçün: «keçməli hədd»i keçmək, təsadüf olmamaq (8 fərziyyəyə görə sərtləşdirilmiş) və
@@ -68,4 +68,5 @@
 <script src="/static/results.js"></script>
 <script src="/static/pwa.js"></script>
 <script src="/static/nav.js"></script>
+<script src="/static/flow.js"></script>
 </body></html>

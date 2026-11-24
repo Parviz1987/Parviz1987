@@ -19,6 +19,8 @@
   <div class="evbanner" id="offline" hidden>İnternet yoxdur: qiymətlər yenilənmir. Əlaqə gələndə panel özü davam edəcək.</div>
   <div class="evbanner" id="evbanner" hidden></div>
   <div class="tiles" id="tiles"></div>
+  <div class="ticker" id="ticker" aria-label="Analizdə istifadə olunan bazarlar"></div>
+  <nav class="flow" id="flow" aria-label="Sistemin canlı axını" hidden></nav>
   <div class="main">
     <div class="box" id="sec-chart">
       <h2><span id="ctitle">Qrafik</span><span class="sp"></span>
@@ -38,23 +40,23 @@
       <div class="cards" id="cards"></div></div>
   </div>
   <div class="split">
-    <div class="box"><h2>Strateqin izahı <span class="sp"></span><span class="note" id="stmeta"></span></h2><div id="strat"></div></div>
-    <div class="box"><h2>Kəşfiyyatçı: X və vebdə son 3 saat <span class="sp"></span><span class="note" id="scmeta"></span></h2><div id="scout"></div></div>
+    <div class="box" data-fold="strat"><h2>Strateqin izahı <span class="sp"></span><span class="note" id="stmeta"></span></h2><div id="strat"></div></div>
+    <div class="box" data-fold="scout" data-fold-default="closed"><h2>Kəşfiyyatçı: X və vebdə son 3 saat <span class="sp"></span><span class="note" id="scmeta"></span></h2><div id="scout"></div></div>
   </div>
   <div class="feeds">
-    <div class="box"><h2>Makro fon <span class="sp"></span><span class="note">FRED, gündəlik</span></h2><div id="macro"></div></div>
-    <div class="box"><h2>İqtisadi təqvim (ABŞ) <span class="sp"></span><span class="note">Forex Factory</span></h2><div class="tbl" id="events"></div>
+    <div class="box" data-fold="macro" data-fold-default="closed"><h2>Makro fon <span class="sp"></span><span class="note">FRED, gündəlik</span></h2><div id="macro"></div></div>
+    <div class="box" data-fold="events" data-fold-default="closed"><h2>İqtisadi təqvim (ABŞ) <span class="sp"></span><span class="note">Forex Factory</span></h2><div class="tbl" id="events"></div>
       <h3 class="sub">Son açıqlanan rəqəmlər: gözləntiyə qarşı <span class="note">FMP</span></h3><div class="tbl" id="releases"></div></div>
-    <div class="box"><h2>Xəbərlər <span class="sp"></span><span class="seg" id="nfilter"><button data-f="metal" class="on">Seçilmiş metal</button><button data-f="all">Hamısı</button></span></h2><div id="news"></div></div>
+    <div class="box" data-fold="news" data-fold-default="closed"><h2>Xəbərlər <span class="sp"></span><span class="seg" id="nfilter"><button data-f="metal" class="on">Seçilmiş metal</button><button data-f="all">Hamısı</button></span></h2><div id="news"></div></div>
   </div>
-  <div class="box" id="sec-mkt"><h2>Bazarlar və əlaqələr <span class="sp"></span><span class="note" id="mktnote"></span></h2>
+  <div class="box" id="sec-mkt" data-fold="mkt" data-fold-default="closed"><h2>Bazarlar və əlaqələr <span class="sp"></span><span class="note" id="mktnote"></span></h2>
     <div class="mkts" id="mkts"></div>
     <p class="note">«Birlikdə»: son 30 gündə saatlıq hərəkətlərin seçilmiş metalla əlaqəsi (+1 eyni istiqamət, −1 əks, 0 əlaqə yoxdur).
       «Qabaqlayır»: bu bazarın 15 dəqiqəlik hərəkəti metalın NÖVBƏTİ 15 dəqiqəsi ilə nə qədər əlaqəlidir (0-a yaxın = qabaqlamır).
       Əlaqə iddia edilmir, ölçülür; «Dollar impulsu» və «Neft impulsu» üsulları bunu Hakimdə yoxlayır.</p></div>
-  <div class="box" id="sec-fund"><h2>Fundamental: qızıla təsir edən amillər <span class="sp"></span><span class="note">FRED gündəlik · CFTC həftəlik</span></h2>
+  <div class="box" id="sec-fund" data-fold="fund" data-fold-default="closed"><h2>Fundamental: qızıla təsir edən amillər <span class="sp"></span><span class="note">FRED gündəlik · CFTC həftəlik</span></h2>
     <div class="fund"><div id="fsig"></div><div class="tbl" id="cot"></div></div></div>
-  <div class="box" id="sec-judge"><h2>Hakim: proqnozlar nə qədər düz çıxır <span class="sp"></span>
+  <div class="box" id="sec-judge" data-fold="judge" data-fold-default="closed"><h2>Hakim: proqnozlar nə qədər düz çıxır <span class="sp"></span>
       <span class="seg" id="modes"><button data-m="live" class="on">Canlı</button><button data-m="history">Tarixçə üzrə</button></span></h2>
     <p class="note">Hər üsul iki bazis qaydası ilə yarışır: «Dəyişməz» (istiqamət yoxdur) və «Həmişə yuxarı». «Sübut» statusu
       üçün üsul daha çox düz çıxmalı (p &lt; 0.05), Brier balı müsbət olmalı və kifayət qədər yoxlama yığılmalıdır.</p>
@@ -72,10 +74,11 @@
       <div class="tbl" id="passports"></div></details>
     <h3 class="sub">Harada düz, harada səhv: seans və bazar əhvalı üzrə (tarixçə)</h3>
     <div class="tbl" id="jwhere"></div></div>
-  <div class="box"><h2>Son yoxlanmış proqnozlar</h2><div class="tbl" id="journal"></div></div>
+  <div class="box" data-fold="journal" data-fold-default="closed"><h2>Son yoxlanmış proqnozlar</h2><div class="tbl" id="journal"></div></div>
 </main>
 <script src="/static/chart.js"></script>
 <script src="/static/panel.js"></script>
 <script src="/static/pwa.js"></script>
 <script src="/static/nav.js"></script>
+<script src="/static/flow.js"></script>
 </body></html>

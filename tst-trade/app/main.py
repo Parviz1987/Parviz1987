@@ -325,6 +325,36 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         finally:
             hub.subscribers.discard(q)
 
+    @app.get("/api/ticker")
+    async def ticker():
+        """The strip under the metal tiles: every market our analysis reads, with its price and today's change —
+        the linked markets from the broker stream, the ETF proxies (US hours) and the nearest Fed decision odds."""
+        from . import markets as mk
+        from .feeds import ETF_SYMBOLS
+        now = time.time()
+        rows = []
+        for code in mk.saved(db).get("epics", {}):
+            q = engine.quotes.get(code)
+            day = candles.get(db, code, "1d", limit=1)
+            rows.append({"code": code, "name": mk.RELATED.get(code, {}).get("name", code),
+                         "price": q["price"] if q else None, "day_open": day[-1]["o"] if day else None,
+                         "status": engine.status(code, now) if q else "OFFLINE", "kind": "bazar"})
+        day0 = int(now // 86400 * 86400)
+        for sym in ETF_SYMBOLS:
+            last = candles.get(db, sym, "15m", limit=1)
+            first = db.execute("SELECT o FROM candles WHERE symbol=? AND tf='15m' AND t>=? ORDER BY t LIMIT 1",
+                               (sym, day0)).fetchone()
+            rows.append({"code": sym, "name": sym, "price": last[-1]["c"] if last else None,
+                         "day_open": first["o"] if first else None,
+                         "status": "LIVE" if last and now - last[-1]["t"] < 1800 else "DELAYED", "kind": "ETF"})
+        fed = feeds.fed_odds(3)
+        return {"markets": rows, "fed": fed, "ts": now}
+
+    @app.get("/api/agents/state")
+    async def agents_state():
+        """The hub's current picture without a WebSocket (the panel's system-flow strip polls it)."""
+        return hub.snapshot()
+
     @app.get("/api/hypotheses")
     async def hypotheses_api():
         """Block 8: the pre-registered hypotheses, judged only on live forecasts issued after their registration."""
