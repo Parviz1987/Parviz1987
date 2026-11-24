@@ -751,11 +751,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     db.put("futures:running", "0")       # a download cut by a restart is not «running»
 
-    # The owner approved the 8.76 $ quote in the chat with Claude (2026-11-24 ~08:50 UTC: «Təsdiq olundu 8.76 $ ... man
-    # təsdiq edim», then «işlədisə özün idarə elə») before the approval was stored here. Recorded once, with a 9 $ cap.
-    if db.get("futures:approved") is None and db.get("futures:quote"):
-        db.put("futures:approved", json.dumps({"limit_usd": 9.0, "ts": time.time(),
-                                               "by": "sahib, Claude ilə çatda 2026-11-24 (8.76 $ təsdiqi)"}))
+    fut_busy = {"on": False}             # one Databento download at a time: never two paying for the same month
 
     async def futures_resume():
         """A download the owner approved but a restart cut off goes on by itself (stored months are skipped, so
@@ -768,14 +764,19 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             if not appr or not key or (last and last.get("ok")):
                 return
             await asyncio.sleep(60)
+            if fut_busy["on"]:
+                return
+            fut_busy["on"] = True          # set before any await: nothing else can start in between
             db.put("futures:running", "1")
-            res = await futures.download(db, key, float(appr["limit_usd"]), hub.report)
-            if not res.get("ok"):
-                db.put("futures:last", json.dumps(res, ensure_ascii=False))
+            try:
+                res = await futures.download(db, key, float(appr["limit_usd"]), hub.report)
+                if not res.get("ok"):
+                    db.put("futures:last", json.dumps(res, ensure_ascii=False))
+            finally:
+                fut_busy["on"] = False
+                db.put("futures:running", "0")
         except Exception as e:
             db.put("futures:last", json.dumps({"ok": False, "msg": f"{type(e).__name__}: {str(e)[:200]}"}))
-        finally:
-            db.put("futures:running", "0")
     app.state.futures_resume = futures_resume
 
     @app.get("/api/admin/futures/quote")
@@ -799,10 +800,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             limit = min(float(body.get("limit_usd")), 125.0)
         except (TypeError, ValueError):
             raise HTTPException(400, "yanlış məbləğ")
-        if limit < 0:
+        import math
+        if not math.isfinite(limit) or limit < 0:
             raise HTTPException(400, "yanlış məbləğ")
-        if db.get("futures:running") == "1":
+        if fut_busy["on"]:
             return {"msg": "yükləmə artıq gedir"}
+        fut_busy["on"] = True              # set before any await: a second press cannot start a second download
 
         db.put("futures:approved", json.dumps({"limit_usd": limit, "ts": time.time()}))   # the owner's decision
 
@@ -815,8 +818,9 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             except Exception as e:
                 db.put("futures:last", json.dumps({"ok": False, "msg": f"{type(e).__name__}: {str(e)[:200]}"}))
             finally:
+                fut_busy["on"] = False
                 db.put("futures:running", "0")
-        asyncio.create_task(job())
+        asyncio.get_running_loop().create_task(job())
         return {"msg": f"Təsdiq qəbul olundu: ən çox {limit:.2f} $. Yükləmə başladı; Agentlər səhifəsində «Tarixçə» "
                        "agentində görünür, bitəndə nəticə buradadır və Claude-a hesabat gedir."}
 

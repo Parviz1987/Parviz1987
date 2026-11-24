@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import math
+from bisect import bisect_left
 import time
 from array import array
 from datetime import datetime
@@ -50,32 +51,36 @@ def _load(db: DB, sym: str):
     return ts, cs, vs
 
 
-def check(db: DB) -> dict:
+def check(db: DB, loaded: dict | None = None) -> dict:
+    """Per metal: bars, first and last day, and short gaps (2..30 missing minutes inside a session; longer gaps are the
+    daily break or a weekend). Computed from the loaded times, not with a heavy SQL window under the DB lock."""
     out = {}
     for sym in SYMBOLS:
-        r = db.execute("SELECT COUNT(*) n, MIN(t) a, MAX(t) b FROM fut_candles WHERE symbol=?", (sym,)).fetchone()
-        if not r["n"]:
+        ts = (loaded or {}).get(sym)
+        if ts is None:
+            ts = array("q", (int(r["t"]) for r in db.execute("SELECT t FROM fut_candles WHERE symbol=? ORDER BY t",
+                                                               (sym,))))
+        if not len(ts):
             out[sym] = {"n": 0}
             continue
-        # gaps of 2..30 minutes inside the session (longer = the daily break or a weekend, not missing data)
-        gaps = db.execute("SELECT COUNT(*) g FROM (SELECT t - LAG(t) OVER (ORDER BY t) d FROM fut_candles "
-                          "WHERE symbol=?) WHERE d BETWEEN 120 AND 1800", (sym,)).fetchone()["g"]
-        out[sym] = {"n": r["n"], "first": time.strftime("%Y-%m-%d", time.gmtime(r["a"])),
-                    "last": time.strftime("%Y-%m-%d", time.gmtime(r["b"])), "short_gaps": gaps}
+        gaps = sum(1 for a, b in zip(ts, ts[1:]) if 120 <= b - a <= 1800)
+        out[sym] = {"n": len(ts), "first": time.strftime("%Y-%m-%d", time.gmtime(ts[0])),
+                    "last": time.strftime("%Y-%m-%d", time.gmtime(ts[-1])), "short_gaps": gaps}
     return out
 
 
 def study(db: DB) -> dict:
     from .judge import full_cost
-    out: dict = {"computed": time.time(), "check": check(db), "metals": {}}
+    out: dict = {"computed": time.time(), "metals": {}}
+    loaded_ts: dict = {}
     cells = 0
     raw: dict = {}
     for sym in SYMBOLS:
         ts, cs, vs = _load(db, sym)
+        loaded_ts[sym] = ts
         n = len(ts)
         if n < 5000:
             continue
-        idx = {t: i for i, t in enumerate(ts)}
         mid = ts[0] + (ts[-1] - ts[0]) // 2
         fut_cost = 1.5 * TICK[sym] / (sum(cs[-1000:]) / min(1000, n))
         cap_cost = full_cost(sym)
@@ -106,8 +111,9 @@ def study(db: DB) -> dict:
                 if a < max(K * usual, FLOOR[sym]):
                     continue
                 for H in HS:
-                    j1 = idx.get(ts[i] + 60 * (1 + H))
-                    if j1 is None:
+                    want = ts[i] + 60 * (1 + H)
+                    j1 = bisect_left(ts, want, j0)
+                    if j1 >= n or ts[j1] != want:
                         continue
                     move = cs[j1] / cs[j0] - 1
                     gain = move if r > 0 else -move
@@ -128,6 +134,7 @@ def study(db: DB) -> dict:
                 cells += 1
         raw[sym] = rows
         out["metals"][sym] = {"bars": n, "cost_futures": round(fut_cost, 6), "cost_capital": round(cap_cost, 6)}
+    out["check"] = check(db, loaded_ts)
     p_bar = 0.05 / max(1, cells)
     out["p_bar"] = p_bar
     for sym, rows in raw.items():

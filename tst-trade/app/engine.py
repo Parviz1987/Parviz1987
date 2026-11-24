@@ -53,11 +53,13 @@ class MacroLookup:
         for sid in ("DFII10", "DTWEXBGS"):
             try:
                 rows = db.execute("SELECT d, v FROM macro WHERE series=? ORDER BY d", (sid,)).fetchall()
-                # Block 18: where ALFRED gave the first published value of a day, it replaces the revised one
+            except Exception:
+                rows = []
+            try:     # Block 18: where ALFRED gave the first published value of a day, it replaces the revised one
                 first = {r["d"]: r["v"] for r in db.execute("SELECT d, v FROM macro_first WHERE series=?",
                                                             (sid,)).fetchall()}
             except Exception:
-                rows, first = [], {}
+                first = {}
             self.series[sid] = ([r["d"] for r in rows], [first.get(r["d"], r["v"]) for r in rows])
 
     def first_day(self) -> str | None:
@@ -460,9 +462,9 @@ class Engine:
             except Exception as e:   # one source failing (login refused...) must not stop the next one
                 log.warning("history %s: %s", src.name, e)
                 result.setdefault("*", {})[src.name] = f"xəta: {str(e)[:120]}"
-                if src.name == "capital":
-                    await self._read_swap(src)
             finally:
+                if src.name == "capital":
+                    await self._read_swap(src)       # Block 15: the broker's overnight fees (never stops the history)
                 await src.aclose()
         self.history_state = {"ts": now, "result": result, "source": ", ".join(s.name for s, _ in sources)}
         self.db.put("history_state", json.dumps(self.history_state))

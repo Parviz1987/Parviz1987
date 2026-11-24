@@ -145,8 +145,14 @@ def evaluate_focus(db: DB, now: float | None = None) -> list[dict]:
     for h in FOCUS:
         if h.get("kind") == "impulse":
             row = {k: h[k] for k in ("id", "name", "idea", "source")}
-            evs = [e for e in impulse.events(db, now) if e["t"] >= FOCUS_REGISTERED and e["symbol"] in ("XPT", "XPD")
-                   and e["K"] == 4.0 and e["H"] == 15]
+            # one-minute candles are kept 30 days: each impulse is stored once when seen, so the count only grows
+            db.script("CREATE TABLE IF NOT EXISTS focus_impulse (t INTEGER, symbol TEXT, cont INTEGER, net REAL, "
+                      "PRIMARY KEY (t, symbol))")
+            db.executemany("INSERT OR IGNORE INTO focus_impulse VALUES(?,?,?,?)",
+                           [(e["t"], e["symbol"], e["cont"], e["net"]) for e in impulse.events(db, now)
+                            if e["t"] >= FOCUS_REGISTERED and e["symbol"] in ("XPT", "XPD") and e["K"] == 4.0
+                            and e["H"] == 15])
+            evs = [dict(r) for r in db.execute("SELECT cont, net FROM focus_impulse").fetchall()]
             n = len(evs)
             hits = sum(e["cont"] for e in evs)
             net = sum(e["net"] for e in evs) / n if n else None

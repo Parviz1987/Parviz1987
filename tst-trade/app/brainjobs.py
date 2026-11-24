@@ -270,8 +270,8 @@ class BrainJobs:
         self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p, known_ts) VALUES(?,?,?,?,?,?,?,?)",
                             rows)
         try:     # Block 16: the frozen forecast card (scenario, counter-scenario, invalidation, data quality, version)
-            nc = cards.freeze(self.db, max(now, time.time()), "strateq", data, how, facts, STRATEGIST_SYSTEM,
-                              self._chain(trigger) if trigger else "saatlıq")
+            nc = await asyncio.to_thread(cards.freeze, self.db, max(now, time.time()), "strateq", data, how, facts,
+                                         STRATEGIST_SYSTEM, self._chain(trigger) if trigger else "saatlıq")
             self._rep("cards", "done", note=f"{nc} proqnoz kartı donduruldu")
         except Exception as e:   # a card that cannot be written never loses the forecast itself
             log.warning("forecast card: %s", e)

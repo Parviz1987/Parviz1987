@@ -134,9 +134,10 @@ async def download(db: DB, key: str, limit_usd: float, report=None, now: float |
                 if r.status_code != 200:
                     errors.append(f"{sym} {a[:7]}: HTTP {r.status_code} {r.text[:80]}")
                     continue
-                rows = parse_ohlcv_csv(r.text)
-                db.executemany("INSERT OR REPLACE INTO fut_candles(symbol, t, o, h, l, c, v) VALUES(?,?,?,?,?,?,?)",
-                               [(sym, *x) for x in rows])
+                import asyncio
+                rows = await asyncio.to_thread(parse_ohlcv_csv, r.text)       # CPU and DB work off the event loop
+                await asyncio.to_thread(db.executemany, "INSERT OR REPLACE INTO fut_candles(symbol, t, o, h, l, c, v) "
+                                        "VALUES(?,?,?,?,?,?,?)", [(sym, *x) for x in rows])
                 got[sym] += len(rows)
     total = {sym: db.execute("SELECT COUNT(*) n FROM fut_candles WHERE symbol=?", (sym,)).fetchone()["n"]
              for sym in SYMBOLS}
