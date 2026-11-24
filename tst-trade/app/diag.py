@@ -130,6 +130,7 @@ def _futures_now(db) -> dict:
     except Exception:
         rows = []
     return {"running": db.get("futures:running"), "approved": json.loads(db.get("futures:approved") or "null"),
+            "last": json.loads(db.get("futures:last") or "null"),
             "stored": {r["symbol"]: {"bars": r["n"], "months": r["m"], "from": time.strftime("%Y-%m-%d", time.gmtime(r["a"])),
                                      "to": time.strftime("%Y-%m-%d", time.gmtime(r["b"]))} for r in rows}}
 
