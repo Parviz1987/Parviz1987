@@ -75,7 +75,9 @@ function overlayFor(fc) {
   const card = fc.cards.find((c) => c.horizon === tf);
   if (!card || !card.methods.length) return null;
   const m = card.methods.find((x) => x.method === (card.verdict.method || "rw")) || card.methods[0];
-  return { ...m, name: card.name };
+  // the unified forecast's direction is drawn in the range box (an arrow and its probability), with the proof status
+  const v = card.methods.find((x) => x.method === "vahid");
+  return { ...m, name: card.name, vahid: v ? v.p_up : null, proven: card.verdict.status === "sübut" };
 }
 
 async function loadChart() {

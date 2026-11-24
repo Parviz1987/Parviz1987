@@ -193,6 +193,17 @@
       g.globalAlpha = .45; g.fillRect(x0, y(ov.hi50), w, y(ov.lo50) - y(ov.hi50));
       g.globalAlpha = 1; g.strokeStyle = gold; g.setLineDash([4, 3]);
       g.beginPath(); g.moveTo(0, y(ov.price0)); g.lineTo(x0 + w, y(ov.price0)); g.stroke(); g.setLineDash([]);
+      // the unified forecast: an arrow from the current price towards the side it leans to, with its probability
+      if (ov.vahid != null && Math.abs(ov.vahid - 0.5) >= 0.01) {
+        const upw = ov.vahid > 0.5, cx0 = x0 + w / 2, y0 = y(ov.price0);
+        const y1 = upw ? y(ov.hi50) : y(ov.lo50);
+        g.strokeStyle = g.fillStyle = upw ? up : down; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(cx0, y0); g.lineTo(cx0, y1); g.stroke();
+        g.beginPath(); g.moveTo(cx0, y1); g.lineTo(cx0 - 5, y1 + (upw ? 7 : -7)); g.lineTo(cx0 + 5, y1 + (upw ? 7 : -7)); g.fill();
+        g.lineWidth = 1; g.font = "11px ui-monospace,monospace"; g.textAlign = "right";
+        g.fillText(`Vahid ${Math.round(ov.vahid * 100)}%${ov.proven ? " ✓" : " · sübut yox"}`, Math.max(80, x0 - 4), y1 + (upw ? -4 : 12));
+        g.textAlign = "left";
+      }
     }
     // ---- alarm marks (opts.marks: [{ts, kind, text}]): a glowing triangle above the candle it happened in ----
     const marksAt = {};
