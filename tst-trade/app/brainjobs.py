@@ -12,7 +12,7 @@ import logging
 import re
 import time
 
-from . import brains, brainviews, candles, cards, forecast, judge, markets, signals
+from . import brains, brainviews, candles, cards, forecast, judge, markets, newsevents, signals
 from .db import DB
 from .keys import KeyStore
 
@@ -177,8 +177,17 @@ class BrainJobs:
         return json.loads(self.db.get(f"brainjob:{slot}") or "{}")
 
     async def reader(self, now: float) -> int:
+        # Block 17: one story copied by many sites is one event; only its first headline is read (and paid for)
+        ev = await asyncio.to_thread(newsevents.assign, self.db, now)
+        if ev["headlines"]:
+            c = newsevents.day_counts(self.db, now)
+            self._rep("events", "done", note=f"{ev['headlines']} yeni başlıq → {ev['new_events']} yeni hadisə · "
+                                             f"24 saat: {c['headlines']} başlıq = {c['events']} hadisə")
         rows = self.db.execute(
-            "SELECT n.uid, n.title FROM news n LEFT JOIN news_ai a ON a.uid = n.uid WHERE a.uid IS NULL AND n.ts > ? "
+            "SELECT n.uid, n.title FROM news n LEFT JOIN news_ai a ON a.uid = n.uid "
+            "LEFT JOIN news_event e ON e.uid = n.uid "
+            "WHERE a.uid IS NULL AND n.ts > ? AND (e.uid IS NULL OR e.uid = (SELECT e2.uid FROM news_event e2 "
+            "WHERE e2.event_id = e.event_id ORDER BY e2.ts, e2.uid LIMIT 1)) "
             "ORDER BY n.ts DESC LIMIT ?", (now - 6 * 3600, READER_BATCH)).fetchall()
         if not rows:
             return 0
@@ -261,10 +270,18 @@ class BrainJobs:
         self.db.executemany("INSERT INTO brain_views(ts, source, metal, lean, note, horizon, p, known_ts) VALUES(?,?,?,?,?,?,?,?)",
                             rows)
         try:     # Block 16: the frozen forecast card (scenario, counter-scenario, invalidation, data quality, version)
-            cards.freeze(self.db, max(now, time.time()), "strateq", data, how, facts, STRATEGIST_SYSTEM,
-                         self._chain(trigger) if trigger else "saatlıq")
+            nc = cards.freeze(self.db, max(now, time.time()), "strateq", data, how, facts, STRATEGIST_SYSTEM,
+                              self._chain(trigger) if trigger else "saatlıq")
+            self._rep("cards", "done", note=f"{nc} proqnoz kartı donduruldu")
         except Exception as e:   # a card that cannot be written never loses the forecast itself
             log.warning("forecast card: %s", e)
+            self._rep("cards", "error", note=f"{type(e).__name__}: {str(e)[:100]}")
+        from . import checker
+        self.db.script(checker.SCHEMA)
+        chk = self.db.execute("SELECT invented FROM brain_checks WHERE slot='strategist' ORDER BY ts DESC LIMIT 1").fetchone()
+        if chk is not None:
+            self._rep("checker", "done", note="Strateqin son cavabı: " + (
+                f"{chk['invented']} uydurma rəqəm (göstərilmədi)" if chk["invented"] else "uydurma rəqəm yoxdur"))
         await self.second_brain(now, facts, trigger)
         await self.debate(now, facts, trigger)
         self._state("strategist", f"izah yazıldı · {how}")

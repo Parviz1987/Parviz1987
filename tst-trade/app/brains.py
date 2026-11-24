@@ -141,6 +141,9 @@ async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema:
             db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,1,?,?,?,NULL)",
                        (_time.time(), slot, provider, model, tin, tout,
                         llm.cost(model, tin, tout) + calls * llm.SEARCH_CALL_USD))
+            if not search:      # Block 17: count numbers the brain wrote that it was not given
+                from . import checker
+                checker.record(db, slot, data, user + "\n" + system)
             return data, f"{provider} · {model}"
         except Exception as e:   # a broken brain must never stop the system
             msg = str(e).replace(key, "***")[:200]

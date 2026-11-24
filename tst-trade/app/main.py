@@ -434,7 +434,9 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                                  "history": {k: hv.get(k) for k in ("nh", "hit_rate", "bar", "status")},
                                  "weight": w.get(m, 0.0)})
                 out.append({"horizon": h, "name": forecast.HORIZON_NAMES[h], "rows": rows})
-            return {"symbol": symbol, "desks": out, "brains": diag._slow("brain_score", lambda: brainviews.score(db, now))}
+            from . import checker
+            return {"symbol": symbol, "desks": out, "brains": diag._slow("brain_score", lambda: brainviews.score(db, now)),
+                    "checks": checker.report(db)}
         return await asyncio.to_thread(build)
 
     @app.get("/results")

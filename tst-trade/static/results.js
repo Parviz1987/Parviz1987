@@ -145,7 +145,7 @@ async function loadSim() {
 }
 
 let ahz = "1h", adata = null;
-const BRAIN_NAMES = { strateq: "Strateq (Claude)", brain2: "İkinci beyin (OpenAI)" };
+const BRAIN_NAMES = { strateq: "Strateq (Claude)", brain2: "İkinci beyin (OpenAI)", strategist: "Strateq", analyst2: "İkinci analitik", reviewer: "Nəzarətçi (müzakirə)", reader: "Oxuyucu", hunter: "Rəqəm ovçusu", scout: "Kəşfiyyatçı" };
 function renderAnalysts() {
   const d = adata; if (!d) return;
   $("ahz").innerHTML = d.desks.map((x) => `<button data-h="${x.horizon}" class="${x.horizon === ahz ? "on" : ""}">${esc(x.name)}</button>`).join("");
@@ -162,6 +162,12 @@ function renderAnalysts() {
       d.brains.map((b) => `<tr><td>${esc(BRAIN_NAMES[b.brain] || b.brain)}</td><td>${esc(b.when)}</td><td>${esc(b.horizon)}</td>
         <td class="c">${pc(b.hit_rate)}</td><td class="c mut">${b.n}</td></tr>`).join("") + "</table>"
     : "<p class='note'>Hələ yoxlanmış beyin fikri yoxdur: ilk nəticələr fikir verildikdən 1 saat sonra gəlir.</p>";
+  // Block 17: the source checker — numbers a brain wrote that it was not given (30 days)
+  const ck = d.checks || [];
+  if (ck.length) $("brainscore").innerHTML += `<p class="note" style="margin-top:10px"><b>Mənbə yoxlayıcısı</b> (30 gün): beyin ona verilməyən rəqəm yazıbsa, o, uydurma sayılır və sizə göstərilmir.</p>
+    <table class="sc"><tr><th>Beyin</th><th>Cavab</th><th>Uydurma rəqəmli cavab</th><th>Uydurma rəqəm</th></tr>` +
+    ck.map((c) => `<tr><td>${esc(BRAIN_NAMES[c.slot] || c.slot)}</td><td class="c mut">${c.answers}</td>
+      <td class="c ${c.bad_share > 0.1 ? "down" : ""}">${pc(c.bad_share)}</td><td class="c mut">${c.invented || 0}</td></tr>`).join("") + "</table>";
 }
 async function loadAnalysts() { adata = await api(`/api/analysts?symbol=${sym}`); renderAnalysts(); }
 

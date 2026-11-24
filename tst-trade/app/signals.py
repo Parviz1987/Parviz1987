@@ -3,7 +3,7 @@
 A signal is written here by the part that saw it; the brain jobs read the pending ones and run the Strategist right
 away with «what happened» in its facts (an alarm). Kinds:
 - news     a headline the Reader rated strength 3 (a market mover: war, Fed, sanctions...)
-- flow     2+ headlines of strength 2+ on the same metal and direction within 15 minutes
+- flow     2+ different events (not copies of one story) of strength 2+, same metal and direction, within 15 min
 - release  a US figure whose actual was confirmed (two brains agreed, or the calendar had it)
 - move     a 15-minute move of a metal or a linked market 4x bigger than its usual move of the last 2 days
 - band     the price left our own 1-hour 80 % range: our prediction failed (nerve.py, prediction-error alarm)
@@ -48,18 +48,23 @@ def from_news(db: DB, now: float) -> int:
     if not _table(db, "news_ai"):
         return 0
     n = 0
-    rows = db.execute("SELECT a.uid, a.ts, a.metals, a.direction, a.strength, n.title FROM news_ai a "
-                      "JOIN news n ON n.uid = a.uid WHERE a.ts > ? AND a.strength >= 2 AND a.direction != 'neutral' "
+    from . import newsevents
+    newsevents.ensure(db)
+    rows = db.execute("SELECT a.uid, a.ts, a.metals, a.direction, a.strength, n.title, e.event_id FROM news_ai a "
+                      "JOIN news n ON n.uid = a.uid LEFT JOIN news_event e ON e.uid = a.uid "
+                      "WHERE a.ts > ? AND a.strength >= 2 AND a.direction != 'neutral' "
                       "ORDER BY a.ts", (now - 900,)).fetchall()
-    flows: dict[tuple[str, str], list] = {}
+    flows: dict[tuple[str, str], dict] = {}
     for r in rows:
         metals = [m for m in (r["metals"] or "").split(",") if m]
+        key = f"ev{r['event_id']}" if r["event_id"] is not None else r["uid"]    # Block 17: one story, one alarm
         if r["strength"] >= 3:
-            n += emit(db, "news:" + r["uid"], "news", f"Güclü xəbər ({r['direction']}): {r['title']}", 3,
+            n += emit(db, "news:" + key, "news", f"Güclü xəbər ({r['direction']}): {r['title']}", 3,
                       ",".join(metals) or None, now)
         for m in metals:
-            flows.setdefault((m, r["direction"]), []).append(r["title"])
-    for (m, d), titles in flows.items():
+            flows.setdefault((m, r["direction"]), {})[key] = r["title"]
+    for (m, d), by_event in flows.items():
+        titles = list(by_event.values())          # distinct events: a copied story is counted once
         if len(titles) >= 2:
             n += emit(db, f"flow:{m}:{d}:{int(now // 900)}", "flow",
                       f"{NAMES.get(m, m)}: 15 dəqiqədə {len(titles)} güclü xəbər, istiqamət {d}: {titles[-1]}", 2, m, now)
