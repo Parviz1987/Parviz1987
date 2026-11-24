@@ -122,6 +122,16 @@ def _bid_ask(engine, sym: str):
     return [q.bid, q.ask] if q is not None and q.bid is not None else None
 
 
+def _plan_v3(db) -> dict:
+    from . import cards, checker, judge, newsevents
+    last = cards.recent(db, None, 4)
+    return {"swap": json.loads(db.get("swap_rates") or "null"),
+            "cost_1d": {s: judge.cost_parts(s, "1d") for s in candles.METALS},
+            "cards": {"last": last, "summary": cards.summary(db)},
+            "checker": checker.report(db), "news_events": newsevents.day_counts(db),
+            "focus": hypotheses.evaluate_focus(db), "alfred": json.loads(db.get("alfred:last") or "null")}
+
+
 def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
     now = time.time()
     db.script(SCHEMA)
@@ -176,6 +186,8 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "brain_score": _slow("brain_score", lambda: brainviews.score(db, time.time())),
         "hypotheses": _slow("hypotheses", lambda: hypotheses.evaluate(db)),
         "impulse_study": _slow("impulse", lambda: impulse.study(db), ttl=3600),
+        # Plan v3 (Blocks 15-18): full cost, forecast cards, source checker, news events, focus targets, ALFRED
+        "plan_v3": _slow("plan_v3", lambda: _plan_v3(db)),
         "learning": {"ab_lessons": _slow("ab", lambda: learning.ab_report(db)), "lessons": learning.active_lessons(db),
                      "sleep": json.loads(db.get("sleep:last") or "null"), "calib": json.loads(db.get("calib") or "null"),
                      "nerve": json.loads(db.get("nerve:state") or "null"), "backup": json.loads(db.get("backup:last") or "null")},

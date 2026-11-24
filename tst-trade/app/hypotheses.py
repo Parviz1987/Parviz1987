@@ -42,7 +42,7 @@ HYPOTHESES = [
 
 # Əsas hədəflər (Block 18, owner's focus 2026-11-24): a SECOND small family, registered later with its own time and
 # bar, judged net of the FULL cost (spread + slippage + overnight financing). The first family is left as registered.
-FOCUS_REGISTERED = 1795608000      # 2026-11-25 12:00 UTC
+FOCUS_REGISTERED = 1795521600      # 2026-11-24 12:00 UTC (registered 08:30 UTC the same day, before any count)
 FOCUS_P_BAR = 0.05 / 3
 FOCUS = [
     {"id": "H9", "name": "Qızıl, 1 gün: tərəzi", "method": "terazi", "horizon": "1d", "symbol": "XAU",
