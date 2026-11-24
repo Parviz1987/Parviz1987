@@ -67,6 +67,7 @@ MACRO_SERIES = {
 EXTRA_SERIES = {"GLD_T": "GLD fondundakı qızıl, ton"}
 GLD_URL = "https://www.spdrgoldshares.com/assets/dynamic/GLD/GLD_US_archive_EN.csv"
 GLD_EVERY = 6 * 3600
+SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "gld", "alpaca", "fmp")   # every collector that reports health
 # CFTC Commitments of Traders (disaggregated, futures only; public, no key): weekly positions on COMEX / NYMEX.
 COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
 COT_CODES = {"088691": "XAU", "084691": "XAG", "076651": "XPT", "075651": "XPD"}

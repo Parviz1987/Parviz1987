@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import auth, brains, brainviews, candles, forecast, judge, keys, registry
 from . import diag
+from . import feeds as feeds_mod
 from .brainjobs import BrainJobs
 from .feeds import Feeds
 from .config import BASE_DIR, PROVIDERS, Settings, load_settings
@@ -528,7 +529,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return {"news": news, "releases": surprise.recent(db, now), "hunter": jobs.hunter.recent(4),
                 "events": feeds.upcoming(now), "macro": feeds.macro_view(), "event_mode": feeds.event_mode(now),
                 "cot": feeds.cot_view(),
-                "health": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp")}}
+                "health": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS}}
 
     _rs_cache: list = [0.0, None]
 
@@ -630,10 +631,10 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     @app.post("/api/admin/feeds/{name}")
     async def refresh_feed(name: str):
-        if name not in ("news", "calendar", "macro", "cot"):
+        if name not in ("news", "calendar", "macro", "cot", "gld"):
             raise HTTPException(404, "naməlum mənbə")
         await feeds.tick(force=name)
-        return {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot")}
+        return {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot", "gld")}
 
     @app.post("/api/admin/guest")
     async def set_guest(request: Request):

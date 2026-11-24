@@ -13,6 +13,7 @@ import time
 import traceback
 
 from . import brains, brainviews, candles, forecast, judge, registry, signals
+from . import feeds as feeds_mod
 from .db import DB
 
 SCHEMA = """
@@ -207,7 +208,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "version": version, "now": now, "uptime_s": round(now - STARTED),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
-        "sources": {k: feeds.health(k) for k in ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp")},
+        "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},
         "keys": key_state,
         "brains": [{**{k: b[k] for k in ("id", "name", "state", "in_use", "spent", "last_call")},
                     "config": {k: v for k, v in b["config"].items()}} for b in brains.view(db, keys)],
