@@ -26,3 +26,13 @@
 - Xəbərdarlıq: ABŞ 10 illik istiqraz 1 saatdan çoxdur yeni qiymət vermir (axın).
 - Beyinlərin ilk canlı hesabı (1 saat): həyəcandan sonra Strateq 88 % (17), İkinci beyin 100 % (12); saatlıq 38 % (8)
   və 55 % (11). 2-4 hadisədən gəlir: sübut deyil, izlənir.
+
+## 2026-11-24, 01:49 NY (növbətçi yoxlama)
+- Təhlükəsizlik: sakit. 1 giriş və 1 açar saxlanması (BLS, sahib tərəfindən), ikisi də yeganə tanınmış ünvandan.
+  «Qiymət mənbəyi dəyişib» 7 dəfə yazılıb: hamısı eyni tanınmış ünvandan, Admin-də mənbə seçimi; şübhəli deyil.
+- Sağlamlıq: versiya d6043aa, xəta yoxdur. Server 1 GB-a böyüdüldü (boş yaddaş 548 MB), gündəlik ehtiyat nüsxə açıqdır.
+  DB 567 MB (4000 şamlıq tarixçə); 1 GB yaddaş və 10 GB disklə təhlükəli deyil.
+- FMP «istifadə olunmur» (boz); BLS, FRED, Kalshi, ETF mənbələri işləyir.
+- Düzəldildi: bugünkü (UTC) 12 həyəcanın 9-u məhdudiyyət qoyulmazdan əvvəl adi hərəkətlərə getmişdi; günün sayğacı
+  bir dəfə sıfırlanır ki, bugünkü xəbər və rəqəmlər üçün həyəcan qalsın.
+- Palladium gecə saatlarında sakitdir (saatda ~800 qiymət): zəncirdə bəzən «3/4 canlı» görünür, xəta deyil.

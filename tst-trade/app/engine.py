@@ -250,6 +250,11 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:alarm_count_reset_1124"):
+            # 9 of the 12 alarms of 2026-11-24 (UTC) went to ordinary moves before the move cap existed (9f897e5):
+            # the day's count starts again once, so today's news and figures still get their alarms.
+            self.db.put("alarm:count", "{}")
+            self.db.put("migr:alarm_count_reset_1124", "1")
         if not self.db.get("migr:cheaper_brains_v1"):
             # Block 12: a slot still on the old default moves to the new, cheaper default (an owner's own choice stays).
             for slot, old in (("reader", ("openai", "gpt-5.4-nano")), ("strategist", ("anthropic", "claude-opus-5-5"))):
