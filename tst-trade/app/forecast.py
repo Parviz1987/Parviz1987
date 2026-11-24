@@ -42,10 +42,10 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
                  "1mo": "1 ay"}
 METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "tsmom", "rsi", "fib", "pullback", "macro",
            "session", "surprise", "dollar", "oil", "news", "strateq", "brain2", "debate", "cot", "season", "jewel", "seans", "trendmix", "consensus",
-           "terazi", "vahid")
+           "sam", "ichimoku", "pair", "garch", "gvz", "chartist", "terazi", "vahid")
 # Families: methods that carry the SAME idea (momentum and trend are both "the move continues"). The consensus gives
 # each family one voice, so one idea measured three ways cannot outvote two independent ideas.
-FAMILY = {"momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
+FAMILY = {"sam": "revert", "ichimoku": "trend", "pair": "cross", "momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
           "reversal": "revert", "rsi": "revert", "fib": "revert", "pullback": "revert",
           "dollar": "cross", "oil": "cross", "macro": "fund", "surprise": "fund",
           "news": "brain", "strateq": "brain", "brain2": "brain", "debate": "brain", "session": "time", "seans": "time", "trendmix": "trend", "cot": "position",
@@ -60,6 +60,9 @@ METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", 
                 "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)", "debate": "Müzakirə (yuxarı ↔ aşağı)",
                 "cot": "COT: fond mövqeləri", "seans": "Seans: Asiya ↑ / ABŞ ↓",
                 "trendmix": "Çoxsürətli trend (dalğalanmaya görə)", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
+                "sam": "Şam fiqurları", "ichimoku": "Ichimoku buludu", "pair": "Metal nisbəti (qızıl/gümüş, platin/palladium)",
+                "garch": "GARCH dəyişkənlik aralığı", "gvz": "GVZ (opsionların gözlədiyi dəyişkənlik)",
+                "chartist": "Qrafik analitiki (AI)",
                 "terazi": "Tərəzi (Hakimin çəkisi ilə)", "vahid": "Vahid proqnoz (hamısı birlikdə, öyrənən)",
                 "consensus": "Seçici konsensus (müstəqil ailələr)"}
 BASELINES = ("rw", "up")
@@ -97,7 +100,10 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("dollar")     # catch-up after a linked market's move: a short-horizon effect
         out.remove("oil")
         out.remove("news")       # headlines move prices for hours, not weeks
+    if tf_of(h) not in ("1d", "1w"):
+        out.remove("gvz")        # GVZ is a daily close
     if h not in ("1h", "4h", "1d"):
+        out.remove("chartist")
         out.remove("strateq")
         out.remove("brain2")
         out.remove("debate")
@@ -336,6 +342,87 @@ def _clip(p: float) -> float:
     return min(max(p, P_CAP[0]), P_CAP[1])
 
 
+# ---------- Block 22 (owner 2026-11-24: «build them all»): more methods, each measured by the Judge ----------
+def candle_pattern_view(cands: list[dict]) -> tuple[float, str]:
+    """Şam fiqurları: the last candle's shape after a move. Engulfing and hammer / shooting star at the end of a
+    3-candle run against it are the classic reversal signs; weak evidence in research, so a small lean."""
+    if len(cands) < 6:
+        return 0.5, "şam azdır"
+    a, b = cands[-2], cands[-1]
+    body, rng = abs(b["c"] - b["o"]), (b["h"] - b["l"]) or 1e-12
+    run = cands[-5]["c"] - cands[-2]["c"]                 # >0: price fell into this candle
+    if b["c"] > b["o"] and a["c"] < a["o"] and b["c"] >= a["o"] and b["o"] <= a["c"] and run > 0:
+        return 0.55, "yuxarı udma (bullish engulfing) düşüşdən sonra"
+    if b["c"] < b["o"] and a["c"] > a["o"] and b["c"] <= a["o"] and b["o"] >= a["c"] and run < 0:
+        return 0.45, "aşağı udma (bearish engulfing) qalxışdan sonra"
+    lower, upper = min(b["o"], b["c"]) - b["l"], b["h"] - max(b["o"], b["c"])
+    if run > 0 and lower >= 2 * body and upper <= body and lower / rng > 0.55:
+        return 0.54, "çəkic (hammer): aşağıdan alıcı çıxdı"
+    if run < 0 and upper >= 2 * body and lower <= body and upper / rng > 0.55:
+        return 0.46, "atan ulduz (shooting star): yuxarıdan satıcı çıxdı"
+    return 0.5, "aydın fiqur yoxdur"
+
+
+def ichimoku_view(cands: list[dict]) -> tuple[float, str]:
+    """Ichimoku: price above the cloud and the fast line (9) above the slow line (26) = up; both below = down."""
+    if len(cands) < 78:
+        return 0.5, "şam azdır (78 lazımdır)"
+    hi = lambda xs: max(c["h"] for c in xs)
+    lo = lambda xs: min(c["l"] for c in xs)
+    tenkan = (hi(cands[-9:]) + lo(cands[-9:])) / 2
+    kijun = (hi(cands[-26:]) + lo(cands[-26:])) / 2
+    past = cands[:-26]                                   # the cloud drawn 26 candles ago for «now»
+    span_a = ((hi(past[-9:]) + lo(past[-9:])) / 2 + (hi(past[-26:]) + lo(past[-26:])) / 2) / 2
+    span_b = (hi(past[-52:]) + lo(past[-52:])) / 2
+    top, bot, price = max(span_a, span_b), min(span_a, span_b), cands[-1]["c"]
+    if price > top and tenkan > kijun:
+        return 0.55, "qiymət buluddan yuxarı, sürətli xətt yavaşdan yuxarı"
+    if price < bot and tenkan < kijun:
+        return 0.45, "qiymət buluddan aşağı, sürətli xətt yavaşdan aşağı"
+    return 0.5, "qiymət buludun içində və ya xətlər ziddir"
+
+
+def pair_view(pair: tuple | None) -> tuple[float, str]:
+    """Metal nisbəti: this metal against its partner (gold/silver, platinum/palladium). When the ratio is far from its
+    recent mean (|z| > 2 over the last 100 candles), a pull back towards the mean is expected: an expensive metal
+    leans down, a cheap one up."""
+    if not pair:
+        return 0.5, "cüt metalın şamı yoxdur"
+    g, o = pair
+    rs = [math.log(a / b) for a, b in zip(g, o) if a and b]
+    if len(rs) < 60:
+        return 0.5, "cüt şam azdır"
+    m = sum(rs) / len(rs)
+    sd = math.sqrt(sum((x - m) ** 2 for x in rs) / (len(rs) - 1)) or 1e-9
+    z = (rs[-1] - m) / sd
+    if z > 2:
+        return 0.45, f"nisbət orta səviyyədən {z:.1f} sd yuxarıdır: bu metal cütünə görə bahadır"
+    if z < -2:
+        return 0.55, f"nisbət orta səviyyədən {abs(z):.1f} sd aşağıdır: bu metal cütünə görə ucuzdur"
+    return 0.5, f"nisbət normaldır (z {z:+.1f})"
+
+
+def garch_range(rets: list[float], price: float, k: int) -> dict:
+    """GARCH(1,1) with fixed textbook weights (0.05 shock, 0.90 memory): tomorrow's variance from today's shock and
+    the long-run level; the range over k candles from it. Only the range is tested (no direction)."""
+    var_l = sum(r * r for r in rets) / len(rets)
+    h = var_l
+    for r in rets:
+        h = 0.05 * var_l + 0.05 * r * r + 0.90 * h
+    sk = math.sqrt(h * k)
+    return {"lo50": price * math.exp(-0.6745 * sk), "hi50": price * math.exp(0.6745 * sk),
+            "lo80": price * math.exp(-1.2816 * sk), "hi80": price * math.exp(1.2816 * sk)}
+
+
+def gvz_range(gvz: float | None, price: float, days: float) -> dict | None:
+    """GVZ: the volatility gold options expect (annual %); the range over `days` trading days from it."""
+    if not gvz:
+        return None
+    sk = gvz / 100 * math.sqrt(days / 252)
+    return {"lo50": price * math.exp(-0.6745 * sk), "hi50": price * math.exp(0.6745 * sk),
+            "lo80": price * math.exp(-1.2816 * sk), "hi80": price * math.exp(1.2816 * sk)}
+
+
 def weighted_view(out: dict, weights: dict | None) -> dict:
     """«Tərəzi»: every analyst's lean weighted by what the Judge measured for it on this desk (weights from
     judge.weights: 0 for an analyst not better than the bar). Live only: in the history replay the weights would
@@ -511,13 +598,36 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
         else:
             out["macro"] = {"p_up": 0.5, "basis": "FRED məlumatı yoxdur"}
 
+    mf = methods_for(horizon)
+    if "sam" in mf:
+        p, basis = candle_pattern_view(cands)
+        out["sam"] = {"p_up": p, "basis": basis}
+    if "ichimoku" in mf:
+        p, basis = ichimoku_view(cands)
+        out["ichimoku"] = {"p_up": p, "basis": basis}
+    if "pair" in mf:
+        p, basis = pair_view((related or {}).get("pair"))
+        out["pair"] = {"p_up": p, "basis": basis}
+    if "garch" in mf:
+        out["garch"] = {"p_up": 0.5, "basis": "yalnız aralıq: GARCH(1,1) dəyişkənliyi",
+                        **garch_range(rets, price, k)}
+    if "gvz" in mf:
+        days = {"1d": 1, "3d": 3, "1w": 5, "10d": 10, "1mo": 21}.get(horizon, 1)
+        gr = gvz_range((related or {}).get("gvz"), price, days)
+        out["gvz"] = ({"p_up": 0.5, "basis": f"yalnız aralıq: opsionların gözlədiyi dəyişkənlik {related['gvz']:.1f} %",
+                       **gr} if gr else {"p_up": 0.5, "basis": "GVZ məlumatı yoxdur"})
+    if "chartist" in mf:
+        p, basis = (views or {}).get("chartist", (0.5, "Qrafik analitikinin yeni fikri yoxdur"))
+        out["chartist"] = {"p_up": p, "basis": basis}
+
     out["consensus"] = selective_consensus(out, rets, sigma, event_near)
     out["terazi"] = weighted_view(out, (views or {}).get("_weights"))
     from .unified import view as unified_view       # one forecast from every analyst, weights learned walk-forward
     out["vahid"] = unified_view((views or {}).get("_unified"), out)
 
-    for v in out.values():
-        v.update(rng)
+    for v in out.values():          # a method with its own range (GARCH, GVZ) keeps it; all others use ours
+        for key, val in rng.items():
+            v.setdefault(key, val)
     return {"price": price, "sigma": sigma, "methods": out}
 
 
@@ -593,6 +703,18 @@ PASSPORT = {
     "jewel": {"why": "Divali (qızıl, gümüş) və Çin Yeni ili (qızıl) öncəsi 21 gün zərgərlik alışı artır. Dostun "
                      "layihəsindən (#14) ideya; sahibin sahəsi.",
               "expect": "1 həftə – 1 ay; ildə iki pəncərə.", "else": "Çıxarılır."},
+    "sam": {"why": "Treyderlərin ən çox baxdığı şam fiqurları (udma, çəkic, atan ulduz) hərəkətdən sonra.",
+            "expect": "Qısa üfüqdə dönüşü həddən yaxşı tutmalıdır.", "else": "Sübut olmasa, çəkisi 0 qalır."},
+    "ichimoku": {"why": "Ichimoku buludu: trendin və onun gücünün klassik ölçüsü.",
+                 "expect": "Trend üsulları kimi uzun üfüqdə sübut.", "else": "Sübut olmasa, çəkisi 0 qalır."},
+    "pair": {"why": "Qızıl/gümüş və platin/palladium nisbəti adətən ortaya qayıdır: bahalanmış metal geri qalır.",
+             "expect": "Nisbət uçlarda olanda həddən yaxşı.", "else": "Sübut olmasa, çəkisi 0 qalır."},
+    "garch": {"why": "Dəyişkənlik dəstə-dəstə gəlir: GARCH sabahkı dəyişkənliyi bu günkü şokdan hesablayır.",
+              "expect": "Aralıqlar 50 % və 80 % daha dəqiq tutmalıdır.", "else": "Bizim aralıqdan pisdirsə, istifadə olunmur."},
+    "gvz": {"why": "Opsion bazarı qızılın nə qədər tərpənəcəyini qiymətə qoyur (GVZ indeksi).",
+            "expect": "Gün və həftə aralıqlarını daha dəqiq tutmalıdır.", "else": "Bizim aralıqdan pisdirsə, istifadə olunmur."},
+    "chartist": {"why": "AI analitik özü qrafikə baxır: bir neçə vaxt çərçivəsi, səviyyələr, fiqurlar, göstəricilər.",
+                 "expect": "Texniki düsturlardan yaxşı olmalıdır.", "else": "Sübut olmasa, çəkisi 0 qalır."},
     "vahid": {"why": "Bütün analitiklərin və beyinlərin fikri bir ehtimalda: kimin nə qədər çəki alacağını sistem öz "
                      "keçmiş nəticələrindən addım-addım öyrənir (yalnız o anda bilinən nəticələrlə).",
               "expect": "Ayrı-ayrı analitiklərdən və tərəzidən yaxşı olmalıdır; öz-özünü sınaqda həddi keçməlidir.",

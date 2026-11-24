@@ -85,6 +85,25 @@ class MacroLookup:
         return None if r is None or d is None else {"dfii10": r, "dollar": d}
 
 
+class GvzLookup:
+    """GVZ (FRED GVZCLS, gold options' expected volatility) as known before a daily candle (published the next day)."""
+    def __init__(self, db: DB):
+        try:
+            rows = db.execute("SELECT d, v FROM macro WHERE series='GVZCLS' ORDER BY d").fetchall()
+        except Exception:
+            rows = []
+        self.ds, self.vs = [r["d"] for r in rows], [r["v"] for r in rows]
+
+    def at(self, t: int) -> float | None:
+        import bisect
+        day = datetime.fromtimestamp(t - 86400, timezone.utc).strftime("%Y-%m-%d")
+        i = bisect.bisect_left(self.ds, day) - 1
+        return self.vs[i] if i >= 0 else None
+
+
+PAIR = {"XAU": "XAG", "XAG": "XAU", "XPT": "XPD", "XPD": "XPT"}
+
+
 class BondLookup:
     """The 10-year Treasury note's 12-month price change as known before a time (daily candles, past only)."""
     def __init__(self, db: DB):
@@ -330,7 +349,7 @@ class Engine:
         bv = brainviews.Lookup(self.db)
         sv = slowviews.Lookup(self.db)
         ev = EventLookup(self.db)
-        bonds = BondLookup(self.db)
+        bonds, gvz = BondLookup(self.db), GvzLookup(self.db)
         for h, tf in forecast.HORIZONS.items():
             issued_t = candles.bucket(now, tf)
             step = candles.TF[tf]
@@ -348,7 +367,8 @@ class Engine:
                 monday = tf == "1d" and datetime.fromtimestamp(issued_t, timezone.utc).weekday() == 0
                 if gap != step and not (monday and gap == 3 * step):
                     continue
-                linked_now = {**self.related_closes(past, tf, now), "bond": bonds.at(issued_t)}
+                linked_now = {**self.related_closes(past, tf, now, sym=sym), "bond": bonds.at(issued_t),
+                              "gvz": gvz.at(issued_t) if tf in ("1d", "1w") else None}
                 fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
                                     rel.window(issued_t, h), linked_now,
                                     {**bv.views(sym, issued_t, h), **sv.views(sym, issued_t, h),
@@ -491,7 +511,7 @@ class Engine:
         bv = brainviews.Lookup(self.db)
         sv = slowviews.Lookup(self.db)
         ev = EventLookup(self.db)
-        bonds = BondLookup(self.db)
+        bonds, gvz = BondLookup(self.db), GvzLookup(self.db)
         first = macro.first_day()
         if first:
             # Replayed before FRED data arrived: those macro forecasts said "no data". Now that the data covers
@@ -507,7 +527,7 @@ class Engine:
                 k = forecast.steps_of(h)
                 batch: list = []
                 linked = {c: {r["t"]: r["c"] for r in candles.closed(self.db, c, tf, now, limit=BACKTEST_MAX)}
-                          for c in markets.saved(self.db).get("epics", {})}
+                          for c in list(markets.saved(self.db).get("epics", {})) + [PAIR[sym]]}
                 done = {r["issued_t"] for r in self.db.execute(
                     "SELECT issued_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='history' "
                     "GROUP BY issued_t HAVING COUNT(*) >= ?", (sym, h, len(forecast.methods_for(h)))).fetchall()}
@@ -519,7 +539,8 @@ class Engine:
                         continue   # a gap (weekend): the candle after it is not "the next one"
                     window = rows[max(0, i - forecast.history_need(h)):i]
                     fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
-                                        {**self.related_closes(window, tf, now, linked), "bond": bonds.at(t)},
+                                        {**self.related_closes(window, tf, now, linked, sym), "bond": bonds.at(t),
+                                         "gvz": gvz.at(t) if tf in ("1d", "1w") else None},
                                         {**bv.views(sym, t, h), **sv.views(sym, t, h)},
                                         ev.near(t))
                     if fc is None:
@@ -565,7 +586,8 @@ class Engine:
             self.history_state["ts"] = 0
             self._drop_unlinked()
 
-    def related_closes(self, past: list[dict], tf: str, now: float, rows_by_code: dict | None = None) -> dict:
+    def related_closes(self, past: list[dict], tf: str, now: float, rows_by_code: dict | None = None,
+                       sym: str | None = None) -> dict:
         """For the impulse methods: the dollar and oil closes aligned with the metal's candles (same candle times),
         only when the linked market has the metal's last candle too (else no view)."""
         epics = markets.saved(self.db).get("epics", {})
@@ -591,6 +613,14 @@ class Engine:
                     best = (strength, g, o, markets.RELATED[c]["name"])
             if best is not None:
                 out[key] = best[1:]
+        if sym in PAIR and past:     # Block 22: the partner metal's closes at the same candle times (past only)
+            o = PAIR[sym]
+            m = (rows_by_code or {}).get(o)
+            if m is None:
+                m = {r["t"]: r["c"] for r in candles.closed(self.db, o, tf, now, limit=150)}
+            if past[-1]["t"] in m:
+                pairs = [(x["c"], m[x["t"]]) for x in past[-101:] if x["t"] in m]
+                out["pair"] = ([a for a, _ in pairs], [b for _, b in pairs])
         return out
 
     def _rep(self, task: str, status: str, *a, **k) -> None:
