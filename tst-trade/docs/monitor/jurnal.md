@@ -36,3 +36,36 @@
 - Düzəldildi: bugünkü (UTC) 12 həyəcanın 9-u məhdudiyyət qoyulmazdan əvvəl adi hərəkətlərə getmişdi; günün sayğacı
   bir dəfə sıfırlanır ki, bugünkü xəbər və rəqəmlər üçün həyəcan qalsın.
 - Palladium gecə saatlarında sakitdir (saatda ~800 qiymət): zəncirdə bəzən «3/4 canlı» görünür, xəta deyil.
+
+## 2026-11-24 gecə–səhər (NY 03:00–07:00) — sahibin tapşırığı ilə avtomatik iş
+
+**Qurulanlar:**
+- **Blok 15–19:** tam xərc, proqnoz kartı, hadisələr və mənbə yoxlayıcısı, əsas hədəflər və ALFRED, canlı agentlər xəritəsi.
+- **Blok 20–21, 24:**
+  - Databento 2 illik COMEX tarixçəsi alındı: 8,72 $, pulsuz kreditdən; 4 metal, ~2,4 mln dəqiqəlik şam.
+  - Fyuçers sınaqları qurulub: impuls, xəbər dəqiqəsi, VWAP.
+- **Blok 22–23:** yeni üsullar (şam fiqurları, Ichimoku, metal nisbəti, GARCH/GVZ aralığı) və Qrafik analitiki (AI).
+- **Blok 25–29:** Bilik kitabı (27 qayda), qayda dedektorları və hər qaydanın ölçülməsi, beyinlərin qaydalarla işləməsi, gecə dərslərinin qayda təklifinə çevrilməsi və A/B sınağı.
+- **Vahid proqnoz:**
+  - Bütün analitiklər bir ehtimalda birləşir; sistem keçmişi addım-addım oynayıb özünü sınayır.
+  - Paneldə «Sabah üçün proqnoz» tək cavab verir.
+- **Uyğunlaşma:**
+  - Sistemin vahid xəritəsi: `docs/SISTEM.md`.
+  - Bütün beyinlərə ortaq ana məqsəd verilir.
+  - Hakimdə Holm üsulu (eyni qoruma, daha az sərt).
+  - Tək Hakim hökmü: kart, qərar lenti, «Sabah üçün proqnoz» və beyinlərin faktları eyni hökmü işlədir.
+  - Ziddiyyət yoxlamasının 11 tapıntısı düzəldildi.
+
+**Xəta (düzəldilib):**
+- 10:31–11:05 UTC arasında canlı proqnoz verilmədi.
+- Səbəb: Qrafik analitikinin fikir ailəsinin adı siyahıda yox idi (`KeyError`).
+- Düzəliş: ad əlavə olundu; bütün ailələrin adı olduğunu yoxlayan test də əlavə olundu.
+
+**Fyuçers sınaqlarının nəticəsi (2 il, xərcdən sonra):**
+- Adi impuls 4 metalda da davam etmir: 45–50 %. Sahibin impuls fikri birja məlumatında təsdiqlənmədi.
+- VWAP da işləmir: davam etmə 48 %, xərcdən sonra mənfi.
+- Diqqətə layiq tapıntı: qızılda ABŞ rəqəmi dəqiqəsindəki impuls 60 dəqiqədə 63,5 % davam edib (104 hal, iki ildə də müsbət).
+  - Sərt həddi keçməyib.
+  - Canlı yoxlama üçün **H13** kimi əvvəlcədən qeyd olundu (12:00 UTC-dən sayılır).
+
+**Diqqət:** verilənlər bazası böyüyür: fyuçers məlumatı, yeni üsulların tarixçəsi və qayda siqnalları. Disk yerinə həftəlik baxılmalıdır.
