@@ -37,6 +37,12 @@ RELATED = {
               "sign": 0},
     "VIX": {"name": "VIX (qorxu)", "epics": ["VIX"], "search": "volatility index",
             "why": "Bazarın qorxu ölçüsü: qorxu artanda sığınacaq tələbi artır.", "sign": +1},
+    "USDCNH": {"name": "USD/CNH (yuan)", "epics": ["USDCNH"], "search": "USD/CNH",
+               "why": "Yuan zəifləyəndə Çin alıcıları qızılla qorunur (Çin dünyanın ən böyük fiziki alıcısıdır).",
+               "sign": +1},
+    "COPPER": {"name": "Mis", "epics": ["COPPER", "HG", "XCUUSD"], "search": "copper",
+               "why": "Mis/qızıl nisbəti iqtisadi böyümənin göstəricisidir: qalxanda sənaye metalları (gümüş, platin, "
+                      "palladium) güclənir, qızıl sığınacaq kimi zəifləyir.", "sign": 0},
     # The broker has the 10-year Treasury note FUTURE (a price), not the yield: the price falls when the yield rises.
     "US10Y": {"name": "ABŞ 10 illik istiqraz (qiymət)", "epics": ["US10Y", "TNOTE", "UST10Y", "T-NOTE"],
               "search": "10-year",

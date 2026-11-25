@@ -101,8 +101,8 @@ def test_session_and_multispeed_trend_methods():
           for i in range(300)]
     p, why = forecast.trendmix_view(up, "1d")
     assert p > 0.5 and "yuxarı" in why
-    assert {"seans"} <= set(forecast.methods_for("1h")) and "trendmix" in forecast.methods_for("1mo")
-    assert "seans" not in forecast.methods_for("1d") and "trendmix" not in forecast.methods_for("1h")
+    assert {"vaxt"} <= set(forecast.methods_for("1h")) and "trendmix" in forecast.methods_for("1mo")
+    assert "vaxt" not in forecast.methods_for("1w") and "seans" in forecast.RETIRED
 
 
 def test_schema_scripts_never_break_a_running_write_in_another_thread():

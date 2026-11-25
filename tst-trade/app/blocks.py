@@ -34,18 +34,23 @@ BLOCKS = [
      "evidence": "Xəbər əhvalı qızılın gəlirinə və dəyişkənliyinə təsir edir, mənfi xəbər daha güclü (Smales 2014, 2015; "
                  "Apergis-Hayat-Saeed 2021: geopolitik xəbər daha güclü).",
      "missing": "Geopolitik risk indeksi (Caldara-Iacoviello GPR): mənbəyə hələ qoşulmayıb."},
-    {"id": "cross", "name": "Bazarlar arası", "page": None,
-     "reads": "Broker: DXY, EUR/USD, USD/JPY, WTI, Brent, S&P 500, VIX, 10 illik istiqraz",
-     "methods": ["dollar", "oil", "risk"], "ai": None,
-     "evidence": "Dollar qızılın ən güclü qısa müddətli amillərindən biridir; neft inflyasiya gözləntisi kanalıdır; "
-                 "risk/qorxu GRAM-ın ayrıca amilidir. Metal nisbəti (qızıl/gümüş) texniki analiz blokundadır.",
+    {"id": "cross", "name": "Bazarlar arası", "page": "/bazarlar",
+     "reads": "Broker: DXY, EUR/USD, USD/JPY, USD/CNH, WTI, Brent, S&P 500, VIX, 10 illik istiqraz, mis; cüt metal",
+     "methods": ["bazarlar"], "ai": None,
+     "evidence": "Bazarlar arası analiz (J. Murphy); dollar qızılın ən güclü qısa müddətli amillərindən biridir; qızıl "
+                 "səhm böhranlarında sığınacaqdır (Baur-Lucey 2010, Baur-McDermott 2010); neft inflyasiya kanalıdır; "
+                 "mis/qızıl nisbəti böyümə göstəricisidir. 11 qayda Hakimdə ayrıca ölçülür. Metal nisbəti (IM-RATIO-1) "
+                 "səhifədə göstərilir, səsi texniki analiz blokundadır.",
      "missing": "10 illik istiqrazın canlı qiyməti axşamlar kəsilir."},
-    {"id": "time", "name": "Vaxt və təqvim", "page": None,
-     "reads": "Saat, gün, ay; Hindistan/Çin zərgərlik mövsümləri",
-     "methods": ["seans", "season", "jewel"], "ai": None,
-     "evidence": "Asiya saatlarında qalxma, ABŞ saatlarında enmə müşahidə olunur (CBS tezisi; StoneX 2026), amma uzun "
-                 "müddətli sübut zəifdir; ay və həftə günü effektləri ziddiyyətlidir (2012, 2024 araşdırmaları).",
-     "missing": "—"},
+    {"id": "time", "name": "Vaxt və təqvim", "page": "/vaxt",
+     "reads": "Saat (UTC, London, New York), həftənin günü, ay dönüşü, ABŞ birja bayramları, ABŞ rəqəmi saatları; "
+              "Hindistan/Çin zərgərlik mövsümləri",
+     "methods": ["vaxt", "season", "jewel"], "ai": None,
+     "evidence": "Asiya saatlarında qalxma, ABŞ saatlarında enmə (Blose və b. 2018; WGC 2024); London fiksinqi "
+                 "(Caminschi-Heaney 2014); bazar ertəsi effekti (Lucey-Tully 2006); ay dönüşü və bayram ərəfəsi "
+                 "(səhmlərdə güclü, qızılda zəif); ABŞ rəqəmi saatında davam (bizim H13). 7 qayda Hakimdə ayrıca ölçülür; "
+                 "aylıq mövsümilik və zərgərlik mövsümü həftə-ay üfüqünün üsullarıdır.",
+     "missing": "FOMC iclas təqvimi (Fed saytı) hələ qoşulmayıb: ABŞ rəqəmi saatı qaydası 14:00-ı böyük şamla tutur."},
     {"id": "brain", "name": "AI beyinlər (hamısını oxuyan)", "page": "/agents",
      "reads": "Bütün blokların faktları, Bilik kitabı",
      "methods": ["strateq", "brain2", "debate"], "ai": "Strateq (Claude), İkinci beyin (OpenAI), Müzakirə",

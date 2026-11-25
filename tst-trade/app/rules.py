@@ -334,10 +334,13 @@ def run(db: DB, now: float | None = None) -> dict:
         for tf, ind in inds.items():
             cs = ind.cs
             have = {r["t"] for r in db.execute("SELECT DISTINCT t FROM rule_signals WHERE metal=? AND tf=? "
-                                                 "AND rule NOT LIKE 'FA-%' AND rule NOT LIKE 'NW-%' AND mode != 'futures'",
+                                                 "AND rule NOT LIKE 'FA-%' AND rule NOT LIKE 'NW-%' AND rule NOT LIKE 'CM-%' "
+                                                 "AND rule NOT LIKE 'TM-%' AND rule NOT LIKE 'HY-%' AND mode != 'futures'",
                                                  (sym, tf)).fetchall()}
             # each metal and timeframe replays its own history once (a replay cut by a restart resumes here)
-            first = db.execute("SELECT 1 FROM rule_signals WHERE metal=? AND tf=? AND mode='history' LIMIT 1",
+            first = db.execute("SELECT 1 FROM rule_signals WHERE metal=? AND tf=? AND mode='history' AND rule NOT LIKE "
+                               "'CM-%' AND rule NOT LIKE 'TM-%' AND rule NOT LIKE 'HY-%' AND rule NOT LIKE 'FA-%' "
+                               "AND rule NOT LIKE 'NW-%' LIMIT 1",
                                (sym, tf)).fetchone() is None
             ver_key = f"rules:ver:{sym}:{tf}"
             if not first and db.get(ver_key) != RULES_VER:
@@ -401,9 +404,13 @@ def run(db: DB, now: float | None = None) -> dict:
     fa = fundamental.run(db)
     from . import newsblock
     nw = newsblock.run(db)
+    from . import crossmarket
+    cm = crossmarket.run(db)
+    from . import timeblock
+    tm = timeblock.run(db)
     from . import ideas
     hy = ideas.derive_all(db)
-    return {"added": added, "replay": first_any, "futures_volume": fut, "fundamental": fa, "news": nw, "ideas": hy}
+    return {"added": added, "replay": first_any, "futures_volume": fut, "fundamental": fa, "news": nw, "cross": cm, "time": tm, "ideas": hy}
 
 
 FUT_VOL_VER = "2026-11-25"
@@ -774,6 +781,13 @@ def live_lookup(db: DB, kind: str = "ta") -> Lookup:
     """Live forecasts reuse one Lookup per block for 10 minutes (it reads every rule firing)."""
     hit = _LIVE.get(kind)
     if hit is None or time.time() - hit[0] > 600:
-        hit = (time.time(), Lookup(db) if kind == "ta" else fa_lookup(db))
+        if kind == "cm":
+            from . import crossmarket
+            hit = (time.time(), crossmarket.lookup(db))
+        elif kind == "tm":
+            from . import timeblock
+            hit = (time.time(), timeblock.lookup(db))
+        else:
+            hit = (time.time(), Lookup(db) if kind == "ta" else fa_lookup(db))
         _LIVE[kind] = hit
     return hit[1]

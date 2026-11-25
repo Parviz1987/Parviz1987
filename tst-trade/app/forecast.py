@@ -42,11 +42,13 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
 # ratio) were removed from the forecasts: each was a copy of a rule in the block (Ichimoku moved into it). «session»
 # was a copy of «seans». Their past forecasts stay in the database; the long-horizon trend (tsmom, trendmix) stays:
 # it works on weeks and months, which the block's candle rules do not cover.
-METHODS = ("rw", "up", "tsmom", "fundamental", "surprise", "dollar", "oil", "risk", "xeber", "strateq", "brain2", "debate",
-           "season", "jewel", "seans", "trendmix", "consensus", "garch", "gvz", "chartist", "qaydalar", "terazi", "vahid")
+METHODS = ("rw", "up", "tsmom", "fundamental", "surprise", "bazarlar", "xeber", "strateq", "brain2", "debate",
+           "season", "jewel", "vaxt", "trendmix", "consensus", "garch", "gvz", "chartist", "qaydalar", "terazi", "vahid")
 RETIRED = ("momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback", "session", "sam", "ichimoku", "pair",
            "macro", "cot",      # macro and COT: now rules of the fundamental block (FA-RY-1, FA-USD-1, FA-COT-1)
-           "news")              # the headline sum: now the news block's rules (NW-*), its voice is «xeber»
+           "news",              # the headline sum: now the news block's rules (NW-*), its voice is «xeber»
+           "seans",                  # the overnight/day pattern: now the time block's rules TM-SES-1/2, voice «vaxt»
+           "dollar", "oil", "risk")  # the impulses: now rules of the cross-market block (CM-USD-2, CM-OIL-1, CM-RISK-1)
 # Families = the blocks (owner 2026-11-25: «every block one organ, one voice»; app/blocks.py). Methods of one block
 # carry related ideas from the same kind of data: the consensus gives each block one voice and the Judge counts a
 # block once in its multiple-testing bar. The AI analysts that read every block (Strateq, the second brain, the
@@ -54,8 +56,8 @@ RETIRED = ("momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback"
 FAMILY = {"qaydalar": "ta", "chartist": "ta", "tsmom": "ta", "trendmix": "ta",
           "fundamental": "fund", "surprise": "fund",
           "xeber": "news",
-          "dollar": "cross", "oil": "cross", "risk": "cross",
-          "seans": "time", "season": "time", "jewel": "time",
+          "bazarlar": "cross",
+          "vaxt": "time", "season": "time", "jewel": "time",
           "strateq": "brain", "brain2": "brain", "debate": "brain"}
 FAMILY_NAMES = {"ta": "texniki analiz", "fund": "fundamental", "news": "xəbər", "cross": "bazarlar arası",
                 "time": "vaxt və təqvim", "brain": "AI beyinlər"}
@@ -64,8 +66,10 @@ METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", 
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "pullback": "Trend içində geri çəkilmə", "macro": "Makro (real faiz + dollar)",
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
                 "dollar": "Dollar impulsu", "oil": "Neft impulsu", "risk": "Risk əhvalı (VIX impulsu)",
+                "bazarlar": "Bazarlar arası (blokun qaydaları: dollar, faiz, neft, risk, mis, cüt metal)",
                 "xeber": "Xəbər (blokun qaydaları: əhval, Fed, rəqəm, geosiyasət, axın)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)", "debate": "Müzakirə (yuxarı ↔ aşağı)",
                 "fundamental": "Fundamental (blokun qaydaları: faiz, Fed, dollar, COT, sürprizlər)", "seans": "Seans: Asiya ↑ / ABŞ ↓",
+                "vaxt": "Vaxt və təqvim (blokun qaydaları: seans, London fiksinqi, gün, ay dönüşü, bayram, rəqəm saatı)",
                 "trendmix": "Çoxsürətli trend (dalğalanmaya görə)", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
                 "sam": "Şam fiqurları", "ichimoku": "Ichimoku buludu", "pair": "Metal nisbəti (qızıl/gümüş, platin/palladium)",
                 "garch": "GARCH dəyişkənlik aralığı", "gvz": "GVZ (opsionların gözlədiyi dəyişkənlik)",
@@ -95,9 +99,6 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("fundamental")   # FRED, COT and the surprise index are daily-to-weekly drivers
     if h not in ("15m", "30m", "1h", "4h", "1d"):
         out.remove("surprise")
-        out.remove("dollar")     # catch-up after a linked market's move: a short-horizon effect
-        out.remove("oil")
-        out.remove("risk")
         out.remove("xeber")      # headlines move prices for hours, not weeks
     if tf_of(h) not in ("1d", "1w"):
         out.remove("gvz")        # GVZ is a daily close
@@ -106,8 +107,8 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("strateq")
         out.remove("brain2")
         out.remove("debate")
-    if h not in ("1h", "4h"):
-        out.remove("seans")      # the overnight/day pattern lives inside a day
+    if h not in ("15m", "30m", "1h", "4h", "1d"):
+        out.remove("vaxt")       # hour-of-day and day-of-week rules speak about the next hour or the next day
     if h not in ("1w", "10d", "1mo"):
         out.remove("trendmix")   # monthly seasons, festival seasons: weeks-to-months effects
         out.remove("season")
@@ -368,9 +369,9 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
     if "trendmix" in methods_for(horizon):
         p, basis = trendmix_view(longer, tf)
         out["trendmix"] = {"p_up": p, "basis": basis}
-    if "seans" in methods_for(horizon):
-        p, basis = seans_view(next_t, horizon)
-        out["seans"] = {"p_up": p, "basis": basis}
+    if "vaxt" in methods_for(horizon):
+        p, basis = (views or {}).get("vaxt", (0.5, "təqvim məlumatı yoxdur"))
+        out["vaxt"] = {"p_up": p, "basis": basis}
 
     if "surprise" in methods_for(horizon):
         if releases:
@@ -383,15 +384,9 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
             out["surprise"] = {"p_up": 0.5, "basis": "bu müddətdə ABŞ rəqəmi açıqlanmayıb" if releases is not None
                                else "təqvim məlumatı yoxdur"}
 
-    for key in ("dollar", "oil", "risk"):
-        if key in methods_for(horizon):
-            from .markets import impulse_view
-            if related and key in related:
-                g, x, name = related[key]
-                p, basis = impulse_view(g, x, name)
-            else:
-                p, basis = 0.5, "bu bazarın şamı yoxdur"
-            out[key] = {"p_up": p, "basis": basis}
+    if "bazarlar" in methods_for(horizon):
+        p, basis = (views or {}).get("bazarlar", (0.5, "bazarlar arası məlumat yoxdur"))
+        out["bazarlar"] = {"p_up": p, "basis": basis}
 
     for key in ("xeber", "strateq", "brain2", "debate", "season", "jewel"):   # brainviews.py, slowviews.py
         if key in methods_for(horizon):
@@ -449,6 +444,11 @@ PASSPORT = {
     "oil": {"why": "Neft inflyasiya gözləntisini və geosiyasi qorxunu daşıyır; qızıl ona gec qoşula bilər.",
             "expect": "1 saat – 1 gün, xüsusən Yaxın Şərq xəbərlərində.",
             "else": "Çıxarılır; neft «Bazarlar» bölməsində ölçü kimi qalır."},
+    "bazarlar": {"why": "Bazarlar arası blokun bir səsi: 11 qayda (dollar trendi və impulsu, yen, yuan, 10 illik istiqraz, "
+                        "neft impulsu, qorxu sıçrayışı, risk iştahı, dollarla əlaqənin dəyişməsi, mis/qızıl nisbəti, cüt "
+                        "metal). Hər qayda Hakimdə ayrıca ölçülür; səsdə hər fikir ailəsi bir dəfə sayılır.",
+                 "expect": "1 saat – 1 gün; dollar və qorxu sıçrayışlarında güclü.",
+                 "else": "Sübut olmasa, vahid proqnozda çəkisi 0-a düşür."},
     "xeber": {"why": "Xəbər blokunun bir səsi: Oxuyucunun qiymətləndirdiyi başlıqlardan 7 qayda — əhval (mənfi xəbər 1,5 "
                      "qat, təsir 2 saatda yarıya sönür), mövzu üzrə (Fed, ABŞ rəqəmləri, geosiyasət, tələb-təklif), xəbər "
                      "axınının sıçrayışı və böyük xəbər; hər qayda Hakimdə ayrıca ölçülür, səsin gücü onun nəticəsidir.",
@@ -464,6 +464,11 @@ PASSPORT = {
                       "faktlarla tutuşdurub ehtimal verir (TradingAgents ideyası, Radar Gold arayışı).",
                "expect": "1 saat – 1 gün; xüsusən həyəcan anlarında tək beyindən yaxşı.",
                "else": "Tək beyinlərdən yaxşı deyilsə söndürülür (3 sorğu: xərc azalır)."},
+    "vaxt": {"why": "Vaxt və təqvim blokunun bir səsi: 7 qayda — Asiya/ABŞ saatları, Londonun günorta fiksinqi, bazar "
+                    "ertəsi, ay dönüşü, bayram ərəfəsi, ABŞ rəqəmi saatında böyük şamın davamı. Hər qayda Hakimdə ayrıca "
+                    "ölçülür; təqvim əvvəlcədən bilindiyi üçün proqnoz edilən şamın özü üçün hesablanır.",
+             "expect": "1 saat – 1 gün.",
+             "else": "Sübut olmasa, vahid proqnozda çəkisi 0-a düşür."},
     "seans": {"why": "Araşdırma: gecə (Asiya saatları) qızıl qalxmağa, ABŞ gündüzü zəifləməyə meyllidir (Blose və b. 2018; "
                      "WGC 2024). Əvvəlcədən sabitlənib, bizim məlumata uyğunlaşdırılmayıb.",
               "expect": "1 saat və 4 saat; kiçik, amma tez-tez.", "else": "Spred qazancı yeyirsə və ya sübut yoxdursa söndürülür."},

@@ -20,10 +20,11 @@ def _series(closes, v=None):
 
 
 def test_every_detector_rule_in_the_book_is_detected_in_code():
-    from app import fundamental, newsblock
+    from app import crossmarket, fundamental, newsblock, timeblock
     code = (Path(rules.__file__).read_text() + Path(patterns.__file__).read_text() + Path(fundamental.__file__).read_text()
-            + Path(newsblock.__file__).read_text())
-    found = set(re.findall(r'"((?:TA|TH|PA|VOL|IM|FA|NW)-[A-Z0-9-]+)"', code))
+            + Path(newsblock.__file__).read_text() + Path(crossmarket.__file__).read_text()
+            + Path(timeblock.__file__).read_text())
+    found = set(re.findall(r'"((?:TA|TH|PA|VOL|IM|FA|NW|CM|TM)-[A-Z0-9-]+)"', code))
     for r in playbook.RULES:
         if r["detector"]:
             assert r["id"] in found, r["id"]
@@ -210,7 +211,11 @@ def test_adx_measures_strength_and_every_rule_has_a_family():
     fams = {"Fundamental": fundamental.FAMILY, "Xəbər": newsblock.FAMILY}
     for r in playbook.RULES:
         if r["detector"]:
-            assert r["id"] in (rules.RULE_FAMILY if r["area"] in playbook.TA_AREAS else fams[r["area"]]), r["id"]
+            from app import crossmarket
+            from app import timeblock
+            fam = crossmarket.FAMILY if r["id"].startswith("CM-") else timeblock.FAMILY if r["id"].startswith("TM-") else (
+                rules.RULE_FAMILY if r["area"] in playbook.TA_AREAS else fams[r["area"]])
+            assert r["id"] in fam, r["id"]
 
 
 def test_main_module_has_its_logger():
@@ -297,7 +302,7 @@ def test_every_method_belongs_to_exactly_one_block_and_families_are_the_blocks()
     Engine(db, KeyStore(db, "s" * 64), "demo", 15)
     st = blocks.status(db, "XAU", "1h")
     assert {b["id"] for b in st["blocks"]} == {b["id"] for b in blocks.BLOCKS}
-    assert "risk" in forecast.methods_for("1h") and "risk" not in forecast.methods_for("1w")
+    assert "bazarlar" in forecast.methods_for("1h") and "risk" in forecast.RETIRED
 
 
 def test_central_bank_rule_uses_only_published_months():

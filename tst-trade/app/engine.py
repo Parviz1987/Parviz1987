@@ -409,6 +409,8 @@ class Engine:
         sv = slowviews.Lookup(self.db)
         rl = rules.live_lookup(self.db)
         fl = rules.live_lookup(self.db, "fa")
+        cl = rules.live_lookup(self.db, "cm")
+        tl = rules.live_lookup(self.db, "tm")
         from . import newsblock
         nv = newsblock.live_voice(self.db)
         ev = EventLookup(self.db)
@@ -436,12 +438,13 @@ class Engine:
                 # and the latest moment whose news and brain views it may use (audit 2026-11-24: 2 h look-ahead)
                 known = decision_time(issued_t, tf)
                 try:
-                    linked_now = {**self.related_closes(past, tf, now, sym=sym), "bond": bonds.at(issued_t),
+                    linked_now = {"bond": bonds.at(issued_t),
                                   "gvz": gvz.at(issued_t) if tf in ("1d", "1w") and sym == "XAU" else None}
                     fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
                                         rel.window(issued_t, h), linked_now,
                                         {**bv.views(sym, known, h), **sv.views(sym, issued_t, h),
                                          **rl.views(sym, known, h), **fl.views(sym, known, h), **nv.views(sym, known, h),
+                                         **cl.views(sym, known, h), **tl.views(sym, known, h),
                                          "_weights": self.weights(sym, h, now) if mode == "live" else None,
                                          "_unified": unified.models(self.db).get(f"{sym}:{h}") if mode == "live" else None},
                                         ev.near(known))
@@ -595,6 +598,10 @@ class Engine:
         sv = slowviews.Lookup(self.db)
         rl = rules.Lookup(self.db)
         fl = rules.fa_lookup(self.db)
+        from . import crossmarket
+        cl = crossmarket.lookup(self.db)
+        from . import timeblock
+        tl = timeblock.lookup(self.db)
         from . import newsblock
         nv = newsblock.Voice(self.db)
         ev = EventLookup(self.db)
@@ -633,11 +640,13 @@ class Engine:
                         continue   # this moment has live forecasts: no history copy of it
                     window = rows[max(0, i - forecast.history_need(h)):i]
                     fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
-                                        {**self.related_closes(window, tf, now, linked, sym), "bond": bonds.at(t),
+                                        {"bond": bonds.at(t),
                                          "gvz": gvz.at(t) if tf in ("1d", "1w") and sym == "XAU" else None},
                                         {**bv.views(sym, decision_time(t, tf), h), **sv.views(sym, t, h),
                                          **rl.views(sym, decision_time(t, tf), h),
                                          **fl.views(sym, decision_time(t, tf), h),
+                                         **cl.views(sym, decision_time(t, tf), h),
+                                         **tl.views(sym, decision_time(t, tf), h),
                                          **nv.views(sym, decision_time(t, tf), h)},
                                         ev.near(decision_time(t, tf)))
                     if fc is None:

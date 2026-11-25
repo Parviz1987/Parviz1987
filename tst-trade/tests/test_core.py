@@ -107,10 +107,10 @@ def test_backtest_walk_forward_and_judge_status():
     now = rows[-1][0] + 2 * 3600
     eng.backtest(now)
     st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
-    assert st["seans"]["n"] > 500
+    assert st["vaxt"]["n"] > 500
     assert st["rw"]["status"] == "bazis"
     # Random walk data: no method may be proven.
-    assert st["seans"]["status"] != "sübut"
+    assert st["vaxt"]["status"] != "sübut"
     assert 0.6 < st["rw"]["cover80"] < 0.95
     # A forecast only uses candles before it: every issued forecast's target is after its price0 candle.
     bad = db.execute("SELECT COUNT(*) FROM forecasts WHERE target_t <= issued_t").fetchone()[0]
@@ -304,11 +304,11 @@ def test_judge_needs_bonferroni_and_a_move_bigger_than_the_spread():
     _fake_scored(db, "up", 1000, 500, 0.001)          # baseline: half up
     _fake_scored(db, "qaydalar", 1000, 700, 0.00001)  # 70 % right but moves far smaller than the spread
     _fake_scored(db, "chartist", 1000, 700, 0.01)     # 70 % right, big moves
-    _fake_scored(db, "seans", 400, 222, 0.01)         # p ~ 0.015: passes 0.05, fails the corrected bar
+    _fake_scored(db, "vaxt", 400, 222, 0.01)         # p ~ 0.015: passes 0.05, fails the corrected bar
     st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
     assert st["qaydalar"]["status"] == "xərc"
     assert st["chartist"]["status"] == "sübut"
-    assert st["seans"]["p"] < 0.05 and st["seans"]["status"] == "yox"
+    assert st["vaxt"]["p"] < 0.05 and st["vaxt"]["status"] == "yox"
     assert judge.official(list(st.values()))["method"] == "chartist"
 
 

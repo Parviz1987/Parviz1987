@@ -118,10 +118,10 @@ def test_selective_consensus_counts_families_not_methods():
         return {k: {"p_up": v} for k, v in kw.items()}
     calm = [0.001 * (1 if i % 2 else -1) for i in range(200)]
     # three trend-family methods up, one revert method down: one idea against another -> no view
-    out = forecast.selective_consensus(m(strateq=0.6, brain2=0.6, debate=0.6, dollar=0.4), calm, 0.001, False)
+    out = forecast.selective_consensus(m(strateq=0.6, brain2=0.6, debate=0.6, bazarlar=0.4), calm, 0.001, False)
     assert out["p_up"] == 0.5 and "razı deyil" in out["basis"]
     # two independent families up, nobody against -> a direction
-    out = forecast.selective_consensus(m(qaydalar=0.6, dollar=0.58), calm, 0.001, False)
+    out = forecast.selective_consensus(m(qaydalar=0.6, bazarlar=0.58), calm, 0.001, False)
     assert out["p_up"] > 0.5 and "2 müstəqil ailə" in out["basis"]
     # one family only (however many methods) -> no view
     assert forecast.selective_consensus(m(strateq=0.6, brain2=0.65), calm, 0.001, False)["p_up"] == 0.5

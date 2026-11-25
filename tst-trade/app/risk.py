@@ -49,7 +49,7 @@ def gate(db: DB, engine, symbol: str, now: float | None = None) -> dict:
 
 
 EVENT_REASON = "mühüm ABŞ rəqəminə 60 dəqiqədən az qalıb və ya 30 dəqiqədən az keçib"
-EVENT_METHODS = ("surprise", "dollar", "xeber")      # built for the release window: it must not silence them
+EVENT_METHODS = ("surprise", "bazarlar", "xeber")      # built for the release window: it must not silence them
 
 
 def decision(db: DB, engine, symbol: str, now: float | None = None) -> dict:

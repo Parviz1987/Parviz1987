@@ -38,8 +38,7 @@ def test_related_closes_align_and_feed_the_methods():
     rel = eng.related_closes(past, "15m", now)
     assert "dollar" in rel and "oil" not in rel and len(rel["dollar"][0]) == len(rel["dollar"][1]) == 101
     m = forecast.build(past, "15m", related=rel)["methods"]
-    assert "dollar" in m and m["oil"]["p_up"] == 0.5
-    assert "dollar" not in forecast.build(past, "1w")["methods"]
+    assert "dollar" not in m and "bazarlar" in m          # the impulse is now the cross-market rule CM-USD-2
 
 
 def test_dollar_falls_back_to_eurusd_when_the_index_is_quiet():

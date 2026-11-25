@@ -454,6 +454,31 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             raise HTTPException(400, "naməlum metal")
         return await asyncio.to_thread(diag._slow, f"nw:{symbol}", lambda: newsblock.page(db, symbol), 60)
 
+    @app.get("/bazarlar")
+    async def cm_page():
+        return FileResponse(STATIC / "bazarlar.html")
+
+    @app.get("/api/bazarlar")
+    async def cm_api(symbol: str = "XAU", tf: str = "1h"):
+        """The cross-market block: the metal with the rules' firings, each linked market, the vote and the book."""
+        from . import crossmarket
+        if symbol not in candles.METALS or tf not in crossmarket.TFS:
+            raise HTTPException(400, "naməlum metal və ya vaxt çərçivəsi")
+        return await asyncio.to_thread(diag._slow, f"cm:{symbol}:{tf}", lambda: crossmarket.page(db, symbol, tf), 120)
+
+    @app.get("/vaxt")
+    async def tm_page():
+        return FileResponse(STATIC / "vaxt.html")
+
+    @app.get("/api/vaxt")
+    async def tm_api(symbol: str = "XAU", tf: str = "1h"):
+        """The time block: the metal with the calendar rules' firings, hour and weekday statistics, the calendar ahead,
+        the slow methods, the vote and the book."""
+        from . import timeblock
+        if symbol not in candles.METALS or tf not in timeblock.TFS:
+            raise HTTPException(400, "naməlum metal və ya vaxt çərçivəsi")
+        return await asyncio.to_thread(diag._slow, f"tm:{symbol}:{tf}", lambda: timeblock.page(db, symbol, tf), 120)
+
     @app.get("/fundamental")
     async def fa_page():
         return FileResponse(STATIC / "fundamental.html")

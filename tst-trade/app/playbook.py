@@ -11,7 +11,7 @@ or is cancelled), source (where the idea comes from and how strong the evidence 
 in rules.py and the Judge measures it on its own; False: an analyst applies it by reading the facts)."""
 from __future__ import annotations
 
-VERSION = "2026-11-25.3"
+VERSION = "2026-11-25.5"
 
 RULES = [
     # ---------------- Texniki analiz: trend ----------------
@@ -401,15 +401,107 @@ RULES = [
      "signal": "Bahalanmış metal → aşağı, ucuzlaşmış → yuxarı.",
      "void": "Nisbət struktur dəyişirsə (yeni rejim), orta qayıdış gec gəlir.",
      "source": "Cüt ticarəti (pairs trading), Gatev-Goetzmann-Rouwenhorst (2006)."},
-    {"id": "IM-RISK-1", "area": "Bazarlar arası", "name": "Risk əhvalı (VIX, səhm)", "detector": False,
-     "how": "VIX sıçrayır, S&P düşür: likvidlik satışı qızılı da qısa müddət endirə bilər, sonra sığınacaq tələbi.",
-     "signal": "Böhranın ilk saatları → qeyri-müəyyən; sonra → yuxarı.",
-     "void": "Sakit bazarda əlaqə zəifdir.",
-     "source": "2008, 2020 epizodları; sübutu epizodikdir."},
+    {"id": "TM-SES-1", "area": "Vaxt", "name": "Asiya saatları (gecə)", "detector": True,
+     "how": "Növbəti saat 22:00–07:00 UTC arasındadır (Asiya seansı).",
+     "signal": "Yuxarı: tarixən qızıl gecə saatlarında qalxmağa meyllidir.",
+     "void": "Böyük xəbər gecəsi və Asiya bayramlarında effekt pozulur.",
+     "source": "Blose, Gondhalekar və Kort (2018); WGC (2024) seanslar üzrə gəlir bölgüsü."},
+    {"id": "TM-SES-2", "area": "Vaxt", "name": "ABŞ saatları (gündüz)", "detector": True,
+     "how": "Növbəti saat 14:00–20:00 UTC arasındadır (ABŞ seansı).",
+     "signal": "Aşağı: tarixən qızıl ABŞ gündüzü zəifləməyə meyllidir.",
+     "void": "ABŞ rəqəmi və Fed günlərində istiqaməti xəbər təyin edir.",
+     "source": "Blose, Gondhalekar və Kort (2018); WGC (2024)."},
+    {"id": "TM-FIX-1", "area": "Vaxt", "name": "Londonun günorta fiksinqi", "detector": True,
+     "how": "Növbəti saat London vaxtı ilə 15:00-dır (LBMA günorta qiyməti).",
+     "signal": "Aşağı: fiksinq ətrafında qiymətin enməsi müşahidə olunub.",
+     "void": "2015-dən fiksinq elektron hərracdır: effekt yox ola bilər — Hakim ölçür.",
+     "source": "Caminschi və Heaney (2014); Abrantes-Metz və Metz (2014)."},
+    {"id": "TM-DOW-1", "area": "Vaxt", "name": "Bazar ertəsi", "detector": True,
+     "how": "Növbəti gündəlik şam bazar ertəsidir.",
+     "signal": "Aşağı: qızıl və gümüşdə «bazar ertəsi effekti».",
+     "void": "Həftəsonu böyük xəbər olubsa, istiqaməti xəbər təyin edir.",
+     "source": "Lucey və Tully (2006) «Seasonality, risk and return in daily COMEX gold and silver data»."},
+    {"id": "TM-TOM-1", "area": "Vaxt", "name": "Ay dönüşü", "detector": True,
+     "how": "Növbəti gün ayın son ticarət günü və ya ilk üç ticarət günündən biridir (ABŞ bayramları nəzərə alınır).",
+     "signal": "Yuxarı: ay sonu və əvvəli fond axınları.",
+     "void": "Qızılda sübutu səhmlərdən zəifdir — Hakim ölçür.",
+     "source": "Lakonishok və Smidt (1988); ay sonu axınları ədəbiyyatı."},
+    {"id": "TM-HOL-1", "area": "Vaxt", "name": "Bayram ərəfəsi (ABŞ)", "detector": True,
+     "how": "Növbəti gün ABŞ birja bayramından əvvəlki son ticarət günüdür (NYSE qaydaları ilə hesablanır).",
+     "signal": "Yuxarı: bayram öncəsi effekt.",
+     "void": "Nazik bazarda yayılma (spread) böyüyür: xərc nəticəni yeyə bilər.",
+     "source": "Ariel (1990) «High stock returns before holidays»."},
+    {"id": "TM-DATA-1", "area": "Vaxt", "name": "ABŞ rəqəmi saatında böyük şam", "detector": True,
+     "how": "08:30, 10:00 və ya 14:00 (New York) daxil olan saatlıq şamın gövdəsi son 100 şamın orta gövdəsinin ən azı 2 "
+            "qatıdır.",
+     "signal": "Növbəti saat həmin şamın istiqamətində davam edir.",
+     "void": "Rəqəm sonradan düzəldilsə və ya Fed şərhi ziddirsə, davam pozulur.",
+     "source": "Bizim fyuçers sınağımız H13: 63,5 % davam, 104 hal, iki ildə də, xərcdən sonra müsbət."},
+    {"id": "CM-USD-1", "area": "Bazarlar arası", "name": "Dollar trendi döndü", "detector": True,
+     "how": "Dollar indeksi (DXY; olmasa EUR/USD tərsinə) son 20 şamda öz adi dəyişkənliyinə görə ±1,5-dən çox "
+            "hərəkət etməyə başlayanda (z həddi keçəndə; trendin hər şamında yox, dönüş anında).",
+     "signal": "Dollar yuxarı → metal aşağı; dollar aşağı → metal yuxarı.",
+     "void": "Böhranda qızıl dollarla birlikdə də qalxa bilər (CM-CORR-1-ə bax).",
+     "source": "Capie, Mills və Wood (2005) «Gold as a hedge against the dollar»; WGC GRAM (dollar amili)."},
+    {"id": "CM-USD-2", "area": "Bazarlar arası", "name": "Dollar sıçradı, metal gecikir", "detector": True,
+     "how": "DXY, EUR/USD, USD/JPY-dan son 100 şamda metalla ən bağlı olanı (|əlaqə| ≥ 0,2) son şamda tərpənib; "
+            "metalın bu əlaqəyə görə gözlənilən hərəkəti ilə real hərəkəti arasındakı fərq ≥ 1 adi hərəkət.",
+     "signal": "Fərqin bağlanması istiqamətində (köhnə «Dollar impulsu» üsulu indi qaydadır).",
+     "void": "Metal eyni şamda artıq reaksiya veribsə, siqnal yoxdur.",
+     "source": "Bazarlar arası gecikmə (lead-lag) ədəbiyyatı; Hasbrouck (1995) qiymət kəşfi."},
+    {"id": "CM-JPY-1", "area": "Bazarlar arası", "name": "Yen sığınacaq sıçrayışı", "detector": True,
+     "how": "USD/JPY bir şamda adi hərəkətinin 2,5 qatı düşür (yen kəskin bahalaşır): bazarda qorxu, carry trade bağlanır.",
+     "signal": "Metal yuxarı (yen və qızıl birlikdə sığınacaqdır).",
+     "void": "Yaponiya Bankının öz qərarı ilə olan hərəkətdə əlaqə zəifləyə bilər.",
+     "source": "Ranaldo-Söderlind (2010) «Safe haven currencies»; Baur-McDermott (2010)."},
+    {"id": "CM-CNH-1", "area": "Bazarlar arası", "name": "Yuan zəifləyir", "detector": True,
+     "how": "USD/CNH 20 şamlıq trendi ±1,5 həddini keçəndə (yalnız qızıl üçün; broker USD/CNH verəndə).",
+     "signal": "Yuan zəifləyir → qızıl yuxarı (Çin alıcısı qızılla qorunur); güclənir → aşağı.",
+     "void": "Çin Mərkəzi Bankı idxal kvotasını məhdudlaşdırsa, əlaqə zəifləyir.",
+     "source": "WGC Çin tələbi hesabatları; Şanxay premiumu yuan zəifliyində artır."},
+    {"id": "CM-YLD-1", "area": "Bazarlar arası", "name": "İstiqraz trendi döndü (10 il)", "detector": True,
+     "how": "10 illik ABŞ istiqrazının QİYMƏTİ son 20 şamda ±1,5 z həddini keçəndə (qiymət qalxır = faiz enir).",
+     "signal": "İstiqraz yuxarı (faiz aşağı) → metal yuxarı; tərsi → aşağı.",
+     "void": "Gündəlik real faiz qaydaları (FA-RY) fundamental bloktadır; bu, gün içi bazar qiymətidir.",
+     "source": "Erb-Harvey (2013) «The Golden Dilemma»; WGC GRAM (fürsət xərci)."},
+    {"id": "CM-OIL-1", "area": "Bazarlar arası", "name": "Neft sıçradı, metal gecikir", "detector": True,
+     "how": "WTI və Brentdən metalla ən bağlı olanı son şamda tərpənib, metal əlaqəyə görə gözlənildiyi qədər "
+            "tərpənməyib (fərq ≥ 1 adi hərəkət).",
+     "signal": "Fərqin bağlanması istiqamətində (köhnə «Neft impulsu» üsulu indi qaydadır).",
+     "void": "Neftin öz təklif xəbəri (OPEC) inflyasiya gözləntisinə təsir etmirsə, əlaqə zəifdir.",
+     "source": "Neft-inflyasiya-qızıl kanalı (Narayan və b. 2010)."},
+    {"id": "CM-RISK-1", "area": "Bazarlar arası", "name": "Qorxu sıçrayışı (VIX ↑, səhm ↓)", "detector": True,
+     "how": "Eyni şamda VIX adi hərəkətinin 2,5 qatı qalxır və S&P 500 2 qatı düşür.",
+     "signal": "Metal yuxarı (sığınacaq tələbi).",
+     "void": "Ən ağır böhranın ilk saatlarında likvidlik satışı qızılı da endirə bilər (2008, mart 2020).",
+     "source": "Baur-Lucey (2010), Baur-McDermott (2010): qızıl səhm böhranlarında sığınacaqdır."},
+    {"id": "CM-RISK-2", "area": "Bazarlar arası", "name": "Sakit risk iştahı", "detector": True,
+     "how": "S&P 500-ün 20 şamlıq trendi +2 z həddini keçir və VIX son 100 şamın ən aşağı 20 %-indədir.",
+     "signal": "Qızıl aşağı (sığınacağa ehtiyac azalır); gümüş, platin, palladium yuxarı (sənaye metallarıdır).",
+     "void": "Faiz enişi ilə gələn səhm rallisində qızıl da qalxa bilər.",
+     "source": "O'Connor və b. (2015) «The financial economics of gold»; PGM-lərin sənaye betası."},
+    {"id": "CM-CORR-1", "area": "Bazarlar arası", "name": "Metal dollara baxmır (sığınacaq rejimi)", "detector": True,
+     "how": "Metalın dollarla 60 şamlıq əlaqəsi adətən mənfidir; +0,2-dən yuxarı çıxanda (ikisi birlikdə alınır) "
+            "və metalın öz 20 şamlıq trendi aydındırsa.",
+     "signal": "Metalın öz trendi istiqamətində (güclü sığınacaq tələbi).",
+     "void": "Qısa müddətli təsadüfi əlaqə də ola bilər: Hakim ölçür.",
+     "source": "Reboredo (2013) qızıl-dollar asılılığı rejimləri; Baur-McDermott (2010)."},
+    {"id": "CM-CU-1", "area": "Bazarlar arası", "name": "Mis/qızıl nisbəti döndü", "detector": True,
+     "how": "Mis qiymətinin qızıla nisbətinin 20 şamlıq trendi ±1,5 z həddini keçəndə (broker mis verəndə).",
+     "signal": "Nisbət yuxarı (böyümə) → qızıl aşağı, gümüş/platin/palladium yuxarı; aşağı → tərsi.",
+     "void": "Çinin mis anbarları və təklif şokları nisbəti böyümədən asılı olmayaraq tərpədə bilər.",
+     "source": "Mis/qızıl nisbəti — böyümə və faiz göstəricisi (bazar praktikası; Gundlach)."},
+    {"id": "CM-LEAD-1", "area": "Bazarlar arası", "name": "Cüt metal önə düşdü", "detector": True,
+     "how": "Cüt metal (qızıl-gümüş, platin-palladium) bir şamda adi hərəkətinin 2,5 qatı tərpənir, bu metal "
+            "isə hələ tərpənməyib (< 0,5 adi hərəkət).",
+     "signal": "Cüt metalın istiqamətində yetişmə.",
+     "void": "Metallardan birinin öz xəbəri (mədən, tətil) varsa, yetişmə olmaya bilər.",
+     "source": "Qiymətli metallar arasında gecikmə (Lucey və b. 2013)."},
+
 ]
 
 BY_ID = {r["id"]: r for r in RULES}
-AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Fundamental", "Xəbər", "Bazarlar arası")
+AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Fundamental", "Xəbər", "Bazarlar arası", "Vaxt")
 TA_AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Bazarlar arası")
 CHART_AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Bazarlar arası", "Öyrənilmiş")
 
