@@ -158,6 +158,8 @@ def test_daily_futures_refresh_needs_approval_and_respects_the_monthly_ceiling(m
 
         async def get(self, url, params=None, auth=None):
             calls.append(url)
+            if "get_dataset_range" in url:
+                return R(200, {"start": "2010-06-06T00:00:00Z", "end": "2030-01-01T00:00:00Z"})
             if "get_cost" in url:
                 return R(200, 0.9)
             return R(200, "ts_event,open,high,low,close,volume\n2026-11-23T00:00:00Z,1,2,0.5,1.5,10\n")
@@ -233,3 +235,44 @@ def test_ta_page_data_has_every_layer_and_the_rules_on_the_chart():
     assert d["fired"] and d["fired"][0]["rule"] == "TA-SR-1"
     assert {r["id"] for r in d["book"]} == {r["id"] for r in playbook.RULES if r["detector"]}
     assert "vote" in d["now"] and d["now"]["regime"]
+
+
+def test_daily_refresh_stops_at_databentos_history_end_and_bills_only_delivered(monkeypatch):
+    import asyncio
+    import json
+    from app import futures
+    db = DB(":memory:")
+    futures.ensure(db)
+    db.put("futures:daily_approved", json.dumps({"by": "test"}))
+    last = 1795305600
+    db.execute("INSERT INTO fut_candles(symbol, t, o, h, l, c, v) VALUES('XAU', ?, 1, 1, 1, 1, 1)", (last,))
+    asked = []
+
+    class R:
+        def __init__(self, status, body):
+            self.status_code, self._b, self.text = status, body, str(body)
+
+        def json(self):
+            return self._b
+
+    class C:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, params=None, auth=None):
+            if "get_dataset_range" in url:
+                return R(200, {"end": "2026-11-24T06:30:00Z"})
+            asked.append(params.get("end"))
+            if "get_cost" in url:
+                return R(200, 0.04)
+            return R(422, {"detail": "dataset_unavailable_range"})
+    monkeypatch.setattr(futures.httpx, "AsyncClient", C)
+    res = asyncio.run(futures.daily_refresh(db, "k", last + 3 * 86400))
+    assert asked and all(e == "2026-11-24T06:00" for e in asked)                    # never past the history end
+    assert not res["ok"] and res["cost_usd"] == 0 and res["month_spent_usd"] == 0      # refused: nothing billed

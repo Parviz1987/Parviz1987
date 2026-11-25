@@ -172,16 +172,19 @@ async def download(db: DB, key: str, limit_usd: float, report=None, now: float |
 DAILY_CAP_USD = 1.0           # hard monthly ceiling for the daily top-up; above it nothing is bought that month
 
 
-def daily_window(db: DB, sym: str, now: float) -> tuple[str, str] | None:
-    """From the day of the newest stored bar to today 00:00 UTC (whole days only; nothing twice)."""
+def daily_window(db: DB, sym: str, now: float, avail_end: datetime | None = None) -> tuple[str, str] | None:
+    """From the minute after the newest stored bar to today 00:00 UTC, or to where Databento's history ends if that is
+    earlier (asking past it is refused: «dataset_unavailable_range»). Whole hours; nothing twice."""
     last = db.execute("SELECT MAX(t) t FROM fut_candles WHERE symbol=?", (sym,)).fetchone()["t"]
     if last is None:
         return None
     start = datetime.fromtimestamp(last + 60, timezone.utc)
     end = datetime.fromtimestamp(now, timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    if avail_end is not None and avail_end < end:
+        end = avail_end.replace(minute=0, second=0, microsecond=0)
     if start >= end:
         return None
-    return start.strftime("%Y-%m-%dT%H:%M"), end.strftime("%Y-%m-%d")
+    return start.strftime("%Y-%m-%dT%H:%M"), end.strftime("%Y-%m-%dT%H:%M")
 
 
 async def daily_refresh(db: DB, key: str, now: float | None = None) -> dict:
@@ -193,19 +196,30 @@ async def daily_refresh(db: DB, key: str, now: float | None = None) -> dict:
         return {"ok": False, "msg": "gündəlik təzələmə təsdiqlənməyib"}
     month = time.strftime("%Y-%m", time.gmtime(now))
     spent = float(db.get(f"futures:daily_spent:{month}") or 0)
-    wins = {s: daily_window(db, s, now) for s in SYMBOLS}
-    wins = {s: w for s, w in wins.items() if w}
-    if not wins:
-        return {"ok": True, "msg": "yeni gün yoxdur", "loaded": {}}
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=180.0)) as c:
+        avail = None
+        try:              # where the exchange's history ends right now (free); newer minutes are not historical yet
+            r = await c.get(f"{BASE}/metadata.get_dataset_range", params={"dataset": DATASET}, auth=(key, ""))
+            if r.status_code == 200:
+                avail = datetime.fromisoformat(str(r.json().get("end", "")).replace("Z", "+00:00")[:25])
+                if avail.tzinfo is None:
+                    avail = avail.replace(tzinfo=timezone.utc)
+        except (httpx.HTTPError, ValueError, AttributeError):
+            avail = None
+        wins = {s: daily_window(db, s, now, avail) for s in SYMBOLS}
+        wins = {s: w for s, w in wins.items() if w and w[0] < w[1]}
+        if not wins:
+            return {"ok": True, "msg": "yeni məlumat yoxdur", "loaded": {}}
         cost = 0.0
+        costs: dict[str, float] = {}
         for sym, (a, b) in wins.items():
             r = await c.get(f"{BASE}/metadata.get_cost", auth=(key, ""), params={
                 "dataset": DATASET, "symbols": SYMBOLS[sym], "stype_in": "continuous", "schema": "ohlcv-1m",
                 "start": a, "end": b})
             if r.status_code != 200:
                 return {"ok": False, "msg": f"qiymət alınmadı: HTTP {r.status_code} {r.text[:120]}"}
-            cost += float(r.json())
+            costs[sym] = float(r.json())
+            cost += costs[sym]
         if spent + cost > DAILY_CAP_USD:
             return {"ok": False, "msg": f"aylıq hədd {DAILY_CAP_USD} $: bu ay {spent:.2f} $ + {cost:.2f} $ olardı — alınmadı"}
         loaded, errors = {}, []
@@ -226,8 +240,9 @@ async def daily_refresh(db: DB, key: str, now: float | None = None) -> dict:
             await asyncio.to_thread(db.executemany, "INSERT OR REPLACE INTO fut_candles(symbol, t, o, h, l, c, v) "
                                     "VALUES(?,?,?,?,?,?,?)", [(sym, *x) for x in rows])
             loaded[sym] = len(rows)
-    db.put(f"futures:daily_spent:{month}", f"{spent + cost:.4f}")
-    res = {"ok": not errors, "ts": now, "cost_usd": round(cost, 4), "month_spent_usd": round(spent + cost, 4),
+    paid = sum(costs[s] for s in loaded)       # only data actually delivered is billed (a refused request costs 0)
+    db.put(f"futures:daily_spent:{month}", f"{spent + paid:.4f}")
+    res = {"ok": not errors, "ts": now, "cost_usd": round(paid, 4), "month_spent_usd": round(spent + paid, 4),
            "loaded": loaded, "errors": errors}
     db.put("futures:daily_last", json.dumps(res, ensure_ascii=False))
     return res

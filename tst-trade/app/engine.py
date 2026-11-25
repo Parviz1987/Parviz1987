@@ -297,6 +297,11 @@ class Engine:
             self.db.put("futures:daily_approved", json.dumps(
                 {"ts": time.time(), "cap_usd_month": fut.DAILY_CAP_USD,
                  "by": "sahib, Claude ilə çatda 2026-11-25 (ayda ~0,35 $, pulsuz kreditdən)"}, ensure_ascii=False))
+        if not self.db.get("migr:futdaily_fix_1125") and not self.db.get("futures:daily_last"):
+            # the first daily top-ups were refused (asked past Databento's history end) but their quote was counted as
+            # spent: nothing was delivered, so nothing was billed
+            self.db.execute("DELETE FROM kv WHERE k LIKE 'futures:daily_spent:%'")
+            self.db.put("migr:futdaily_fix_1125", "1")
         if not self.db.get("migr:limits50_1125"):
             # The owner's decision (chat, 2026-11-25): every brain's monthly limit 50 $. The counted cost of Grok and
             # the OpenAI nano model uses a deliberately high default price, so a 20 $ cap could stop them although
