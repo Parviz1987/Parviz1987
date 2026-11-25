@@ -587,7 +587,7 @@ class Engine:
                 k = forecast.steps_of(h)
                 batch: list = []
                 linked = {c: {r["t"]: r["c"] for r in candles.closed(self.db, c, tf, now, limit=BACKTEST_MAX)}
-                          for c in list(markets.saved(self.db).get("epics", {})) + [PAIR[sym]]}
+                          for c in list(markets.saved(self.db).get("epics", {}))}
                 done = {r["issued_t"] for r in self.db.execute(
                     "SELECT issued_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='history' "
                     "GROUP BY issued_t HAVING COUNT(*) >= ?", (sym, h, len(forecast.methods_for(h)))).fetchall()}
@@ -681,14 +681,6 @@ class Engine:
                     best = (strength, g, o, markets.RELATED[c]["name"])
             if best is not None:
                 out[key] = best[1:]
-        if sym in PAIR and past:     # Block 22: the partner metal's closes at the same candle times (past only)
-            o = PAIR[sym]
-            m = (rows_by_code or {}).get(o)
-            if m is None:
-                m = {r["t"]: r["c"] for r in candles.closed(self.db, o, tf, now, limit=150)}
-            if past[-1]["t"] in m:
-                pairs = [(x["c"], m[x["t"]]) for x in past[-101:] if x["t"] in m]
-                out["pair"] = ([a for a, _ in pairs], [b for _, b in pairs])
         return out
 
     _rules_busy = False

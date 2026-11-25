@@ -73,8 +73,8 @@ def test_forecast_needs_enough_candles_and_uses_past_only():
     fc = forecast.build(closes, "1h")
     m = fc["methods"]
     assert m["rw"]["p_up"] == 0.5
-    assert m["momentum"]["p_up"] > 0.5
-    assert m["momentum"]["p_up"] <= forecast.P_CAP[1]
+    assert m["qaydalar"]["p_up"] == 0.5                      # no rule views given: no view
+    assert not set(forecast.RETIRED) & set(m)               # the old chart methods are gone (one organ: the block)
     assert m["rw"]["lo80"] < m["rw"]["lo50"] < fc["price"] < m["rw"]["hi50"] < m["rw"]["hi80"]
 
 
@@ -107,10 +107,10 @@ def test_backtest_walk_forward_and_judge_status():
     now = rows[-1][0] + 2 * 3600
     eng.backtest(now)
     st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
-    assert st["momentum"]["n"] > 500
+    assert st["seans"]["n"] > 500
     assert st["rw"]["status"] == "bazis"
     # Random walk data: no method may be proven.
-    assert st["momentum"]["status"] in ("yox", "az")
+    assert st["seans"]["status"] != "sübut"
     assert 0.6 < st["rw"]["cover80"] < 0.95
     # A forecast only uses candles before it: every issued forecast's target is after its price0 candle.
     bad = db.execute("SELECT COUNT(*) FROM forecasts WHERE target_t <= issued_t").fetchone()[0]
@@ -125,8 +125,9 @@ def test_trend_makes_momentum_proven():
     st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
     assert st["up"]["n"] > 1000
     # The proof is money (audit 2026-11-24): proven only if the average result after the full cost is above zero.
-    if st["momentum"]["status"] == "sübut":
-        assert st["momentum"]["edge"] > st["momentum"]["cost"]
+    for r in st.values():
+        if r["status"] == "sübut":
+            assert r["edge"] > r["cost"]
 
 
 def test_live_issue_and_score():
@@ -286,13 +287,13 @@ def _fake_scored(db, method, n, hits, move):
 
 def test_always_long_in_a_rising_market_is_no_skill_but_pays():
     db = mem()
-    rows = [("XAU", "1h", "momentum", "history", i * 3600, i * 3600 + 3600, 100.0, 0.6, 99, 101, 98, 102, "",
+    rows = [("XAU", "1h", "qaydalar", "history", i * 3600, i * 3600 + 3600, 100.0, 0.6, 99, 101, 98, 102, "",
              101.0 if i < 700 else 99.0, 1.0, int(i < 700), int(i < 700), 0.16, 1, 1) for i in range(1000)]
     db.executemany("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50, "
                    "lo80, hi80, basis, price1, scored_ts, outcome, hit, brier, in50, in80) "
                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
-    m = st["momentum"]
+    m = st["qaydalar"]
     assert abs(m["bar"] - 0.7) < 1e-9 and m["p_hit"] > 0.05       # 70 % right = the drift: no direction skill
     assert m["status"] == "sübut" and m["edge"] > m["cost"]          # but riding the drift paid after cost: money
 
@@ -300,14 +301,14 @@ def test_always_long_in_a_rising_market_is_no_skill_but_pays():
 def test_judge_needs_bonferroni_and_a_move_bigger_than_the_spread():
     db = mem()
     _fake_scored(db, "up", 1000, 500, 0.001)          # baseline: half up
-    _fake_scored(db, "momentum", 1000, 700, 0.00001)  # 70 % right but moves far smaller than the spread
-    _fake_scored(db, "trend", 1000, 700, 0.01)        # 70 % right, big moves
-    _fake_scored(db, "fib", 400, 222, 0.01)           # p ~ 0.015: passes 0.05, fails 0.05 / 9
+    _fake_scored(db, "qaydalar", 1000, 700, 0.00001)  # 70 % right but moves far smaller than the spread
+    _fake_scored(db, "chartist", 1000, 700, 0.01)     # 70 % right, big moves
+    _fake_scored(db, "seans", 400, 222, 0.01)         # p ~ 0.015: passes 0.05, fails the corrected bar
     st = {r["method"]: r for r in judge.stats(db, "XAU", "1h", "history")}
-    assert st["momentum"]["status"] == "xərc"
-    assert st["trend"]["status"] == "sübut"
-    assert st["fib"]["p"] < 0.05 and st["fib"]["status"] == "yox"
-    assert judge.official(list(st.values()))["method"] == "trend"
+    assert st["qaydalar"]["status"] == "xərc"
+    assert st["chartist"]["status"] == "sübut"
+    assert st["seans"]["p"] < 0.05 and st["seans"]["status"] == "yox"
+    assert judge.official(list(st.values()))["method"] == "chartist"
 
 
 def test_where_splits_hits_by_session_and_mood():

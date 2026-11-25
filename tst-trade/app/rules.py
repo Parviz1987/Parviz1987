@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS rule_signals (metal TEXT NOT NULL, tf TEXT NOT NULL, 
   dir INTEGER NOT NULL, price0 REAL, price1 REAL, mode TEXT NOT NULL, note TEXT, PRIMARY KEY (metal, tf, t, rule));
 CREATE INDEX IF NOT EXISTS rule_signals_r ON rule_signals(rule, tf);
 """
-RULES_VER = "2026-11-25.2"     # a new detector set: each metal x timeframe replays its history once more (old rows kept)
+RULES_VER = "2026-11-25.3"     # a new detector set: each metal x timeframe replays its history once more (old rows kept)
 RR_STOP, RR_TARGET, RR_BARS = 1.0, 2.0, 20      # the trader's test: stop 1 ATR, target 2 ATR, at most 20 candles
 TF_DAYS = {"1h": 1 / 24, "4h": 1 / 6, "1d": 1.0}
 PAIR = {"XAU": "XAG", "XAG": "XAU", "XPT": "XPD", "XPD": "XPT"}
@@ -290,7 +290,7 @@ def detect(ind: Ind, i: int, higher: dict | None = None, pair: tuple | None = No
         if tr == d and 0.236 <= ret < 0.382 and ((d > 0 and turn_up) or (d < 0 and turn_dn)):
             out.append(("TA-FIB-2", d, f"güclü trenddə dayaz geri çəkilmə {ret * 100:.1f} %"))
     # TA-CDL-1: a candle pattern at a level (support/resistance or the Fibonacci zone)
-    from .forecast import candle_pattern_view
+    from .patterns import candle_pattern_view
     p, why = candle_pattern_view(cs[i - 5:i + 1])
     if p != 0.5:
         d = 1 if p > 0.5 else -1
@@ -301,7 +301,7 @@ def detect(ind: Ind, i: int, higher: dict | None = None, pair: tuple | None = No
             out.append(("TA-CDL-1", d, why + " (səviyyədə)"))
     # IM-RATIO-1
     if pair:
-        from .forecast import pair_view
+        from .patterns import pair_view
         pp, why = pair_view(pair)
         if pp != 0.5:
             out.append(("IM-RATIO-1", 1 if pp > 0.5 else -1, why))
@@ -596,7 +596,7 @@ LAG = 1800      # the rules job runs every 15 min and the live lookup is cached 
 # Rules that read the SAME idea (owner 2026-11-25: «what is the same thing under a different name?»). In the vote each
 # idea gets one voice (the average of its rules), so five trend rules cannot outvote one independent idea.
 RULE_FAMILY = {
-    "TA-TREND-1": "trend", "TA-TREND-2": "trend", "TH-DOW-1": "trend", "TA-ADX-1": "trend", "TA-MACD-1": "trend",
+    "TA-TREND-1": "trend", "TA-TREND-2": "trend", "TA-ICHI-1": "trend", "TH-DOW-1": "trend", "TA-ADX-1": "trend", "TA-MACD-1": "trend",
     "TA-BRK-1": "qırılma", "PA-BOS-1": "qırılma", "TA-TL-1": "qırılma", "TA-PAT-TRI": "qırılma",
     "TA-PAT-FLAG": "qırılma", "TA-PAT-WEDGE": "qırılma", "TA-BB-1": "qırılma", "TH-ELL-1": "qırılma",
     "VOL-SPIKE-1": "qırılma",

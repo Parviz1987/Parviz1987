@@ -14,6 +14,68 @@ Volume: the broker gives no exchange volume, so «tick volume» (how many times 
 volume every CFD platform shows) is counted from 2026-11-25 on; volume rules stay silent until enough of it exists."""
 from __future__ import annotations
 
+import math
+
+
+# ---------- chart readings moved here from forecast.py (2026-11-25: one organ for technical analysis) ----------
+def candle_pattern_view(cands: list[dict]) -> tuple[float, str]:
+    """Şam fiqurları: the last candle's shape after a move. Engulfing and hammer / shooting star at the end of a
+    3-candle run against it are the classic reversal signs; weak evidence in research, so a small lean."""
+    if len(cands) < 6:
+        return 0.5, "şam azdır"
+    a, b = cands[-2], cands[-1]
+    body, rng = abs(b["c"] - b["o"]), (b["h"] - b["l"]) or 1e-12
+    run = cands[-5]["c"] - cands[-2]["c"]                 # >0: price fell into this candle
+    if b["c"] > b["o"] and a["c"] < a["o"] and b["c"] >= a["o"] and b["o"] <= a["c"] and run > 0:
+        return 0.55, "yuxarı udma (bullish engulfing) düşüşdən sonra"
+    if b["c"] < b["o"] and a["c"] > a["o"] and b["c"] <= a["o"] and b["o"] >= a["c"] and run < 0:
+        return 0.45, "aşağı udma (bearish engulfing) qalxışdan sonra"
+    lower, upper = min(b["o"], b["c"]) - b["l"], b["h"] - max(b["o"], b["c"])
+    if run > 0 and lower >= 2 * body and upper <= body and lower / rng > 0.55:
+        return 0.54, "çəkic (hammer): aşağıdan alıcı çıxdı"
+    if run < 0 and upper >= 2 * body and lower <= body and upper / rng > 0.55:
+        return 0.46, "atan ulduz (shooting star): yuxarıdan satıcı çıxdı"
+    return 0.5, "aydın fiqur yoxdur"
+
+
+def ichimoku_view(cands: list[dict]) -> tuple[float, str]:
+    """Ichimoku: price above the cloud and the fast line (9) above the slow line (26) = up; both below = down."""
+    if len(cands) < 78:
+        return 0.5, "şam azdır (78 lazımdır)"
+    hi = lambda xs: max(c["h"] for c in xs)
+    lo = lambda xs: min(c["l"] for c in xs)
+    tenkan = (hi(cands[-9:]) + lo(cands[-9:])) / 2
+    kijun = (hi(cands[-26:]) + lo(cands[-26:])) / 2
+    past = cands[:-26]                                   # the cloud drawn 26 candles ago for «now»
+    span_a = ((hi(past[-9:]) + lo(past[-9:])) / 2 + (hi(past[-26:]) + lo(past[-26:])) / 2) / 2
+    span_b = (hi(past[-52:]) + lo(past[-52:])) / 2
+    top, bot, price = max(span_a, span_b), min(span_a, span_b), cands[-1]["c"]
+    if price > top and tenkan > kijun:
+        return 0.55, "qiymət buluddan yuxarı, sürətli xətt yavaşdan yuxarı"
+    if price < bot and tenkan < kijun:
+        return 0.45, "qiymət buluddan aşağı, sürətli xətt yavaşdan aşağı"
+    return 0.5, "qiymət buludun içində və ya xətlər ziddir"
+
+
+def pair_view(pair: tuple | None) -> tuple[float, str]:
+    """Metal nisbəti: this metal against its partner (gold/silver, platinum/palladium). When the ratio is far from its
+    recent mean (|z| > 2 over the last 100 candles), a pull back towards the mean is expected: an expensive metal
+    leans down, a cheap one up."""
+    if not pair:
+        return 0.5, "cüt metalın şamı yoxdur"
+    g, o = pair
+    rs = [math.log(a / b) for a, b in zip(g, o) if a and b]
+    if len(rs) < 60:
+        return 0.5, "cüt şam azdır"
+    m = sum(rs) / len(rs)
+    sd = math.sqrt(sum((x - m) ** 2 for x in rs) / (len(rs) - 1)) or 1e-9
+    z = (rs[-1] - m) / sd
+    if z > 2:
+        return 0.45, f"nisbət orta səviyyədən {z:.1f} sd yuxarıdır: bu metal cütünə görə bahadır"
+    if z < -2:
+        return 0.55, f"nisbət orta səviyyədən {abs(z):.1f} sd aşağıdır: bu metal cütünə görə ucuzdur"
+    return 0.5, f"nisbət normaldır (z {z:+.1f})"
+
 
 def zigzag(cs: list[dict], highs: list[int], lows: list[int]) -> list[tuple[int, str, float]]:
     """Confirmed swings in time order, alternating high/low (of two in a row, the more extreme is kept)."""
@@ -156,6 +218,13 @@ def more(ind, i: int, highs: list[int], lows: list[int], tf: str) -> list[tuple[
         if move < 0 and ph - cs[k]["c"] < 0.5 * -move and c["c"] < pl <= prev["c"]:
             out.append(("TA-PAT-FLAG", -1, "bayraq: güclü düşüşdən sonra fasilə aşağı qırıldı"))
             break
+
+    # --- 4b. İçimoku: price leaves the cloud with the fast line on its side (the state changes on this candle) ---
+    if i >= 80:
+        p1, why = ichimoku_view(cs[i - 79:i + 1])
+        p0, _ = ichimoku_view(cs[i - 80:i])
+        if p1 != 0.5 and p1 != p0:
+            out.append(("TA-ICHI-1", 1 if p1 > 0.5 else -1, "İçimoku: " + why))
 
     # --- 5. Osilyator: Stoxastik ---
     k1, d1, k0, d0 = ind.sk[i], ind.sd[i], ind.sk[i - 1], ind.sd[i - 1]

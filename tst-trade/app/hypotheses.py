@@ -147,7 +147,9 @@ def _method_row(db: DB, h: dict, registered: float, p_bar: float, cost_of) -> di
 
 
 CLOSED = {"H6": "bağlandı: platin və palladiumun xərci (audit 2026-11-24)",
-          "H11": "bağlandı: platin və palladiumun xərci; fyuçersdə də 45–47 % (audit 2026-11-24)"}
+          "H11": "bağlandı: platin və palladiumun xərci; fyuçersdə də 45–47 % (audit 2026-11-24)",
+          "H8": "bağlandı: «qısa dönüş» üsulu çıxarıldı — texniki analiz bir blokda (2026-11-25, sahibin qərarı); "
+                "nəticəsi onsuz da sübut deyildi (30 haldan 60 %, xərcdən sonra mənfi)"}
 
 
 def _close(rows: list[dict]) -> list[dict]:

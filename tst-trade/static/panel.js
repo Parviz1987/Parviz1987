@@ -122,8 +122,8 @@ function renderTaSummary(all) {
     row("ATR 14 (orta şam)", a == null ? "—" : fmt(a) + " · " + (a / last * 100).toFixed(2) + " %") +
     row("Yaxın dəstək", sup ? fmt(sup.v) : "—", "up") + row("Yaxın müqavimət", res ? fmt(res.v) : "—", "down") +
     row("Yaxın Fibonacci", nf ? (nf.f * 100).toFixed(1) + " % · " + fmt(nf.v) : "—") +
-    `<p class="note">Bu xətlər yalnız göstəricidir. Eyni fikirlər proqnoz üsulu kimi Hakimdə yoxlanır${judgeSays("trend") ? ":" : "."}
-      Trend${judgeSays("trend")}; RSI${judgeSays("rsi")}; Fibonacci${judgeSays("fib")}; Sıçrayış${judgeSays("breakout")}.</p>`;
+    `<p class="note">Bu xətlər yalnız göstəricidir. Texniki analiz bir blokdadır (Bilik kitabı: 12 növ, hər qayda Hakimdə ayrıca);
+      proqnoza bir səs kimi gedir — Qaydalar${judgeSays("qaydalar")}; Qrafik analitiki${judgeSays("chartist")}.</p>`;
 }
 
 function cardHtml(c, names) {
@@ -162,7 +162,7 @@ function renderCards(fc) {
 
 let jh = "15m";
 try { jh = localStorage.getItem("tst_jh") || jh; if (jh === "1m") jh = "15m"; } catch (e) {}
-const MCOL = { momentum: "#4ea1ff", reversal: "#c77dff", trend: "#3fb27f", breakout: "#ff9f43", rsi: "#e0605a",
+const MCOL = { qaydalar: "#3fb27f", chartist: "#c77dff", vahid: "#d4a73c", momentum: "#4ea1ff", reversal: "#c77dff", trend: "#3fb27f", breakout: "#ff9f43", rsi: "#e0605a",
   fib: "#d4a73c", macro: "#2ec4b6", session: "#f78fb3", surprise: "#ffd166", dollar: "#06d6a0", oil: "#8d6e63",
   news: "#ef476f", strateq: "#118ab2", pullback: "#b5e48c", consensus: "#9aa5b1" };
 function renderJudge(fc) {
@@ -263,7 +263,7 @@ async function loadWhere(card) {
 async function loadJudgeCharts(card) {
   const d = await api(`/api/judge/series?symbol=${sym}&horizon=${card.horizon}&mode=${mode}`);
   $("jwin").textContent = d.window;
-  const names = lastFc.method_names, bar = (card[mode === "live" ? "stats_live" : "stats_history"].find((r) => r.method === "momentum") || {}).bar || 0.5;
+  const names = lastFc.method_names, bar = (card[mode === "live" ? "stats_live" : "stats_history"].find((r) => r.method === "qaydalar") || {}).bar || 0.5;
   const ser = Object.entries(d.methods).map(([m, pts]) => ({ name: names[m], color: MCOL[m] || "#888", pts }));
   drawLines($("jc1"), ser, [{ v: bar, label: "keçməli hədd " + (bar * 100).toFixed(0) + " %", color: getComputedStyle(document.documentElement).getPropertyValue("--muted") }], 0.3, 0.8);
   $("jl1").innerHTML = ser.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join("");

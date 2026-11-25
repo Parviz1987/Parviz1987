@@ -37,7 +37,7 @@ def test_multi_day_horizons_score_against_kth_trading_day():
         i = by_t[f["issued_t"]]
         assert f["price1"] == rows[i + 2][4]
     st = {r["method"]: r for r in judge.stats(db, "XAU", "10d", "history")}
-    assert "reversal" not in st and "macro" in st and st["trend"]["n"] > 300
+    assert "reversal" not in st and "macro" in st and st["trendmix"]["n"] > 300
     # overlapping forecasts: the p-value uses about n/10 independent tests, so random data is never "proven"
     assert all(r["status"] != "sübut" for r in st.values())
 
@@ -56,26 +56,12 @@ def test_session_day_bucket():
     assert candles.bucket(mon + 3600, "1d") == mon
 
 
-def test_signal_methods():
+def test_macro_method():
     up = [{"o": 100 + i, "h": 100.5 + i, "l": 99.5 + i, "c": 100 + i} for i in range(200)]
     fc = forecast.build(up, "1d")["methods"]
-    assert fc["breakout"]["p_up"] == forecast.SIGNAL_P        # new 20-candle high
-    assert fc["rsi"]["p_up"] == 1 - forecast.SIGNAL_P         # RSI 100: overbought
-    assert fc["trend"]["p_up"] > 0.5
     assert fc["macro"]["p_up"] == 0.5                         # no FRED data: no view
     m = forecast.build(up, "1d", {"dfii10": -0.2, "dollar": -1.5})["methods"]["macro"]
     assert m["p_up"] > 0.5
-    # a swing up then a pullback to the 50 % level -> bounce up
-    sw = [{"o": 100, "h": 100, "l": 100, "c": 100}] * 10 + \
-         [{"o": 100 + i, "h": 100 + i, "l": 100 + i, "c": 100 + i} for i in range(21)] + \
-         [{"o": 120 - i, "h": 120 - i, "l": 120 - i, "c": 120 - i} for i in range(11)]
-    p, basis = forecast.fib_view(sw, 0.001)
-    assert p == forecast.SIGNAL_P and "50.0" in basis
-
-
-def test_rsi_flat_and_known():
-    assert forecast.rsi([1.0] * 10) is None
-    assert forecast.rsi([float(i) for i in range(30)]) == 100.0
 
 
 def test_macro_lookup_uses_only_past_values():
@@ -102,22 +88,6 @@ def test_capital_history_parse_moves_sunday_session_to_monday():
     (t, o, h, l, c), = parse_prices(data, "1d")
     assert dt.datetime.fromtimestamp(t, dt.timezone.utc).date() == dt.date(2026, 11, 23)
     assert (o, h, l, c) == (2, 5, 1, 3)
-
-
-def test_session_method_uses_same_hour_only():
-    t0 = int(dt.datetime(2026, 1, 5, tzinfo=dt.timezone.utc).timestamp())
-    cands = []
-    for i in range(24 * 40):
-        t = t0 + i * 3600
-        up = (t // 3600) % 24 == 3               # 03:00 UTC candles always rise, the others fall
-        cands.append({"t": t, "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.5 if up else 99.5})
-    # next candle 03:00 -> up view; next 04:00 -> down view
-    at3 = [c for c in cands if c["t"] < t0 + 30 * 86400 + 3 * 3600]
-    p3 = forecast.build(at3, "1h")["methods"]["session"]["p_up"]
-    at4 = [c for c in cands if c["t"] < t0 + 30 * 86400 + 4 * 3600]
-    p4 = forecast.build(at4, "1h")["methods"]["session"]["p_up"]
-    assert p3 > 0.6 and p4 < 0.4
-    assert "session" not in forecast.build(at3, "1d")["methods"]
 
 
 def test_no_weekend_daily_forecasts_and_monday_follows_friday():
@@ -148,27 +118,17 @@ def test_selective_consensus_counts_families_not_methods():
         return {k: {"p_up": v} for k, v in kw.items()}
     calm = [0.001 * (1 if i % 2 else -1) for i in range(200)]
     # three trend-family methods up, one revert method down: one idea against another -> no view
-    out = forecast.selective_consensus(m(momentum=0.6, trend=0.6, breakout=0.6, rsi=0.4), calm, 0.001, False)
+    out = forecast.selective_consensus(m(news=0.6, strateq=0.6, brain2=0.6, dollar=0.4), calm, 0.001, False)
     assert out["p_up"] == 0.5 and "razı deyil" in out["basis"]
     # two independent families up, nobody against -> a direction
-    out = forecast.selective_consensus(m(trend=0.6, dollar=0.58), calm, 0.001, False)
+    out = forecast.selective_consensus(m(qaydalar=0.6, dollar=0.58), calm, 0.001, False)
     assert out["p_up"] > 0.5 and "2 müstəqil ailə" in out["basis"]
     # one family only (however many methods) -> no view
-    assert forecast.selective_consensus(m(momentum=0.6, trend=0.65), calm, 0.001, False)["p_up"] == 0.5
+    assert forecast.selective_consensus(m(news=0.6, strateq=0.65), calm, 0.001, False)["p_up"] == 0.5
     # near a high-impact release, or in a wild market -> no view
-    assert forecast.selective_consensus(m(trend=0.6, dollar=0.58), calm, 0.001, True)["p_up"] == 0.5
-    assert forecast.selective_consensus(m(trend=0.6, dollar=0.58), calm, 0.01, False)["p_up"] == 0.5
+    assert forecast.selective_consensus(m(qaydalar=0.6, dollar=0.58), calm, 0.001, True)["p_up"] == 0.5
+    assert forecast.selective_consensus(m(qaydalar=0.6, dollar=0.58), calm, 0.01, False)["p_up"] == 0.5
 
-
-def test_pullback_in_an_up_trend():
-    cands = [{"o": 100 + i * 0.5, "h": 100.6 + i * 0.5, "l": 99.8 + i * 0.5, "c": 100.5 + i * 0.5} for i in range(80)]
-    top = cands[-1]["c"]
-    # a dip to around the EMA 20 (about 5 points below the top) and a green candle back up
-    cands += [{"o": top, "h": top, "l": top - 6, "c": top - 5}, {"o": top - 5, "h": top - 2, "l": top - 5.5, "c": top - 2}]
-    p, basis = forecast.pullback_view(cands, 0.002)
-    assert p == forecast.SIGNAL_P and "EMA 20" in basis
-    flat = [{"o": 100, "h": 100.5, "l": 99.5, "c": 100 + (0.2 if i % 2 else -0.2)} for i in range(80)]
-    assert forecast.pullback_view(flat, 0.002)[0] == 0.5
 
 def test_every_method_has_a_passport():
     for m in forecast.METHODS:

@@ -11,7 +11,7 @@ or is cancelled), source (where the idea comes from and how strong the evidence 
 in rules.py and the Judge measures it on its own; False: an analyst applies it by reading the facts)."""
 from __future__ import annotations
 
-VERSION = "2026-11-25.2"
+VERSION = "2026-11-25.3"
 
 RULES = [
     # ---------------- Texniki analiz: trend ----------------
@@ -126,6 +126,13 @@ RULES = [
      "signal": "Xəttdən sıçrayış → trend istiqamətində; xəttin qırılması → əks istiqamətdə.",
      "void": "Xətt yalnız iki nöqtəyə söykənir; üçüncü toxunuş olmadan etibarı azdır.",
      "source": "Edwards-Magee, Murphy (1999); sübutu zəif, praktikada çox yayılmış."},
+    {"id": "TA-ICHI-1", "area": "Texniki", "name": "İçimoku buludu", "detector": True,
+     "how": "Tenkan (9), Kijun (26), bulud (Senkou A/B, 26 şam irəli çəkilmiş). Qiymət buluddan yuxarı və Tenkan > Kijun "
+            "— yüksələn; buluddan aşağı və Tenkan < Kijun — enən. Qayda vəziyyət bu şamda dəyişəndə işə düşür.",
+     "signal": "Yüksələn vəziyyətə keçid → yuxarı; enən vəziyyətə keçid → aşağı.",
+     "void": "Qiymət buludun içindədirsə və ya xətlər ziddirsə.",
+     "source": "Hosoda (1969); trend izləmənin bir forması, sübutu orta-zəif. 2026-11-25-ə qədər ayrıca proqnoz üsulu idi, "
+               "bloka köçürüldü."},
     {"id": "TA-ADX-1", "area": "Texniki", "name": "ADX: trendin gücü", "detector": True,
      "how": "ADX 14 (Wilder) trendin gücünü ölçür, istiqamətini yox: 20-dən aşağı — trend yoxdur (yan-yana bazar), "
             "20–25 — formalaşır, 25-dən yuxarı — güclü trend. İstiqaməti +DI və −DI verir. Qayda: ADX 25-i aşağıdan "

@@ -47,8 +47,8 @@ deyil.
 | İkinci analitik (AI, başqa şirkət) | Beyin | Müstəqil ikinci fikir | Eyni faktlar | Ehtimal |
 | Müzakirə (AI) | Beyin | Yuxarı və aşağı dəlilləri tərəzidə çəkmək | Eyni faktlar | Ehtimal |
 | Qrafik analitiki (AI) | Beyin | Texniki analiz, qrafikə özü baxır | Şamlar, göstəricilər, Bilik kitabı (texniki), kodun tapdığı qaydalar | Ehtimal, səviyyələr, qaydalar |
-| Kod üsulları (~30) | Beyin | Ölçülə bilən fikirlər | Şamlar, bazarlar, makro | Hər biri ehtimal və aralıq |
-| Qayda dedektorları | Beyin | Bilik kitabını kodla tətbiq etmək: texniki analizin 12 növünün hamısı (klassik, fiqurlar, şamlar, trend, osilyatorlar, dəyişkənlik, həcm, Fibonacci, Dow/Elliott/Wyckoff, price action, bazarlar arası, sistematik ölçmə) — 32 qayda (rules.py, patterns.py) | Şamlar, tik həcmi (2026-11-25-dən) | Qayda siqnalları; Hakim hər qaydanı iki cür ölçür: növbəti şam və stop 1 ATR + hədəf 2 ATR (R ilə) |
+| Kod üsulları (~20) | Beyin | Ölçülə bilən fikirlər, hər fikrin bir yeri: uzun trend, makro, ABŞ rəqəmləri, dollar/neft, seans, mövsüm, COT, aralıqlar (GARCH, GVZ) | Şamlar, bazarlar, makro | Hər biri ehtimal və aralıq. Köhnə qrafik üsulları (momentum, trend, sıçrayış, RSI, Fibonacci, geri çəkilmə, şam, İçimoku, metal nisbəti, qısa dönüş, saat effekti) 2026-11-25-də çıxarıldı: hamısı texniki analiz blokunun qaydalarının təkrarı idi |
+| **Texniki analiz bloku** (qayda dedektorları) | Beyin | Texniki analizin YEGANƏ yeri — 12 növün hamısı (klassik, fiqurlar, şamlar, trend, osilyatorlar, dəyişkənlik, həcm, Fibonacci, Dow/Elliott/Wyckoff, price action, bazarlar arası, sistematik ölçmə, ADX, İçimoku) — 34 qayda (rules.py, patterns.py); proqnoza bir səs: «Qaydalar» (hər fikir ailəsi bir səs, çəki qaydanın o ana qədərki nəticəsindən) | Şamlar, tik həcmi (2026-11-25-dən) | Qayda siqnalları; Hakim hər qaydanı iki cür ölçür: növbəti şam və stop 1 ATR + hədəf 2 ATR (R ilə) |
 | Vahid proqnoz | Beyin → Hakim | **Son söz** | Bütün analitiklər | Bir ehtimal + öz-özünü sınaq |
 | Hakim | Hakim | Kim düz deyir, sübut | Proqnozlar, qiymət | Status, çəkilər |
 | Jurnal katibi | Hakim | Səhvin səbəbini tapmaq | Beyin cavabı | Dondurulmuş proqnoz kartı |

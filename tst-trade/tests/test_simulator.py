@@ -35,11 +35,11 @@ def test_simulate_proves_only_real_money():
     for i in range(300):
         ti = t + i * 3600
         cs.append((ti, 100, 100.6, 99.95, 100.55))      # every hour gold rises to the 50 % target, never to the stop
-        for m, p in (("trend", 0.6), ("rsi", 0.4)):
+        for m, p in (("qaydalar", 0.6), ("seans", 0.4)):
             rows.append(("XAU", "1h", m, "history", ti, ti + 3600, 100.0, p, 99.7, 100.3, 99.0, 101.0, "", 100.55, 1.0))
     candles.store_history(db, "XAU", "1h", cs)
     db.executemany("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50,"
                    " lo80, hi80, basis, price1, scored_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     out = simulator.simulate(db, "XAU", "1h")["methods"]
-    assert out["trend"]["status"] == "sübut" and out["trend"]["avg"] > 0
-    assert out["rsi"]["status"] == "yox" and out["rsi"]["avg"] < 0
+    assert out["qaydalar"]["status"] == "sübut" and out["qaydalar"]["avg"] > 0
+    assert out["seans"]["status"] == "yox" and out["seans"]["avg"] < 0

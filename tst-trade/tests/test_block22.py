@@ -1,6 +1,6 @@
 import math
 
-from app import forecast
+from app import forecast, patterns
 
 
 def c(o, h, l, cl, t=0):
@@ -10,21 +10,21 @@ def c(o, h, l, cl, t=0):
 def test_engulfing_after_fall_leans_up():
     seq = [c(110, 111, 109, 110), c(110, 110, 106, 107), c(107, 107, 104, 105), c(105, 105, 102, 103),
            c(103, 103.5, 100, 101), c(100.5, 104, 100, 103.5)]
-    p, why = forecast.candle_pattern_view(seq)
+    p, why = patterns.candle_pattern_view(seq)
     assert p > 0.5 and "udma" in why
 
 
 def test_ichimoku_uptrend():
     seq = [c(100 + i, 101 + i, 99 + i, 100.5 + i) for i in range(90)]
-    assert forecast.ichimoku_view(seq)[0] > 0.5
-    assert forecast.ichimoku_view(seq[:50])[0] == 0.5
+    assert patterns.ichimoku_view(seq)[0] > 0.5
+    assert patterns.ichimoku_view(seq[:50])[0] == 0.5
 
 
 def test_pair_extreme_ratio():
     g = [100.0] * 99 + [130.0]
     o = [10.0] * 100
-    assert forecast.pair_view((g, o))[0] < 0.5
-    assert forecast.pair_view(None)[0] == 0.5
+    assert patterns.pair_view((g, o))[0] < 0.5
+    assert patterns.pair_view(None)[0] == 0.5
 
 
 def test_garch_and_gvz_ranges_bracket_price():
@@ -42,7 +42,7 @@ def test_build_keeps_own_ranges():
     fc = forecast.build(seq, "1d", related={"gvz": 15.0})
     m = fc["methods"]
     assert m["gvz"]["hi80"] != m["rw"]["hi80"] and m["garch"]["hi80"] != m["rw"]["hi80"]
-    assert m["momentum"]["hi80"] == m["rw"]["hi80"]
+    assert m["qaydalar"]["hi80"] == m["rw"]["hi80"]
 
 
 def test_every_family_has_a_name():
