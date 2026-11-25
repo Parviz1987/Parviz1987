@@ -296,3 +296,23 @@ def test_every_method_belongs_to_exactly_one_block_and_families_are_the_blocks()
     st = blocks.status(db, "XAU", "1h")
     assert {b["id"] for b in st["blocks"]} == {b["id"] for b in blocks.BLOCKS}
     assert "risk" in forecast.methods_for("1h") and "risk" not in forecast.methods_for("1w")
+
+
+def test_central_bank_rule_uses_only_published_months():
+    from app import fundamental
+    from datetime import datetime, timezone
+    db = DB(":memory:")
+    db.script("CREATE TABLE IF NOT EXISTS cb_gold (country TEXT, period TEXT, oz REAL, PRIMARY KEY (country, period));")
+    rows = []
+    for k in range(48):
+        y, m = 2022 + k // 12, k % 12 + 1
+        buy = 3_000_000 if k >= 45 else 100_000          # the last three months: very strong buying
+        for c in ("CHN", "IND", "TUR", "POL", "CZE"):
+            rows.append((c, f"{y}-{m:02d}", 50_000_000 + k * 100_000 + (buy if k >= 45 else 0) * (k - 44)))
+    db.executemany("INSERT INTO cb_gold VALUES(?,?,?)", rows)
+    data = fundamental.Data(db)
+    late = datetime(2026, 3, 1, tzinfo=timezone.utc).timestamp()          # Dec 2025 public by mid-February 2026
+    got = {r: d for r, d, _ in fundamental.detect(data, "XAU", late)}
+    assert got.get("FA-CB-1") == 1
+    early = datetime(2025, 12, 1, tzinfo=timezone.utc).timestamp()        # October (strong) is public only mid-December
+    assert {r: d for r, d, _ in fundamental.detect(data, "XAU", early)}.get("FA-CB-1") != 1

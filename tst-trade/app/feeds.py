@@ -6,6 +6,7 @@ Nothing here is a price: prices come only from the price provider."""
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import logging
 import re
@@ -63,7 +64,7 @@ MACRO_SERIES = {
     "SP500": "S&P 500 səhm indeksi",
     "DCOILWTICO": "Neft WTI (gündəlik), $",
 }
-SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf")
+SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf", "imf")
 # Block 9. Kalshi: market-implied odds of the next Fed decisions (public market data, no key).
 KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
 KALSHI_SERIES = ("KXFEDDECISION", "KXFED", "FEDDECISION", "FED")
@@ -73,6 +74,11 @@ ETF_SYMBOLS = ("GLD", "SLV", "GDX", "UUP", "TIP", "IEF")
 ETF_URL = "https://data.alpaca.markets/v2/stocks/bars"
 # CFTC Commitments of Traders (disaggregated, futures only; public, no key): weekly positions on COMEX / NYMEX.
 COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
+# Central banks' gold (IMF International Liquidity, «gold reserves, volume», fine troy ounces, monthly, free): the
+# largest holders and the buyers of recent years. The fundamental block's FA-CB-1 rule reads their net purchases.
+IMF_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,IL/{c}.RGV_REVS..M"
+CB_COUNTRIES = ("CHN", "IND", "TUR", "POL", "RUS", "KAZ", "UZB", "CZE", "QAT", "SGP", "HUN", "THA", "IRQ", "JPN", "PHL",
+                "EGY", "SAU", "BRA", "DEU", "FRA", "ITA", "NLD", "CHE", "GBR", "USA")
 COT_CODES = {"088691": "XAU", "084691": "XAG", "076651": "XPT", "075651": "XPD"}
 COT_EVERY = 12 * 3600
 METAL_WORDS = {"XAU": r"\bgold\b|bullion", "XAG": r"\bsilver\b", "XPT": r"\bplatinum\b", "XPD": r"\bpalladium\b"}
@@ -275,7 +281,7 @@ class Feeds:
         self.keys = keys
         db.script(SCHEMA)
         self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0,
-                         "official": 0.0, "kalshi": 0.0, "etf": 0.0}
+                         "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0}
         self.activity = None      # app.activity.Hub: where each collector reports its status
         db.script(surprise.SCHEMA)
 
@@ -440,6 +446,26 @@ class Feeds:
         self._health("official", not errors, f"{found}/{len(due)} rəsmi rəqəm" +
                      (f"; xəta: {'; '.join(errors)}" if errors else ""), found)
 
+    async def imf_gold(self, client) -> None:
+        """Central banks' gold holdings (IMF), once a day: the monthly volume per country since 2014."""
+        import csv
+        self.db.script("CREATE TABLE IF NOT EXISTS cb_gold (country TEXT, period TEXT, oz REAL, PRIMARY KEY (country, period));")
+        try:
+            raw = await self._get(client, IMF_URL.format(c="+".join(CB_COUNTRIES)),
+                                  headers={"Accept": "application/vnd.sdmx.data+csv;version=1.0.0"},
+                                  params={"startPeriod": "2014-01", "detail": "dataonly"})
+            rows = []
+            for r in csv.DictReader(io.StringIO(raw.decode("utf-8", "replace"))):
+                per, v = r.get("TIME_PERIOD", ""), r.get("OBS_VALUE", "")
+                if len(per) == 8 and per[4:6] == "-M" and v:
+                    rows.append((r.get("COUNTRY", ""), per[:4] + "-" + per[6:], float(v)))
+            self.db.executemany("INSERT OR REPLACE INTO cb_gold VALUES(?,?,?)", rows)
+            last = max((p for _, p, _ in rows), default="—")
+            self._health("imf", bool(rows), f"{len(rows)} aylıq qeyd, {len({c for c, _, _ in rows})} mərkəzi bank, "
+                                            f"son ay {last}", len(rows))
+        except Exception as e:
+            self._health("imf", False, f"IMF: {str(e)[:120]}")
+
     async def kalshi(self, client) -> None:
         """Market-implied odds of the next Fed decisions: each open market's last price (cents) = probability."""
         self.db.script("CREATE TABLE IF NOT EXISTS fed_odds (ts REAL, ticker TEXT, title TEXT, "
@@ -541,14 +567,14 @@ class Feeds:
                 "fmp": (self.fmp, 60 if self.event_mode(now) else 300),
                 # official actuals: every minute around a release (the agencies publish at the minute)
                 "official": (self.official, 60 if self._recent_release(now) else 900),
-                "kalshi": (self.kalshi, 900), "etf": (self.etf, 300)}
+                "kalshi": (self.kalshi, 900), "etf": (self.etf, 300), "imf": (self.imf_gold, 86400)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
                     self.next_run[name] = now + every
                     task = {"news": "news", "alpaca": "news", "calendar": "calendar", "fmp": "calendar",
                             "macro": "macro", "cot": "macro", "official": "calendar", "kalshi": "macro",
-                            "etf": "macro"}[name]
+                            "etf": "macro", "imf": "macro"}[name]
                     if self.activity:
                         self.activity.report(task, "working", note=name)
                     try:

@@ -279,11 +279,15 @@ RULES = [
      "signal": "Fondlar ardıcıl alır → yuxarı; satır → aşağı.",
      "void": "Mövqe artıq ifrat haldadırsa (FA-COT-1 əks deyir).",
      "source": "Sanders-Irwin-Merrin (2009); sübutu qarışıqdır."},
-    {"id": "FA-CB-1", "area": "Fundamental", "name": "Mərkəzi bank və ETF axını", "detector": False,
-     "how": "Mərkəzi bankların alışı (WGC, aylıq) və ETF ehtiyatları uzun müddətli dəstəkdir.",
-     "signal": "Güclü alış → uzun üfüqdə yuxarı.",
-     "void": "Gün içi və saatlıq proqnoz üçün istifadə olunmur.",
-     "source": "WGC hesabatları; 2022-2025 alışları qiymətin əsas dayağı olub."},
+    {"id": "FA-CB-1", "area": "Fundamental", "name": "Mərkəzi bankların alışı (IMF), 3 ay", "detector": True,
+     "how": "IMF-in rəsmi statistikası (International Liquidity, qızıl ehtiyatının həcmi): 25 mərkəzi bankın (Çin, "
+            "Hindistan, Türkiyə, Polşa, Rusiya, Qazaxıstan, Özbəkistan, Çexiya, Qətər, Sinqapur və b.) aylıq xalis alışı "
+            "tonla. Son 3 ayın cəmi son 3 ilin 3 aylıq cəmləri arasında ən yuxarı (≥ 80-ci faiz) və ya ən aşağı "
+            "(≤ 20-ci faiz) olanda. Hər ay ay bitəndən 45 gün sonra «məlum» sayılır.",
+     "signal": "Güclü alış → yuxarı; zəif alış / satış → aşağı.",
+     "void": "Uzun müddətli dayaqdır: gün içi və saatlıq proqnoz üçün istifadə olunmur. Bəzi ölkələr gec və ya natamam "
+             "bildirir.",
+     "source": "WGC GRAM (mərkəzi bank tələbi amili); Banque de France 2024: 2021-dən qiymətin əsas sürücüsü; IMF IL."},
     {"id": "FA-GEO-1", "area": "Fundamental", "name": "Geosiyasi risk", "detector": False,
      "how": "Müharibə, sanksiya, böhran xəbərləri (Oxuyucu güc 3). Sığınacaq tələbi.",
      "signal": "Yeni risk → yuxarı; risk azalır → aşağı.",

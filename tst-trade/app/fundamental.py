@@ -18,9 +18,11 @@ from .db import DB
 
 LAG_DAYS = {"DFII10": 2, "DGS2": 2, "T10YIE": 2, "DTWEXBGS": 10}
 COT_PUBLIC = 3 * 86400 + 20 * 3600 + 1800        # Tuesday 00:00 UTC -> Friday 20:30 UTC
-FA_VER = "2026-11-25"
+FA_VER = "2026-11-25.2"
 FAMILY = {"FA-RY-1": "faiz", "FA-RY-2": "faiz", "FA-FED-1": "faiz", "FA-BE-1": "faiz", "FA-USD-1": "dollar",
-          "FA-COT-1": "mövqe", "FA-COT-2": "mövqe", "FA-SURP-1": "sürpriz"}
+          "FA-COT-1": "mövqe", "FA-COT-2": "mövqe", "FA-SURP-1": "sürpriz", "FA-CB-1": "mərkəzi bank"}
+OZ_PER_TONNE = 32150.7466
+CB_PUBLIC_DAYS = 45      # a month's IMF figure is public about six weeks after the month ends (counted cautiously)
 
 
 class Data:
@@ -47,6 +49,25 @@ class Data:
             pass
         from . import surprise
         self.sur = surprise.Lookup(db)
+        # central banks' net purchases per month (tonnes), with the moment each month became public
+        self.cb_t: list[float] = []
+        self.cb_net: list[float] = []
+        try:
+            by: dict[str, dict[str, float]] = {}
+            for r in db.execute("SELECT country, period, oz FROM cb_gold").fetchall():
+                by.setdefault(r["period"], {})[r["country"]] = r["oz"]
+            months = sorted(by)
+            for a, b in zip(months, months[1:]):
+                both = set(by[a]) & set(by[b])           # only countries reported in both months
+                if len(both) < 5:
+                    continue
+                net = sum(by[b][c] - by[a][c] for c in both) / OZ_PER_TONNE
+                y, m = int(b[:4]), int(b[5:7])
+                end = datetime(y + (m == 12), m % 12 + 1, 1, tzinfo=timezone.utc).timestamp()
+                self.cb_t.append(end + CB_PUBLIC_DAYS * 86400)
+                self.cb_net.append(net)
+        except Exception:
+            pass
 
     def change(self, sid: str, t: float, days: int, pct: bool = False) -> float | None:
         """The change over `days` observations of the last value published before t."""
@@ -103,6 +124,18 @@ def detect(data: Data, metal: str, t: float) -> list[tuple[str, int, str]]:
         if len(d) == 3 and (all(x > 0 for x in d) or all(x < 0 for x in d)) and abs(sum(d)) >= 3 * big:
             out.append(("FA-COT-2", 1 if d[0] > 0 else -1, "fondlar 3 həftədir ardıcıl " +
                         ("alır" if d[0] > 0 else "satır")))
+    i = bisect.bisect_right(data.cb_t, t)
+    nets = data.cb_net[:i]
+    if len(nets) >= 27:
+        sums = [sum(nets[k - 3:k]) for k in range(3, len(nets) + 1)][-36:]
+        now3 = sums[-1]
+        pct = sum(x < now3 for x in sums) / len(sums) * 100
+        if pct >= 80:
+            out.append(("FA-CB-1", 1, f"mərkəzi banklar son 3 ayda {now3:+.0f} ton aldı: 3 ilin ən güclü alışları "
+                                      f"({pct:.0f}-ci faiz)"))
+        elif pct <= 20:
+            out.append(("FA-CB-1", -1, f"mərkəzi banklar son 3 ayda {now3:+.0f} ton: 3 ilin ən zəif alışları "
+                                       f"({pct:.0f}-ci faiz)"))
     s, n = data.surprise_sum(t)
     if n >= 3 and abs(s) >= 2:
         out.append(("FA-SURP-1", 1 if s > 0 else -1, f"son 14 gündə {n} ABŞ rəqəmi: sürprizlər qızıl üçün "
@@ -123,7 +156,8 @@ def run(db: DB, now: float | None = None) -> int:
         if len(cs) < 30:
             continue
         ind = rules.Ind(cs)
-        mark = f"fa:ver:{FA_VER}:{sym}"
+        # replayed again once the central-bank data first arrives (the IMF feed runs once a day)
+        mark = f"fa:ver:{FA_VER}:{'cb' if data.cb_net else 'nocb'}:{sym}"
         done = int(db.get(mark) or 0)
         rows = []
         for i in range(20, len(cs)):
