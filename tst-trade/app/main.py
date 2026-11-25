@@ -24,6 +24,7 @@ from .engine import Engine, market_open
 from .keys import KeyStore
 
 STATIC = BASE_DIR / "static"
+log = logging.getLogger("tst.main")
 PUBLIC = ("/login", "/healthz", "/version", "/api/diag", "/static/", "/sw.js", "/manifest.webmanifest")
 
 
@@ -783,6 +784,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                         res = await futures.daily_refresh(db, key)
                     finally:
                         fut_busy["on"] = False
+                    db.put("futures:daily_try", json.dumps({"ts": time.time(), **res}, ensure_ascii=False))
                     if res.get("ok"):
                         db.put("futures:daily_day", day)
                         await asyncio.to_thread(rules.run_futures_volume, db)

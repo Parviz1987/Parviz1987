@@ -205,3 +205,8 @@ def test_adx_measures_strength_and_every_rule_has_a_family():
     for r in playbook.RULES:
         if r["detector"]:
             assert r["id"] in rules.RULE_FAMILY, r["id"]
+
+
+def test_main_module_has_its_logger():
+    from app import main
+    assert main.log.name == "tst.main"            # the daily futures loop died on «name 'log' is not defined»

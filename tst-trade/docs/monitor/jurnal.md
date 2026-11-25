@@ -100,3 +100,8 @@
   - 153 test keçir;
   - 6 səhifə kompüterdə və telefonda xətasızdır;
   - server sağlamdır: yeni xəta yoxdur, xəbərdarlıq yoxdur.
+
+## 2026-11-25 01:48 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** sakit. Kənar giriş və bloklanmış ünvan yoxdur, başlıqlar yerindədir.
+- **Xəta tapıldı və düzəldildi:** gündəlik fyuçers təzələməsi ilk cəhddə dayandı. Səbəb: `main.py`-da `log` adı təyin olunmamışdı, ona görə xəbərdarlıq yazmaq istəyəndə proses özü düşdü. Logger təyin olundu, test əlavə olundu. Hər cəhdin nəticəsi indi `futures:daily_try`-da saxlanılır və `/api/diag`-da görünür.
+- **Baza:** 999 MB (tarixçə yeni qaydalarla yenidən hesablandı).

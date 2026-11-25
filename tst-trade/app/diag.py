@@ -142,6 +142,8 @@ def _futures_now(db) -> dict:
         rows = []
     return {"running": db.get("futures:running"), "approved": json.loads(db.get("futures:approved") or "null"),
             "last": json.loads(db.get("futures:last") or "null"),
+            "daily": {"approved": json.loads(db.get("futures:daily_approved") or "null"),
+                      "try": json.loads(db.get("futures:daily_try") or "null"), "day": db.get("futures:daily_day")},
             "stored": {r["symbol"]: {"bars": r["n"], "months": r["m"], "from": time.strftime("%Y-%m-%d", time.gmtime(r["a"])),
                                      "to": time.strftime("%Y-%m-%d", time.gmtime(r["b"]))} for r in rows}}
 
