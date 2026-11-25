@@ -7,7 +7,7 @@
   const pct = (v) => (v == null ? "—" : Math.round(v * 100) + " %");
   const NAMES = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
   const TFN = { "1h": "1 saat", "4h": "4 saat", "1d": "1 gün" };
-  const ST = { "sübut": "✅ sübut", yox: "❌ yox", "zəif": "⚠️ zəif", az: "⏳ az", "xərc": "💸 xərc" };
+  const ST = { "sübut": "✅ sübut", yox: "❌ yox", "zəif": "⚠️ zəif", az: "⏳ az", "xərc": "💸 xərc", "namizəd": "🏁 namizəd (son sınaq gözlənir)" };
   // the 12 kinds of technical analysis and which rules of the block belong to each
   const KINDS = [
     ["Klassik qrafik", ["TA-SR-1", "TA-TL-1", "TA-PIVOT-1", "TA-BRK-1"]],

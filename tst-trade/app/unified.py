@@ -52,16 +52,17 @@ def _rows(db: DB, symbol: str, horizon: str) -> list:
     return db.execute(q, (symbol, horizon, t0, cut)).fetchall()
 
 
-def simulate(db: DB, symbol: str, horizon: str) -> dict:
-    """Walk-forward self-simulation on one desk. Returns the final weights and the out-of-sample score."""
+def simulate(db: DB, symbol: str, horizon: str, rows: list | None = None, exclude: frozenset = frozenset()) -> dict:
+    """Walk-forward self-simulation on one desk. Returns the final weights and the out-of-sample score. exclude: the
+    analysts left out (the block-value test: the same simulation without one block)."""
     from .judge import full_cost
-    rows = _rows(db, symbol, horizon)
+    rows = _rows(db, symbol, horizon) if rows is None else rows
     # group the analysts' views by forecast moment
     moments: dict[int, dict] = {}
     for r in rows:
         m = moments.setdefault(r["issued_t"], {"t": r["issued_t"], "target": r["target_t"], "p0": r["price0"],
                                                "p1": r["price1"], "x": {}})
-        if r["method"] not in SKIP and r["p_up"] is not None and r["p_up"] != 0.5:
+        if r["method"] not in SKIP and r["method"] not in exclude and r["p_up"] is not None and r["p_up"] != 0.5:
             m["x"][r["method"]] = (r["p_up"] - 0.5) * SCALE
     seq = sorted(moments.values(), key=lambda m: m["t"])
     w: dict[str, float] = {}
@@ -119,6 +120,35 @@ def refresh(db: DB) -> dict:
             except Exception as e:      # one desk failing never stops the others
                 out[f"{s}:{h}"] = {"error": f"{type(e).__name__}: {str(e)[:120]}"}
     db.put("unified:models", json.dumps(out, ensure_ascii=False))
+    try:
+        db.put("unified:ablation", json.dumps(ablation(db), ensure_ascii=False))
+    except Exception as e:          # the block-value test never stops the forecasts
+        db.put("unified:ablation", json.dumps({"error": f"{type(e).__name__}: {str(e)[:120]}"}))
+    return out
+
+
+ABLATION_DESKS = ("1h", "4h", "1d", "1w")
+
+
+def ablation(db: DB, symbol: str = "XAU") -> dict:
+    """Block value (Radar Gold: «switch a part off and compare»): the unified forecast's walk-forward self-test run
+    again without each block's analysts, on the same moments. A block helps if the score drops without it."""
+    from .blocks import BLOCKS
+    out: dict = {"symbol": symbol, "computed": time.time(), "desks": {}}
+    for h in ABLATION_DESKS:
+        rows = _rows(db, symbol, h)
+        if not rows:
+            continue
+        full = simulate(db, symbol, h, rows)
+        d = {"full": {k: full.get(k) for k in ("viewed", "hit_rate", "bar", "bss", "net_avg")}, "without": {}}
+        for b in BLOCKS:
+            r = simulate(db, symbol, h, rows, frozenset(b["methods"]))
+            d["without"][b["id"]] = {k: r.get(k) for k in ("viewed", "hit_rate", "bss", "net_avg")}
+            if full.get("bss") is not None and r.get("bss") is not None:
+                d["without"][b["id"]]["bss_change"] = round(r["bss"] - full["bss"], 5)
+            if full.get("hit_rate") is not None and r.get("hit_rate") is not None:
+                d["without"][b["id"]]["hit_change"] = round(r["hit_rate"] - full["hit_rate"], 5)
+        out["desks"][h] = d
     return out
 
 

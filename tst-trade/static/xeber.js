@@ -6,7 +6,7 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const pct = (v) => (v == null ? "—" : Math.round(v * 100) + " %");
   const NAMES = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
-  const ST = { "sübut": "✅ sübut", yox: "❌ yox", "zəif": "⚠️ zəif", az: "⏳ az", "xərc": "💸 xərc" };
+  const ST = { "sübut": "✅ sübut", yox: "❌ yox", "zəif": "⚠️ zəif", az: "⏳ az", "xərc": "💸 xərc", "namizəd": "🏁 namizəd (son sınaq gözlənir)" };
   const FCOL = { "əhval": "#e8b94a", Fed: "#4ea1ff", "ABŞ rəqəmi": "#ff9f43", "geosiyasət": "#ef476f", "tələb-təklif": "#3fb27f",
     "axın sıçrayışı": "#c77dff", "böyük xəbər": "#ffffff" };
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem("tst_nw_" + k)) ?? d; } catch (e) { return d; } };

@@ -4,7 +4,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const NAMES = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
-  const ST = { "sübut": "✅ sübut", yox: "❌ yox", "zəif": "⚠️ zəif (coin-dən pis)", az: "⏳ az" };
+  const ST = { "sübut": "✅ sübut", yox: "❌ yox", "zəif": "⚠️ zəif (coin-dən pis)", az: "⏳ az", "namizəd": "🏁 namizəd (son sınaq gözlənir)" };
   let area = "Texniki", data = null;
   try { area = localStorage.getItem("tst_bilik") || area; } catch (e) { /* fine */ }
   function render() {

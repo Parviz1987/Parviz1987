@@ -90,7 +90,11 @@ def build(db: DB) -> dict:
         v = st.get("vahid")
         if v:
             name = f"Vahid proqnoz, qızıl, {HN[h]}"
-            lt = light(v["hit_rate"], v["nh"] or 0, v["bar"], v["status"] == "sübut")
+            proven = v["status"] == "sübut"
+            if proven:                      # green only after the one-look final test (app/rigor.py)
+                from .rigor import method_final
+                proven = method_final(db, "XAU", h, "vahid").get("status") == "keçdi"
+            lt = light(v["hit_rate"], v["nh"] or 0, v["bar"], proven)
             items.append({"who": name, "kind": "vahid", **lt,
                           "text": sentence(name, v["hit_rate"], v["nh"] or 0, v["bar"], lt)})
     order = {"green": 0, "yellow": 1, "red": 2, "white": 3, "wait": 4}

@@ -98,7 +98,16 @@ def status(db: DB, sym: str, horizon: str) -> dict:
         voice = None if not leans else round(0.5 + sum(leans) / len(leans), 4)
         out.append({**{k: b[k] for k in ("id", "name", "page", "reads", "ai", "evidence", "missing")},
                     "methods": ms, "voice": voice, "with_view": len(leans), "on_desk": len(ms)})
+    import json as _json
+    from . import rigor
+    try:
+        abl = (_json.loads(db.get("unified:ablation") or "{}").get("desks") or {}).get(horizon) if sym == "XAU" else None
+    except ValueError:
+        abl = None
+    for b in out:
+        b["value"] = (abl or {}).get("without", {}).get(b["id"])
     comb = {m: {"name": forecast.METHOD_NAMES.get(m, m), "p": (views.get(m) or {}).get("p_up"),
                 "basis": (views.get(m) or {}).get("basis")} for m in ("consensus", "terazi", "vahid") if m in views}
     return {"symbol": sym, "horizon": horizon, "issued_t": row["t"] if row else None, "ts": time.time(),
-            "blocks": out, "combiners": comb, "support": SUPPORT}
+            "blocks": out, "combiners": comb, "support": SUPPORT, "ablation_full": (abl or {}).get("full"),
+            "trials": rigor.trials(db), "finals": rigor.finals(db)}

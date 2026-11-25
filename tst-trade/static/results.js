@@ -208,7 +208,7 @@ async function loadFut() {
   }
   $("futwhen").textContent = "hesablandı " + dt(st.computed) + " NY · hədd p < " + (st.p_bar || 0).toExponential(1);
   const NM = { XAU: "Qızıl (GC)", XAG: "Gümüş (SI)", XPT: "Platin (PL)", XPD: "Palladium (PA)" };
-  const V = { "sübut": "✅ sübut", yox: "❌ yox", az: "⏳ az" };
+  const V = { "sübut": "✅ sübut", yox: "❌ yox", az: "⏳ az", "namizəd": "🏁 namizəd (son sınaq gözlənir)" };
   $("fut").innerHTML = Object.entries(st.metals).map(([sym, m]) => {
     const c = st.check[sym] || {};
     return `<h3 class="sub">${NM[sym] || sym} · ${m.bars} dəqiqə (${esc(c.first || "")} – ${esc(c.last || "")}) · xərc: fyuçers ${(m.cost_futures * 100).toFixed(3)} %, Capital ${(m.cost_capital * 100).toFixed(3)} %</h3>

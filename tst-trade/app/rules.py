@@ -545,6 +545,11 @@ def records(db: DB) -> dict:
         by_adx = {REGIME_NAMES[g]: {"n": b[0], "hit_rate": round(b[1] / b[0], 4), "net_avg": round(b[2] / b[0], 6),
                                     "gross_r": round(b[4] / b[3], 3) if b[3] else None}
                   for g, b in sorted(regimes.get((rule, tf), {}).items())}
+        if st == "sübut":                     # one-look final on the cases after it became a candidate
+            from .rigor import rule_final
+            fin = rule_final(db, rule, tf)
+            if fin.get("status") != "keçdi":
+                st = "namizəd" if fin.get("status") != "keçmədi" else "yox"
         out.setdefault(rule, {})[tf] = {"n": n, "hit_rate": round(hits / n, 4), "net_avg": round(net, 6), "rr": rr,
                                         "by_adx": by_adx,
                                         "halves": [None if h1 is None else round(h1, 6),

@@ -225,7 +225,25 @@ def _stats(db: DB, symbol: str, horizon: str, mode: str) -> list[dict]:
                     "min_n": MIN_N[horizon], "p_bar": p_bar, "edge": r.get("edge"), "cost": cost,
                     "cost_parts": parts})
     _holm(out, P_MAX, fam_size)
+    n_all = _trials(db)
+    from .rigor import p_all
+    for r in out:                     # every proof shown next to how many attempts it was selected from
+        r["trials"] = n_all
+        r["p_all"] = p_all(r["p"], n_all)
     return out
+
+
+_TRIALS: dict = {"ts": 0.0, "n": 0}
+
+
+def _trials(db: DB) -> int:
+    if time.time() - _TRIALS["ts"] > 600:
+        from .rigor import trials
+        try:
+            _TRIALS["n"], _TRIALS["ts"] = trials(db), time.time()
+        except Exception:
+            pass
+    return _TRIALS["n"] or 1
 
 
 def _holm(rows: list[dict], alpha: float, m: int) -> None:
@@ -445,7 +463,7 @@ def verdict(db: DB, symbol: str, horizon: str, now: float | None = None) -> dict
     v = official(rows)
     v["by"] = mode
     if v["status"] == "sübut":
-        return v
+        return _final_gate(db, symbol, horizon, v, now)
     hit = (now, where_cached(db, symbol, horizon, mode, now))
     rw = db.execute("SELECT lo80, hi80, price0 FROM forecasts WHERE symbol=? AND horizon=? AND mode='live' AND "
                     "method='rw' ORDER BY issued_t DESC LIMIT 1", (symbol, horizon)).fetchone()
@@ -456,6 +474,21 @@ def verdict(db: DB, symbol: str, horizon: str, now: float | None = None) -> dict
                        "AND target_t > ? ORDER BY issued_t DESC LIMIT 1", (symbol, horizon, cond["method"], now)).fetchone()
         if not f or f["p_up"] == 0.5:
             return v                                  # proven in these conditions, but it has no view right now
-        return {"method": cond["method"], "status": "sübut", "by": mode, "condition": cond["group"],
-                "cond_hit_rate": cond["hit_rate"], "cond_n": cond["n"]}
+        return _final_gate(db, symbol, horizon, {"method": cond["method"], "status": "sübut", "by": mode,
+                                                  "condition": cond["group"], "cond_hit_rate": cond["hit_rate"],
+                                                  "cond_n": cond["n"]}, now)
+    return v
+
+
+def _final_gate(db: DB, symbol: str, horizon: str, v: dict, now: float) -> dict:
+    """Radar Gold's one-look final test: a proof counts only after the same method also passed once on data that came
+    AFTER it became a candidate (app/rigor.py). Until then: «namizəd» (no AL / SAT)."""
+    from .rigor import method_final
+    try:
+        fin = method_final(db, symbol, horizon, v["method"], now)
+    except Exception:
+        fin = {"status": "namizəd"}
+    v["final"] = fin
+    if fin.get("status") != "keçdi":
+        v = {**v, "status": "namizəd" if fin.get("status") != "keçmədi" else "yox", "candidate": v["status"]}
     return v

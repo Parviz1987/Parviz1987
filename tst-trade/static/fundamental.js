@@ -7,7 +7,7 @@
   const pct = (v) => (v == null ? "—" : Math.round(v * 100) + " %");
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const NAMES = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
-  const ST = { "sübut": "✅ sübut", yox: "❌ yox", "zəif": "⚠️ zəif", az: "⏳ az", "xərc": "💸 xərc" };
+  const ST = { "sübut": "✅ sübut", yox: "❌ yox", "zəif": "⚠️ zəif", az: "⏳ az", "xərc": "💸 xərc", "namizəd": "🏁 namizəd (son sınaq gözlənir)" };
   const FCOL = { faiz: "#4ea1ff", dollar: "#3fb27f", "mövqe": "#c77dff", "sürpriz": "#ff9f43", "mərkəzi bank": "#e8b94a" };
   const load = (k, d) => { try { return JSON.parse(localStorage.getItem("tst_fa_" + k)) ?? d; } catch (e) { return d; } };
   const save = (k, v) => { try { localStorage.setItem("tst_fa_" + k, JSON.stringify(v)); } catch (e) { /* fine */ } };
