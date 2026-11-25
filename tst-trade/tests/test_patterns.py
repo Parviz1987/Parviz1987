@@ -210,3 +210,26 @@ def test_adx_measures_strength_and_every_rule_has_a_family():
 def test_main_module_has_its_logger():
     from app import main
     assert main.log.name == "tst.main"            # the daily futures loop died on «name 'log' is not defined»
+
+
+def test_ta_page_data_has_every_layer_and_the_rules_on_the_chart():
+    from app import ta
+    db = DB(":memory:")
+    rows = []
+    base = 1_800_000_000 // 3600 * 3600 - 400 * 3600
+    x = 3000.0
+    import math
+    for k in range(400):
+        o = x
+        x = 3000 + 40 * math.sin(k / 15) + k * 0.2
+        rows.append((base + k * 3600, o, max(o, x) + 1, min(o, x) - 1, x))
+    candles.store_history(db, "XAU", "1h", rows)
+    rules.ensure(db)
+    db.execute("INSERT INTO rule_signals(metal, tf, t, rule, dir, price0, price1, mode, note) "
+               "VALUES('XAU','1h',?, 'TA-SR-1', 1, 1, 1, 'live', 'test')", (rows[-2][0],))
+    d = ta.build(db, "XAU", "1h", now=base + 400 * 3600 + 60)
+    L = d["layers"]
+    assert len(L["ichimoku"]["a"]) == len(d["candles"]) == len(L["adx"]["adx"]) == len(L["vol"])
+    assert d["fired"] and d["fired"][0]["rule"] == "TA-SR-1"
+    assert {r["id"] for r in d["book"]} == {r["id"] for r in playbook.RULES if r["detector"]}
+    assert "vote" in d["now"] and d["now"]["regime"]

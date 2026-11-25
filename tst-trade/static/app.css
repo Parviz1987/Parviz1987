@@ -293,3 +293,30 @@ body.simple .main,body.simple .split,body.simple .feeds,body.simple .box[data-fo
 .trust details summary{cursor:pointer;color:var(--acc);font-size:13px}
 .tr-row{display:grid;grid-template-columns:150px 1fr;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}
 @media (max-width:560px){.tr-row{grid-template-columns:1fr;gap:2px}}
+/* ---- Texniki analiz bloku (2026-11-25) ---- */
+.tachart{position:relative;height:min(62vh,560px);min-height:300px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.tachart canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
+.tachart .tip{right:8px;white-space:normal;line-height:1.35}
+.tachart .tclose{display:none;position:absolute;top:8px;right:8px;z-index:2}
+.tachart.full{position:fixed;inset:0;height:auto;min-height:0;z-index:60;border-radius:0;border:0}
+.tachart.full .tclose{display:inline-block}
+.tachart.full .tip{top:44px}
+body.noscroll{overflow:hidden}
+.tabtn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:4px 10px;font-size:.8rem;cursor:pointer}
+.tabtn:hover{border-color:var(--gold)}
+.talayers{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:10px 0 4px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:.84rem;cursor:pointer}
+.chk input{accent-color:var(--gold)}
+.chk i{display:inline-block;width:10px;height:10px;border-radius:3px}
+.tanow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.tanow .big{font-size:1.5rem;font-weight:700}.tanow .big.up{color:var(--up)}.tanow .big.down{color:var(--down)}
+.tanow p{margin:4px 0}
+.tarules{margin:4px 0;padding-left:16px;font-size:.84rem}
+.ta .pill{border:1px solid var(--line);background:var(--panel2);font-weight:600;letter-spacing:0;padding:1px 6px;border-radius:6px}
+.ta .pill.on{background:var(--up-soft);color:var(--up)}
+.takind{border-top:1px solid var(--line);padding:6px 0}
+.takind>summary{cursor:pointer;padding:4px 0}
+.tarule{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:6px 0 6px 14px;border-bottom:1px dashed var(--line)}
+.tarule>details{flex-basis:100%}
+.tarule .tabtn{padding:2px 8px;font-size:.74rem}
+@media (max-width:760px){.tanow{grid-template-columns:1fr}.tachart{height:52vh;min-height:260px}}

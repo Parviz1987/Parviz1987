@@ -393,6 +393,19 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         from . import outlook
         return await asyncio.to_thread(diag._slow, "outlook", lambda: outlook.all_metals(db), 120)
 
+    @app.get("/ta")
+    async def ta_page():
+        return FileResponse(STATIC / "ta.html")
+
+    @app.get("/api/ta")
+    async def ta_api(symbol: str = "XAU", tf: str = "1h"):
+        """The technical-analysis block: candles, every layer, every rule firing, the book with the Judge's record,
+        and what the block says now for this timeframe (the same vote the forecasts use)."""
+        from . import ta
+        if symbol not in candles.METALS or tf not in ta.HORIZON:
+            raise HTTPException(400, "naməlum metal və ya zaman çərçivəsi")
+        return await asyncio.to_thread(diag._slow, f"ta:{symbol}:{tf}", lambda: ta.build(db, symbol, tf), 60)
+
     @app.get("/bilik")
     async def bilik_page():
         return FileResponse(STATIC / "bilik.html")

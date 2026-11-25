@@ -2,7 +2,11 @@
    EMA 20/50/200, Bollinger (20, 2), Fibonacci of the visible swing, classic daily pivots, round numbers,
    support / resistance from swing points, and a lower panel with RSI(14) or MACD(12, 26, 9).
    drawChart(canvas, tip, candles, overlay, tf, opts) — candles may hold extra history before the visible part
-   (opts.show = how many to show) so the long averages start correctly. window.TA exposes the maths. */
+   (opts.show = how many to show) so the long averages start correctly. window.TA exposes the maths.
+   opts.ext (the technical-analysis block page): server-computed layers aligned to the candles —
+   cloud {a, b} (Ichimoku), lines [{v, c, w, d}], zig [{i, p}] (swings), tl [{i0, p0, i1, p1, c}] (trend lines),
+   marks [{i, dir, c, label}] (rule firings), vol [], stoch {k, d}, adx {adx, pdi, mdi}; opts.sub may be
+   "stoch", "adx" or "vol" too. */
 (function () {
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
   function fmt(x) { return x >= 100 ? x.toFixed(2) : x.toFixed(3); }
@@ -174,6 +178,17 @@
       line(g, vis(b.up), x, y, C.bb, 1, [4, 3]); line(g, vis(b.lo), x, y, C.bb, 1, [4, 3]); line(g, vis(b.mid), x, y, C.bb, 1);
     }
 
+    const E = o.ext || null;
+    if (E && E.cloud) {             // Ichimoku cloud: green where span A is above span B, red below
+      const A = vis(E.cloud.a), B = vis(E.cloud.b);
+      for (let i = 1; i < n; i++) {
+        if (A[i] == null || B[i] == null || A[i - 1] == null || B[i - 1] == null) continue;
+        g.globalAlpha = .14; g.fillStyle = A[i] >= B[i] ? up : down;
+        g.beginPath(); g.moveTo(x(i - 1), y(A[i - 1])); g.lineTo(x(i), y(A[i])); g.lineTo(x(i), y(B[i]));
+        g.lineTo(x(i - 1), y(B[i - 1])); g.closePath(); g.fill(); g.globalAlpha = 1;
+      }
+    }
+
     // ---- candles ----
     const bw = Math.max(1, cw * 0.7);
     cs.forEach((c, i) => {
@@ -186,6 +201,30 @@
     if (o.ema) {
       line(g, vis(ema(closesAll, 20)), x, y, C.e20); line(g, vis(ema(closesAll, 50)), x, y, C.e50);
       line(g, vis(ema(closesAll, 200)), x, y, C.e200, 1.6);
+    }
+    const ruleAt = {};
+    if (E) {
+      (E.lines || []).forEach((L) => line(g, vis(L.v), x, y, L.c, L.w || 1.2, L.d));
+      if (E.zig && E.zig.length > 1) {          // the swing structure (Dow, Elliott read it)
+        g.strokeStyle = gold; g.globalAlpha = .7; g.setLineDash([5, 4]); g.beginPath();
+        let on = false;
+        E.zig.forEach((z) => { const i = z.i - off; if (i < -40) return; const X = x(i), Y = y(z.p); on ? g.lineTo(X, Y) : g.moveTo(X, Y); on = true; });
+        g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+      }
+      (E.tl || []).forEach((t) => {             // trend lines through two swings, drawn to the last candle
+        const i0 = t.i0 - off, i1 = t.i1 - off, slope = (t.p1 - t.p0) / ((i1 - i0) || 1), end = n - 1;
+        g.strokeStyle = t.c; g.lineWidth = 1.4; g.beginPath(); g.moveTo(x(i0), y(t.p0)); g.lineTo(x(end), y(t.p0 + slope * (end - i0)));
+        g.stroke(); g.lineWidth = 1;
+      });
+      (E.marks || []).forEach((m) => {          // rule firings: ▲ under the candle (up), ▼ over it (down)
+        const i = m.i - off; if (i < 0 || i >= n) return;
+        const k = (ruleAt[i] = ruleAt[i] || []).push(m) - 1, c = cs[i], X = x(i), s2 = Math.max(3, Math.min(6, cw * 0.4));
+        const Y = m.dir > 0 ? y(c.l) + 8 + k * (s2 * 2 + 2) : y(c.h) - 8 - k * (s2 * 2 + 2);
+        g.fillStyle = m.c; g.beginPath();
+        if (m.dir > 0) { g.moveTo(X, Y - s2); g.lineTo(X - s2, Y + s2); g.lineTo(X + s2, Y + s2); }
+        else { g.moveTo(X, Y + s2); g.lineTo(X - s2, Y - s2); g.lineTo(X + s2, Y - s2); }
+        g.closePath(); g.fill();
+      });
     }
     if (state.ov) {
       const x0 = n * cw + cw * 0.2, w = cw * 2.6, ov = state.ov;
@@ -227,6 +266,24 @@
         g.fillStyle = fg; g.fillText("RSI 14", 4, top + 10); g.fillText("70", x1 + 6, ry(70) + 4); g.fillText("30", x1 + 6, ry(30) + 4);
         line(g, r, x, ry, gold, 1.4);
         const lr = r[r.length - 1]; if (lr != null) { g.fillStyle = gold; g.fillText(lr.toFixed(0), x1 + 30, ry(lr) + 4); }
+      } else if ((sub === "stoch" || sub === "adx" || sub === "vol") && E) {
+        const ry = (v) => top + (100 - v) / 100 * (bot - top);
+        if (sub === "stoch" && E.stoch) {
+          [20, 80].forEach((v) => hline(g, v, ry, 0, x1, fg, null, [2, 3]));
+          line(g, vis(E.stoch.k), x, ry, gold, 1.3); line(g, vis(E.stoch.d), x, ry, "#4ea1ff", 1.2);
+          g.fillStyle = fg; g.fillText("Stoxastik 14/3", 4, top + 10);
+        } else if (sub === "adx" && E.adx) {
+          const mx = Math.max(40, ...vis(E.adx.adx).filter((v) => v != null), ...vis(E.adx.pdi).filter((v) => v != null));
+          const ay = (v) => top + (mx - v) / mx * (bot - top);
+          [20, 25].forEach((v) => hline(g, v, ay, 0, x1, fg, String(v), [2, 3], x1 + 6));
+          line(g, vis(E.adx.adx), x, ay, gold, 1.5); line(g, vis(E.adx.pdi), x, ay, up, 1.1); line(g, vis(E.adx.mdi), x, ay, down, 1.1);
+          g.fillStyle = fg; g.fillText("ADX 14 · +DI · −DI", 4, top + 10);
+        } else if (sub === "vol" && E.vol) {
+          const V = vis(E.vol), mx = Math.max(1, ...V.filter((v) => v != null));
+          V.forEach((v, i) => { if (!v) return; g.fillStyle = cs[i].c >= cs[i].o ? up : down; g.globalAlpha = .55;
+            const hh = v / mx * (bot - top); g.fillRect(x(i) - bw / 2, bot - hh, bw, hh); g.globalAlpha = 1; });
+          g.fillStyle = fg; g.fillText(V.some((v) => v) ? "Tik həcmi" : "Həcm hələ yığılır (tik həcmi 2026-11-25-dən)", 4, top + 10);
+        }
       } else {
         const m = macd(closesAll), L = vis(m.line), S = vis(m.sig), Hh = vis(m.hist);
         const vals = [...L, ...S, ...Hh].filter((v) => v != null);
@@ -246,7 +303,8 @@
     }
     const hm = state.hover >= 0 ? marksAt[state.hover] : null;
     tip.textContent = tlabel(hcan.t, "1m") + " NY  Açılış " + fmt(hcan.o) + "  Max " + fmt(hcan.h) + "  Min " + fmt(hcan.l) +
-      "  Bağlanış " + fmt(hcan.c) + (hm ? "   ⚡ " + hm.map((m) => m.text).join(" · ") : "");
+      "  Bağlanış " + fmt(hcan.c) + (hm ? "   ⚡ " + hm.map((m) => m.text).join(" · ") : "") +
+      (state.hover >= 0 && ruleAt[state.hover] ? "   ◆ " + ruleAt[state.hover].map((m) => (m.dir > 0 ? "▲ " : "▼ ") + m.label).join(" · ") : "");
     state.cw = cw;
   }
 

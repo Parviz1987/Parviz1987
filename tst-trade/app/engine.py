@@ -687,9 +687,10 @@ class Engine:
 
     async def _rules_job(self) -> None:
         self._rules_busy = True
+        self._rep("ta", "working", note="qaydalar yoxlanır")
         try:
             res = await asyncio.to_thread(rules.run, self.db)
-            self._rep("judge", "done", note=f"qaydalar: {res['added']} yeni siqnal"
+            self._rep("ta", "done", note=f"qaydalar: {res['added']} yeni siqnal"
                                             + (" (tarixçə sınağı)" if res["replay"] else ""))
         except Exception as e:
             log.warning("rules: %s", e)

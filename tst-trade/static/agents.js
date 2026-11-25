@@ -13,12 +13,12 @@ const FRESH = 12;                       // seconds a just-finished task keeps it
 const LANES = [
   { key: "eyes", name: "Gözlər", ids: ["news", "events", "scout", "calendar", "macro", "archivist", "history", "prices", "liquidity"] },
   { key: "nerves", name: "Sinirlər", ids: ["reader", "signals", "hunter"] },
-  { key: "brain", name: "Beyin", ids: ["strateq", "debate", "cards", "checker"] },
+  { key: "brain", name: "Beyin", ids: ["strateq", "debate", "ta", "chartist", "cards", "checker"] },
   { key: "judge", name: "Hakim", ids: ["forecast", "judge"] },
   { key: "act", name: "Qərar", ids: ["risk", "decision"] },
 ];
 const LANE_W = [1.25, 0.85, 1.7, 0.85, 0.85];          // relative lane widths on a wide screen
-const BRAIN_IDS = ["strateq", "debate", "reader", "cards", "checker"];   // their work makes the brain's neurons fire
+const BRAIN_IDS = ["strateq", "debate", "reader", "cards", "checker", "ta", "chartist"];   // their work makes the brain's neurons fire
 let NODES = [], live = {}, shown = {}, skew = 0, events = [], mode = "live";
 let nerveState = "SAKİT";
 let winH = 1, speed = 10, playT = null, lastPulse = 0, frozenT = 0;
@@ -243,6 +243,7 @@ function openDetail(id) {
     <p>İndi: <b style="color:${COLOR[s.status || "waiting"]}">${WORD[s.status || "waiting"]}</b> ${esc(s.stage || "")} ${esc(s.note || "")}</p>
     ${s.ts ? `<p>Son hadisə: ${ny(s.ts, true)} NY · ${ago(s.ts)}</p>` : ""}
     ${n.stages.length ? `<p>Mərhələlər: ${n.stages.map(esc).join(" → ")}</p>` : ""}
+    ${id === "ta" || id === "chartist" ? `<p><a href="/ta">Texniki analiz blokunu aç →</a></p>` : ""}
     <ul>${evs.map((e) => `<li><span style="color:${COLOR[e.status]}">●</span> ${ny(e.ts, true)} ${WORD[e.status]} ${esc(e.stage || "")} ${esc(e.note || "")}</li>`).join("") || "<li>Son saatlarda hadisə yoxdur</li>"}</ul>`;
   d.classList.add("open");
   const x = d.querySelector(".x");

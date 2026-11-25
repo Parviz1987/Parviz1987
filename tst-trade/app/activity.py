@@ -59,7 +59,9 @@ NODES = {
                  "Hər proqnozu dondurur: ssenari, əks ssenari, zəifləmə şərti, məlumat keyfiyyəti, versiya"),
     "checker":  (19, "Mənbə yoxlayıcısı",  "strateq",  [],
                  "Beyin cavabında ona verilməyən rəqəmləri sayır (uydurma göstərilmir)"),
-    "chartist": (21, "Qrafik analitiki",   "signals",  ["W1 Şamlar", "W2 Beyin", "W3 Yaddaş"],
+    "ta":       (22, "Texniki analiz bloku", "prices", [],
+                 "Kod: 12 növ, 34 qayda qrafikdə tapılır, Hakim hər qaydanı ölçür, proqnoza bir səs («Qaydalar»)"),
+    "chartist": (21, "Qrafik analitiki",   "ta",  ["W1 Şamlar", "W2 Beyin", "W3 Yaddaş"],
                  "Beyin: qrafikə özü baxır (3 vaxt çərçivəsi, səviyyələr, fiqurlar), 1 saat / 4 saat / 1 gün ehtimalı"),
     "archivist": (20, "Arxivçi",           "macro",    [],
                   "ALFRED: rəqəmin ilk dərc olunmuş dəyəri, sonrakı düzəlişlər keçmiş sınağa qarışmasın"),
@@ -70,7 +72,7 @@ NODES = {
 FLOW = {"prices": None, "liquidity": "prices", "forecast": "prices", "judge": "forecast", "history": "orch",
         "news": None, "events": "news", "reader": "events", "calendar": None, "hunter": "calendar", "macro": None,
         "scout": None, "signals": "reader", "strateq": "signals", "debate": "strateq", "cards": "strateq",
-        "checker": "strateq", "risk": "liquidity", "decision": "risk", "orch": None, "archivist": "macro", "chartist": "prices"}
+        "checker": "strateq", "risk": "liquidity", "decision": "risk", "orch": None, "archivist": "macro", "chartist": "ta", "ta": "prices"}
 
 
 class Hub:
