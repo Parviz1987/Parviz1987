@@ -375,3 +375,31 @@ def test_fed_odds_and_shanghai_premium_rules():
     end = datetime(2026, 7, 31, tzinfo=timezone.utc).timestamp()
     got = {r: d for r, d, _ in fundamental.detect(data, "XAU", end)}
     assert got.get("FA-SGE-1") == 1
+
+
+def test_gld_archive_parser_and_etf_rule():
+    import io, zipfile
+    from app import feeds, fundamental
+    from datetime import date, timedelta, datetime, timezone
+    rows_xml, strs = [], ["Date", "Tonnes of Gold"]
+    d0 = date(2025, 1, 1)
+    vals = []
+    for k in range(320):
+        vals.append(((d0 + timedelta(days=k)).strftime("%d-%b-%Y"), 900 + (0 if k < 310 else (k - 309) * 6)))
+    for v, _ in vals:
+        strs.append(v)
+    rows_xml.append('<row r="1"><c r="A1" t="s"><v>0</v></c><c r="J1" t="s"><v>1</v></c></row>')
+    for i, (d, t) in enumerate(vals):
+        rows_xml.append(f'<row r="{i + 2}"><c r="A{i + 2}" t="s"><v>{i + 2}</v></c><c r="J{i + 2}"><v>{t}</v></c></row>')
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("xl/sharedStrings.xml", "".join(f"<si><t>{s}</t></si>" for s in strs))
+        z.writestr("xl/worksheets/sheet2.xml", "<sheetData>" + "".join(rows_xml) + "</sheetData>")
+    got = feeds.parse_gld_xlsx(buf.getvalue())
+    assert len(got) == 320 and got[0] == ("2025-01-01", 900.0)
+    db = DB(":memory:")
+    db.script("CREATE TABLE IF NOT EXISTS etf_gold (fund TEXT, d TEXT, tonnes REAL, PRIMARY KEY (fund, d));")
+    db.executemany("INSERT INTO etf_gold VALUES('GLD',?,?)", got)
+    data = fundamental.Data(db)
+    end = datetime(2025, 11, 20, tzinfo=timezone.utc).timestamp()       # after the last ten days of strong inflows
+    assert {r: d for r, d, _ in fundamental.detect(data, "XAU", end)}.get("FA-ETF-1") == 1

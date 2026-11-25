@@ -20,10 +20,11 @@ LAG_DAYS = {"DFII10": 2, "DGS2": 2, "T10YIE": 2, "DTWEXBGS": 10, "DEXCHUS": 2}
 GROW_PUBLIC_DAYS = 60     # CFNAI for a month (dated its first day) comes out about three to four weeks after it ends
 OZ_G = 31.1035
 COT_PUBLIC = 3 * 86400 + 20 * 3600 + 1800        # Tuesday 00:00 UTC -> Friday 20:30 UTC
-FA_VER = "2026-11-25.3"
+FA_VER = "2026-11-25.4"
 FAMILY = {"FA-RY-1": "faiz", "FA-RY-2": "faiz", "FA-FED-1": "faiz", "FA-BE-1": "faiz", "FA-USD-1": "dollar",
           "FA-COT-1": "mövqe", "FA-COT-2": "mövqe", "FA-SURP-1": "sürpriz", "FA-CB-1": "mərkəzi bank",
-          "FA-FED-2": "faiz", "FA-SGE-1": "fiziki tələb", "FA-GROW-1": "böyümə"}
+          "FA-FED-2": "faiz", "FA-SGE-1": "fiziki tələb", "FA-GROW-1": "böyümə",
+          "FA-ETF-1": "ETF axını", "FA-ETF-2": "ETF axını"}
 FED_BPS = {"H26": 50, "H25": 25, "H0": 0, "C25": -25, "C26": -50}
 OZ_PER_TONNE = 32150.7466
 CB_PUBLIC_DAYS = 45      # a month's IMF figure is public about six weeks after the month ends (counted cautiously)
@@ -89,6 +90,13 @@ class Data:
                 self.sge_prem.append(usd_oz / xau[r["d"]] - 1)
         except Exception:
             pass
+        # ETF flow: GLD's tonnes per day (the issuer publishes by 16:45 New York; counted known the next day)
+        try:
+            etf = db.execute("SELECT d, tonnes FROM etf_gold WHERE fund='GLD' ORDER BY d").fetchall()
+        except Exception:
+            etf = []
+        self.etf_t = [datetime.fromisoformat(r["d"]).replace(tzinfo=timezone.utc).timestamp() + 86400 for r in etf]
+        self.etf_v = [r["tonnes"] for r in etf]
         try:
             rows = db.execute("SELECT d, v FROM macro WHERE series='CFNAIMA3' ORDER BY d").fetchall()
         except Exception:
@@ -202,6 +210,17 @@ def detect(data: Data, metal: str, t: float) -> list[tuple[str, int, str]]:
                                        f"tələbi güclü)"))
         elif pct <= 20:
             out.append(("FA-SGE-1", -1, f"Şanxay premiumu {cur * 100:+.2f} %: ilin ən aşağı {pct:.0f} %-i (Çin tələbi zəif)"))
+    k = bisect.bisect_right(data.etf_t, t)
+    tn = data.etf_v[max(0, k - 300):k]
+    for rule, w, label in (("FA-ETF-1", 5, "5 gündə"), ("FA-ETF-2", 20, "20 gündə")):
+        if len(tn) > 250 + w:
+            flows = [tn[j] - tn[j - w] for j in range(w, len(tn))][-250:]
+            cur = flows[-1]
+            pct = sum(x < cur for x in flows) / len(flows) * 100
+            if pct >= 80 and cur > 0:
+                out.append((rule, 1, f"GLD {label} {cur:+.1f} ton aldı: ilin ən güclü girişlərindən ({pct:.0f}-ci faiz)"))
+            elif pct <= 20 and cur < 0:
+                out.append((rule, -1, f"GLD {label} {cur:+.1f} ton itirdi: ilin ən güclü çıxışlarından ({pct:.0f}-ci faiz)"))
     k = bisect.bisect_right(data.grow_t, t)
     if k:
         g = data.grow_v[k - 1]
@@ -230,7 +249,7 @@ def run(db: DB, now: float | None = None) -> int:
             continue
         ind = rules.Ind(cs)
         # replayed again once the central-bank data first arrives (the IMF feed runs once a day)
-        have = "".join(x for x, ok in (("c", data.cb_net), ("s", data.sge_prem), ("g", data.grow_v)) if ok)
+        have = "".join(x for x, ok in (("c", data.cb_net), ("s", data.sge_prem), ("g", data.grow_v), ("e", data.etf_v)) if ok)
         mark = f"fa:ver:{FA_VER}:{have}:{sym}"
         done = int(db.get(mark) or 0)
         rows = []
@@ -308,6 +327,8 @@ def page(db: DB, sym: str, now: float | None = None) -> dict:
                 "pts": [[t, v] for t, v in zip(ts, nets) if t >= t0]})
     fac.append({"id": "SGE", "name": "Şanxay premiumu (Çin tələbi), %", "good": 1,
                 "pts": [[t, round(v * 100, 3)] for t, v in zip(data.sge_t, data.sge_prem) if t >= t0]})
+    fac.append({"id": "ETF", "name": "GLD ETF-in qızılı, ton (ETF axını)", "good": 1,
+                "pts": [[t, v] for t, v in zip(data.etf_t, data.etf_v) if t >= t0]})
     fac.append({"id": "FED", "name": "Kalshi: növbəti Fed iclasında gözlənilən dəyişmə, bp", "good": -1,
                 "pts": [[t, round(v, 1)] for t, v in zip(data.fed_t, data.fed_bps) if t >= t0]})
     out["factors"] = fac

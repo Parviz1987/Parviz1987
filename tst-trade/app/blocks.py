@@ -27,8 +27,7 @@ BLOCKS = [
      "evidence": "Dünya Qızıl Şurasının GRAM modeli: fürsət xərci (real faiz, dollar), risk, iqtisadi böyümə, mərkəzi "
                  "bank tələbi. Fed sürprizləri qızılı dəqiqələr içində tərpədir (Awartani-Hussain-Virk 2024); ABŞ "
                  "rəqəmi dəqiqəsində impuls bizim fyuçers sınağında 63,5 % (H13).",
-     "missing": "ETF axınları: GLD və IAU saytları məlumatı proqrama açıq vermir (rəsmi pulsuz API tapılmadı). Mərkəzi bank "
-                "alışları IMF-dən gəlir (FA-CB-1, ~1,5 ay gecikmə ilə). Fed ehtimalları (Kalshi) toplanır, AI oxuyur."},
+     "missing": "Hindistan tələbi (yerli premium/endirim): pulsuz gündəlik rəsmi mənbə hələ qoşulmayıb."},
     {"id": "news", "name": "Xəbər", "page": None,
      "reads": "RSS və Benzinga başlıqları, Kəşfiyyatçı (Grok, X), Hadisə birləşdiricisi (eyni xəbər bir dəfə)",
      "methods": ["news"], "ai": "Oxuyucu (Claude Haiku) — hər başlığı qiymətləndirir",

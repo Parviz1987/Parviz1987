@@ -66,7 +66,7 @@ MACRO_SERIES = {
     "SP500": "S&P 500 səhm indeksi",
     "DCOILWTICO": "Neft WTI (gündəlik), $",
 }
-SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf", "imf", "sge")
+SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf", "imf", "sge", "gld")
 # Block 9. Kalshi: market-implied odds of the next Fed decisions (public market data, no key).
 KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
 KALSHI_SERIES = ("KXFEDDECISION", "KXFED", "FEDDECISION", "FED")
@@ -78,6 +78,9 @@ ETF_URL = "https://data.alpaca.markets/v2/stocks/bars"
 COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
 # Central banks' gold (IMF International Liquidity, «gold reserves, volume», fine troy ounces, monthly, free): the
 # largest holders and the buyers of recent years. The fundamental block's FA-CB-1 rule reads their net purchases.
+# SPDR Gold Trust (GLD, the largest gold ETF): the issuer's own daily archive since 2004 (XLSX), tonnes of gold held —
+# the ETF flow. Used inside the system only (the file's terms forbid redistribution: nothing of it is republished).
+GLD_URL = "https://api.spdrgoldshares.com/api/v1/historical-archive?product=gld&exchange=NYSE&lang=en"
 # Shanghai Gold Exchange daily quotes (free): Au99.99 close in yuan per gram and its volume — China's physical demand.
 SGE_URL = "https://en.sge.com.cn/data/data_daily_international_new"
 IMF_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,IL/{c}.RGV_REVS..M"
@@ -209,6 +212,38 @@ def parse_fred(data) -> list[tuple[str, float]]:
     return out
 
 
+def parse_gld_xlsx(raw: bytes) -> list[tuple[str, float]]:
+    """GLD's archive (an XLSX: a zip of XML; no extra library) -> [(YYYY-MM-DD, tonnes)] in date order."""
+    import zipfile
+    from datetime import datetime as _dt
+    z = zipfile.ZipFile(io.BytesIO(raw))
+    strs = [re.sub(r"<[^>]+>", "", m) for m in re.findall(r"<si>(.*?)</si>", z.read("xl/sharedStrings.xml").decode(), re.S)]
+    name = next((n for n in z.namelist() if n.startswith("xl/worksheets/sheet") and
+                 "Tonnes" in "".join(strs) and b"<row" in z.read(n)[:200000] and
+                 len(re.findall(rb"<row ", z.read(n))) > 100), None)
+    if not name:
+        return []
+    out = []
+    head = None
+    for row in re.findall(r"<row [^>]*>(.*?)</row>", z.read(name).decode(), re.S):
+        cells = {}
+        for c in re.finditer(r'<c r="([A-Z]+)\d+"([^>]*?)(?:/>|>(?:<f>.*?</f>)?(?:<v>([^<]*)</v>)?)', row):
+            v = c.group(3)
+            if v is not None and 't="s"' in c.group(2):
+                v = strs[int(v)]
+            cells[c.group(1)] = v
+        if head is None:
+            if "Date" in cells.values():
+                head = {v: k for k, v in cells.items() if v}
+            continue
+        try:
+            d = _dt.strptime(cells.get(head["Date"], ""), "%d-%b-%Y").strftime("%Y-%m-%d")
+            out.append((d, float(cells.get(head["Tonnes of Gold"], ""))))
+        except (KeyError, ValueError, TypeError):
+            continue
+    return sorted(out)
+
+
 def parse_sge(text: str) -> list[tuple[str, float, float]]:
     """The SGE daily table -> (date, Au99.99 close yuan/g, volume kg)."""
     import html as _html
@@ -300,7 +335,7 @@ class Feeds:
         self.keys = keys
         db.script(SCHEMA)
         self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0,
-                         "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0, "sge": 0.0}
+                         "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0, "sge": 0.0, "gld": 0.0}
         self.activity = None      # app.activity.Hub: where each collector reports its status
         db.script(surprise.SCHEMA)
 
@@ -465,6 +500,20 @@ class Feeds:
         self._health("official", not errors, f"{found}/{len(due)} rəsmi rəqəm" +
                      (f"; xəta: {'; '.join(errors)}" if errors else ""), found)
 
+    async def gld(self, client) -> None:
+        """GLD's holdings (tonnes) per day from the issuer's archive, every six hours."""
+        self.db.script("CREATE TABLE IF NOT EXISTS etf_gold (fund TEXT, d TEXT, tonnes REAL, PRIMARY KEY (fund, d));")
+        try:
+            r = await client.get(GLD_URL, headers=UA)
+            if r.status_code != 200:
+                raise ValueError(f"HTTP {r.status_code}")
+            rows = parse_gld_xlsx(r.content)
+            self.db.executemany("INSERT OR REPLACE INTO etf_gold VALUES('GLD',?,?)", rows)
+            self._health("gld", bool(rows), f"GLD: {len(rows)} gün, son {rows[-1][0]} = {rows[-1][1]:.1f} ton"
+                         if rows else "GLD faylında sətir yoxdur", len(rows))
+        except Exception as e:
+            self._health("gld", False, f"GLD: {str(e)[:120]}")
+
     async def sge(self, client) -> None:
         """Shanghai Gold Exchange: Au99.99 daily close (yuan/gram) and volume (kg). The first run loads two years
         month by month; then the last two weeks every six hours."""
@@ -615,14 +664,14 @@ class Feeds:
                 # official actuals: every minute around a release (the agencies publish at the minute)
                 "official": (self.official, 60 if self._recent_release(now) else 900),
                 "kalshi": (self.kalshi, 900), "etf": (self.etf, 300), "imf": (self.imf_gold, 86400),
-                "sge": (self.sge, 6 * 3600)}
+                "sge": (self.sge, 6 * 3600), "gld": (self.gld, 6 * 3600)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
                     self.next_run[name] = now + every
                     task = {"news": "news", "alpaca": "news", "calendar": "calendar", "fmp": "calendar",
                             "macro": "macro", "cot": "macro", "official": "calendar", "kalshi": "macro",
-                            "etf": "macro", "imf": "macro", "sge": "macro"}[name]
+                            "etf": "macro", "imf": "macro", "sge": "macro", "gld": "macro"}[name]
                     if self.activity:
                         self.activity.report(task, "working", note=name)
                     try:

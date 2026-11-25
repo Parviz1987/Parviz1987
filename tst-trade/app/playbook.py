@@ -299,6 +299,18 @@ RULES = [
                "eyni zamanda faiz endirimi və qorxu ilə qızılı qaldıra bilər — Hakim hansı təsirin güclü olduğunu ölçür.",
      "void": "Gecikmə ilə gəlir: həftəlik üfüqdən qısa üçün deyil.",
      "source": "WGC GRAM («iqtisadi genişlənmə» amili); Chicago Fed CFNAI."},
+    {"id": "FA-ETF-1", "area": "Fundamental", "name": "ETF axını (GLD), 5 gün", "detector": True,
+     "how": "Dünyanın ən böyük qızıl ETF-i GLD-nin fondda saxladığı qızıl (ton, emitentin gündəlik rəsmi arxivi, 2004-dən). "
+            "5 günlük dəyişmə ilin 5 günlük dəyişmələri arasında ən yuxarı 20 %-də (giriş) və ya ən aşağı 20 %-də (çıxış). "
+            "Rəqəm ertəsi gün «məlum» sayılır.",
+     "signal": "Güclü giriş → yuxarı; güclü çıxış → aşağı.",
+     "void": "Axın çox vaxt qiymətin ardınca gəlir (Invesco, Banque de France): Hakim irəlidəmi, gecikirmi — ölçür.",
+     "source": "SPDR Gold Trust rəsmi arxivi; WGC ETF hesabatları."},
+    {"id": "FA-ETF-2", "area": "Fundamental", "name": "ETF axını (GLD), 20 gün", "detector": True,
+     "how": "Eyni ölçü 20 günlük pəncərədə: investorların davamlı alışı və ya satışı.",
+     "signal": "Davamlı giriş → yuxarı; davamlı çıxış → aşağı.",
+     "void": "Eyni.",
+     "source": "SPDR Gold Trust; WGC."},
     {"id": "FA-CB-1", "area": "Fundamental", "name": "Mərkəzi bankların alışı (IMF), 3 ay", "detector": True,
      "how": "IMF-in rəsmi statistikası (International Liquidity, qızıl ehtiyatının həcmi): 25 mərkəzi bankın (Çin, "
             "Hindistan, Türkiyə, Polşa, Rusiya, Qazaxıstan, Özbəkistan, Çexiya, Qətər, Sinqapur və b.) aylıq xalis alışı "
