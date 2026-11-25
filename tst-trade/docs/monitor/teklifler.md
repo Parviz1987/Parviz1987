@@ -16,3 +16,8 @@
 3. **Verilənlər bazasının böyüməsi.**
    - Sübut: baza 24 saatda 567 MB-dan 792 MB-a çatıb. Səbəblər: fyuçers şamları, yeni üsulların tarixçəsi, qayda siqnalları.
    - Təklif: fyuçers sınaqları hesablandıqdan sonra dəqiqəlik fyuçers şamlarını sıxışdırılmış fayla köçürmək, yaxud qayda siqnallarının köhnə tarixçəsini 90 günlə məhdudlaşdırmaq. Hər ikisi geri qaytarıla bilir.
+
+## 2026-11-25 (NY 04:47) — sahib qərar verir, həyata keçirilməyib
+1. **Bazanın ölçüsü üçün saxlama müddəti.**
+   - Sübut: baza 24 noyabrda 567 → 792 → 999 MB, bu gün 1014 MB. Böyümə yavaşlayıb (8 saatda +15 MB), amma 500 MB həddindən iki dəfə böyükdür; gündəlik ehtiyat nüsxə də bu qədər böyüyür.
+   - Təklif: `rule_signals`-in köhnə tarixçəsini qayda versiyası dəyişəndə silmək (yenisi onsuz da yenidən hesablanır) və kağız ticarətin rədd edilmiş təkliflərini 90 gün saxlamaq. Geri qaytarıla bilir: tarixçə hər an yenidən hesablanır.

@@ -105,3 +105,10 @@
 - **Təhlükəsizlik:** sakit. Kənar giriş və bloklanmış ünvan yoxdur, başlıqlar yerindədir.
 - **Xəta tapıldı və düzəldildi:** gündəlik fyuçers təzələməsi ilk cəhddə dayandı. Səbəb: `main.py`-da `log` adı təyin olunmamışdı, ona görə xəbərdarlıq yazmaq istəyəndə proses özü düşdü. Logger təyin olundu, test əlavə olundu. Hər cəhdin nəticəsi indi `futures:daily_try`-da saxlanılır və `/api/diag`-da görünür.
 - **Baza:** 999 MB (tarixçə yeni qaydalarla yenidən hesablandı).
+
+## 2026-11-25 04:47 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** sakit. Kənar giriş, bloklanmış ünvan, uğursuz giriş yoxdur; başlıqlar yerindədir; tanınan ünvan 1.
+- **Server:** versiya 2663ce4 (kağız ticarət əlavə olundu, yenilənmədən dərhal sonra), /healthz 200. Yaddaş: 222 MB istifadədə, 467 MB boş.
+  Yeni xəta yoxdur; siyahıdakı 3 xəta köhnədir (fyuçers `log` xətası artıq düzəldilib).
+- **Axın:** 4/4 metal canlı, 8/8 əlaqəli bazar, mənbələrin hamısı işləyir. Yeganə «warn»: Xəbər və Fundamental bloklarında son gündə qayda işə düşməyib — şərt yaranmayıb, xəta deyil.
+- **Baza:** 1014 MB (8 saatda +15 MB, böyümə yavaşlayıb). Təklif aşağıda.
