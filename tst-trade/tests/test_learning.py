@@ -60,11 +60,24 @@ def test_old_default_brains_move_to_cheaper_defaults_but_keep_the_owner_limit():
     db.put("brain:strategist", json.dumps({"provider": "anthropic", "model": "claude-opus-5-5", "fallback": "gemini",
                                            "fallback_model": "gemini-4-argon", "month_usd": 35.0}))
     db.put("brain:reader", json.dumps({"provider": "xai", "model": "grok-x", "month_usd": 5.0}))   # owner's own
+    db.put("migr:limits50_1125", "1")          # this test is about the older migration only
     eng = Engine(db, KeyStore(db, "s" * 64), "demo", 15)
     eng.migrate()
     st = json.loads(db.get("brain:strategist"))
     assert st["model"] == "claude-sonnet-5-5" and st["month_usd"] == 35.0
     assert json.loads(db.get("brain:reader"))["model"] == "grok-x"
+
+
+def test_owner_limit_50_for_every_brain_once():
+    import json
+    from app import brains, registry
+    db = DB(":memory:")
+    db.put("brain:reader", json.dumps({"provider": "xai", "model": "grok-x", "month_usd": 5.0}))
+    db.put("brain:strategist", json.dumps({"provider": "anthropic", "model": "claude-sonnet-5-5", "month_usd": 80.0}))
+    Engine(db, KeyStore(db, "s" * 64), "demo", 15).migrate()
+    assert all(brains.config(db, s)["month_usd"] >= 50 for s in registry.BRAIN_IDS)
+    assert brains.config(db, "strategist")["month_usd"] == 80.0          # a higher limit is never lowered
+    assert brains.config(db, "reader")["model"] == "grok-x"              # only the limit changes
 
 
 def test_cost_thermostat_slows_a_slot_heading_over_its_limit():
