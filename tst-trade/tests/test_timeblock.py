@@ -27,7 +27,8 @@ def test_calendar_rules_fire_on_their_days_and_hours():
     # London 15:00 in winter = 15:00 UTC: candle 14:00 UTC is followed by the fix hour
     assert "TM-FIX-1" in names("1h", _ts(2026, 11, 24, 14))
     # daily candle labelled D starts 22:00 UTC the evening before: Monday 2026-11-30 starts Sun 22:00
-    assert "TM-DOW-1" in names("1d", _ts(2026, 11, 28, 22))            # the candle before starts Sat 22:00
+    assert "TM-DOW-1" in names("1d", _ts(2026, 11, 26, 22))            # Friday's candle (starts Thu 22:00): next is Monday
+    assert "TM-DOW-1" not in names("1d", _ts(2026, 11, 25, 22))
     assert "TM-HOL-1" in names("1d", _ts(2026, 11, 23, 22))            # next day Wed 25th, Thanksgiving on 26th
     assert "TM-TOM-1" in names("1d", _ts(2026, 11, 29, 22))            # next day Mon 30th: the last trading day
     assert "TM-TOM-1" in names("1d", _ts(2026, 11, 30, 22))            # next day Tue Dec 1st: the first

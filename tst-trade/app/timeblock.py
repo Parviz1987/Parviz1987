@@ -26,7 +26,7 @@ from zoneinfo import ZoneInfo
 
 from .db import DB
 
-TM_VER = "2026-11-25.1"
+TM_VER = "2026-11-25.2"     # .2: after Friday comes Monday (the Monday rule never fired)
 TFS = ("1h", "1d")                # the calendar rules speak about the next hour or the next day
 NY = ZoneInfo("America/New_York")
 LON = ZoneInfo("Europe/London")
@@ -109,6 +109,8 @@ def detect(tf: str, cs: list[dict], i: int, body_med: float | None = None) -> li
                                                              f"{'yuxarı' if body > 0 else 'aşağı'}, davamı gözlənilir"))
     if tf == "1d":
         d = _day_of(nxt)
+        while d.weekday() >= 5:            # no daily candle on Saturday or Sunday: after Friday comes Monday
+            d += timedelta(days=1)
         if d.weekday() == 0:
             out.append(("TM-DOW-1", -1, "sabah bazar ertəsidir"))
         if _trading_day(d):
