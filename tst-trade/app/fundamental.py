@@ -189,3 +189,79 @@ def run(db: DB, now: float | None = None) -> int:
                            "AND rule=?", upd)
         db.put(mark, str(cs[-2]["t"]))
     return added
+
+
+# ---------- the block's page (/fundamental) ----------
+FACTORS = [  # what each line is, and which way is good for gold
+    {"id": "DFII10", "name": "Real faiz (10 il, TIPS), %", "good": -1},
+    {"id": "DGS2", "name": "2 illik faiz (Fed gözləntisi), %", "good": -1},
+    {"id": "T10YIE", "name": "İnflyasiya gözləntisi (10 il), %", "good": 1},
+    {"id": "DTWEXBGS", "name": "Geniş dollar indeksi", "good": -1},
+]
+
+
+def page(db: DB, sym: str, now: float | None = None) -> dict:
+    """Everything the fundamental page shows, from the block itself: the gold daily chart with the rules' firings,
+    each driver over the last two years, the central banks' monthly buying, COT, the surprise index, the vote and
+    the book with the Judge's record."""
+    import json as _json
+    from . import candles, judge, playbook, rules
+    rules.ensure(db)
+    now = time.time() if now is None else now
+    cs = [dict(r) for r in candles.closed(db, sym, "1d", now, limit=600)]
+    out: dict = {"symbol": sym, "ts": now, "candles": cs}
+    if not cs:
+        return out
+    t0 = cs[max(0, len(cs) - 520)]["t"]
+    idx = {c["t"]: i for i, c in enumerate(cs)}
+    out["fired"] = [{"i": idx[r["t"]], "t": r["t"], "rule": r["rule"], "dir": r["dir"], "note": r["note"]}
+                    for r in db.execute("SELECT t, rule, dir, note FROM rule_signals WHERE metal=? AND tf='1d' "
+                                        "AND rule LIKE 'FA-%' AND t>=? ORDER BY t", (sym, cs[0]["t"])).fetchall()
+                    if r["t"] in idx]
+    day0 = datetime.fromtimestamp(t0, timezone.utc).strftime("%Y-%m-%d")
+    fac = []
+    for f in FACTORS:
+        try:
+            pts = [[datetime.fromisoformat(r["d"]).replace(tzinfo=timezone.utc).timestamp(), r["v"]]
+                   for r in db.execute("SELECT d, v FROM macro WHERE series=? AND d>=? ORDER BY d", (f["id"], day0))]
+        except Exception:
+            pts = []
+        fac.append({**f, "pts": pts})
+    data = Data(db)
+    ts, nets = data.cot.get(sym, ([], []))
+    fac.append({"id": "COT", "name": "Fondların xalis mövqeyi (COT, kontrakt)", "good": 0,
+                "pts": [[t, v] for t, v in zip(ts, nets) if t >= t0]})
+    out["factors"] = fac
+    out["cb"] = [[t, round(v, 1)] for t, v in zip(data.cb_t, data.cb_net) if t >= t0 - 365 * 86400]
+    sur = []
+    for c in cs:
+        if c["t"] >= t0:
+            s, n = data.surprise_sum(c["t"] + 86400 - 7200)
+            sur.append([c["t"], round(s, 2), n])
+    out["surprise"] = sur
+    try:
+        rec = _json.loads(db.get("ta:records") or "null")
+    except ValueError:
+        rec = None
+    if not rec or now - rec.get("ts", 0) > 900:
+        rec = {"ts": now, "r": rules.records(db).get("rules", {})}
+        db.put("ta:records", _json.dumps(rec, ensure_ascii=False))
+    out["book"] = [{"id": r["id"], "name": r["name"], "family": FAMILY.get(r["id"]), "how": r["how"],
+                    "signal": r["signal"], "void": r["void"], "source": r["source"],
+                    "record": (rec["r"].get(r["id"]) or {}).get("1d")}
+                   for r in playbook.RULES if r["area"] == "Fundamental"]
+    last_t = cs[-1]["t"]
+    p, basis = rules.live_lookup(db, "fa").views(sym, now, "1d")["fundamental"]
+    st = {r["method"]: r for r in judge.stats(db, sym, "1d", "live", ttl=600)}
+    hist = {r["method"]: r for r in judge.stats(db, sym, "1d", "history", ttl=600)}
+    pick = lambda m: (st.get(m) if (st.get(m) or {}).get("nh") else hist.get(m)) or {}
+    out["now"] = {"t": last_t, "vote": {"p": p, "basis": basis},
+                  "rules": [f for f in out["fired"] if f["t"] == last_t],
+                  "judge": {m: {k: pick(m).get(k) for k in ("nh", "hit_rate", "bar", "status")}
+                            for m in ("fundamental", "surprise", "strateq")}}
+    from . import cards
+    card = next((c for c in cards.recent(db, sym, 60) if c["source"] == "strateq" and c["horizon"] == "1d"), None)
+    if card:
+        out["now"]["strateq"] = {"p": card["p_cal"] if card["p_cal"] is not None else card["p"], "ts": card["known_ts"],
+                                 "scenario": card["scenario"], "counter": card["counter"]}
+    return out

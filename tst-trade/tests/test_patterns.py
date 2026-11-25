@@ -316,3 +316,23 @@ def test_central_bank_rule_uses_only_published_months():
     assert got.get("FA-CB-1") == 1
     early = datetime(2025, 12, 1, tzinfo=timezone.utc).timestamp()        # October (strong) is public only mid-December
     assert {r: d for r, d, _ in fundamental.detect(data, "XAU", early)}.get("FA-CB-1") != 1
+
+
+def test_fundamental_page_data():
+    from app import fundamental
+    import math
+    db = DB(":memory:")
+    from app.engine import Engine
+    from app.feeds import Feeds
+    from app.keys import KeyStore
+    Engine(db, KeyStore(db, "s" * 64), "demo", 15)
+    Feeds(db, KeyStore(db, "s" * 64))
+    base = 1_790_000_000 // 86400 * 86400
+    rows = [(base + k * 86400, 3000 + k, 3010 + k, 2990 + k, 3000 + k + math.sin(k)) for k in range(300)
+            if ((base + k * 86400) // 86400 + 3) % 7 < 5]
+    candles.store_history(db, "XAU", "1d", rows)
+    db.executemany("INSERT OR REPLACE INTO macro(series, d, v) VALUES(?,?,?)",
+                   [("DFII10", (__import__("datetime").date(2026, 1, 1) + __import__("datetime").timedelta(days=k)).isoformat(), 2 - k * 0.01) for k in range(60)])
+    d = fundamental.page(db, "XAU", now=base + 301 * 86400)
+    assert d["candles"] and {f["id"] for f in d["factors"]} >= {"DFII10", "DGS2", "COT"}
+    assert {r["id"] for r in d["book"]} >= {"FA-RY-1", "FA-CB-1"} and "vote" in d["now"]
