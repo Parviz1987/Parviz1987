@@ -50,7 +50,11 @@ def sentence(name: str, hit: float | None, n: int, base: float | None, lt: dict)
     if lt["light"] == "green":
         return f"{name}: Hakimin sübutu var (xərcdən sonra qazandırır)."
     if lt["light"] == "yellow":
-        tail = f" Sübut üçün təxminən {lt['need']} hal lazımdır." if lt.get("need") else ""
+        need = lt.get("need")
+        if need and need > n:
+            tail = f" Sübut üçün təxminən {need - n} hal da lazımdır."
+        else:
+            tail = " Say kifayət edir, amma Hakimin pul sınağını (tam xərcdən sonra, bütün analitiklər içində) hələ keçməyib."
         return f"{name}: {n} haldan {h} % düz, sadə model {b} % — yaxşıdır, amma hələ sübut deyil.{tail}"
     if lt["light"] == "red":
         return f"{name}: {h} % düz, sadə model {b} % — sadə modeldən pisdir."
