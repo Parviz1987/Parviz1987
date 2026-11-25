@@ -586,6 +586,13 @@ class BrainJobs:
                 self._state("reporter", f"{n} bazar rəqəmi tapıldı və iki beyin təsdiqlədi")
         except Exception:
             log.exception("reporter failed")
+        try:
+            from . import ideas
+            n = await ideas.tick(self.db, self.keys, now, self.activity)
+            if n:
+                self._state("ideas", f"{n} yeni fikir Hakimin sınağına göndərildi")
+        except Exception:
+            log.exception("ideas failed")
         if now >= self.next_scout and self.feeds is not None:
             # Every 4 hours while the market is open; every 30 minutes around a high-impact US release.
             from .engine import market_open

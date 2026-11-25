@@ -163,7 +163,7 @@ def test_brain_slots_save_and_validate():
     except ValueError:
         pass
     view = brains.view(db, KeyStore(db, SECRET))
-    assert {v["id"] for v in view} == {"scout", "hunter", "reader", "strategist", "analyst2", "reviewer", "chartist",
+    assert {v["id"] for v in view} == {"scout", "hunter", "reader", "strategist", "analyst2", "reviewer", "chartist", "ideas",
                                        "reporter"}
     assert all(sum(r["weight"] for r in v["requirements"]) == 100 for v in view)
 

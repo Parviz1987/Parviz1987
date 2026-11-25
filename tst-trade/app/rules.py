@@ -401,7 +401,9 @@ def run(db: DB, now: float | None = None) -> dict:
     fa = fundamental.run(db)
     from . import newsblock
     nw = newsblock.run(db)
-    return {"added": added, "replay": first_any, "futures_volume": fut, "fundamental": fa, "news": nw}
+    from . import ideas
+    hy = ideas.derive_all(db)
+    return {"added": added, "replay": first_any, "futures_volume": fut, "fundamental": fa, "news": nw, "ideas": hy}
 
 
 FUT_VOL_VER = "2026-11-25"
@@ -685,10 +687,21 @@ class Lookup:
         self.name, self.tfs, self.families = name, tfs, families if families is not None else RULE_FAMILY
         self.fire: dict[str, list] = {}                   # metal -> [(known_t, tf, rule, dir)] sorted
         out: dict[tuple, list] = {}                       # (rule, tf) -> [(outcome_known_t, hit)]
+        # Fərziyyə agenti's rules (HY-) vote only once the owner approved them in the registry, and only with firings
+        # after the idea was born: the filter was chosen by looking at history, so history must not vote for it.
+        hy = {}
+        if prefixes == self.TA_PREFIXES:
+            from . import ideas
+            from .rigor import registry_status
+            ideas.ensure(db)
+            for x in db.execute("SELECT rule, tf, ts, base FROM ideas WHERE status='sınaqda' AND rule IS NOT NULL").fetchall():
+                if registry_status(db, "rule", x["rule"], "*", x["tf"]) == "təsdiqlənib":
+                    hy[x["rule"]] = x["ts"]
+                    self.families = {**self.families, x["rule"]: self.families.get(x["base"], x["base"])}
         for r in db.iterate("SELECT metal, tf, t, rule, dir, price0, price1, adx FROM rule_signals "
                             "WHERE mode != 'futures'"):
             step = TF_SEC.get(r["tf"])
-            if not step or not r["rule"].startswith(prefixes):
+            if not step or not (r["rule"].startswith(prefixes) or (r["rule"] in hy and r["t"] > hy[r["rule"]])):
                 continue
             g = regime(r["adx"])
             self.fire.setdefault(r["metal"], []).append((r["t"] + step, r["tf"], r["rule"], r["dir"], g))

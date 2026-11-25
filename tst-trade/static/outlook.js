@@ -10,6 +10,7 @@
   const px = (v) => (v == null ? "—" : v >= 100 ? v.toFixed(2) : v.toFixed(3));
   const ny = (t) => new Date(t * 1000).toLocaleString("az-Latn-AZ", { timeZone: "America/New_York", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const dirWord = (p) => (p == null ? "—" : Math.abs(p - 0.5) < 0.03 ? "fikir yox" : p > 0.5 ? "yuxarı" : "aşağı");
+  const ev = (x) => `<span title="${esc(x.why)}">${esc(x.block)}: ${esc(x.name)} ${pct(x.p)}</span>`;
   const PROOF = { "sübut": "✅ sübut var", yox: "❌ istiqamət sübutu yoxdur", az: "⏳ hələ az yoxlanıb" };
   async function load() {
     let d;
@@ -38,6 +39,11 @@
         ${m.chartist ? `<div class="olw"><b>Qrafik:</b> ${esc(m.chartist.trend || "")}${m.chartist.levels ? " · " + esc(m.chartist.levels) : ""}${m.chartist.pattern ? " · " + esc(m.chartist.pattern) : ""}</div>` : ""}
         <div class="olr"><span>Tərəzi (Hakim)</span><span>${t ? (String(t.basis || "").startsWith("çəkilər yoxdur") ? `<span class="note">Hakim hələ heç bir analitikə güvənmir</span>` : `${dirWord(t.p)} ${pct(t.p)} <span class="note">· ${esc(t.basis || "")}</span>`) : "—"}</span></div>
         <div class="olr"><span>Analitiklərin səsi</span><span>▲ ${v.up} · ▼ ${v.down}</span></div>
+        ${m.scenarios ? `<div class="olw"><b>Ssenarilər (1 gün):</b><br>${m.scenarios.map((x) => x.name === "aralıq"
+          ? `↔ aralıq ${pct(x.p)}: ${px(x.from)} – ${px(x.to)} <span class="note">(xərcdən kiçik hərəkət)</span>`
+          : `${x.name === "yuxarı" ? "▲" : "▼"} ${x.name} ${pct(x.p)}: ${px(x.from)}-dən ${x.name === "yuxarı" ? "yuxarı" : "aşağı"}, ehtimal olunan ${px(x.mid)}, uzaq hədd ${px(x.far)}`).join("<br>")}</div>` : ""}
+        ${m.evidence && (m.evidence.pro.length || m.evidence.con.length) ? `<div class="olw"><b>${m.evidence.lean ? "Lehinə dəlillər" : "Yuxarı deyənlər"}:</b> ${m.evidence.pro.map(ev).join("; ") || "yoxdur"}</div>
+        <div class="olw"><b>${m.evidence.lean ? "Əleyhinə dəlillər (əks dəlil)" : "Aşağı deyənlər"}:</b> ${m.evidence.con.map(ev).join("; ") || "yoxdur"}</div>` : ""}
       </div>`;
     }).join("");
   }

@@ -125,7 +125,44 @@ def build(db: DB, sym: str) -> dict:
     out["cost"] = judge.full_cost(sym, H)
     out["breakeven"] = judge.breakeven(db, sym, H)
     out["three_way"] = three_way((out.get("vahid") or {}).get("p"), rw, out["cost"])
+    out["scenarios"] = scenarios(rw, out["three_way"])
+    out["evidence"] = evidence(fc, lean or out["weak_dir"])
     return out
+
+
+def scenarios(rw: dict | None, tw: dict | None) -> list[dict] | None:
+    """A4 (Radar Gold scheme, owner 2026-11-25): the three outcomes as price scenarios. Levels come only from our own
+    ranges (rw 50 % / 80 %), the chances from three_way; nothing is invented."""
+    if not rw or not tw:
+        return None
+    p0, band = rw["price0"], tw["band"]
+    return [{"name": "yuxarı", "p": tw["up"], "from": round(p0 * (1 + band), 4), "mid": rw["hi50"], "far": rw["hi80"]},
+            {"name": "aralıq", "p": tw["neutral"], "from": round(p0 * (1 - band), 4), "to": round(p0 * (1 + band), 4)},
+            {"name": "aşağı", "p": tw["down"], "from": round(p0 * (1 - band), 4), "mid": rw["lo50"], "far": rw["lo80"]}]
+
+
+def evidence(fc: dict, lean: int) -> dict:
+    """A4: per block (TA, fundamental, news, cross-market, time, AI brains), which analysts support the unified lean
+    and which argue against it (the counter-evidence), each with its own probability and reason from the forecasts."""
+    from .forecast import FAMILY, FAMILY_NAMES
+    pro, con, blocks = [], [], {}
+    for m, v in fc.items():
+        b = FAMILY.get(m)
+        d = _dir(v["p_up"])
+        if not b or not d:
+            continue
+        blocks.setdefault(b, []).append(v["p_up"])
+        item = {"block": FAMILY_NAMES[b], "name": METHOD_NAMES.get(m, m), "p": v["p_up"],
+                "why": str(v.get("basis") or "")[:160]}
+        if lean and d == lean:
+            pro.append(item)
+        elif lean:
+            con.append(item)
+        else:
+            (pro if d > 0 else con).append(item)
+    key = lambda x: -abs(x["p"] - 0.5)
+    return {"lean": lean, "pro": sorted(pro, key=key)[:8], "con": sorted(con, key=key)[:8],
+            "blocks": {FAMILY_NAMES[b]: round(sum(v) / len(v), 4) for b, v in blocks.items()}}
 
 
 def three_way(p: float | None, rw: dict | None, cost: float) -> dict | None:

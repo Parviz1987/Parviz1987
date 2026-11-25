@@ -14,7 +14,7 @@ const LANES = [
   { key: "eyes", name: "Gözlər", ids: ["news", "events", "scout", "calendar", "macro", "archivist", "reporter", "history", "prices", "liquidity"] },
   { key: "nerves", name: "Sinirlər", ids: ["reader", "signals", "hunter"] },
   { key: "brain", name: "Beyin", ids: ["strateq", "debate", "ta", "chartist", "cards", "checker"] },
-  { key: "judge", name: "Hakim", ids: ["forecast", "judge"] },
+  { key: "judge", name: "Hakim", ids: ["forecast", "judge", "ideas"] },
   { key: "act", name: "Qərar", ids: ["risk", "decision"] },
 ];
 const LANE_W = [1.25, 0.85, 1.7, 0.85, 0.85];          // relative lane widths on a wide screen

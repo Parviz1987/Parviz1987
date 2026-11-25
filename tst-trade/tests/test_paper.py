@@ -90,3 +90,15 @@ def test_step_waits_without_al_sat_and_acts_on_one():
     eng.quotes = {"XAU": {"price": 3500.0, "recv_ts": now}}
     paper.step(db, eng, {"XAU": {"desks": [{"horizon": "1d", "call": "AL", "p_up": 0.7, "method": "m"}]}}, now)
     assert paper.view(db)["open"][0]["symbol"] == "XAU"
+
+
+def test_outlook_scenarios_and_evidence():
+    from app import outlook
+    rw = {"price0": 100.0, "lo50": 99, "hi50": 101, "lo80": 98, "hi80": 102}
+    tw = outlook.three_way(0.6, rw, 0.002)
+    sc = outlook.scenarios(rw, tw)
+    assert [x["name"] for x in sc] == ["yuxarı", "aralıq", "aşağı"] and abs(sum(x["p"] for x in sc) - 1) < 1e-3
+    fc = {"qaydalar": {"p_up": 0.6, "basis": "TA up"}, "xeber": {"p_up": 0.4, "basis": "news down"},
+          "rw": {"p_up": 0.5, "basis": ""}}
+    ev = outlook.evidence(fc, 1)
+    assert ev["pro"][0]["block"] == "texniki analiz" and ev["con"][0]["block"] == "xəbər"

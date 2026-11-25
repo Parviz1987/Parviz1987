@@ -117,6 +117,14 @@ BRAIN_SLOTS: list[dict] = [
      "provider": "openai", "model": "gpt-5.4-nano", "fallback": "anthropic", "fallback_model": "claude-haiku-5-5",
      "why": "Hindistan tələbi üçün pulsuz rəsmi gündəlik mənbə yoxdur (IBJA pullu API); həftəlik xəbərlər var. "
             "Sahibin qərarı (2026-11-25): aylıq limit 10 $."},
+    {"id": "ideas", "name": "Fərziyyə agenti",
+     "job": "Həftədə bir dəfə tədqiqat yaddaşını oxuyur (hər qaydanın xərcdən sonrakı nəticəsi, rejim və metal üzrə, "
+            "əvvəlki fikirlərin taleyi) və ən çox 2 yeni ölçülə bilən fikir təklif edir. Proqram fikri sərt şablonla "
+            "qaydaya (HY-) çevirir; Hakim onu hər qayda kimi ölçür, son sınaq və sahibin təsdiqi olmadan işə düşmür.",
+     "may_not": "Qiymət yazmaq; şablondan kənar qayda yazmaq; fikri özü işə salmaq.",
+     "requirements": [("Tədqiqat düşüncəsi", 50), ("Sərt cavab forması", 30), ("Qiymət", 20)],
+     "provider": "anthropic", "model": "claude-sonnet-5-5", "fallback": "openai", "fallback_model": "gpt-5.4-nano",
+     "why": "Radar Gold sxemi (R2 + R3), sahibin qərarı 2026-11-25. Həftədə bir sorğu: ayda ~0.2-0.5 $; limit 3 $."},
     {"id": "reader", "name": "Oxuyucu",
      "job": "Başlığı oxuyur: nə oldu, hansı metal, hansı istiqamət, nə qədər güclü, mənbə. Cavab sərt formada.",
      "may_not": "Qiymət yazmaq, proqnoz vermək.",

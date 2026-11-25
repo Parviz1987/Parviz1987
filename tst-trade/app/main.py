@@ -873,11 +873,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     @app.get("/api/admin/registry")
     async def registry_api():
-        """The strategy registry, finalists, the experiment journal and the price audit (owner)."""
-        from . import rigor
+        """The strategy registry, finalists, the experiment journal, the price audit and the hypothesis agent (owner)."""
+        from . import ideas, rigor
         def build():
             return {"registry": rigor.registry(db), "finals": rigor.finals(db), "experiments": rigor.experiments(db),
-                    "trials": rigor.trials(db), "price_audit": json.loads(db.get("rigor:price_audit") or "null")}
+                    "trials": rigor.trials(db), "price_audit": json.loads(db.get("rigor:price_audit") or "null"),
+                    "ideas": ideas.view(db), "ideas_next": float(db.get("ideas:last") or 0) + ideas.WEEK}
         return await asyncio.to_thread(build)
 
     @app.post("/api/admin/registry")

@@ -302,6 +302,11 @@ class Engine:
             # spent: nothing was delivered, so nothing was billed
             self.db.execute("DELETE FROM kv WHERE k LIKE 'futures:daily_spent:%'")
             self.db.put("migr:futdaily_fix_1125", "1")
+        if not self.db.get("migr:ideas3_1125"):
+            # The owner's decision (chat, 2026-11-25, «1-2 ed»): the new «Fərziyyə agenti» slot, monthly limit 3 $.
+            from . import brains as brain_cfg
+            brain_cfg.save(self.db, "ideas", {"month_usd": 3})
+            self.db.put("migr:ideas3_1125", "1")
         if not self.db.get("migr:reporter10_1125"):
             # The owner's decision (chat, 2026-11-25): the new «Bazar müxbiri» slot gets a 10 $ monthly limit.
             from . import brains as brain_cfg
@@ -312,7 +317,7 @@ class Engine:
             # the OpenAI nano model uses a deliberately high default price, so a 20 $ cap could stop them although
             # the real bill is lower; real prices are to be compared with the providers' bills after 4-5 days.
             from . import brains as brain_cfg      # (registry is imported at module level: no local name here)
-            for slot in registry.BRAIN_IDS - {"reporter"}:      # the reporter's own limit is 10 $ (owner, below)
+            for slot in registry.BRAIN_IDS - {"reporter", "ideas"}:      # the reporter's own limit is 10 $ (owner, below)
                 if float(brain_cfg.config(self.db, slot)["month_usd"]) < 50:
                     brain_cfg.save(self.db, slot, {"month_usd": 50})
             self.db.put("migr:limits50_1125", "1")
