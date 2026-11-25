@@ -97,6 +97,17 @@ def _slow(key: str, fn, ttl: float = 600):
     return out
 
 
+def _rules(db: DB) -> dict:
+    """Bilik kitabı rules: the Judge's record per rule and timeframe (next candle and stop + target), and replay state."""
+    from . import rules
+    rec = rules.records(db)
+    ver = {k: db.get(f"rules:ver:{s}:{tf}") for s in ("XAU", "XAG", "XPT", "XPD") for tf in rules.TFS
+           for k in (f"{s}:{tf}",)}
+    return {"bar": rec.get("bar"), "version": rules.RULES_VER, "replayed": ver,
+            "rules": {r: {tf: {k: x.get(k) for k in ("n", "hit_rate", "net_avg", "status", "rr")} for tf, x in tfs.items()}
+                      for r, tfs in rec.get("rules", {}).items()}}
+
+
 def _security(db: DB) -> dict:
     from .security import Guard
     return Guard(db).summary()
@@ -205,6 +216,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         # Plan v3 (Blocks 15-18): full cost, forecast cards, source checker, news events, focus targets, ALFRED
         "plan_v3": _slow("plan_v3", lambda: _plan_v3(db)),
         "futures_now": _futures_now(db),
+        "rules": _slow("rules", lambda: _rules(db)),
         "learning": {"ab_lessons": _slow("ab", lambda: learning.ab_report(db)), "lessons": learning.active_lessons(db),
                      "sleep": json.loads(db.get("sleep:last") or "null"), "calib": json.loads(db.get("calib") or "null"),
                      "nerve": json.loads(db.get("nerve:state") or "null"), "backup": json.loads(db.get("backup:last") or "null")},
