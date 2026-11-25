@@ -1,6 +1,7 @@
 """SQLite storage: ticks, candles, forecasts and their scores, saved keys and settings."""
 from __future__ import annotations
 
+import re
 import sqlite3
 import threading
 from pathlib import Path
@@ -67,6 +68,10 @@ class Rows:
         return self.rows[i]
 
 
+_READ = re.compile(r"\s*(SELECT|WITH)\b", re.I)
+_WRITE = re.compile(r"\b(INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER)\b", re.I)
+
+
 class DB:
     def __init__(self, path: Path | str):
         if str(path) != ":memory:":
@@ -75,6 +80,7 @@ class DB:
         self.conn = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
         self.conn.row_factory = sqlite3.Row
         self.lock = threading.RLock()
+        self._local = threading.local()
         self.conn.executescript(SCHEMA)
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(candles)").fetchall()}
         if "v" not in cols:          # tick volume (2026-11-25): how many times the price changed inside the candle
@@ -87,8 +93,25 @@ class DB:
         with self.lock:
             self.conn.executescript(sql)
 
+    def _reader(self) -> sqlite3.Connection:
+        """This thread's own read-only connection (2026-11-25: the site froze while a long report read the 1 GB
+        database, because every read waited for the one shared lock and the web handlers' small reads queued behind
+        it). WAL lets any number of readers work beside the one writer; reads see everything already committed."""
+        c = getattr(self._local, "conn", None)
+        if c is None:
+            c = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True, check_same_thread=False, isolation_level=None)
+            c.row_factory = sqlite3.Row
+            c.execute("PRAGMA busy_timeout=5000")
+            self._local.conn = c
+        return c
+
     def execute(self, sql: str, args: tuple | list = ()) -> Rows:
-        """Run one statement and read its rows while holding the lock (see Rows). For very large reads use iterate."""
+        """Run one statement and read its rows. A plain read (SELECT / WITH ... SELECT) goes through this thread's own
+        read connection without the lock; every write and schema statement holds the lock on the one writer
+        connection (see Rows). For very large reads use iterate."""
+        if self.path != ":memory:" and _READ.match(sql) and not _WRITE.search(sql):
+            cur = self._reader().execute(sql, args)
+            return Rows(cur.fetchall(), cur.rowcount, cur.lastrowid)
         with self.lock:
             cur = self.conn.execute(sql, args)
             rows = cur.fetchall() if cur.description is not None else []
