@@ -34,7 +34,14 @@ def _json(text: str) -> dict:
     try:
         data = json.loads(t)
     except ValueError as e:
-        raise LLMError(f"cavab JSON deyil: {t[:120]}") from e
+        # a search model may add a sentence AFTER the object (2026-11-25: the hunter lost an answer this way):
+        # read the first complete JSON object and ignore what follows it
+        try:
+            data, _ = json.JSONDecoder().raw_decode(t[t.find("{"):]) if "{" in t else (None, 0)
+        except ValueError:
+            data = None
+        if data is None:
+            raise LLMError(f"cavab JSON deyil: {t[:120]}") from e
     if not isinstance(data, dict):
         raise LLMError("cavab obyekt deyil")
     return data

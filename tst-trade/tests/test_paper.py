@@ -102,3 +102,12 @@ def test_outlook_scenarios_and_evidence():
           "rw": {"p_up": 0.5, "basis": ""}}
     ev = outlook.evidence(fc, 1)
     assert ev["pro"][0]["block"] == "texniki analiz" and ev["con"][0]["block"] == "xəbər"
+
+
+def test_llm_json_with_text_after_the_object():
+    from app import llm
+    assert llm._json('{"found": false, "actual": ""}\nI could not find the release.') == {"found": False, "actual": ""}
+    assert llm._json('Here: {"a": 1} done') == {"a": 1}
+    import pytest
+    with pytest.raises(llm.LLMError):
+        llm._json('{"found": false, "actual": "')

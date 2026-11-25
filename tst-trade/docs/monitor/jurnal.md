@@ -120,3 +120,10 @@
   İndi hər axının öz oxuma bağlantısı var (WAL), yazılar kilidlə qalır. Test əlavə olundu. Serverdə yoxlama: 64 saniyəlik hesabat
   işləyərkən 329 sorğunun hamısı keçdi, ən yavaşı 1,4 san.
 - **Server:** versiya 75632bb, yeni xəta yoxdur, boş yaddaş 443 MB, baza 1023 MB. Yeganə «warn» əvvəlki kimidir (qayda şərti yaranmayıb).
+
+## 2026-11-25 10:47 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** sakit. 24 saatda 3 uğursuz giriş (hədd 20), hamısı tanınan tək ünvandan; bloklanmış ünvan yoxdur; başlıqlar yerindədir.
+- **Server:** versiya c610204 (AMFI, fərziyyə agenti, ssenari kartı), yenilənmədən 7 dəq sonra; yeni xəta yoxdur. Boş yaddaş 463 MB, baza 1031 MB.
+- **AMFI:** işləyir — 14 ay yığılıb (son 2026-10 = +3 474 krore), qalan tarixçə 6 saatda 12 ay.
+- **Rəqəm ovçusu «warn»:** bu gün ÜDM və PCE rəqəmlərini iki beyin eyni anda tapa bilmədi (biri tapdı, o biri yox) — qayda belədir, tək beyin rəqəmi işlədilmir.
+  Bir halda Claude-un cavabı rədd olunmuşdu, çünki JSON-dan sonra mətn yazmışdı: düzəldildi (ilk tam JSON obyekti oxunur), test əlavə olundu.
