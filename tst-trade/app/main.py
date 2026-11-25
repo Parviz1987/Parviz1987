@@ -891,6 +891,24 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         except (KeyError, ValueError) as e:
             raise HTTPException(400, str(e)[:200])
 
+    @app.get("/api/admin/paper")
+    async def paper_api():
+        """Kağız ticarət: the virtual account, open positions, the journal (also rejected proposals) and statistics."""
+        from . import paper
+        return await asyncio.to_thread(paper.view, db)
+
+    @app.post("/api/admin/paper")
+    async def paper_set(request: Request):
+        """Emergency stop on/off or the risk settings (owner)."""
+        from . import paper
+        b = await request.json()
+        try:
+            if "stop" in b:
+                return paper.emergency(db, bool(b["stop"]))
+            return paper.set_settings(db, b.get("settings") or {})
+        except (TypeError, ValueError) as e:
+            raise HTTPException(400, str(e)[:200])
+
     async def futures_daily():
         """Owner-approved daily top-up of the COMEX bars (after 06:00 UTC, once a day), then the volume rules run on
         the new candles. Never two downloads at once; the monthly ceiling is checked inside."""

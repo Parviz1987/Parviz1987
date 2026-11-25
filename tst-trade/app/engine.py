@@ -753,6 +753,11 @@ class Engine:
         self._rep("signals", "done", note=f"{st['state']}: {st['why']}")
         out = {s: risk.decision(self.db, self, s, now) for s in candles.METALS}
         self.decisions = out
+        try:                                      # kağız ticarət: only AL / SAT, which already need proof + approval
+            from . import paper
+            paper.step(self.db, self, out, now)
+        except Exception as e:  # noqa: BLE001 — a paper error must never stop the decisions
+            log.warning("paper step: %s", e)
         thin = [s for s in out if (out[s]["gate"]["liquidity"] or {}).get("state") == "nazik"]
         closed = [s for s in out if not out[s]["gate"]["open"]]
         calls = [f"{s} {d['name']} {d['call']}" for s in out for d in out[s]["desks"] if d["call"] != "GÖZLƏ"]
