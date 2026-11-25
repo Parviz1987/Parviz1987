@@ -127,3 +127,11 @@
 - **AMFI:** işləyir — 14 ay yığılıb (son 2026-10 = +3 474 krore), qalan tarixçə 6 saatda 12 ay.
 - **Rəqəm ovçusu «warn»:** bu gün ÜDM və PCE rəqəmlərini iki beyin eyni anda tapa bilmədi (biri tapdı, o biri yox) — qayda belədir, tək beyin rəqəmi işlədilmir.
   Bir halda Claude-un cavabı rədd olunmuşdu, çünki JSON-dan sonra mətn yazmışdı: düzəldildi (ilk tam JSON obyekti oxunur), test əlavə olundu.
+
+## 2026-11-25 13:48 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** sakit. 24 saatda 3 uğursuz giriş (hədd 20), tanınan tək ünvan; bloklanmış ünvan yoxdur; başlıqlar yerindədir.
+- **Server:** versiya 127f6b6 (Bazarlar arası və Vaxt blokları), 1,7 saatdır fasiləsiz işləyir, yeni xəta yoxdur. Boş yaddaş 425 MB, baza 1043 MB.
+- **Yeni bloklar:** 15 CM/TM qaydası Hakimdə ölçülür; «bazar ertəsi» düzəlişindən sonra TM-DOW-1 də var (1 289 hal, 47 % — effekt yoxdur).
+- **AMFI xətası tapıldı və düzəldildi:** 2025-ci ilin bəzi ayları .xls adı altında yeni .xlsx formatındadır, oxunmurdu.
+  İndi hər iki format oxunur (may 2025 = +291,9 krore, xəbərlərlə eyni), test əlavə olundu.
+- **Rəqəm ovçusu «warn»:** əvvəlki kimi (iki beyin eyni rəqəmi tapmadı) — qaydaya uyğundur.

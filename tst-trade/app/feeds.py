@@ -222,8 +222,51 @@ AMFI_SCHEMA = "CREATE TABLE IF NOT EXISTS india_etf (month TEXT PRIMARY KEY, net
 MONTHS3 = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
 
 
+def _xlsx_rows(raw: bytes) -> list[list[list]]:
+    """Every sheet of an .xlsx file (a zip of XML) as rows of cell values; no extra library."""
+    import zipfile
+    z = zipfile.ZipFile(io.BytesIO(raw))
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    shared = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        for si in ET.fromstring(z.read("xl/sharedStrings.xml")).iter(ns + "si"):
+            shared.append("".join(t.text or "" for t in si.iter(ns + "t")))
+    sheets = []
+    for name in sorted(n for n in z.namelist() if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n)):
+        rows = []
+        for row in ET.fromstring(z.read(name)).iter(ns + "row"):
+            cells: dict[int, object] = {}
+            for c in row.iter(ns + "c"):
+                ref = re.match(r"([A-Z]+)", c.get("r", "A"))
+                col = 0
+                for ch in ref.group(1):
+                    col = col * 26 + ord(ch) - 64
+                v = c.find(ns + "v")
+                if c.get("t") == "s" and v is not None:
+                    val = shared[int(v.text)]
+                elif c.get("t") == "inlineStr":
+                    val = "".join(t.text or "" for t in c.iter(ns + "t"))
+                else:
+                    val = v.text if v is not None else ""
+                    try:
+                        val = float(val)
+                    except (TypeError, ValueError):
+                        pass
+                cells[col - 1] = val
+            rows.append([cells.get(i, "") for i in range(max(cells) + 1)] if cells else [])
+        sheets.append(rows)
+    return sheets
+
+
 def parse_amfi_gold(raw: bytes) -> float | None:
-    """AMFI's monthly report (old Excel .xls) -> the gold ETF net inflow (+) / outflow (-) in crore rupees."""
+    """AMFI's monthly report -> the gold ETF net inflow (+) / outflow (-) in crore rupees. Most months are old Excel
+    (.xls); some are the newer .xlsx under the same .xls name (2026-11-25: April-June 2025 failed to read)."""
+    if raw[:2] == b"PK":
+        for rows in _xlsx_rows(raw):
+            v = amfi_gold_from_rows(rows)
+            if v is not None:
+                return v
+        return None
     import xlrd
     book = xlrd.open_workbook(file_contents=raw)
     for sh in book.sheets():
