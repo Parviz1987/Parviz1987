@@ -23,11 +23,35 @@ CREATE TABLE IF NOT EXISTS rule_signals (metal TEXT NOT NULL, tf TEXT NOT NULL, 
   dir INTEGER NOT NULL, price0 REAL, price1 REAL, mode TEXT NOT NULL, note TEXT, PRIMARY KEY (metal, tf, t, rule));
 CREATE INDEX IF NOT EXISTS rule_signals_r ON rule_signals(rule, tf);
 """
+RULES_VER = "2026-11-25"     # a new detector set: each metal x timeframe replays its history once more (old rows kept)
+RR_STOP, RR_TARGET, RR_BARS = 1.0, 2.0, 20      # the trader's test: stop 1 ATR, target 2 ATR, at most 20 candles
+TF_DAYS = {"1h": 1 / 24, "4h": 1 / 6, "1d": 1.0}
 PAIR = {"XAU": "XAG", "XAG": "XAU", "XPT": "XPD", "XPD": "XPT"}
 
 
 def ensure(db: DB) -> None:
     db.script(SCHEMA)
+    cols = {r["name"] for r in db.execute("PRAGMA table_info(rule_signals)").fetchall()}
+    for col, typ in (("atr", "REAL"), ("rr", "REAL"), ("held", "INTEGER")):
+        if col not in cols:          # stop + target outcome (2026-11-25), in units of risk (R)
+            db.script(f"ALTER TABLE rule_signals ADD COLUMN {col} {typ};")
+
+
+def stop_target(cs: list[dict], i: int, d: int, atr: float) -> tuple[float, int] | None:
+    """Enter at candle i's close in direction d; stop RR_STOP x ATR away, target RR_TARGET x ATR away. Walk the next
+    candles: the stop counts first when one candle touches both (the cautious reading). Result in R (risk units) and
+    the number of candles held; None until RR_BARS candles have closed."""
+    if not atr or i + RR_BARS >= len(cs):
+        return None
+    e = cs[i]["c"]
+    stop, target = e - d * RR_STOP * atr, e + d * RR_TARGET * atr
+    for k in range(i + 1, i + RR_BARS + 1):
+        x = cs[k]
+        if (d > 0 and x["l"] <= stop) or (d < 0 and x["h"] >= stop):
+            return -RR_STOP, k - i
+        if (d > 0 and x["h"] >= target) or (d < 0 and x["l"] <= target):
+            return RR_TARGET, k - i
+    return (cs[i + RR_BARS]["c"] - e) * d / atr, RR_BARS
 
 
 # ---------- indicators (whole series, computed once) ----------
@@ -103,6 +127,9 @@ class Ind:
                 m = s / 20
                 sd = math.sqrt(max(s2 / 20 - m * m, 0))
                 self.bbu[i], self.bbl[i], self.bbw[i] = m + 2 * sd, m - 2 * sd, (4 * sd / m if m else None)
+        from .patterns import obv, stochastic
+        self.sk, self.sd = stochastic(cs)
+        self.obv = obv(cs)
 
     def trend(self, i: int) -> int:
         e20, e50, e200, c = self.e20[i], self.e50[i], self.e200[i], self.c[i]
@@ -126,7 +153,8 @@ def _swings(cs: list[dict], lo: int, hi: int, k: int = 3) -> tuple[list[int], li
     return highs, lows
 
 
-def detect(ind: Ind, i: int, higher: dict | None = None, pair: tuple | None = None) -> list[tuple[str, int, str]]:
+def detect(ind: Ind, i: int, higher: dict | None = None, pair: tuple | None = None,
+           tf: str = "1h") -> list[tuple[str, int, str]]:
     """The rules that fire at candle i (using candles 0..i only)."""
     cs, out = ind.cs, []
     if i < 210 or ind.atr[i] is None:
@@ -227,6 +255,8 @@ def detect(ind: Ind, i: int, higher: dict | None = None, pair: tuple | None = No
         pp, why = pair_view(pair)
         if pp != 0.5:
             out.append(("IM-RATIO-1", 1 if pp > 0.5 else -1, why))
+    from .patterns import more
+    out.extend(more(ind, i, highs, lows, tf))
     return out
 
 
@@ -253,6 +283,9 @@ def run(db: DB, now: float | None = None) -> dict:
             # each metal and timeframe replays its own history once (a replay cut by a restart resumes here)
             first = db.execute("SELECT 1 FROM rule_signals WHERE metal=? AND tf=? AND mode='history' LIMIT 1",
                                (sym, tf)).fetchone() is None
+            ver_key = f"rules:ver:{sym}:{tf}"
+            if not first and db.get(ver_key) != RULES_VER:
+                first, have = True, set()        # new detectors: replay; rows already there are kept (INSERT OR IGNORE)
             first_any = first_any or first
             start = 210 if first else max(210, len(cs) - 30)
             rows = []
@@ -274,10 +307,26 @@ def run(db: DB, now: float | None = None) -> dict:
                 if len(pts) >= 60 and cs[i]["t"] in o:
                     pair = ([a for a, _ in pts], [b for _, b in pts])
                 p1 = cs[i + 1]["c"] if i + 1 < len(cs) else None
-                for rule, d, note in detect(ind, i, higher, pair):
+                for rule, d, note in detect(ind, i, higher, pair, tf):
                     rows.append((sym, tf, t, rule, d, cs[i]["c"], p1, "history" if first else "live", note[:120]))
-            db.executemany("INSERT OR IGNORE INTO rule_signals VALUES(?,?,?,?,?,?,?,?,?)", rows)
+            db.executemany("INSERT OR IGNORE INTO rule_signals(metal, tf, t, rule, dir, price0, price1, mode, note) "
+                           "VALUES(?,?,?,?,?,?,?,?,?)", rows)
             added += len(rows)
+            db.put(ver_key, RULES_VER)
+            # the trader's test (stop + target) for every firing whose 20 candles have closed
+            idx = {x["t"]: k for k, x in enumerate(cs)}
+            upd = []
+            for r in db.execute("SELECT t, rule, dir FROM rule_signals WHERE metal=? AND tf=? AND rr IS NULL AND t>=?",
+                                (sym, tf, cs[0]["t"])).fetchall():
+                k = idx.get(r["t"])
+                if k is None or ind.atr[k] is None:
+                    continue
+                res = stop_target(cs, k, r["dir"], ind.atr[k])
+                if res:
+                    upd.append((ind.atr[k], res[0], res[1], sym, tf, r["t"], r["rule"]))
+            if upd:
+                db.executemany("UPDATE rule_signals SET atr=?, rr=?, held=? WHERE metal=? AND tf=? AND t=? AND rule=?",
+                               upd)
             # score live firings whose next candle has closed since
             for r in db.execute("SELECT t FROM rule_signals WHERE metal=? AND tf=? AND price1 IS NULL",
                                 (sym, tf)).fetchall():
@@ -293,11 +342,19 @@ def records(db: DB) -> dict:
     halves, p against a coin, status with a Bonferroni bar over all cells."""
     from .judge import full_cost, _p_one_sided
     ensure(db)
+    from .judge import COST, SLIP, SWAP, SWAP_GUESS
     cells: dict[tuple, list] = {}
-    for r in db.execute("SELECT metal, tf, t, rule, dir, price0, price1 FROM rule_signals WHERE price1 IS NOT NULL "
-                        "AND price0 > 0 ORDER BY t").fetchall():
+    rr_cells: dict[tuple, list] = {}
+    for r in db.iterate("SELECT metal, tf, t, rule, dir, price0, price1, atr, rr, held FROM rule_signals "
+                        "WHERE price1 IS NOT NULL AND price0 > 0 ORDER BY t"):
         ret = (r["price1"] / r["price0"] - 1) * r["dir"]
         cells.setdefault((r["rule"], r["tf"]), []).append((r["t"], ret, ret - full_cost(r["metal"], r["tf"]), r["metal"]))
+        if r["rr"] is not None and r["atr"]:
+            # cost in risk units: spread + slippage once, the overnight fee for the candles held
+            frac = COST.get(r["metal"], 0.0) * (1 + SLIP) + \
+                r["held"] * TF_DAYS.get(r["tf"], 0.0) * SWAP.get(r["metal"], SWAP_GUESS)
+            rr_cells.setdefault((r["rule"], r["tf"]), []).append(
+                (r["rr"] - frac * r["price0"] / r["atr"], r["rr"] >= RR_TARGET))
     bar = 0.05 / max(1, len(cells))
     out = {}
     for (rule, tf), v in cells.items():
@@ -317,7 +374,22 @@ def records(db: DB) -> dict:
         st = ("az" if n < 100 else
               "sübut" if p is not None and p < bar and net > 0 and h1 and h2 and h1 > 0 and h2 > 0 else
               "zəif" if hits / n < 0.5 and net < 0 else "yox")
-        out.setdefault(rule, {})[tf] = {"n": n, "hit_rate": round(hits / n, 4), "net_avg": round(net, 6),
+        rv = rr_cells.get((rule, tf), [])
+        rr = None
+        if rv:
+            m = len(rv)
+            mean = sum(x for x, _ in rv) / m
+            sd = math.sqrt(sum((x - mean) ** 2 for x, _ in rv) / (m - 1)) if m > 1 else 0.0
+            half_r = m // 2
+            a1 = sum(x for x, _ in rv[:half_r]) / half_r if half_r else None
+            a2 = sum(x for x, _ in rv[half_r:]) / (m - half_r)
+            z = mean / (sd / math.sqrt(m)) if sd else 0.0
+            p_r = 0.5 * math.erfc(z / math.sqrt(2))
+            rr = {"n": m, "net_r": round(mean, 3), "target_share": round(sum(1 for _, w in rv if w) / m, 3),
+                  "p": round(p_r, 5), "status": ("az" if m < 100 else
+                                                 "sübut" if p_r < bar and mean > 0 and a1 and a1 > 0 and a2 > 0 else
+                                                 "yox")}
+        out.setdefault(rule, {})[tf] = {"n": n, "hit_rate": round(hits / n, 4), "net_avg": round(net, 6), "rr": rr,
                                         "halves": [None if h1 is None else round(h1, 6),
                                                    None if h2 is None else round(h2, 6)],
                                         "p": None if p is None else round(p, 5), "status": st,
@@ -331,7 +403,9 @@ def short_records(rec: dict) -> dict:
     out = {}
     for rule, tfs in rec.get("rules", {}).items():
         out[rule] = "; ".join(f"{tf} {round(x['hit_rate'] * 100)} %/{x['n']} xərcdən sonra {x['net_avg'] * 100:+.3f} % "
-                              f"{x['status']}" for tf, x in sorted(tfs.items()))
+                              f"{x['status']}" + (f", stop+hədəf: hədəfə çatdı {round(x['rr']['target_share'] * 100)} %, "
+                                                  f"xərcdən sonra {x['rr']['net_r']:+.2f} R {x['rr']['status']}"
+                                                  if x.get("rr") else "") for tf, x in sorted(tfs.items()))
     return out
 
 

@@ -76,6 +76,9 @@ class DB:
         self.conn.row_factory = sqlite3.Row
         self.lock = threading.RLock()
         self.conn.executescript(SCHEMA)
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(candles)").fetchall()}
+        if "v" not in cols:          # tick volume (2026-11-25): how many times the price changed inside the candle
+            self.conn.execute("ALTER TABLE candles ADD COLUMN v INTEGER")
 
     def script(self, sql: str) -> None:
         """Schema statements under the same lock as every write. sqlite's executescript COMMITs first: run unlocked

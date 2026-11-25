@@ -110,10 +110,14 @@ DEBATE_JUDGE_SYSTEM = (
 
 CHARTIST_SYSTEM = (
     "You are a professional technical analyst of precious metals. You get, for each of XAU, XAG, XPT, XPD, recent "
-    "candles on three timeframes (1 hour, 4 hours, 1 day: time, open, high, low, close) and computed indicators (EMA "
-    "20/50/200, RSI 14, MACD histogram, recent highs and lows, Fibonacci levels of the recent swing). Read the charts "
-    "like a trader: trend on each timeframe and whether they agree, support and resistance, chart and candle patterns, "
-    "momentum and divergences. Then give the probability (0..1) that the price is HIGHER than the last close in 1 hour "
+    "candles on three timeframes (1 hour, 4 hours, 1 day: time, open, high, low, close, tick volume v when counted) "
+    "and computed indicators (EMA 20/50/200, RSI 14, MACD, Stochastic 14/3, Bollinger 20/2, ATR 14, yesterday's pivot "
+    "points P/R1/S1, the last swing highs and lows, Fibonacci levels of the recent swing). Read the charts like a "
+    "complete trader, through every school: classic (trend lines, support and resistance, pivots), chart patterns "
+    "(double top/bottom, head and shoulders, triangle, wedge, flag), candles, trend indicators, oscillators, volatility, "
+    "volume (when counted), Fibonacci retracements and extensions, Dow structure, Elliott (wave 3 start, 5 waves done), "
+    "Wyckoff (spring, upthrust), price action (liquidity sweep, break of structure, order block) and intermarket (the "
+    "metal ratio). Say which agree and which disagree. Then give the probability (0..1) that the price is HIGHER than the last close in 1 hour "
     "(p1h), 4 hours (p4h) and 1 day (p1d). 0.5 = no edge; move away from it only when the chart gives a reason (usually "
     "0.4-0.6). Write 'trend', 'levels' and 'why' in Azerbaijani, short. Use ONLY prices that appear in the data; never "
     "invent levels. No news, no macro: charts only. Your answers are checked later against real prices. "
@@ -172,8 +176,25 @@ def chart_facts(db: DB, now: float) -> str:
             e12, e26 = _ema(closes, 12), _ema(closes, 26)
             seg = rows[-100:]
             hi, lo = max(r["h"] for r in seg), min(r["l"] for r in seg)
+            from . import patterns, rules as rules_
+            ind = rules_.Ind(rows)
+            hs, ls = rules_._swings(rows, len(rows) - 100, len(rows))
+            zz = patterns.zigzag(rows, hs, ls)[-6:]
+            prev_day = [r for r in rows if patterns._period_key(r["t"], tf) ==
+                        max((patterns._period_key(x["t"], tf) for x in rows
+                             if patterns._period_key(x["t"], tf) < patterns._period_key(rows[-1]["t"], tf)), default=-1)]
+            piv = None
+            if prev_day:
+                ph, pl, pc = max(r["h"] for r in prev_day), min(r["l"] for r in prev_day), prev_day[-1]["c"]
+                pp = (ph + pl + pc) / 3
+                piv = {"P": r_(pp), "R1": r_(2 * pp - pl), "S1": r_(2 * pp - ph)}
             d[tf] = {"candles": [[time.strftime("%m-%d %H:%M", time.gmtime(r["t"])), r_(r["o"]), r_(r["h"]), r_(r["l"]),
-                                  r_(r["c"])] for r in rows[-n:]],
+                                  r_(r["c"])] + ([r["v"]] if r.get("v") else []) for r in rows[-n:]],
+                     "stoch_k": None if ind.sk[-1] is None else round(ind.sk[-1], 1),
+                     "stoch_d": None if ind.sd[-1] is None else round(ind.sd[-1], 1),
+                     "boll_up": r_(ind.bbu[-1]), "boll_low": r_(ind.bbl[-1]), "atr14": r_(ind.atr[-1]),
+                     "pivot": piv,
+                     "swings": [[time.strftime("%m-%d %H:%M", time.gmtime(rows[j]["t"])), k, r_(p)] for j, k, p in zz],
                      "ema20": r_(_ema(closes, 20)), "ema50": r_(_ema(closes, 50)), "ema200": r_(_ema(closes, 200)),
                      "rsi14": None if _rsi(closes) is None else round(_rsi(closes), 1),
                      "macd": None if e12 is None or e26 is None else r_(e12 - e26),
@@ -188,7 +209,7 @@ def chart_facts(db: DB, now: float) -> str:
                     for x in rules.active_now(db, sym)] for sym in out}
     return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)), "charts": out,
                        "rules_firing_now": firing,
-                       "rulebook": playbook.text_for(("Texniki", "Fibonacci", "Bazarlar arası", "Öyrənilmiş"), rec,
+                       "rulebook": playbook.text_for(playbook.CHART_AREAS, rec,
                                                      learning.accepted_rules(db))},
                       ensure_ascii=False)
 

@@ -11,7 +11,7 @@ or is cancelled), source (where the idea comes from and how strong the evidence 
 in rules.py and the Judge measures it on its own; False: an analyst applies it by reading the facts)."""
 from __future__ import annotations
 
-VERSION = "2026-11-24.2"
+VERSION = "2026-11-25.1"
 
 RULES = [
     # ---------------- Texniki analiz: trend ----------------
@@ -76,10 +76,10 @@ RULES = [
      "signal": "Trend istiqamətində.",
      "void": "50 %-dən dərin geri çəkilmə — artıq «güclü trend» deyil, TA-FIB-1 qaydası işləyir.",
      "source": "Peşəkar praktika; sübutu zəif."},
-    {"id": "TA-FIB-EXT", "area": "Fibonacci", "name": "Uzanma hədəfləri 127,2 / 161,8 %", "detector": False,
-     "how": "Geri çəkilmədən sonra yeni dalğanın ehtimal olunan hədəfi: əvvəlki dalğanın 127,2 və 161,8 %-i. Yalnız "
-            "hədəf/aralıq kimi istifadə olunur, istiqamət vermir.",
-     "signal": "İstiqamət vermir; mümkün dayanma yerləri.",
+    {"id": "TA-FIB-EXT", "area": "Fibonacci", "name": "Uzanma hədəfləri 127,2 / 161,8 %", "detector": True,
+     "how": "Dalğa (dib → zirvə), geri çəkilmə, sonra yeni dalğa. Hədəf zonası: geri çəkilmənin dibindən əvvəlki "
+            "dalğanın 127,2–161,8 %-i qədər. Qiymət bu zonaya çatıb əks şam bağlayanda mənfəət götürülür.",
+     "signal": "Yuxarı dalğa zonada satıcı şamı → aşağı (düzəliş); aşağı dalğada alıcı şamı → yuxarı.",
      "void": "Dalğa düzgün seçilməyibsə.",
      "source": "Praktika; sübutu zəif."},
     # ---------------- şam və qrafik fiqurları ----------------
@@ -88,15 +88,129 @@ RULES = [
      "signal": "Yuxarı fiqur → yuxarı; aşağı fiqur → aşağı.",
      "void": "Səviyyədən uzaqda və ya yatay bazarda fiqur.",
      "source": "Nison (1991); akademik sübutu zəif və bazardan asılıdır (Marshall-Young-Rose 2006)."},
-    {"id": "TA-PAT-1", "area": "Texniki", "name": "Qrafik fiqurları (baş-çiyinlər, ikiqat zirvə/dib, üçbucaq)",
-     "detector": False,
-     "how": "Qrafik analitiki şamlarda görür: boyun xəttinin qırılması ilə təsdiqlənir; hədəf fiqurun hündürlüyü qədər.",
+    {"id": "TA-PAT-1", "area": "Texniki", "name": "İkiqat zirvə / ikiqat dib", "detector": True,
+     "how": "Son 40 şamda iki təsdiqlənmiş zirvə (və ya dib) arası ən azı 5 şam, hündürlük fərqi ≤ 0,5 ATR, aralarındakı "
+            "dib (boyun xətti) ən azı 2 ATR aşağıda. Şam boyun xəttindən o tərəfdə bağlananda fiqur tamamlanır; hədəf "
+            "fiqurun hündürlüyü qədər.",
+     "signal": "İkiqat zirvə → aşağı; ikiqat dib → yuxarı.",
+     "void": "Boyun xətti qırılmayıbsa fiqur yoxdur; qırılandan sonra qiymət yenidən zirvədən yuxarı çıxarsa ləğv.",
+     "source": "Bulkowski (2005); Lo-Mamaysky-Wang (2000): bəzi fiqurlar əlavə məlumat daşıyır; təsiri kiçikdir."},
+    {"id": "TA-PAT-HS", "area": "Texniki", "name": "Baş-çiyinlər / tərs baş-çiyinlər", "detector": True,
+     "how": "Üç ardıcıl zirvə: ortadakı (baş) ikisindən ən azı 0,5 ATR yüksək, çiyinlər bir-birindən ≤ 1 ATR fərqli. "
+            "Boyun xətti — aralarındakı ən aşağı dib. Şam boyun xəttinin altında bağlananda tamamlanır.",
+     "signal": "Baş-çiyinlər → aşağı; tərs baş-çiyinlər → yuxarı.",
+     "void": "Boyun xətti qırılmayıbsa; qırılmadan sonra sağ çiyin yuxarı keçilərsə.",
+     "source": "Edwards-Magee (1948); Lo-Mamaysky-Wang (2000), Osler (2000): təsiri kiçik, bazardan asılı."},
+    {"id": "TA-PAT-TRI", "area": "Texniki", "name": "Üçbucaq (sıxılan aralıq)", "detector": True,
+     "how": "Son 60 şamda iki zirvə enir, iki dib qalxır (xətlər yaxınlaşır). Şam yuxarı və ya aşağı xəttdən kənarda "
+            "bağlananda qırılma.",
      "signal": "Qırılma istiqamətində.",
-     "void": "Boyun xətti qırılmayıbsa fiqur yoxdur.",
-     "source": "Lo-Mamaysky-Wang (2000): bəzi fiqurlar əlavə məlumat daşıyır; təsiri kiçikdir."},
+     "void": "Qırılmadan sonra qiymət üçbucağın içinə qayıdırsa — yalançı qırılma.",
+     "source": "Edwards-Magee; Bulkowski: üçbucaqlarda yalançı qırılma tez-tez olur."},
+    {"id": "TA-PAT-WEDGE", "area": "Texniki", "name": "Paz (yüksələn / enən)", "detector": True,
+     "how": "Zirvələr də, diblər də eyni tərəfə gedir, amma xətlər yaxınlaşır (hərəkət zəifləyir). Yüksələn paz aşağı "
+            "xəttdən, enən paz yuxarı xəttdən qırılır.",
+     "signal": "Yüksələn paz qırıldı → aşağı; enən paz qırıldı → yuxarı.",
+     "void": "Qırılma olmadan paz davam edirsə.",
+     "source": "Edwards-Magee; Bulkowski; sübutu zəif."},
+    {"id": "TA-PAT-FLAG", "area": "Texniki", "name": "Bayraq (güclü hərəkətdən sonra fasilə)", "detector": True,
+     "how": "6 şamda ən azı 3 ATR güclü hərəkət (dirək), sonra 4–15 şamlıq dar fasilə (dirəyin yarısından dar, "
+            "yarısından az geri çəkilmə). Fasilənin sərhədi hərəkət istiqamətində qırılanda.",
+     "signal": "Dirəyin istiqamətində.",
+     "void": "Fasilə dirəyin yarısından çox geri çəkilirsə — bayraq deyil.",
+     "source": "Bulkowski: davam fiqurlarının ən etibarlısı sayılır; akademik sübutu orta."},
+    {"id": "TA-TL-1", "area": "Texniki", "name": "Trend xətti (maili)", "detector": True,
+     "how": "Yüksələn xətt son iki təsdiqlənmiş yüksələn dibdən, enən xətt son iki enən zirvədən çəkilir. Qiymət xəttə "
+            "toxunub trend istiqamətində şam bağlayır (sıçrayış) və ya xəttin o tərəfində 0,2 ATR-dən çox bağlanır "
+            "(qırılma).",
+     "signal": "Xəttdən sıçrayış → trend istiqamətində; xəttin qırılması → əks istiqamətdə.",
+     "void": "Xətt yalnız iki nöqtəyə söykənir; üçüncü toxunuş olmadan etibarı azdır.",
+     "source": "Edwards-Magee, Murphy (1999); sübutu zəif, praktikada çox yayılmış."},
+    {"id": "TA-STOCH-1", "area": "Texniki", "name": "Stoxastik (14, 3)", "detector": True,
+     "how": "%K son 14 şamın aralığında bağlanışın yeri, %D onun 3 şamlıq ortası. 20-dən aşağıda %K %D-ni yuxarı "
+            "kəsir — həddən artıq satılmışdan çıxış; 80-dən yuxarıda aşağı kəsir — həddən artıq alınmışdan çıxış.",
+     "signal": "Aşağı zonada yuxarı kəsişmə → yuxarı; yuxarı zonada aşağı kəsişmə → aşağı.",
+     "void": "Güclü trenddə osilyator uzun müddət ifrat zonada qalır — trendə qarşı siqnal zəifdir.",
+     "source": "Lane (1950-ci illər); RSI ilə çox oxşardır; sübutu zəif."},
+    {"id": "TA-PIVOT-1", "area": "Texniki", "name": "Pivot nöqtələri (S1 / R1)", "detector": True,
+     "how": "Əvvəlki günün (gündəlik qrafikdə əvvəlki həftənin) zirvə H, dib L, bağlanış C: P = (H+L+C)/3, R1 = 2P − L, "
+            "S1 = 2P − H. Qiymət S1-ə toxunub alıcı şamı ilə bağlanır və ya R1-ə toxunub satıcı şamı ilə bağlanır.",
+     "signal": "S1-dən dönüş → yuxarı; R1-dən dönüş → aşağı.",
+     "void": "Böyük xəbər günü səviyyələr asan qırılır.",
+     "source": "Gündəlik treyderlərin standart səviyyəsi; öz-özünü doğruldan səviyyə ola bilər, sübutu zəif."},
+    # ---------------- Nəzəriyyələr ----------------
+    {"id": "TH-DOW-1", "area": "Nəzəriyyə", "name": "Dow: zirvə-dib quruluşu", "detector": True,
+     "how": "Son iki təsdiqlənmiş zirvə və iki dib: hər ikisi yüksəlirsə yüksələn trend, hər ikisi enirsə enən trend. "
+            "Trend əks siqnal gələnə qədər davam edir.",
+     "signal": "Yüksək zirvə + yüksək dib → yuxarı; alçaq zirvə + alçaq dib → aşağı.",
+     "void": "Zirvə və dib fərqli tərəfə gedirsə (qarışıq quruluş).",
+     "source": "Dow, Hamilton, Rhea (1900–1932); trend izləmənin kökü, müasir sübutu trend araşdırmaları ilə ortaqdır."},
+    {"id": "TH-ELL-1", "area": "Nəzəriyyə", "name": "Elliott: 3-cü dalğanın başlanğıcı", "detector": True,
+     "how": "Dib → zirvə (1-ci dalğa) → dib (2-ci dalğa: 1-cinin 38,2–78,6 %-i, başlanğıcdan aşağı enmir). Qiymət 1-ci "
+            "dalğanın zirvəsini keçəndə 3-cü dalğa (adətən ən güclüsü) başlayır.",
+     "signal": "Yuxarı quruluşda → yuxarı; aşağı quruluşda → aşağı.",
+     "void": "2-ci dalğa 1-cinin başlanğıcından o tərəfə keçərsə, sayım səhvdir.",
+     "source": "Elliott (1938), Frost-Prechter; dalğa sayımı subyektivdir — burada yalnız yoxlanıla bilən an götürülüb. "
+               "Akademik sübutu yoxdur, Hakim ölçür."},
+    {"id": "TH-ELL-2", "area": "Nəzəriyyə", "name": "Elliott: 5 dalğa tamamlandı", "detector": True,
+     "how": "Beş ardıcıl dalğa üç qaydaya uyğundur: 2-ci başlanğıcdan aşağı enmir, 3-cü ən qısa deyil, 4-cü 1-cinin "
+            "zirvəsinə girmir. 5-ci dalğa 3-cünün zirvəsini keçib əks şamla geri bağlananda düzəliş gözlənir.",
+     "signal": "Yuxarı 5 dalğadan sonra → aşağı; aşağı 5 dalğadan sonra → yuxarı.",
+     "void": "Qiymət 5-ci dalğanın ucundan o tərəfdə möhkəmlənirsə — dalğa uzanır.",
+     "source": "Elliott; subyektivdir, akademik sübutu yoxdur. Hakim ölçür."},
+    {"id": "TH-WYC-1", "area": "Nəzəriyyə", "name": "Wyckoff: spring / upthrust", "detector": True,
+     "how": "Son 40 şam yatay aralıqdır (EMA-lar qarışıq, aralıq ≤ 8 ATR). Qiymət aralığın dibinin altına düşüb geri "
+            "qayıdır (spring — böyük alıcı satışları udur) və ya zirvənin üstünə çıxıb geri qayıdır (upthrust).",
+     "signal": "Spring → yuxarı; upthrust → aşağı.",
+     "void": "Qiymət aralıqdan kənarda möhkəmlənirsə — əsl qırılmadır.",
+     "source": "Wyckoff (1930-cu illər); praktikada məşhur, akademik sübutu yoxdur."},
+    # ---------------- Price action / smart money ----------------
+    {"id": "PA-LIQ-1", "area": "Price action", "name": "Likvidlik toplanması (stop ovu)", "detector": True,
+     "how": "Qiymət son təsdiqlənmiş zirvənin üstünə (dibin altına) çıxır, oradakı stopları işə salır, sonra geri "
+            "qayıdıb uzun kölgə ilə səviyyənin bu tərəfində bağlanır (kölgə şamın yarısından çox).",
+     "signal": "Zirvə üstündə toplanma → aşağı; dib altında → yuxarı.",
+     "void": "Növbəti şam yenidən səviyyənin o tərəfində bağlanırsa.",
+     "source": "ICT / «smart money» praktikası; Osler (2003): stop sifarişləri dəyirmi səviyyələrdə toplanır. Sübutu zəif."},
+    {"id": "PA-BOS-1", "area": "Price action", "name": "Quruluşun qırılması (BOS / CHoCH)", "detector": True,
+     "how": "Şam son təsdiqlənmiş zirvənin üstündə (dibin altında) bağlanır. Əgər əvvəlki quruluş əks idisə (alçaq "
+            "zirvələr), bu «xarakter dəyişməsi» (CHoCH) sayılır.",
+     "signal": "Zirvə qırıldı → yuxarı; dib qırıldı → aşağı.",
+     "void": "Qırılmadan dərhal sonra geri qayıdış (yalançı qırılma, bax PA-LIQ-1).",
+     "source": "Dow quruluşunun müasir adı; «smart money» praktikası; sübutu zəif."},
+    {"id": "PA-OB-1", "area": "Price action", "name": "Order block (ilk qayıdış)", "detector": True,
+     "how": "3 şamda ən azı 2 ATR güclü hərəkət (son 10 şamın ucunu qırır). Ondan əvvəlki son əks şam «order block» "
+            "zonasıdır. Qiymət sonra ilk dəfə bu zonaya qayıdıb hərəkət istiqamətində şam bağlayanda.",
+     "signal": "Alıcı bloku → yuxarı; satıcı bloku → aşağı.",
+     "void": "Zona bir dəfə istifadə olunub və ya qiymət zonanın o tərəfində bağlanıb.",
+     "source": "ICT / «smart money» praktikası; akademik sınağı yoxdur. Hakim ölçür."},
+    # ---------------- Həcm ----------------
+    {"id": "VOL-SPIKE-1", "area": "Həcm", "name": "Böyük həcmlə qırılma (böyük oyunçu)", "detector": True,
+     "how": "Şamın tik həcmi son 100 şamın ortasından ≥ 2 qat, şam ATR-dən böyük və 20 şamın zirvəsini (dibini) qırır.",
+     "signal": "Zirvə qırıldı → yuxarı; dib qırıldı → aşağı.",
+     "void": "Həcm məlumatı yoxdursa qayda susur (tik həcmi 2026-11-25-dən sayılır).",
+     "source": "Granville, Wyckoff; tik həcmi brokerin qiymət dəyişmə sayıdır — real birja həcminin təxmini əvəzi."},
+    {"id": "VOL-OBV-1", "area": "Həcm", "name": "OBV divergensiyası", "detector": True,
+     "how": "OBV (On-Balance Volume): qalxan şamın həcmi əlavə, düşənin çıxılır. Qiymət 20 şamın yeni zirvəsində, OBV isə "
+            "yox — alış zəifdir; qiymət yeni dibdə, OBV yox — satış zəifdir.",
+     "signal": "Zirvədə təsdiq yoxdur → aşağı; dibdə təsdiq yoxdur → yuxarı.",
+     "void": "Həcm məlumatı yoxdursa.",
+     "source": "Granville (1963); sübutu zəif."},
+    {"id": "VOL-VWAP-1", "area": "Həcm", "name": "VWAP keçidi", "detector": True,
+     "how": "VWAP — həcmlə çəkili orta qiymət (1 saatlıqda son 24 şam, 4 saatlıqda 6, gündəlikdə 5). Qiymət VWAP-ı "
+            "ortadan böyük həcmlə keçir.",
+     "signal": "Yuxarı keçid → yuxarı; aşağı keçid → aşağı.",
+     "void": "Həcm məlumatı yoxdursa; fyuçers sınağımızda (2 il, Databento) VWAP qaydası işləmədi.",
+     "source": "Kurumsal icra standartı; proqnoz gücü zəif."},
+    {"id": "VOL-POC-1", "area": "Həcm", "name": "Həcm profili: POC səviyyəsi", "detector": True,
+     "how": "Son 100 şamın həcmi qiymət pillələrinə (0,25 ATR) bölünür; ən çox həcm olan qiymət — POC. Qiymət yuxarıdan "
+            "POC-a enib alıcı şamı ilə bağlanır (dəstək) və ya aşağıdan qalxıb satıcı şamı ilə bağlanır (müqavimət).",
+     "signal": "POC dəstək → yuxarı; POC müqavimət → aşağı.",
+     "void": "Həcm məlumatı yoxdursa.",
+     "source": "Steidlmayer (Market Profile, 1980-ci illər); sübutu zəif."},
     # ---------------- dəyişkənlik və risk ----------------
     {"id": "TA-ATR-1", "area": "Texniki", "name": "Dəyişkənliyə görə aralıq və stop", "detector": False,
-     "how": "ATR 14 gözlənilən hərəkətin ölçüsüdür: stop girişdən 1,5–2 ATR, hədəf ən azı 1,5 qat stop.",
+     "how": "ATR 14 gözlənilən hərəkətin ölçüsüdür: stop girişdən 1–2 ATR, hədəf ən azı 2 qat stop. Hakim hər qaydanı "
+            "belə də ölçür: stop 1 ATR, hədəf 2 ATR, ən çox 20 şam — nəticə R ilə (1 R = stop qədər risk).",
      "signal": "İstiqamət vermir; aralıq və risk ölçüsü.",
      "void": "Böyük xəbər ərəfəsində ATR keçmişi əks etdirir, gələcəyi yox.",
      "source": "Wilder; risk idarəsində standart."},
@@ -162,7 +276,8 @@ RULES = [
 ]
 
 BY_ID = {r["id"]: r for r in RULES}
-AREAS = ("Texniki", "Fibonacci", "Fundamental", "Bazarlar arası")
+AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Fundamental", "Bazarlar arası")
+CHART_AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Bazarlar arası", "Öyrənilmiş")
 
 
 def text_for(areas: tuple[str, ...], records: dict | None = None, extra: list[dict] | None = None) -> str:

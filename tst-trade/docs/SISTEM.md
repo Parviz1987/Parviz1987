@@ -48,7 +48,7 @@ deyil.
 | Müzakirə (AI) | Beyin | Yuxarı və aşağı dəlilləri tərəzidə çəkmək | Eyni faktlar | Ehtimal |
 | Qrafik analitiki (AI) | Beyin | Texniki analiz, qrafikə özü baxır | Şamlar, göstəricilər, Bilik kitabı (texniki), kodun tapdığı qaydalar | Ehtimal, səviyyələr, qaydalar |
 | Kod üsulları (~30) | Beyin | Ölçülə bilən fikirlər | Şamlar, bazarlar, makro | Hər biri ehtimal və aralıq |
-| Qayda dedektorları | Beyin | Bilik kitabını kodla tətbiq etmək | Şamlar | Qayda siqnalları |
+| Qayda dedektorları | Beyin | Bilik kitabını kodla tətbiq etmək: texniki analizin 12 növünün hamısı (klassik, fiqurlar, şamlar, trend, osilyatorlar, dəyişkənlik, həcm, Fibonacci, Dow/Elliott/Wyckoff, price action, bazarlar arası, sistematik ölçmə) — 32 qayda (rules.py, patterns.py) | Şamlar, tik həcmi (2026-11-25-dən) | Qayda siqnalları; Hakim hər qaydanı iki cür ölçür: növbəti şam və stop 1 ATR + hədəf 2 ATR (R ilə) |
 | Vahid proqnoz | Beyin → Hakim | **Son söz** | Bütün analitiklər | Bir ehtimal + öz-özünü sınaq |
 | Hakim | Hakim | Kim düz deyir, sübut | Proqnozlar, qiymət | Status, çəkilər |
 | Jurnal katibi | Hakim | Səhvin səbəbini tapmaq | Beyin cavabı | Dondurulmuş proqnoz kartı |

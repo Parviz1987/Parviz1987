@@ -23,12 +23,14 @@ def bucket(ts: float, tf: str) -> int:
 
 
 def add_tick(db: DB, symbol: str, ts: float, price: float) -> None:
-    """Fold one price into every timeframe's current candle."""
+    """Fold one price into every timeframe's current candle. v = tick volume: how many times the price changed (a
+    candle that began as history and is finished live keeps v NULL, so a part-counted candle is never used)."""
     for tf in TF:
         t = bucket(ts, tf)
         db.execute(
-            "INSERT INTO candles(symbol, tf, t, o, h, l, c, origin) VALUES(?,?,?,?,?,?,?,'live') "
-            "ON CONFLICT(symbol, tf, t) DO UPDATE SET h=max(h, excluded.h), l=min(l, excluded.l), c=excluded.c",
+            "INSERT INTO candles(symbol, tf, t, o, h, l, c, origin, v) VALUES(?,?,?,?,?,?,?,'live',1) "
+            "ON CONFLICT(symbol, tf, t) DO UPDATE SET h=max(h, excluded.h), l=min(l, excluded.l), c=excluded.c, "
+            "v=CASE WHEN candles.v IS NULL THEN NULL WHEN candles.c != excluded.c THEN candles.v + 1 ELSE candles.v END",
             (symbol, tf, t, price, price, price, price))
 
 
@@ -48,7 +50,7 @@ def store_history(db: DB, symbol: str, tf: str, rows: list[tuple[int, float, flo
 
 
 def get(db: DB, symbol: str, tf: str, limit: int = 300, before: int | None = None) -> list[dict]:
-    sql = "SELECT t, o, h, l, c FROM candles WHERE symbol=? AND tf=?"
+    sql = "SELECT t, o, h, l, c, v FROM candles WHERE symbol=? AND tf=?"
     args: list = [symbol, tf]
     if before is not None:
         sql += " AND t<?"
