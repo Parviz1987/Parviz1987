@@ -108,6 +108,15 @@ BRAIN_SLOTS: list[dict] = [
      "requirements": [("Uydurmamaq", 50), ("Veb axtarışı", 30), ("Qiymət", 20)],
      "provider": "openai", "model": "gpt-5.4-nano", "fallback": "anthropic", "fallback_model": "claude-opus-5-5",
      "why": "İki fərqli şirkətin beyni bir-birini yoxlayır; FMP təqvimi olmadan faktı gətirmək üçün."},
+    {"id": "reporter", "name": "Bazar müxbiri",
+     "job": "Pulsuz rəsmi lenti olmayan fiziki bazar rəqəmlərini dərc olunmuş xəbərlərdə tapır: Hindistan və Çin "
+            "premiumu (həftəlik), Hindistanın qızıl ETF axını və idxalı (aylıq). İki beyin ayrı-ayrı tapır, mənbə linki "
+            "ilə; rəqəm və dövr üst-üstə düşməsə, heç biri istifadə olunmur.",
+     "may_not": "Rəqəmi təxmin etmək və ya hesablamaq; tək beynin tapdığını istifadə etmək; qiymət yazmaq.",
+     "requirements": [("Uydurmamaq", 50), ("Veb axtarışı", 30), ("Qiymət", 20)],
+     "provider": "openai", "model": "gpt-5.4-nano", "fallback": "anthropic", "fallback_model": "claude-haiku-5-5",
+     "why": "Hindistan tələbi üçün pulsuz rəsmi gündəlik mənbə yoxdur (IBJA pullu API); həftəlik xəbərlər var. "
+            "Sahibin qərarı (2026-11-25): aylıq limit 10 $."},
     {"id": "reader", "name": "Oxuyucu",
      "job": "Başlığı oxuyur: nə oldu, hansı metal, hansı istiqamət, nə qədər güclü, mənbə. Cavab sərt formada.",
      "may_not": "Qiymət yazmaq, proqnoz vermək.",

@@ -20,11 +20,11 @@ LAG_DAYS = {"DFII10": 2, "DGS2": 2, "T10YIE": 2, "DTWEXBGS": 10, "DEXCHUS": 2}
 GROW_PUBLIC_DAYS = 60     # CFNAI for a month (dated its first day) comes out about three to four weeks after it ends
 OZ_G = 31.1035
 COT_PUBLIC = 3 * 86400 + 20 * 3600 + 1800        # Tuesday 00:00 UTC -> Friday 20:30 UTC
-FA_VER = "2026-11-25.4"
+FA_VER = "2026-11-25.5"
 FAMILY = {"FA-RY-1": "faiz", "FA-RY-2": "faiz", "FA-FED-1": "faiz", "FA-BE-1": "faiz", "FA-USD-1": "dollar",
           "FA-COT-1": "mövqe", "FA-COT-2": "mövqe", "FA-SURP-1": "sürpriz", "FA-CB-1": "mərkəzi bank",
           "FA-FED-2": "faiz", "FA-SGE-1": "fiziki tələb", "FA-GROW-1": "böyümə",
-          "FA-ETF-1": "ETF axını", "FA-ETF-2": "ETF axını"}
+          "FA-ETF-1": "ETF axını", "FA-ETF-2": "ETF axını", "FA-IND-1": "fiziki tələb", "FA-IND-2": "fiziki tələb"}
 FED_BPS = {"H26": 50, "H25": 25, "H0": 0, "C25": -25, "C26": -50}
 OZ_PER_TONNE = 32150.7466
 CB_PUBLIC_DAYS = 45      # a month's IMF figure is public about six weeks after the month ends (counted cautiously)
@@ -97,6 +97,12 @@ class Data:
             etf = []
         self.etf_t = [datetime.fromisoformat(r["d"]).replace(tzinfo=timezone.utc).timestamp() + 86400 for r in etf]
         self.etf_v = [r["tonnes"] for r in etf]
+        from . import reporter                  # India, from news reports confirmed by two brains (Bazar müxbiri)
+        try:
+            self.ind_prem = reporter.accepted(db, "india_premium")
+            self.ind_etf = reporter.accepted(db, "india_etf")
+        except Exception:
+            self.ind_prem, self.ind_etf = [], []
         try:
             rows = db.execute("SELECT d, v FROM macro WHERE series='CFNAIMA3' ORDER BY d").fetchall()
         except Exception:
@@ -221,6 +227,17 @@ def detect(data: Data, metal: str, t: float) -> list[tuple[str, int, str]]:
                 out.append((rule, 1, f"GLD {label} {cur:+.1f} ton aldı: ilin ən güclü girişlərindən ({pct:.0f}-ci faiz)"))
             elif pct <= 20 and cur < 0:
                 out.append((rule, -1, f"GLD {label} {cur:+.1f} ton itirdi: ilin ən güclü çıxışlarından ({pct:.0f}-ci faiz)"))
+    known = [x for x in data.ind_prem if x[0] <= t]
+    if len(known) >= 2 and t - known[-1][0] <= 14 * 86400:
+        ch = known[-1][2] - known[-2][2]
+        if abs(ch) >= 5:
+            out.append(("FA-IND-1", 1 if ch > 0 else -1, f"Hindistan premiumu {known[-2][2]:+.0f} → {known[-1][2]:+.0f} $/unsiya "
+                                                         f"({'tələb güclənir' if ch > 0 else 'tələb zəifləyir'})"))
+    etf = [x for x in data.ind_etf if x[0] <= t]
+    if etf and t - etf[-1][0] <= 45 * 86400 and abs(etf[-1][2]) >= 500:
+        v = etf[-1][2]
+        out.append(("FA-IND-2", 1 if v > 0 else -1, f"Hindistanın qızıl ETF-lərinə {etf[-1][1]} ayında xalis "
+                                                    f"{'giriş' if v > 0 else 'çıxış'} {v:+,.0f} krore rupi"))
     k = bisect.bisect_right(data.grow_t, t)
     if k:
         g = data.grow_v[k - 1]
@@ -249,7 +266,8 @@ def run(db: DB, now: float | None = None) -> int:
             continue
         ind = rules.Ind(cs)
         # replayed again once the central-bank data first arrives (the IMF feed runs once a day)
-        have = "".join(x for x, ok in (("c", data.cb_net), ("s", data.sge_prem), ("g", data.grow_v), ("e", data.etf_v)) if ok)
+        have = "".join(x for x, ok in (("c", data.cb_net), ("s", data.sge_prem), ("g", data.grow_v), ("e", data.etf_v),
+                                         ("i", data.ind_prem)) if ok)
         mark = f"fa:ver:{FA_VER}:{have}:{sym}"
         done = int(db.get(mark) or 0)
         rows = []
@@ -329,6 +347,8 @@ def page(db: DB, sym: str, now: float | None = None) -> dict:
                 "pts": [[t, round(v * 100, 3)] for t, v in zip(data.sge_t, data.sge_prem) if t >= t0]})
     fac.append({"id": "ETF", "name": "GLD ETF-in qızılı, ton (ETF axını)", "good": 1,
                 "pts": [[t, v] for t, v in zip(data.etf_t, data.etf_v) if t >= t0]})
+    fac.append({"id": "IND", "name": "Hindistan premiumu/endirimi, $/unsiya (xəbərlərdən, Bazar müxbiri)", "good": 1,
+                "pts": [[t, v] for t, _, v in data.ind_prem]})
     fac.append({"id": "FED", "name": "Kalshi: növbəti Fed iclasında gözlənilən dəyişmə, bp", "good": -1,
                 "pts": [[t, round(v, 1)] for t, v in zip(data.fed_t, data.fed_bps) if t >= t0]})
     out["factors"] = fac

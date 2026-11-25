@@ -421,3 +421,39 @@ def test_news_page_data():
     d = newsblock.page(db, "XAU", now=t)
     assert d["headlines"][0]["topic"] == "geosiyasət" and d["topics"]["geosiyasət"]["up"] == 1
     assert {r["id"] for r in d["book"]} == set(newsblock.FAMILY) and "vote" in d["now"]
+
+
+def test_market_reporter_accepts_only_agreeing_figures_and_has_a_10_dollar_limit(monkeypatch):
+    import asyncio
+    from datetime import datetime, timezone
+    from app import brains, fundamental, reporter
+    from app.engine import Engine
+    from app.keys import KeyStore
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    Engine(db, ks, "demo", 15).migrate()
+    assert brains.config(db, "reporter")["month_usd"] == 10
+    monkeypatch.setattr(ks, "first", lambda p: "k")
+    answers = {"india_premium": [({"found": True, "value": -12, "period": "2026-11-20", "source_url": "https://a"}, "a"),
+                                 ({"found": True, "value": -13, "period": "week ending 2026-11-20", "source_url": "https://b"}, "b")],
+               "china_premium": [({"found": True, "value": 10, "period": "2026-11-20", "source_url": "https://a"}, "a"),
+                                 ({"found": True, "value": 30, "period": "2026-11-20", "source_url": "https://b"}, "b")]}
+    calls = []
+
+    async def fake(db_, keys, slot, system, user, max_tokens=2000):
+        assert slot == "reporter"
+        topic = "india_premium" if "Indian gold dealers" in user else "china_premium"
+        calls.append(topic)
+        return answers[topic]
+    monkeypatch.setattr(brains, "run_both", fake)
+    fri = datetime(2026, 11, 20, 14, tzinfo=timezone.utc).timestamp()
+    r = reporter.Reporter(db, ks)
+    assert asyncio.run(r.tick(fri)) == 1                       # India agreed (−12 / −13); China did not (10 / 30)
+    assert asyncio.run(r.tick(fri + 600)) == 0 and len(calls) == 2   # asked once a day
+    got = reporter.accepted(db, "india_premium")
+    assert got and got[0][1] == "2026-11-20" and got[0][2] == -12.5
+    assert reporter.accepted(db, "china_premium") == []
+    # a second, higher week: the India rule fires
+    db.execute("INSERT INTO market_reports VALUES('india_premium','2026-11-27',-2,'$/oz',?,'{}','{}',1,'x')", (fri + 7 * 86400,))
+    data = fundamental.Data(db)
+    assert {r_: d for r_, d, _ in fundamental.detect(data, "XAU", fri + 7 * 86400 + 60)}.get("FA-IND-1") == 1

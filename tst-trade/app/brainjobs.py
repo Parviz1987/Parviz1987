@@ -273,6 +273,8 @@ class BrainJobs:
         self.next_strategist = 0.0
         from .hunter import Hunter
         self.hunter = Hunter(db, keys)
+        from .reporter import Reporter
+        self.reporter = Reporter(db, keys)
         self.activity = None      # app.activity.Hub, set by the app
         from .brainviews import SCHEMA as BV
         db.script(BV)
@@ -577,6 +579,13 @@ class BrainJobs:
                 self._state("hunter", f"{n} rəqəm tapıldı və iki beyin təsdiqlədi")
         except Exception:
             log.exception("hunter failed")
+        self.reporter.activity = self.activity
+        try:
+            n = await self.reporter.tick(now)
+            if n:
+                self._state("reporter", f"{n} bazar rəqəmi tapıldı və iki beyin təsdiqlədi")
+        except Exception:
+            log.exception("reporter failed")
         if now >= self.next_scout and self.feeds is not None:
             # Every 4 hours while the market is open; every 30 minutes around a high-impact US release.
             from .engine import market_open

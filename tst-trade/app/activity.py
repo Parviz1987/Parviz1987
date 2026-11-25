@@ -59,6 +59,8 @@ NODES = {
                  "Hər proqnozu dondurur: ssenari, əks ssenari, zəifləmə şərti, məlumat keyfiyyəti, versiya"),
     "checker":  (19, "Mənbə yoxlayıcısı",  "strateq",  [],
                  "Beyin cavabında ona verilməyən rəqəmləri sayır (uydurma göstərilmir)"),
+    "reporter": (23, "Bazar müxbiri",     "orch",     ["W1 İki beyin axtarır", "W2 Müqayisə"],
+                 "İki beyin Hindistan/Çin premiumunu, Hindistanın ETF axını və idxalını xəbərlərdə ayrı-ayrı tapır"),
     "ta":       (22, "Texniki analiz bloku", "prices", [],
                  "Kod: 12 növ, 34 qayda qrafikdə tapılır, Hakim hər qaydanı ölçür, proqnoza bir səs («Qaydalar»)"),
     "chartist": (21, "Qrafik analitiki",   "ta",  ["W1 Şamlar", "W2 Beyin", "W3 Yaddaş"],
@@ -72,7 +74,7 @@ NODES = {
 FLOW = {"prices": None, "liquidity": "prices", "forecast": "prices", "judge": "forecast", "history": "orch",
         "news": None, "events": "news", "reader": "events", "calendar": None, "hunter": "calendar", "macro": None,
         "scout": None, "signals": "reader", "strateq": "signals", "debate": "strateq", "cards": "strateq",
-        "checker": "strateq", "risk": "liquidity", "decision": "risk", "orch": None, "archivist": "macro", "chartist": "ta", "ta": "prices"}
+        "checker": "strateq", "risk": "liquidity", "decision": "risk", "orch": None, "archivist": "macro", "chartist": "ta", "ta": "prices", "reporter": None}
 
 
 class Hub:

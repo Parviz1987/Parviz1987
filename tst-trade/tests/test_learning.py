@@ -75,7 +75,8 @@ def test_owner_limit_50_for_every_brain_once():
     db.put("brain:reader", json.dumps({"provider": "xai", "model": "grok-x", "month_usd": 5.0}))
     db.put("brain:strategist", json.dumps({"provider": "anthropic", "model": "claude-sonnet-5-5", "month_usd": 80.0}))
     Engine(db, KeyStore(db, "s" * 64), "demo", 15).migrate()
-    assert all(brains.config(db, s)["month_usd"] >= 50 for s in registry.BRAIN_IDS)
+    assert all(brains.config(db, s)["month_usd"] >= 50 for s in registry.BRAIN_IDS - {"reporter"})
+    assert brains.config(db, "reporter")["month_usd"] == 10              # the owner gave the reporter 10 $
     assert brains.config(db, "strategist")["month_usd"] == 80.0          # a higher limit is never lowered
     assert brains.config(db, "reader")["model"] == "grok-x"              # only the limit changes
 

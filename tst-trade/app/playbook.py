@@ -311,6 +311,19 @@ RULES = [
      "signal": "Davamlı giriş → yuxarı; davamlı çıxış → aşağı.",
      "void": "Eyni.",
      "source": "SPDR Gold Trust; WGC."},
+    {"id": "FA-IND-1", "area": "Fundamental", "name": "Hindistan premiumu (həftəlik)", "detector": True,
+     "how": "Hindistan dilerlərinin rəsmi daxili qiymətə görə premiumu (+) və ya endirimi (−), $/unsiya, həftəlik xəbər "
+            "hesabatlarından (Reuters «Asia Gold»). Bazar müxbiri iki beyinlə tapır: rəqəm və dövr üst-üstə düşəndə qəbul "
+            "olunur. Son iki hesabat arasında ±5 $-dan çox dəyişəndə; son hesabat 14 gündən köhnə olmamalıdır.",
+     "signal": "Premium artır (endirim azalır) → yuxarı; azalır → aşağı.",
+     "void": "Qiymətin özü kəskin dəyişəndə dilerlər endirimi genişləndirir: bu, tələbdən çox qiymət reaksiyasıdır.",
+     "source": "WGC Hindistan hesabatları; Reuters həftəlik Asiya fiziki bazar icmalı."},
+    {"id": "FA-IND-2", "area": "Fundamental", "name": "Hindistanın qızıl ETF axını (aylıq)", "detector": True,
+     "how": "AMFI-nin dərc etdiyi aylıq xalis axın (krore rupi), xəbərlərdən; |axın| ≥ 500 krore və rəqəm 45 gündən köhnə "
+            "deyilsə.",
+     "signal": "Giriş → yuxarı; çıxış → aşağı.",
+     "void": "Aylıq və gecikmə ilə: yalnız uzun üfüq üçün.",
+     "source": "AMFI aylıq hesabatları; WGC."},
     {"id": "FA-CB-1", "area": "Fundamental", "name": "Mərkəzi bankların alışı (IMF), 3 ay", "detector": True,
      "how": "IMF-in rəsmi statistikası (International Liquidity, qızıl ehtiyatının həcmi): 25 mərkəzi bankın (Çin, "
             "Hindistan, Türkiyə, Polşa, Rusiya, Qazaxıstan, Özbəkistan, Çexiya, Qətər, Sinqapur və b.) aylıq xalis alışı "

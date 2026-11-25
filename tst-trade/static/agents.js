@@ -11,7 +11,7 @@ const SIDX = { waiting: 0, working: 1, done: 2, error: 3 };
 const FRESH = 12;                       // seconds a just-finished task keeps its green dot
 // the five lanes of the nervous system; a task that is not listed goes one lane after its data source
 const LANES = [
-  { key: "eyes", name: "Gözlər", ids: ["news", "events", "scout", "calendar", "macro", "archivist", "history", "prices", "liquidity"] },
+  { key: "eyes", name: "Gözlər", ids: ["news", "events", "scout", "calendar", "macro", "archivist", "reporter", "history", "prices", "liquidity"] },
   { key: "nerves", name: "Sinirlər", ids: ["reader", "signals", "hunter"] },
   { key: "brain", name: "Beyin", ids: ["strateq", "debate", "ta", "chartist", "cards", "checker"] },
   { key: "judge", name: "Hakim", ids: ["forecast", "judge"] },
