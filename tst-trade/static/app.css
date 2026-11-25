@@ -287,3 +287,9 @@ body.simple .main,body.simple .split,body.simple .feeds,body.simple .box[data-fo
 .rule .rr>span:first-child{color:var(--muted)}
 .rule .rtf{display:block}
 @media (max-width:560px){.rule .rr{grid-template-columns:1fr;gap:0}}
+
+/* Etibar işığı */
+.trust .trust-head{font-size:15px;margin:4px 0 8px;font-weight:600}
+.trust details summary{cursor:pointer;color:var(--acc);font-size:13px}
+.tr-row{display:grid;grid-template-columns:150px 1fr;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}
+@media (max-width:560px){.tr-row{grid-template-columns:1fr;gap:2px}}

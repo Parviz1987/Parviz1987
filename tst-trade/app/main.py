@@ -379,6 +379,12 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 "v_registered": hypotheses.V_REGISTERED, "v_p_bar": hypotheses.V_P_BAR,
                 "v": await asyncio.to_thread(diag._slow, "vtests", lambda: hypotheses.evaluate_v(db))}
 
+    @app.get("/api/trust")
+    async def trust_api():
+        """Etibar işığı: every analyst and the unified forecast as one light and one sentence."""
+        from . import trust
+        return await asyncio.to_thread(diag._slow, "trust", lambda: trust.build(db), 300)
+
     @app.get("/api/outlook")
     async def outlook_api():
         """Sabah üçün proqnoz: per metal the 1-day range, the three voices on direction with their records, the proof."""
