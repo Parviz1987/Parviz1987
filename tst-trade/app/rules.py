@@ -505,3 +505,81 @@ def active_now(db: DB, sym: str) -> list[dict]:
                             "AND mode!='futures'", (sym, tf, t)).fetchall():
             out.append({"tf": tf, "t": t, "rule": r["rule"], "dir": r["dir"], "note": r["note"]})
     return out
+
+
+# ---------- the rules as ONE analyst for the forecasts (owner 2026-11-25: «into our nervous system») ----------
+TF_SEC = {"1h": 3600, "4h": 14400, "1d": 86400}
+RULE_TFS = {"15m": ("1h",), "30m": ("1h",), "1h": ("1h",), "4h": ("1h", "4h")}      # longer horizons: 4h + 1d
+LAG = 1800      # the rules job runs every 15 min and the live lookup is cached 10 min: a firing is used 30 min after its
+                # candle closed, in the replay exactly as live (no history advantage)
+
+
+class Lookup:
+    """«Qaydalar»: every Bilik kitabı rule that fired on the newest closed candles votes in its direction, weighted by
+    its OWN record known at that moment (walk-forward: an outcome counts only after its candle has closed, so the
+    replay never uses the future). A rule with no edge so far (hit rate <= 50 %) gets no voice. Futures-only volume
+    firings are left out (on live they arrive a day late)."""
+
+    def __init__(self, db: DB):
+        ensure(db)
+        self.fire: dict[str, list] = {}                   # metal -> [(known_t, tf, rule, dir)] sorted
+        out: dict[tuple, list] = {}                       # (rule, tf) -> [(outcome_known_t, hit)]
+        for r in db.iterate("SELECT metal, tf, t, rule, dir, price0, price1 FROM rule_signals WHERE mode != 'futures'"):
+            step = TF_SEC.get(r["tf"])
+            if not step:
+                continue
+            self.fire.setdefault(r["metal"], []).append((r["t"] + step, r["tf"], r["rule"], r["dir"]))
+            if r["price1"] is not None and r["price0"]:
+                out.setdefault((r["rule"], r["tf"]), []).append((r["t"] + 2 * step,
+                                                                 int((r["price1"] - r["price0"]) * r["dir"] > 0)))
+        for v in self.fire.values():
+            v.sort()
+        self.fkeys = {m: [x[0] for x in v] for m, v in self.fire.items()}
+        self.rec: dict[tuple, tuple[list, list]] = {}
+        for k, v in out.items():
+            v.sort()
+            ts, cum, s = [], [], 0
+            for t, h in v:
+                s += h
+                ts.append(t)
+                cum.append(s)
+            self.rec[k] = (ts, cum)
+
+    def weight(self, rule: str, tf: str, t: float) -> tuple[float, int, float]:
+        ts, cum = self.rec.get((rule, tf), ([], []))
+        n = bisect_left(ts, t + 1)
+        if not n:
+            return 0.0, 0, 0.5
+        hits = cum[n - 1]
+        return max(0.0, 2 * (hits - n / 2) / (n + 50)), n, hits / n
+
+    def views(self, metal: str, t: float, horizon: str) -> dict:
+        tfs = RULE_TFS.get(horizon, ("4h", "1d"))
+        keys = self.fkeys.get(metal, [])
+        now_t = t - LAG
+        lo = bisect_left(keys, now_t - max(TF_SEC[x] for x in tfs) + 1)
+        hi = bisect_left(keys, now_t + 1)
+        vote, used = 0.0, []
+        for known, tf, rule, d in self.fire[metal][lo:hi] if keys else []:
+            if tf not in tfs or known <= now_t - TF_SEC[tf]:
+                continue                                  # only the newest closed candle of each timeframe
+            w, n, hr = self.weight(rule, tf, now_t)
+            if w <= 0:
+                continue
+            vote += d * w
+            used.append((w, f"{rule} {tf} {'↑' if d > 0 else '↓'} ({round(hr * 100)} %/{n})"))
+        if not used:
+            return {"qaydalar": (0.5, "indi keçmişi müsbət olan qayda işə düşməyib")}
+        p = round(0.5 + max(-0.15, min(0.15, 0.5 * vote)), 4)
+        used.sort(reverse=True)
+        return {"qaydalar": (p, f"{len(used)} qayda: " + ", ".join(x for _, x in used[:4]))}
+
+
+_LIVE: dict = {"ts": 0.0, "lk": None}
+
+
+def live_lookup(db: DB) -> Lookup:
+    """Live forecasts reuse one Lookup for 10 minutes (it reads every rule firing)."""
+    if _LIVE["lk"] is None or time.time() - _LIVE["ts"] > 600:
+        _LIVE["lk"], _LIVE["ts"] = Lookup(db), time.time()
+    return _LIVE["lk"]

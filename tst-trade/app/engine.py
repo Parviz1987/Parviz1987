@@ -8,7 +8,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from . import brainviews, candles, registry, forecast, judge, markets, slowviews, surprise, unified
+from . import brainviews, candles, registry, forecast, judge, markets, rules, slowviews, surprise, unified
 from .db import DB
 from .keys import KeyStore
 from .providers.base import NotServed, ProviderError, Quote
@@ -392,6 +392,7 @@ class Engine:
         rel = self._releases(now)
         bv = brainviews.Lookup(self.db)
         sv = slowviews.Lookup(self.db)
+        rl = rules.live_lookup(self.db)
         ev = EventLookup(self.db)
         bonds, gvz = BondLookup(self.db), GvzLookup(self.db)
         for h, tf in forecast.HORIZONS.items():
@@ -422,6 +423,7 @@ class Engine:
                     fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
                                         rel.window(issued_t, h), linked_now,
                                         {**bv.views(sym, known, h), **sv.views(sym, issued_t, h),
+                                         **rl.views(sym, known, h),
                                          "_weights": self.weights(sym, h, now) if mode == "live" else None,
                                          "_unified": unified.models(self.db).get(f"{sym}:{h}") if mode == "live" else None},
                                         ev.near(known))
@@ -567,6 +569,7 @@ class Engine:
         bv = brainviews.Lookup(self.db)
         bv.calib = {}        # calibration bands come from recent outcomes: never applied to the past (look-ahead)
         sv = slowviews.Lookup(self.db)
+        rl = rules.Lookup(self.db)
         ev = EventLookup(self.db)
         bonds, gvz = BondLookup(self.db), GvzLookup(self.db)
         first = macro.first_day()
@@ -605,7 +608,8 @@ class Engine:
                     fc = forecast.build(window, h, macro.at(t) if tf == "1d" else None, t, rel.window(t, h),
                                         {**self.related_closes(window, tf, now, linked, sym), "bond": bonds.at(t),
                                          "gvz": gvz.at(t) if tf in ("1d", "1w") and sym == "XAU" else None},
-                                        {**bv.views(sym, decision_time(t, tf), h), **sv.views(sym, t, h)},
+                                        {**bv.views(sym, decision_time(t, tf), h), **sv.views(sym, t, h),
+                                         **rl.views(sym, decision_time(t, tf), h)},
                                         ev.near(decision_time(t, tf)))
                     if fc is None:
                         continue
@@ -690,7 +694,6 @@ class Engine:
     _rules_busy = False
 
     async def _rules_job(self) -> None:
-        from . import rules
         self._rules_busy = True
         try:
             res = await asyncio.to_thread(rules.run, self.db)

@@ -42,17 +42,17 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
                  "1mo": "1 ay"}
 METHODS = ("rw", "up", "momentum", "reversal", "trend", "breakout", "tsmom", "rsi", "fib", "pullback", "macro",
            "session", "surprise", "dollar", "oil", "news", "strateq", "brain2", "debate", "cot", "season", "jewel", "seans", "trendmix", "consensus",
-           "sam", "ichimoku", "pair", "garch", "gvz", "chartist", "terazi", "vahid")
+           "sam", "ichimoku", "pair", "garch", "gvz", "chartist", "qaydalar", "terazi", "vahid")
 # Families: methods that carry the SAME idea (momentum and trend are both "the move continues"). The consensus gives
 # each family one voice, so one idea measured three ways cannot outvote two independent ideas.
-FAMILY = {"chartist": "chart", "sam": "revert", "ichimoku": "trend", "pair": "cross", "momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
+FAMILY = {"chartist": "chart", "qaydalar": "rules", "sam": "revert", "ichimoku": "trend", "pair": "cross", "momentum": "trend", "trend": "trend", "breakout": "trend", "tsmom": "trend",
           "reversal": "revert", "rsi": "revert", "fib": "revert", "pullback": "revert",
           "dollar": "cross", "oil": "cross", "macro": "fund", "surprise": "fund",
           "news": "brain", "strateq": "brain", "brain2": "brain", "debate": "brain", "session": "time", "seans": "time", "trendmix": "trend", "cot": "position",
           "season": "calendar", "jewel": "calendar"}
 FAMILY_NAMES = {"trend": "trend", "revert": "geri dönüş", "cross": "bazarlar arası", "fund": "fundamental",
                 "brain": "beyinlər", "time": "vaxt", "position": "fond mövqeləri", "calendar": "təqvim",
-                "chart": "qrafik analitiki"}
+                "chart": "qrafik analitiki", "rules": "Bilik kitabı qaydaları"}
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
                 "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)", "tsmom": "12 aylıq trend + istiqraz",
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "pullback": "Trend içində geri çəkilmə", "macro": "Makro (real faiz + dollar)",
@@ -64,6 +64,7 @@ METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", 
                 "sam": "Şam fiqurları", "ichimoku": "Ichimoku buludu", "pair": "Metal nisbəti (qızıl/gümüş, platin/palladium)",
                 "garch": "GARCH dəyişkənlik aralığı", "gvz": "GVZ (opsionların gözlədiyi dəyişkənlik)",
                 "chartist": "Qrafik analitiki (AI)",
+                "qaydalar": "Qaydalar (Bilik kitabı, 12 növ)",
                 "terazi": "Tərəzi (Hakimin çəkisi ilə)", "vahid": "Vahid proqnoz (hamısı birlikdə, öyrənən)",
                 "consensus": "Seçici konsensus (müstəqil ailələr)"}
 BASELINES = ("rw", "up")
@@ -619,6 +620,9 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
     if "chartist" in mf:
         p, basis = (views or {}).get("chartist", (0.5, "Qrafik analitikinin yeni fikri yoxdur"))
         out["chartist"] = {"p_up": p, "basis": basis}
+    if "qaydalar" in mf:
+        p, basis = (views or {}).get("qaydalar", (0.5, "qayda məlumatı yoxdur"))
+        out["qaydalar"] = {"p_up": p, "basis": basis}
 
     out["consensus"] = selective_consensus(out, rets, sigma, event_near)
     out["terazi"] = weighted_view(out, (views or {}).get("_weights"))
@@ -715,6 +719,11 @@ PASSPORT = {
             "expect": "Gün və həftə aralıqlarını daha dəqiq tutmalıdır.", "else": "Bizim aralıqdan pisdirsə, istifadə olunmur."},
     "chartist": {"why": "AI analitik özü qrafikə baxır: bir neçə vaxt çərçivəsi, səviyyələr, fiqurlar, göstəricilər.",
                  "expect": "Texniki düsturlardan yaxşı olmalıdır.", "else": "Sübut olmasa, çəkisi 0 qalır."},
+    "qaydalar": {"why": "Bilik kitabının 32 qaydası (texniki analizin 12 növü) bir səs: indi işə düşən hər qayda öz "
+                        "istiqamətinə səs verir, səsin gücü həmin qaydanın o ana qədər bilinən nəticəsidir (50 %-dən "
+                        "yaxşı olmayanın səsi yoxdur).",
+                 "expect": "Tək qaydalardan və texniki düsturlardan yaxşı olmalıdır.",
+                 "else": "Sübut olmasa, vahid proqnozda çəkisi 0-a düşür."},
     "vahid": {"why": "Bütün analitiklərin və beyinlərin fikri bir ehtimalda: kimin nə qədər çəki alacağını sistem öz "
                      "keçmiş nəticələrindən addım-addım öyrənir (yalnız o anda bilinən nəticələrlə).",
               "expect": "Ayrı-ayrı analitiklərdən və tərəzidən yaxşı olmalıdır; öz-özünü sınaqda həddi keçməlidir.",

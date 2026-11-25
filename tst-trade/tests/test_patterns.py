@@ -167,3 +167,27 @@ def test_daily_futures_refresh_needs_approval_and_respects_the_monthly_ceiling(m
     db.execute("INSERT INTO fut_candles(symbol, t, o, h, l, c, v) VALUES('XAU', ?, 1, 1, 1, 1, 1)", (now + 60,))
     res2 = asyncio.run(futures.daily_refresh(db, "k", now + 2 * 86400))        # 0.9 + 0.9 > 1.0 $: refused
     assert not res2["ok"] and "hədd" in res2["msg"]
+
+
+def test_rules_analyst_votes_only_with_rules_that_had_an_edge_before_that_moment():
+    db = DB(":memory:")
+    rules.ensure(db)
+    H = 3600
+    rows = []
+    for k in range(200):                    # TA-X was right 70 % of the time, TA-Y 30 %, on XAG (one hour each)
+        t = 1_700_000_000 + k * H
+        rows.append(("XAG", "1h", t, "TA-X", 1, 100.0, 101.0 if k % 10 < 7 else 99.0, "history", ""))
+        rows.append(("XAG", "1h", t, "TA-Y", 1, 100.0, 101.0 if k % 10 < 3 else 99.0, "history", ""))
+    t_now = 1_700_000_000 + 300 * H
+    rows.append(("XAU", "1h", t_now - H, "TA-X", -1, 1.0, None, "live", ""))
+    rows.append(("XAU", "1h", t_now - H, "TA-Y", 1, 1.0, None, "live", ""))
+    db.executemany("INSERT INTO rule_signals(metal, tf, t, rule, dir, price0, price1, mode, note) "
+                   "VALUES(?,?,?,?,?,?,?,?,?)", rows)
+    lk = rules.Lookup(db)
+    p, why = lk.views("XAU", t_now + rules.LAG, "1h")["qaydalar"]
+    assert p < 0.5 and "TA-X" in why and "TA-Y" not in why          # only the rule with an edge votes
+    p0, _ = lk.views("XAU", 1_700_000_000 + 5 * H, "1h")["qaydalar"]
+    assert p0 == 0.5                                                   # early on nothing was known yet
+    assert lk.weight("TA-X", "1h", 1_700_000_000 + 10 * H)[1] < 10     # outcomes count only after their candle
+    from app import forecast
+    assert "qaydalar" in forecast.methods_for("1h") and forecast.FAMILY["qaydalar"] in forecast.FAMILY_NAMES
