@@ -69,3 +69,35 @@ def test_block_value_runs_without_each_block():
     d = a["desks"]["1h"]
     assert set(d["without"]) == {b["id"] for b in blocks.BLOCKS}
     assert d["without"]["ta"]["hit_rate"] < d["full"]["hit_rate"]       # the informative block: worse without it
+
+
+def test_physical_stock_values_lots_and_journals_sales():
+    from app import candles, stock
+    db = _db()
+    candles.add_tick(db, "XAU", 1_800_000_000, 3000.0)
+    lid = stock.add_lot(db, "585 lom", "XAU", 500, 585, 20000, "2026-11-01")
+    v = stock.view(db)
+    lot = v["lots"][0]
+    assert abs(lot["net_g"] - 292.5) < 1e-9 and abs(lot["net_oz"] - 292.5 / 31.1034768) < 1e-4
+    assert abs(lot["spot_value"] - 292.5 / 31.1034768 * 3000) < 0.01
+    assert abs(lot["refiner_value"] - lot["spot_value"] * 0.985) < 0.01          # 1 % fee + 0.5 % melt loss
+    t = v["totals"][0]
+    assert t["scenarios"]["+1%"] > 0 > t["scenarios"]["-5%"]
+    stock.sell(db, lid, 200, 583, 9000)
+    v = stock.view(db)
+    assert v["lots"][0]["grams"] == 300 and v["sales"][0]["cost"] == 8000.0 and v["realised"] == 1000.0
+    try:
+        stock.delete_lot(db, lid)
+        raise AssertionError("a sold lot must not be deleted")
+    except ValueError:
+        pass
+    r = stock.import_csv(db, "ad,metal,qram,əyar,dəyər\nring,XAU,10,750,500\nbad,XAU,x,750,1\n")
+    assert r["added"] == 1 and len(r["errors"]) == 1
+
+
+def test_guest_cannot_open_the_stock():
+    from fastapi.testclient import TestClient
+    import os
+    os.environ.setdefault("APP_PASSWORD", "test")
+    from app import main
+    assert "/api/stock" in open(main.__file__).read() and '"/ehtiyat", "/api/stock"' in open(main.__file__).read()

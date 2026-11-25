@@ -82,7 +82,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 if path.startswith("/api/"):
                     return JSONResponse({"error": "giriş lazımdır"}, status_code=401)
                 return RedirectResponse("/login", status_code=303)
-            if who == "guest" and (path.startswith(("/admin", "/api/admin", "/status", "/agents", "/api/agents"))):
+            if who == "guest" and (path.startswith(("/admin", "/api/admin", "/status", "/agents", "/api/agents",
+                                                    "/ehtiyat", "/api/stock"))):
                 # A guest sees the panel only: no keys, no settings, no password page.
                 if path.startswith("/api/"):
                     return JSONResponse({"error": "qonaq üçün bağlıdır"}, status_code=403)
@@ -392,6 +393,39 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         """Sabah üçün proqnoz: per metal the 1-day range, the three voices on direction with their records, the proof."""
         from . import outlook
         return await asyncio.to_thread(diag._slow, "outlook", lambda: outlook.all_metals(db), 120)
+
+    @app.get("/ehtiyat")
+    async def stock_page():
+        return FileResponse(STATIC / "ehtiyat.html")
+
+    @app.get("/api/stock")
+    async def stock_api():
+        """The owner's physical metal: each lot valued at the live price, totals, sensitivity, sales (owner only)."""
+        from . import stock
+        return await asyncio.to_thread(stock.view, db)
+
+    @app.post("/api/stock/{action}")
+    async def stock_write(action: str, request: Request):
+        from . import stock
+        b = await request.json()
+        try:
+            if action == "lot":
+                return {"id": stock.add_lot(db, str(b.get("name", "")), str(b.get("metal", "")).upper(), float(b["grams"]),
+                                            float(b["assay"]), float(b["cost"]), str(b.get("bought", "")),
+                                            str(b.get("note", "")))}
+            if action == "csv":
+                return stock.import_csv(db, str(b.get("text", ""))[:200_000])
+            if action == "sell":
+                return stock.sell(db, int(b["lot_id"]), float(b["grams"]), float(b["assay"]), float(b["received"]),
+                                  str(b.get("note", "")))
+            if action == "delete":
+                stock.delete_lot(db, int(b["lot_id"]))
+                return {"ok": True}
+            if action == "settings":
+                return stock.set_settings(db, float(b["refiner_fee_pct"]), float(b["melt_loss_pct"]))
+        except (KeyError, TypeError, ValueError) as e:
+            raise HTTPException(400, str(e)[:200])
+        raise HTTPException(404, "naməlum əməliyyat")
 
     @app.get("/bloklar")
     async def blocks_page():

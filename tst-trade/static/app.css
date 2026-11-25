@@ -324,3 +324,8 @@ body.noscroll{overflow:hidden}
 .fac{position:relative;height:170px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
 .fac canvas{position:absolute;inset:0;width:100%;height:100%}
 @media (max-width:760px){.fagrid{grid-template-columns:1fr}}
+.stform{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin:6px 0}
+.stform label{display:flex;flex-direction:column;font-size:.78rem;color:var(--muted);gap:3px}
+.stform input,.stform select,#csv{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:6px 8px;font-size:.9rem;min-width:120px}
+.stform label.wide{flex:1 1 220px}
+#csv{width:100%;font-family:var(--mono);margin:6px 0}

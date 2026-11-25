@@ -1,0 +1,49 @@
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TST Trade · Ehtiyat</title><link rel="stylesheet" href="/static/app.css">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0f1317">
+<link rel="icon" href="/static/icons/fav-64.png"><link rel="apple-touch-icon" href="/static/icons/apple-180.png">
+</head><body>
+<header class="top">
+  <div class="brand">TST <b>Trade</b> · Fiziki ehtiyat</div><span class="sp"></span>
+  <span class="clock" id="upd"></span>
+<nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
+</header>
+<main class="wrap res ta">
+  <section class="box"><h2>Ümumi <span class="sp"></span><span class="note">yalnız siz görürsünüz · proqnoz və ticarətdən ayrıdır</span></h2>
+    <div id="totals"></div>
+    <p class="note">Təmiz metal = qram × əyar; unsiya = təmiz qram / 31,1034768; dəyər = unsiya × canlı qiymət (paneldəki eyni
+      mənbə). «Rafineri ödəyər» = dəyər − rafineri haqqı − ərimə itkisi. Nəticə = rafineri dəyəri − alış dəyəri.</p></section>
+  <section class="box"><h2>Lotlar</h2><div class="tbl" id="lots"></div></section>
+  <section class="box"><h2>Yeni lot</h2>
+    <div class="stform" id="addf">
+      <label>Ad<input id="f_name" placeholder="məs. 585 lom, noyabr"></label>
+      <label>Metal<select id="f_metal"><option value="XAU">Qızıl</option><option value="XAG">Gümüş</option><option value="XPT">Platin</option><option value="XPD">Palladium</option></select></label>
+      <label>Qram (ümumi)<input id="f_grams" inputmode="decimal" placeholder="500"></label>
+      <label>Əyar<input id="f_assay" inputmode="decimal" placeholder="585 və ya 0.585"></label>
+      <label>Alış dəyəri, $<input id="f_cost" inputmode="decimal" placeholder="25000"></label>
+      <label>Tarix<input id="f_date" type="date"></label>
+      <label class="wide">Qeyd<input id="f_note"></label>
+      <button class="tabtn" id="f_add">Əlavə et</button><span class="note" id="f_msg"></span>
+    </div>
+    <details><summary class="note">CSV ilə çoxlu lot (ad,metal,qram,əyar,alış_dəyəri,tarix,qeyd)</summary>
+      <textarea id="csv" rows="5" placeholder="585 lom,XAU,500,585,25000,2026-11-01,"></textarea>
+      <button class="tabtn" id="csvb">Yüklə</button><span class="note" id="csvm"></span></details>
+  </section>
+  <section class="box"><h2>Satış (bağlanmış sövdələşmə)</h2>
+    <div class="stform">
+      <label>Lot<select id="s_lot"></select></label>
+      <label>Qram<input id="s_grams" inputmode="decimal"></label>
+      <label>Alıcının əyarı<input id="s_assay" inputmode="decimal" placeholder="583"></label>
+      <label>Alınan pul, $<input id="s_recv" inputmode="decimal"></label>
+      <label class="wide">Qeyd<input id="s_note"></label>
+      <button class="tabtn" id="s_go">Satışı yaz</button><span class="note" id="s_msg"></span>
+    </div>
+    <div class="tbl" id="sales"></div></section>
+  <section class="box"><h2>Rafineri şərtləri</h2>
+    <div class="stform"><label>Rafineri haqqı, %<input id="r_fee" inputmode="decimal"></label>
+      <label>Ərimə itkisi, %<input id="r_loss" inputmode="decimal"></label><button class="tabtn" id="r_save">Saxla</button>
+      <span class="note" id="r_msg"></span></div></section>
+</main>
+<script src="/static/ehtiyat.js"></script>
+<script src="/static/nav.js"></script>
+</body></html>
