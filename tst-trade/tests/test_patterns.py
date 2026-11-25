@@ -457,3 +457,22 @@ def test_market_reporter_accepts_only_agreeing_figures_and_has_a_10_dollar_limit
     db.execute("INSERT INTO market_reports VALUES('india_premium','2026-11-27',-2,'$/oz',?,'{}','{}',1,'x')", (fri + 7 * 86400,))
     data = fundamental.Data(db)
     assert {r_: d for r_, d, _ in fundamental.detect(data, "XAU", fri + 7 * 86400 + 60)}.get("FA-IND-1") == 1
+
+
+def test_london_range_breakout_first_close_only():
+    from datetime import datetime, timezone
+    day = int(datetime(2026, 1, 14, tzinfo=timezone.utc).timestamp())     # winter: London = UTC
+    cs = []
+    for h in range(24):
+        t = day + h * 3600
+        if h < 7:
+            cs.append(_c(t, 100, 101, 99, 100))                              # the Asian range 99-101
+        elif h == 9:
+            cs.append(_c(t, 100.5, 103, 100.4, 102.5))                       # first close above: signal
+        elif h == 10:
+            cs.append(_c(t, 102.5, 104, 102, 103.5))                         # second close above: none
+        else:
+            cs.append(_c(t, 100, 100.6, 99.6, 100.2))
+    got = [patterns.london_range(cs, i, 2.0) for i in range(24)]
+    assert got[9] and got[9][0] == "TA-LDN-1" and got[9][1] == 1
+    assert all(g is None for k, g in enumerate(got) if k != 9)

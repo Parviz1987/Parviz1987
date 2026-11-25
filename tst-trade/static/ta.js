@@ -10,7 +10,7 @@
   const ST = { "sübut": "✅ sübut", yox: "❌ yox", "zəif": "⚠️ zəif", az: "⏳ az", "xərc": "💸 xərc", "namizəd": "🏁 namizəd (son sınaq gözlənir)" };
   // the 12 kinds of technical analysis and which rules of the block belong to each
   const KINDS = [
-    ["Klassik qrafik", ["TA-SR-1", "TA-TL-1", "TA-PIVOT-1", "TA-BRK-1"]],
+    ["Klassik qrafik", ["TA-SR-1", "TA-TL-1", "TA-PIVOT-1", "TA-BRK-1", "TA-LDN-1"]],
     ["Fiqurlar", ["TA-PAT-1", "TA-PAT-HS", "TA-PAT-TRI", "TA-PAT-WEDGE", "TA-PAT-FLAG"]],
     ["Yapon şamları", ["TA-CDL-1"]],
     ["Trend indikatorları", ["TA-TREND-1", "TA-TREND-2", "TA-MACD-1", "TA-ICHI-1", "TA-ADX-1"]],

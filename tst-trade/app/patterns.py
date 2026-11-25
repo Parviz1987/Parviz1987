@@ -77,6 +77,44 @@ def pair_view(pair: tuple | None) -> tuple[float, str]:
     return 0.5, f"nisbət normaldır (z {z:+.1f})"
 
 
+def _london(t: int):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    return datetime.fromtimestamp(t, ZoneInfo("Europe/London"))
+
+
+def london_range(cs: list[dict], i: int, atr: float) -> tuple[str, int, str] | None:
+    """Candle i (1 hour) closes beyond the Asian-hours range for the first time today. The range needs all seven
+    hours 00-06 London time and a width of at least 0.3 ATR; the buffer is 0.1 ATR; a candle that crosses both sides
+    is undetermined (no signal), as the design asks."""
+    li = _london(cs[i]["t"])
+    if not 7 <= li.hour < 16 or li.weekday() >= 5:
+        return None
+    day = li.date()
+    asia, today = [], []
+    for j in range(i - 1, max(-1, i - 24), -1):
+        lj = _london(cs[j]["t"])
+        if lj.date() != day:
+            break
+        (asia if lj.hour < 7 else today).append(cs[j])
+    if len(asia) != 7:
+        return None
+    hi, lo = max(x["h"] for x in asia), min(x["l"] for x in asia)
+    if hi - lo < 0.3 * atr:
+        return None
+    buf = 0.1 * atr
+    if any(x["c"] > hi + buf or x["c"] < lo - buf for x in today):
+        return None                                   # only the first breakout of the day
+    c = cs[i]
+    if c["h"] > hi + buf and c["l"] < lo - buf:
+        return None                                   # both sides in one candle: undetermined
+    if c["c"] > hi + buf:
+        return ("TA-LDN-1", 1, f"Asiya aralığının ({lo:.2f}–{hi:.2f}) zirvəsi London saatlarında qırıldı")
+    if c["c"] < lo - buf:
+        return ("TA-LDN-1", -1, f"Asiya aralığının ({lo:.2f}–{hi:.2f}) dibi London saatlarında qırıldı")
+    return None
+
+
 def zigzag(cs: list[dict], highs: list[int], lows: list[int]) -> list[tuple[int, str, float]]:
     """Confirmed swings in time order, alternating high/low (of two in a row, the more extreme is kept)."""
     pts = sorted([(j, "H", cs[j]["h"]) for j in highs] + [(j, "L", cs[j]["l"]) for j in lows])
@@ -225,6 +263,13 @@ def more(ind, i: int, highs: list[int], lows: list[int], tf: str) -> list[tuple[
         p0, _ = ichimoku_view(cs[i - 80:i])
         if p1 != 0.5 and p1 != p0:
             out.append(("TA-ICHI-1", 1 if p1 > 0.5 else -1, "İçimoku: " + why))
+
+    # --- 1c. London aralığı (OCO, from the Radar Gold design): the range of the Asian hours (London 00:00-07:00) and
+    # its first close beyond it in London / New York hours (07:00-16:00 London time, daylight saving included) ---
+    if tf == "1h":
+        r = london_range(cs, i, atr)
+        if r:
+            out.append(r)
 
     # --- 5. Osilyator: Stoxastik ---
     k1, d1, k0, d0 = ind.sk[i], ind.sd[i], ind.sk[i - 1], ind.sd[i - 1]

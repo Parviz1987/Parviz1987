@@ -119,6 +119,15 @@ RULES = [
      "signal": "Dirəyin istiqamətində.",
      "void": "Fasilə dirəyin yarısından çox geri çəkilirsə — bayraq deyil.",
      "source": "Bulkowski: davam fiqurlarının ən etibarlısı sayılır; akademik sübutu orta."},
+    {"id": "TA-LDN-1", "area": "Texniki", "name": "London aralığının qırılması (OCO)", "detector": True,
+     "how": "1 saatlıq qrafikdə Asiya saatlarının (London vaxtı 00:00–07:00, yay vaxtı nəzərə alınır) aralığı — 7 şamın "
+            "hamısı olmalı, eni ən azı 0,3 ATR. London və Nyu-York saatlarında (07:00–16:00) şam aralıqdan 0,1 ATR "
+            "o tərəfdə ilk dəfə bağlananda. Gündə yalnız birinci qırılma; bir şam hər iki tərəfi keçərsə — qeyri-müəyyən, "
+            "siqnal yoxdur.",
+     "signal": "Zirvə qırıldı → yuxarı; dib qırıldı → aşağı.",
+     "void": "Böyük xəbərdən əvvəl yalançı qırılma olur; bazar bağlı gün və natamam seans siqnal vermir.",
+     "source": "Radar Gold dizaynı (gold-breakout-lab, OCO); sessiya aralığı qırılması — gündəlik treyderlərin klassik "
+               "qurulumu; müəllifin gəlir iddiaları yoxlanmayıb, Hakim ölçür."},
     {"id": "TA-TL-1", "area": "Texniki", "name": "Trend xətti (maili)", "detector": True,
      "how": "Yüksələn xətt son iki təsdiqlənmiş yüksələn dibdən, enən xətt son iki enən zirvədən çəkilir. Qiymət xəttə "
             "toxunub trend istiqamətində şam bağlayır (sıçrayış) və ya xəttin o tərəfində 0,2 ATR-dən çox bağlanır "
