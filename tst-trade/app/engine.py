@@ -665,7 +665,7 @@ class Engine:
         only when the linked market has the metal's last candle too (else no view)."""
         epics = markets.saved(self.db).get("epics", {})
         out = {}
-        for key, codes in (("dollar", ("DXY", "EURUSD", "USDJPY")), ("oil", ("OIL", "BRENT"))):
+        for key, codes in (("dollar", ("DXY", "EURUSD", "USDJPY")), ("oil", ("OIL", "BRENT")), ("risk", ("VIX", "US500"))):
             # Of the markets that carry this driver and have the metal's last candle, the one most linked to the
             # metal over the last 100 candles (past only): the dollar index can drift apart from gold for weeks
             # while EUR/USD still moves with it. A quiet market never silences the method.

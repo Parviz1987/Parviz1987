@@ -393,6 +393,19 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         from . import outlook
         return await asyncio.to_thread(diag._slow, "outlook", lambda: outlook.all_metals(db), 120)
 
+    @app.get("/bloklar")
+    async def blocks_page():
+        return FileResponse(STATIC / "bloklar.html")
+
+    @app.get("/api/blocks")
+    async def blocks_api(symbol: str = "XAU", horizon: str = "1h"):
+        """The organs: each block's voice now, its methods' views and records, evidence and what is missing."""
+        from . import blocks
+        if symbol not in candles.METALS or horizon not in forecast.HORIZONS:
+            raise HTTPException(400, "naməlum metal və ya üfüq")
+        return await asyncio.to_thread(diag._slow, f"blocks:{symbol}:{horizon}",
+                                       lambda: blocks.status(db, symbol, horizon), 60)
+
     @app.get("/ta")
     async def ta_page():
         return FileResponse(STATIC / "ta.html")

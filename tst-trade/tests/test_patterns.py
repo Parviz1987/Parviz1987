@@ -276,3 +276,21 @@ def test_daily_refresh_stops_at_databentos_history_end_and_bills_only_delivered(
     res = asyncio.run(futures.daily_refresh(db, "k", last + 3 * 86400))
     assert asked and all(e == "2026-11-24T06:00" for e in asked)                    # never past the history end
     assert not res["ok"] and res["cost_usd"] == 0 and res["month_spent_usd"] == 0      # refused: nothing billed
+
+
+def test_every_method_belongs_to_exactly_one_block_and_families_are_the_blocks():
+    from app import blocks, forecast
+    for m in forecast.METHODS:
+        if m in blocks.COMBINERS:
+            continue
+        owners = [b["id"] for b in blocks.BLOCKS if m in b["methods"]]
+        assert len(owners) == 1, (m, owners)
+        assert forecast.FAMILY[m] == owners[0], m
+    assert set(forecast.FAMILY_NAMES) == {b["id"] for b in blocks.BLOCKS}
+    db = DB(":memory:")
+    from app.engine import Engine
+    from app.keys import KeyStore
+    Engine(db, KeyStore(db, "s" * 64), "demo", 15)
+    st = blocks.status(db, "XAU", "1h")
+    assert {b["id"] for b in st["blocks"]} == {b["id"] for b in blocks.BLOCKS}
+    assert "risk" in forecast.methods_for("1h") and "risk" not in forecast.methods_for("1w")

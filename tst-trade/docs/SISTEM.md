@@ -84,3 +84,19 @@ deyil.
 
 Kodda tək mənbələr: qaydalar `app/playbook.py`, agentlərin xəritəsi `app/activity.py`, beyin yuvaları
 `app/registry.py`, üsullar və pasportları `app/forecast.py`, ana məqsəd mətni `app/registry.py` (MISSION).
+
+
+## Bloklar (2026-11-25, sahibin tələbi: «bir bədən, hər orqan öz işini görür»)
+Hər üsul yalnız bir bloka aiddir (`app/blocks.py`, `forecast.FAMILY` eyni xəritədir). Blok konsensusda bir səs verir və
+Hakimin çoxlu sınaq həddində bir dəfə sayılır. Səhifə: `/bloklar`.
+
+| Blok | Üsullar | AI | Əsas sübut | Çatmayan |
+|---|---|---|---|---|
+| Texniki analiz | qaydalar (34 qayda), chartist, tsmom, trendmix | Qrafik analitiki | uzun trend (Moskowitz və b.) | order flow (pullu) |
+| Fundamental | macro, surprise, cot | Strateq | GRAM (WGC), Fed sürprizi, H13 | mərkəzi bank, ETF axını |
+| Xəbər | news | Oxuyucu | Smales, Apergis-Hayat-Saeed | GPR indeksi |
+| Bazarlar arası | dollar, oil, **risk** (yeni: VIX/S&P impulsu) | — | GRAM «risk» amili | 10 illik istiqraz axşam kəsilir |
+| Vaxt və təqvim | seans, season, jewel | — | zəif, ziddiyyətli | — |
+| AI beyinlər | strateq, brain2, debate | 3 beyin | Lopez-Lira & Tang | sahibin 4–5 günlük qərarı |
+
+Dəstək orqanları (istiqamət vermir): Hakim, Öyrənmə (vahid, tərəzi, konsensus, gecə yuxusu), Risk və qərar.

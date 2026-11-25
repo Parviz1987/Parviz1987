@@ -42,22 +42,26 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
 # ratio) were removed from the forecasts: each was a copy of a rule in the block (Ichimoku moved into it). «session»
 # was a copy of «seans». Their past forecasts stay in the database; the long-horizon trend (tsmom, trendmix) stays:
 # it works on weeks and months, which the block's candle rules do not cover.
-METHODS = ("rw", "up", "tsmom", "macro", "surprise", "dollar", "oil", "news", "strateq", "brain2", "debate", "cot",
+METHODS = ("rw", "up", "tsmom", "macro", "surprise", "dollar", "oil", "risk", "news", "strateq", "brain2", "debate", "cot",
            "season", "jewel", "seans", "trendmix", "consensus", "garch", "gvz", "chartist", "qaydalar", "terazi", "vahid")
 RETIRED = ("momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback", "session", "sam", "ichimoku", "pair")
-# Families: methods that carry the SAME idea. The consensus gives each family one voice.
-FAMILY = {"chartist": "chart", "qaydalar": "rules", "tsmom": "trend", "trendmix": "trend",
-          "dollar": "cross", "oil": "cross", "macro": "fund", "surprise": "fund",
-          "news": "brain", "strateq": "brain", "brain2": "brain", "debate": "brain", "seans": "time", "cot": "position",
-          "season": "calendar", "jewel": "calendar"}
-FAMILY_NAMES = {"trend": "uzun trend", "cross": "bazarlar arası", "fund": "fundamental",
-                "brain": "beyinlər", "time": "vaxt", "position": "fond mövqeləri", "calendar": "təqvim",
-                "chart": "qrafik analitiki", "rules": "Bilik kitabı qaydaları"}
+# Families = the blocks (owner 2026-11-25: «every block one organ, one voice»; app/blocks.py). Methods of one block
+# carry related ideas from the same kind of data: the consensus gives each block one voice and the Judge counts a
+# block once in its multiple-testing bar. The AI analysts that read every block (Strateq, the second brain, the
+# debate) are their own family.
+FAMILY = {"qaydalar": "ta", "chartist": "ta", "tsmom": "ta", "trendmix": "ta",
+          "macro": "fund", "surprise": "fund", "cot": "fund",
+          "news": "news",
+          "dollar": "cross", "oil": "cross", "risk": "cross",
+          "seans": "time", "season": "time", "jewel": "time",
+          "strateq": "brain", "brain2": "brain", "debate": "brain"}
+FAMILY_NAMES = {"ta": "texniki analiz", "fund": "fundamental", "news": "xəbər", "cross": "bazarlar arası",
+                "time": "vaxt və təqvim", "brain": "AI beyinlər"}
 METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", "momentum": "Momentum",
                 "reversal": "Qısa dönüş", "trend": "Trend (3 pəncərə)", "breakout": "Sıçrayış (20 şam)", "tsmom": "12 aylıq trend + istiqraz",
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "pullback": "Trend içində geri çəkilmə", "macro": "Makro (real faiz + dollar)",
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
-                "dollar": "Dollar impulsu", "oil": "Neft impulsu",
+                "dollar": "Dollar impulsu", "oil": "Neft impulsu", "risk": "Risk əhvalı (VIX impulsu)",
                 "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)", "debate": "Müzakirə (yuxarı ↔ aşağı)",
                 "cot": "COT: fond mövqeləri", "seans": "Seans: Asiya ↑ / ABŞ ↓",
                 "trendmix": "Çoxsürətli trend (dalğalanmaya görə)", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
@@ -91,6 +95,7 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("surprise")
         out.remove("dollar")     # catch-up after a linked market's move: a short-horizon effect
         out.remove("oil")
+        out.remove("risk")
         out.remove("news")       # headlines move prices for hours, not weeks
     if tf_of(h) not in ("1d", "1w"):
         out.remove("gvz")        # GVZ is a daily close
@@ -377,7 +382,7 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
             out["surprise"] = {"p_up": 0.5, "basis": "bu müddətdə ABŞ rəqəmi açıqlanmayıb" if releases is not None
                                else "təqvim məlumatı yoxdur"}
 
-    for key in ("dollar", "oil"):
+    for key in ("dollar", "oil", "risk"):
         if key in methods_for(horizon):
             from .markets import impulse_view
             if related and key in related:
@@ -492,6 +497,11 @@ PASSPORT = {
                         "yaxşı olmayanın səsi yoxdur).",
                  "expect": "Tək qaydalardan və texniki düsturlardan yaxşı olmalıdır.",
                  "else": "Sübut olmasa, vahid proqnozda çəkisi 0-a düşür."},
+    "risk": {"why": "Risk və qeyri-müəyyənlik qızılın dörd əsas amilindən biridir (Dünya Qızıl Şurasının GRAM modeli): "
+                    "qorxu indeksi (VIX) qəfil qalxanda sığınacaq tələbi artır. Qızıl hələ reaksiya verməyibsə, fərqin "
+                    "bağlanması gözlənilir (dollar və neft impulsu ilə eyni üsul, əlaqə son 100 şamdan ölçülür).",
+             "expect": "15 dəqiqə – 1 gün üfüqündə qorxu sıçrayışlarından sonra həddən yaxşı.",
+             "else": "Sübut olmasa, vahid proqnozda çəkisi 0-a düşür."},
     "vahid": {"why": "Bütün analitiklərin və beyinlərin fikri bir ehtimalda: kimin nə qədər çəki alacağını sistem öz "
                      "keçmiş nəticələrindən addım-addım öyrənir (yalnız o anda bilinən nəticələrlə).",
               "expect": "Ayrı-ayrı analitiklərdən və tərəzidən yaxşı olmalıdır; öz-özünü sınaqda həddi keçməlidir.",
