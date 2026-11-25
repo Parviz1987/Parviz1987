@@ -101,3 +101,42 @@ def test_guest_cannot_open_the_stock():
     os.environ.setdefault("APP_PASSWORD", "test")
     from app import main
     assert "/api/stock" in open(main.__file__).read() and '"/ehtiyat", "/api/stock"' in open(main.__file__).read()
+
+
+def test_registry_approval_gates_the_verdict(monkeypatch):
+    from app import judge
+    db = _db()
+    monkeypatch.setattr(judge, "stats", lambda *a, **k: [{"method": "seans", "status": "sübut", "bss": 0.1}])
+    monkeypatch.setattr(rigor, "method_final", lambda *a, **k: {"status": "keçdi"})
+    rigor.register(db, "method", "seans", "XAU", "1h")
+    assert judge.verdict(db, "XAU", "1h", now=1_800_000_000)["status"] == "təsdiq gözləyir"
+    rigor.decide(db, "method", "seans", "XAU", "1h", True, "test")
+    assert judge.verdict(db, "XAU", "1h", now=1_800_000_000)["status"] == "sübut"
+    assert rigor.experiments(db)[0]["kind"] == "decision"
+
+
+def test_independent_recheck_catches_wrong_stored_prices():
+    db = _db()
+    from app import candles
+    t0 = 1_800_000_000 // 3600 * 3600
+    candles.store_history(db, "XAU", "1h", [(t0 + i * 3600, 100 + i, 101 + i, 99 + i, 100 + i) for i in range(60)])
+    rows = []
+    for i in range(1, 40):
+        t = t0 + i * 3600
+        p0 = 100 + i - 1
+        rows.append(("XAU", "1h", "seans", "live", t, t + 3600, p0, 0.6, 99, 101, 98, 102, "", p0 + 1, 1.0, 1, 1, 0.16, 1, 1))
+    db.executemany("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50, "
+                   "lo80, hi80, basis, price1, scored_ts, outcome, hit, brier, in50, in80) "
+                   "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    assert rigor.verify_method(db, "XAU", "1h", "seans", t0)["ok"]
+    db.execute("UPDATE forecasts SET price1 = price0 * 0.9")                          # stored prices gone wrong
+    assert not rigor.verify_method(db, "XAU", "1h", "seans", t0)["ok"]
+
+
+def test_three_way_probabilities_sum_to_one_and_robustness_flags_fragile():
+    from app import outlook, rules
+    tw = outlook.three_way(0.6, {"price0": 3000, "lo50": 2970, "hi50": 3030}, 0.0006)
+    assert abs(tw["up"] + tw["down"] + tw["neutral"] - 1) < 1e-3 and tw["up"] > tw["down"]
+    v = [(1_700_000_000 + i * 86400, 0.002, 0.0015 if i < 150 else -0.0005, "XAU") for i in range(300)]
+    r = rules.robustness(v, [0.0005] * 300, deep=True)
+    assert r["fragile"] and "boot95" in r and r["windows"]

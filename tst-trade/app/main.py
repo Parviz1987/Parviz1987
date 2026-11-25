@@ -47,6 +47,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             engine.start()
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
             asyncio.get_running_loop().create_task(app.state.futures_daily())
+            asyncio.get_running_loop().create_task(app.state.rigor_daily())
         yield
         if start_engine:
             await engine.stop()
@@ -855,6 +856,41 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     fut_busy = {"on": False}             # one Databento download at a time: never two paying for the same month
 
+    async def rigor_daily():
+        """Once a day: our closes against an independent source (Twelve Data); the code version for the journal."""
+        from . import rigor
+        db.put("app:commit", _commit() or "?")
+        await asyncio.sleep(600)
+        while True:
+            try:
+                day = time.strftime("%Y-%m-%d", time.gmtime())
+                if db.get("rigor:audit_day") != day:
+                    await rigor.price_audit(db, store.first("twelvedata"))
+                    db.put("rigor:audit_day", day)
+            except Exception as e:
+                log.warning("price audit: %s", e)
+            await asyncio.sleep(3600)
+
+    @app.get("/api/admin/registry")
+    async def registry_api():
+        """The strategy registry, finalists, the experiment journal and the price audit (owner)."""
+        from . import rigor
+        def build():
+            return {"registry": rigor.registry(db), "finals": rigor.finals(db), "experiments": rigor.experiments(db),
+                    "trials": rigor.trials(db), "price_audit": json.loads(db.get("rigor:price_audit") or "null")}
+        return await asyncio.to_thread(build)
+
+    @app.post("/api/admin/registry")
+    async def registry_decide(request: Request):
+        """The owner approves or rejects a finalist (passed its one-look final test and the independent re-check)."""
+        from . import rigor
+        b = await request.json()
+        try:
+            return rigor.decide(db, str(b["kind"]), str(b["name"]), str(b["symbol"]), str(b["horizon"]),
+                                bool(b.get("approve")), str(b.get("note", "")))
+        except (KeyError, ValueError) as e:
+            raise HTTPException(400, str(e)[:200])
+
     async def futures_daily():
         """Owner-approved daily top-up of the COMEX bars (after 06:00 UTC, once a day), then the volume rules run on
         the new candles. Never two downloads at once; the monthly ceiling is checked inside."""
@@ -926,6 +962,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     app.state.futures_resume = futures_resume
     app.state.futures_keeper = futures_keeper
     app.state.futures_daily = futures_daily
+    app.state.rigor_daily = rigor_daily
 
     @app.get("/api/admin/futures/quote")
     async def futures_quote():

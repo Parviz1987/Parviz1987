@@ -124,7 +124,23 @@ def build(db: DB, sym: str) -> dict:
         out["vahid"]["proof"] = (st.get("vahid") or {}).get("status")
     out["cost"] = judge.full_cost(sym, H)
     out["breakeven"] = judge.breakeven(db, sym, H)
+    out["three_way"] = three_way((out.get("vahid") or {}).get("p"), rw, out["cost"])
     return out
+
+
+def three_way(p: float | None, rw: dict | None, cost: float) -> dict | None:
+    """Radar Gold's three outcomes (up / down / neutral, summing to 100 %): «neutral» = a move smaller than the full
+    cost of a trade (it would not pay either way). Its chance comes from our own 50 % range (normal width); the rest is
+    split by the unified forecast's up probability."""
+    import math
+    if p is None or not rw or not rw.get("price0") or rw.get("hi50") is None:
+        return None
+    sigma = (rw["hi50"] - rw["lo50"]) / 2 / 0.6745 / rw["price0"]
+    if sigma <= 0:
+        return None
+    neutral = math.erf(cost / (sigma * math.sqrt(2)))
+    return {"up": round((1 - neutral) * p, 4), "down": round((1 - neutral) * (1 - p), 4), "neutral": round(neutral, 4),
+            "band": round(cost, 6)}
 
 
 def all_metals(db: DB) -> dict:

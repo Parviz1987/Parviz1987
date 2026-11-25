@@ -446,6 +446,12 @@ class Engine:
                 if fc is None:
                     continue
                 n += judge.issue(self.db, sym, h, issued_t, target_time(issued_t, h), fc, mode)
+                if mode == "live":           # the data this forecast saw, fingerprinted (Radar Gold: snapshot ID)
+                    try:
+                        from . import rigor
+                        rigor.snapshot(self.db, sym, h, issued_t, past, fc)
+                    except Exception:
+                        log.exception("snapshot %s %s", sym, h)
                 self._issued.add((h, sym, issued_t))
                 if len(self._issued) > 5000:
                     self._issued = {x for x in self._issued if x[2] >= issued_t - 40 * 86400}

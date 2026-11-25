@@ -94,9 +94,15 @@ def method_final(db: DB, sym: str, horizon: str, method: str, now: float | None 
         return st
     rets = [(r["price1"] / r["price0"] - 1) * (1 if r["p_up"] > 0.5 else -1) for r in rows if r["price0"]]
     net, p = _money_test(rets, full_cost(sym, horizon), steps_of(horizon))
-    st.update({"status": "keçdi" if p is not None and p < ALPHA and net > 0 else "keçmədi", "p": p, "net": net,
-               "tested": now})
+    passed = p is not None and p < ALPHA and net > 0
+    if passed:                                      # the independent re-check must agree (R5)
+        st["verify"] = verify_method(db, sym, horizon, method, st["since"])
+        passed = st["verify"]["ok"]
+    st.update({"status": "keçdi" if passed else "keçmədi", "p": p, "net": net, "tested": now})
     db.put(key, json.dumps(st))
+    log_experiment(db, "final", f"method:{method}:{sym}:{horizon}", st)
+    if passed:
+        register(db, "method", method, sym, horizon, f"son sınaq: {st['n']} hal, p={p:.4f}")
     return st
 
 
@@ -122,6 +128,9 @@ def rule_final(db: DB, rule: str, tf: str, now: float | None = None) -> dict:
     st.update({"status": "keçdi" if p is not None and p < ALPHA and net > 0 else "keçmədi", "p": p, "net": net,
                "tested": now})
     db.put(key, json.dumps(st))
+    log_experiment(db, "final", f"rule:{rule}:{tf}", st)
+    if st["status"] == "keçdi":
+        register(db, "rule", rule, "*", tf, f"son sınaq: {st['n']} hal, p={p:.4f}")
     return st
 
 
@@ -133,3 +142,139 @@ def finals(db: DB) -> list[dict]:
         out.append({"kind": "üsul" if kind == "m" else "qayda", "symbol": sym, "horizon": h, "name": name,
                     **json.loads(r["v"])})
     return out
+
+
+# ---------- independent re-check (Radar Gold R5: «cannot accept its own work») ----------
+def verify_method(db: DB, sym: str, horizon: str, method: str, since: float) -> dict:
+    """Recompute the final cases a second way, from the candles themselves instead of the stored forecast prices:
+    each forecast's start and end close are read again from the candle table and the hit rate counted anew. The
+    final passes only when both ways agree (prices within 0.05 %, hit rate within 1 point)."""
+    from .candles import TF
+    from .forecast import HORIZONS
+    step = TF[HORIZONS[horizon]]
+    rows = db.execute("SELECT issued_t, target_t, p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND "
+                      "method=? AND mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5",
+                      (sym, horizon, method, since)).fetchall()
+    tf = HORIZONS[horizon]
+    closes = {r["t"]: r["c"] for r in db.execute("SELECT t, c FROM candles WHERE symbol=? AND tf=? AND t>=?",
+                                                 (sym, tf, since - 2 * step)).fetchall()}
+    n = bad = h1 = h2 = 0
+    for r in rows:
+        a, b = closes.get(r["issued_t"] - step), closes.get(r["target_t"] - step)
+        if a is None or b is None:
+            continue
+        n += 1
+        if abs(a / r["price0"] - 1) > 0.0005 or abs(b / r["price1"] - 1) > 0.0005:
+            bad += 1
+        up = r["p_up"] > 0.5
+        h1 += int((r["price1"] > r["price0"]) == up)
+        h2 += int((b > a) == up)
+    ok = n >= 10 and bad / n < 0.01 and abs(h1 - h2) / n <= 0.01
+    return {"n": n, "price_mismatch": bad, "hit_stored": h1 / n if n else None, "hit_recomputed": h2 / n if n else None,
+            "ok": ok}
+
+
+# ---------- strategy registry (Radar Gold: candidate -> final -> owner approval -> versioned registry) ----------
+REG_SCHEMA = """
+CREATE TABLE IF NOT EXISTS strategy_registry (kind TEXT, name TEXT, symbol TEXT, horizon TEXT, version TEXT,
+  status TEXT, ts REAL, decided_ts REAL, note TEXT, PRIMARY KEY (kind, name, symbol, horizon));
+CREATE TABLE IF NOT EXISTS experiments (ts REAL, kind TEXT, name TEXT, version TEXT, data_fp TEXT, result TEXT);
+"""
+
+
+def ensure(db: DB) -> None:
+    db.script(REG_SCHEMA)
+
+
+def version(db: DB) -> str:
+    return db.get("app:commit") or "?"
+
+
+def log_experiment(db: DB, kind: str, name: str, result: dict, data_fp: str = "") -> None:
+    """The experiment journal: every final test, re-check and approval with the code version — failed ones too."""
+    ensure(db)
+    db.execute("INSERT INTO experiments VALUES(?,?,?,?,?,?)", (time.time(), kind, name, version(db), data_fp,
+                                                               json.dumps(result, ensure_ascii=False, default=str)[:4000]))
+
+
+def register(db: DB, kind: str, name: str, sym: str, horizon: str, note: str = "") -> None:
+    ensure(db)
+    db.execute("INSERT OR IGNORE INTO strategy_registry VALUES(?,?,?,?,?,?,?,?,?)",
+               (kind, name, sym, horizon, version(db), "təsdiq gözləyir", time.time(), None, note[:300]))
+
+
+def registry_status(db: DB, kind: str, name: str, sym: str, horizon: str) -> str | None:
+    ensure(db)
+    r = db.execute("SELECT status FROM strategy_registry WHERE kind=? AND name=? AND symbol=? AND horizon=?",
+                   (kind, name, sym, horizon)).fetchone()
+    return r["status"] if r else None
+
+
+def decide(db: DB, kind: str, name: str, sym: str, horizon: str, approve: bool, note: str = "") -> dict:
+    """The owner's decision on a finalist that passed its final test and the re-check."""
+    ensure(db)
+    st = "təsdiqlənib" if approve else "rədd edilib"
+    n = db.execute("UPDATE strategy_registry SET status=?, decided_ts=?, note=? WHERE kind=? AND name=? AND symbol=? "
+                   "AND horizon=?", (st, time.time(), note[:300], kind, name, sym, horizon)).rowcount
+    if not n:
+        raise ValueError("reyestrdə belə namizəd yoxdur")
+    log_experiment(db, "decision", f"{kind}:{name}:{sym}:{horizon}", {"status": st, "note": note})
+    return {"status": st}
+
+
+def registry(db: DB) -> list[dict]:
+    ensure(db)
+    return [dict(r) for r in db.execute("SELECT * FROM strategy_registry ORDER BY ts DESC").fetchall()]
+
+
+def experiments(db: DB, limit: int = 50) -> list[dict]:
+    ensure(db)
+    return [dict(r) for r in db.execute("SELECT * FROM experiments ORDER BY ts DESC LIMIT ?", (limit,)).fetchall()]
+
+
+# ---------- independent price source (Radar Gold: the result is checked against another price source) ----------
+async def price_audit(db: DB, key: str | None) -> dict:
+    """Our daily closes (the broker's CFD) against Twelve Data's (an independent source) for the last 30 days: the
+    median and the worst gap. A large gap means a forecast may be judged on a wrong price."""
+    from .providers.twelvedata import TwelveDataHistory
+    if not key:
+        return {"ok": False, "msg": "Twelve Data açarı yoxdur"}
+    src = TwelveDataHistory(key)
+    out = {"ts": time.time(), "metals": {}}
+    try:
+        for sym in ("XAU", "XAG", "XPT", "XPD"):
+            try:
+                theirs = {int(t): c for t, o, h, l, c in await src.candles(sym, "1d", 30)}
+            except Exception as e:
+                out["metals"][sym] = {"error": str(e)[:100]}
+                continue
+            ours = {r["t"]: r["c"] for r in db.execute("SELECT t, c FROM candles WHERE symbol=? AND tf='1d' AND t>=?",
+                                                       (sym, min(theirs or {0: 0}))).fetchall()}
+            gaps = sorted(abs(ours[t] / c - 1) for t, c in theirs.items() if t in ours and c)
+            out["metals"][sym] = {"days": len(gaps), "median_gap": gaps[len(gaps) // 2] if gaps else None,
+                                  "worst_gap": gaps[-1] if gaps else None}
+    finally:
+        await src.aclose()
+    out["ok"] = all((m.get("worst_gap") or 0) < 0.01 for m in out["metals"].values() if "error" not in m)
+    db.put("rigor:price_audit", json.dumps(out))
+    return out
+
+
+# ---------- the data a forecast was made from (Radar Gold: snapshot ID) ----------
+SNAP_SCHEMA = """
+CREATE TABLE IF NOT EXISTS forecast_snap (symbol TEXT, horizon TEXT, issued_t INTEGER, last_t INTEGER, closes_fp TEXT,
+  version TEXT, inputs TEXT, PRIMARY KEY (symbol, horizon, issued_t));
+"""
+
+
+def snapshot(db: DB, sym: str, horizon: str, issued_t: int, past: list[dict], fc: dict) -> None:
+    """A fingerprint of the candles a live forecast saw and which analysts had a view, with the code version: the
+    same forecast can be traced and reproduced later."""
+    import hashlib
+    db.script(SNAP_SCHEMA)
+    tail = ",".join(f"{c['t']}:{c['c']:.4f}" for c in past[-50:])
+    fp = hashlib.sha1(tail.encode()).hexdigest()[:16]
+    inputs = {m: v["p_up"] for m, v in (fc.get("methods") or {}).items() if v.get("p_up") not in (None, 0.5)}
+    db.execute("INSERT OR IGNORE INTO forecast_snap VALUES(?,?,?,?,?,?,?)",
+               (sym, horizon, issued_t, past[-1]["t"] if past else None, fp, version(db),
+                json.dumps(inputs, separators=(",", ":"))))

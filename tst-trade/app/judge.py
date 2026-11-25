@@ -490,5 +490,10 @@ def _final_gate(db: DB, symbol: str, horizon: str, v: dict, now: float) -> dict:
         fin = {"status": "namizəd"}
     v["final"] = fin
     if fin.get("status") != "keçdi":
-        v = {**v, "status": "namizəd" if fin.get("status") != "keçmədi" else "yox", "candidate": v["status"]}
+        return {**v, "status": "namizəd" if fin.get("status") != "keçmədi" else "yox", "candidate": v["status"]}
+    from .rigor import registry_status                # the owner approves a finalist before it may act (registry)
+    reg = registry_status(db, "method", v["method"], symbol, horizon)
+    if reg != "təsdiqlənib":
+        return {**v, "status": "təsdiq gözləyir" if reg != "rədd edilib" else "yox", "candidate": "sübut",
+                "registry": reg}
     return v

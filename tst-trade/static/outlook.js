@@ -24,6 +24,7 @@
         <div class="olh"><b>${NAMES[m.symbol]}</b><span class="ol-lean ${cls}">${arrow}${esc(m.lean)}</span></div>
         <div class="note">${esc(m.agree)} · vahid proqnozun sübutu: ${m.vahid ? (PROOF[m.vahid.proof] || "⏳ hələ az yoxlanıb") : "—"}${m.proof === "sübut" ? " · 1 günlük masada sübutlu üsul: " + esc(m.proof_method || "") : ""}</div>
         ${m.vahid ? `<div class="olv"><span>Vahid proqnoz</span><b class="${m.vahid.p >= 0.53 ? "up" : m.vahid.p <= 0.47 ? "down" : "mut"}">${dirWord(m.vahid.p)} ${pct(m.vahid.p)}</b>
+          ${m.three_way ? `<span class="note">üç nəticə: ▲ ${pct(m.three_way.up)} · ▼ ${pct(m.three_way.down)} · neytral (xərcdən kiçik hərəkət, ±${(m.three_way.band * 100).toFixed(2)} %) ${pct(m.three_way.neutral)}</span>` : ""}
           <span class="note">öz-özünü sınaq: ${m.vahid.self_test.n || 0} proqnoz, düz ${pct(m.vahid.self_test.hit_rate)} (hədd ${pct(m.vahid.self_test.bar)}) · canlı: ${m.vahid.live.n || 0} yoxlanıb${m.vahid.live.n ? ", düz " + pct(m.vahid.live.hit_rate) : ""}</span></div>` : ""}
         ${m.breakeven ? `<div class="note">Xərci ödəmək üçün lazım olan düzlük: ${pct(m.breakeven)}${m.breakeven > 0.6 ? " — bu brokerdə ticarət üçün çox bahadır" : ""}</div>` : ""}
         <div class="olr"><span>Aralıq (80 %)</span><span>${rg ? px(rg.lo80) + " – " + px(rg.hi80) + ` <span class="note">real tutma ${pct(rg.cover80)}</span>` : "—"}</span></div>

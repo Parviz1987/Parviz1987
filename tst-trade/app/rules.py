@@ -545,19 +545,70 @@ def records(db: DB) -> dict:
         by_adx = {REGIME_NAMES[g]: {"n": b[0], "hit_rate": round(b[1] / b[0], 4), "net_avg": round(b[2] / b[0], 6),
                                     "gross_r": round(b[4] / b[3], 3) if b[3] else None}
                   for g, b in sorted(regimes.get((rule, tf), {}).items())}
+        rob = robustness(v, [full_cost(m_, tf) for _, _, _, m_ in v], deep=st == "sübut" or net > 0)
         if st == "sübut":                     # one-look final on the cases after it became a candidate
             from .rigor import rule_final
             fin = rule_final(db, rule, tf)
             if fin.get("status") != "keçdi":
                 st = "namizəd" if fin.get("status") != "keçmədi" else "yox"
         out.setdefault(rule, {})[tf] = {"n": n, "hit_rate": round(hits / n, 4), "net_avg": round(net, 6), "rr": rr,
-                                        "by_adx": by_adx,
+                                        "by_adx": by_adx, "robust": rob,
                                         "halves": [None if h1 is None else round(h1, 6),
                                                    None if h2 is None else round(h2, 6)],
                                         "p": None if p is None else round(p, 5), "status": st,
                                         "by_metal": {m: {"n": b[0], "hit_rate": round(b[1] / b[0], 4),
                                                          "net_avg": round(b[2] / b[0], 6)} for m, b in by_metal.items()}}
     return {"bar": bar, "rules": out}
+
+
+def _boot(nets: list[float], block: int = 10, reps: int = 300, seed: int = 7) -> tuple[float, float]:
+    """Block bootstrap (Radar Gold: Monte Carlo with block resampling, because neighbouring cases are related): the
+    95 % range of the mean result after cost."""
+    import random
+    rnd = random.Random(seed)
+    n = len(nets)
+    blocks = max(1, n // block)
+    means = []
+    for _ in range(reps):
+        s, c = 0.0, 0
+        for _ in range(blocks):
+            st = rnd.randrange(0, max(1, n - block + 1))
+            chunk = nets[st:st + block]
+            s += sum(chunk)
+            c += len(chunk)
+        means.append(s / c)
+    means.sort()
+    return means[int(0.025 * reps)], means[int(0.975 * reps) - 1]
+
+
+def robustness(v: list[tuple], costs: list[float], deep: bool = False) -> dict:
+    """Is a result solid or fragile (Radar Gold: higher cost, walk-forward windows, resampling)?
+    - at twice the cost; - by quarter (each window shown, weak ones kept); - the 95 % bootstrap range (only for cells
+    that look positive: it costs time); fragile when it pays only at the normal cost, in fewer than 60 % of the
+    windows, in one half only, or its bootstrap range includes zero."""
+    from datetime import datetime, timezone
+    n = len(v)
+    if not n:
+        return {}
+    nets = [x[2] for x in v]
+    net2 = sum(x[2] - c for x, c in zip(v, costs)) / n
+    win: dict[str, list[float]] = {}
+    for t, _, x, _ in v:
+        d = datetime.fromtimestamp(t, timezone.utc)
+        win.setdefault(f"{d.year}-Q{(d.month - 1) // 3 + 1}", []).append(x)
+    windows = {k: {"n": len(xs), "net": round(sum(xs) / len(xs), 6)} for k, xs in sorted(win.items())}
+    pos = sum(1 for w in windows.values() if w["net"] > 0) / len(windows)
+    out = {"net_2x_cost": round(net2, 6), "windows": windows, "windows_positive": round(pos, 3)}
+    if deep and n >= 100:
+        lo, hi = _boot(nets)
+        out["boot95"] = [round(lo, 6), round(hi, 6)]
+    mean = sum(nets) / n
+    half = n // 2
+    h1 = sum(nets[:half]) / half if half else 0
+    h2 = sum(nets[half:]) / (n - half) if n - half else 0
+    out["fragile"] = bool(mean > 0 and (net2 <= 0 or pos < 0.6 or h1 <= 0 or h2 <= 0 or
+                                        ("boot95" in out and out["boot95"][0] <= 0)))
+    return out
 
 
 def short_records(rec: dict) -> dict:
