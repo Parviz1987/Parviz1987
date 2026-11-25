@@ -112,3 +112,11 @@
   Yeni xəta yoxdur; siyahıdakı 3 xəta köhnədir (fyuçers `log` xətası artıq düzəldilib).
 - **Axın:** 4/4 metal canlı, 8/8 əlaqəli bazar, mənbələrin hamısı işləyir. Yeganə «warn»: Xəbər və Fundamental bloklarında son gündə qayda işə düşməyib — şərt yaranmayıb, xəta deyil.
 - **Baza:** 1014 MB (8 saatda +15 MB, böyümə yavaşlayıb). Təklif aşağıda.
+
+## 2026-11-25 07:48 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** sakit. Kənar giriş, bloklanmış ünvan, uğursuz giriş yoxdur; başlıqlar yerindədir.
+- **Sahib «sayt işləmir» dedi (NY ~05:20), səbəb tapıldı və düzəldildi (75632bb):** bütün oxumalar bir ortaq kilidi gözləyirdi;
+  1 GB bazada uzun iş (hesabat, qayda hesabı) kilidi tutanda saytın kiçik sorğuları da növbədə qalırdı — ölçmədə /healthz 60 san cavab vermədi.
+  İndi hər axının öz oxuma bağlantısı var (WAL), yazılar kilidlə qalır. Test əlavə olundu. Serverdə yoxlama: 64 saniyəlik hesabat
+  işləyərkən 329 sorğunun hamısı keçdi, ən yavaşı 1,4 san.
+- **Server:** versiya 75632bb, yeni xəta yoxdur, boş yaddaş 443 MB, baza 1023 MB. Yeganə «warn» əvvəlki kimidir (qayda şərti yaranmayıb).
