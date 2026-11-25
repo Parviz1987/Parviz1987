@@ -22,7 +22,7 @@ BLOCKS = [
      "missing": "Order flow (hər əməliyyat): pullu Databento paketi tələb edir."},
     {"id": "fund", "name": "Fundamental", "page": "/fundamental",
      "reads": "FRED (real faiz, dollar, inflyasiya gözləntisi, VIX), ABŞ rəqəmləri (təqvim + Rəqəm ovçusu), CFTC COT, "
-              "ALFRED (ilk dərc olunan rəqəm)",
+              "ALFRED (ilk dərc olunan rəqəm), AMFI (Hindistanın qızıl ETF axını, aylıq, rəsmi)",
      "methods": ["fundamental", "surprise"], "ai": "Strateq (Claude Sonnet) — fundamental şərh", 
      "evidence": "Dünya Qızıl Şurasının GRAM modeli: fürsət xərci (real faiz, dollar), risk, iqtisadi böyümə, mərkəzi "
                  "bank tələbi. Fed sürprizləri qızılı dəqiqələr içində tərpədir (Awartani-Hussain-Virk 2024); ABŞ "

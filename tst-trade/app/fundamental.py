@@ -20,7 +20,7 @@ LAG_DAYS = {"DFII10": 2, "DGS2": 2, "T10YIE": 2, "DTWEXBGS": 10, "DEXCHUS": 2}
 GROW_PUBLIC_DAYS = 60     # CFNAI for a month (dated its first day) comes out about three to four weeks after it ends
 OZ_G = 31.1035
 COT_PUBLIC = 3 * 86400 + 20 * 3600 + 1800        # Tuesday 00:00 UTC -> Friday 20:30 UTC
-FA_VER = "2026-11-25.5"
+FA_VER = "2026-11-25.6"     # .6: India gold ETF from AMFI (official)
 FAMILY = {"FA-RY-1": "faiz", "FA-RY-2": "faiz", "FA-FED-1": "faiz", "FA-BE-1": "faiz", "FA-USD-1": "dollar",
           "FA-COT-1": "mövqe", "FA-COT-2": "mövqe", "FA-SURP-1": "sürpriz", "FA-CB-1": "mərkəzi bank",
           "FA-FED-2": "faiz", "FA-SGE-1": "fiziki tələb", "FA-GROW-1": "böyümə",
@@ -101,6 +101,13 @@ class Data:
         try:
             self.ind_prem = reporter.accepted(db, "india_premium")
             self.ind_etf = reporter.accepted(db, "india_etf")
+            # the official monthly figure (AMFI) replaces the news-found one wherever it exists
+            from .feeds import AMFI_SCHEMA
+            db.script(AMFI_SCHEMA)
+            amfi = [(r["known_ts"], r["month"], r["net"])
+                    for r in db.execute("SELECT * FROM india_etf ORDER BY known_ts").fetchall()]
+            if amfi:
+                self.ind_etf = amfi
         except Exception:
             self.ind_prem, self.ind_etf = [], []
         try:
@@ -267,7 +274,7 @@ def run(db: DB, now: float | None = None) -> int:
         ind = rules.Ind(cs)
         # replayed again once the central-bank data first arrives (the IMF feed runs once a day)
         have = "".join(x for x, ok in (("c", data.cb_net), ("s", data.sge_prem), ("g", data.grow_v), ("e", data.etf_v),
-                                         ("i", data.ind_prem)) if ok)
+                                         ("i", data.ind_prem)) if ok) + (f"a{len(data.ind_etf) // 24}" if data.ind_etf else "")
         mark = f"fa:ver:{FA_VER}:{have}:{sym}"
         done = int(db.get(mark) or 0)
         rows = []
@@ -349,6 +356,8 @@ def page(db: DB, sym: str, now: float | None = None) -> dict:
                 "pts": [[t, v] for t, v in zip(data.etf_t, data.etf_v) if t >= t0]})
     fac.append({"id": "IND", "name": "Hindistan premiumu/endirimi, $/unsiya (xəbərlərdən, Bazar müxbiri)", "good": 1,
                 "pts": [[t, v] for t, _, v in data.ind_prem]})
+    fac.append({"id": "AMFI", "name": "Hindistanın qızıl ETF-lərinə aylıq xalis axın, krore rupi (AMFI, rəsmi)", "good": 1,
+                "pts": [[t, v] for t, _, v in data.ind_etf if t >= t0 - 365 * 86400]})
     fac.append({"id": "FED", "name": "Kalshi: növbəti Fed iclasında gözlənilən dəyişmə, bp", "good": -1,
                 "pts": [[t, round(v, 1)] for t, v in zip(data.fed_t, data.fed_bps) if t >= t0]})
     out["factors"] = fac

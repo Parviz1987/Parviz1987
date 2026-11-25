@@ -8,7 +8,7 @@ brain — only a number printed in a news report (premium in dollars per ounce, 
 Topics and when they are asked (most reports come out on Friday; monthly figures in the first half of the month):
 - India premium/discount of local dealers over the official domestic price (Reuters «Asia gold», weekly)  Fri, Mon
 - China premium over the global price (cross-check of the Shanghai Gold Exchange data)                     Fri, Mon
-- India's gold ETF net flow for the last month (AMFI)                                                     Wed
+(India's gold ETF flow is no longer asked here: it comes from AMFI's official monthly report, feeds.amfi.)
 - India's gold imports for the last month (tonnes)                                                        Wed
 Monthly limit: the slot «reporter» (10 $ a month, the owner's decision)."""
 from __future__ import annotations
@@ -35,9 +35,6 @@ TOPICS = {
                       "q": "Chinese gold dealers' premium (positive) or discount (negative) over the global benchmark "
                            "spot price, as reported in the most recent weekly report (for example Reuters 'Asia Gold'). "
                            "In US dollars per ounce; mid-point if a range is quoted."},
-    "india_etf": {"days": (2,), "unit": "INR crore", "tol": 0.05, "rel": True,
-                  "q": "Net inflow (positive) or outflow (negative) into Indian gold ETFs in the most recent month "
-                       "reported by AMFI (Association of Mutual Funds in India), in Indian rupees crore."},
     "india_imports": {"days": (2,), "unit": "tonnes", "tol": 0.10, "rel": True,
                       "q": "India's gold imports in the most recent month for which a figure has been published "
                            "(government data or a major news report), in metric tonnes."},

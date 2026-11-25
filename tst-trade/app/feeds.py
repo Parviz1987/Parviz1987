@@ -66,7 +66,8 @@ MACRO_SERIES = {
     "SP500": "S&P 500 səhm indeksi",
     "DCOILWTICO": "Neft WTI (gündəlik), $",
 }
-SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf", "imf", "sge", "gld")
+SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf", "imf", "sge", "gld",
+              "amfi")
 # Block 9. Kalshi: market-implied odds of the next Fed decisions (public market data, no key).
 KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
 KALSHI_SERIES = ("KXFEDDECISION", "KXFED", "FEDDECISION", "FED")
@@ -81,6 +82,11 @@ COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
 # SPDR Gold Trust (GLD, the largest gold ETF): the issuer's own daily archive since 2004 (XLSX), tonnes of gold held —
 # the ETF flow. Used inside the system only (the file's terms forbid redistribution: nothing of it is republished).
 GLD_URL = "https://api.spdrgoldshares.com/api/v1/historical-archive?product=gld&exchange=NYSE&lang=en"
+# AMFI (Association of Mutual Funds in India) monthly industry report: the official net inflow into India's gold ETFs
+# (crore rupees). Owner's decision 2026-11-25. AMFI's terms allow personal, non-commercial use and forbid storing a
+# significant portion of the site: only ONE number per month is kept (the gold ETF line), used inside the system only.
+AMFI_URL = "https://portal.amfiindia.com/spages/am{mon}{year}repo.xls"
+AMFI_FROM = (2019, 1)
 # Shanghai Gold Exchange daily quotes (free): Au99.99 close in yuan per gram and its volume — China's physical demand.
 SGE_URL = "https://en.sge.com.cn/data/data_daily_international_new"
 IMF_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,IL/{c}.RGV_REVS..M"
@@ -212,6 +218,37 @@ def parse_fred(data) -> list[tuple[str, float]]:
     return out
 
 
+AMFI_SCHEMA = "CREATE TABLE IF NOT EXISTS india_etf (month TEXT PRIMARY KEY, net REAL NOT NULL, known_ts REAL NOT NULL);"
+MONTHS3 = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+
+
+def parse_amfi_gold(raw: bytes) -> float | None:
+    """AMFI's monthly report (old Excel .xls) -> the gold ETF net inflow (+) / outflow (-) in crore rupees."""
+    import xlrd
+    book = xlrd.open_workbook(file_contents=raw)
+    for sh in book.sheets():
+        v = amfi_gold_from_rows([[c.value for c in sh.row(r)] for r in range(sh.nrows)])
+        if v is not None:
+            return v
+    return None
+
+
+def amfi_gold_from_rows(rows: list[list]) -> float | None:
+    """The column whose header says «Net Inflow», on the row whose scheme name is «Gold ETF»."""
+    col = None
+    for cells in rows:
+        txt = [str(x).strip() for x in cells]
+        if col is None:
+            col = next((i for i, x in enumerate(txt) if "net inflow" in x.lower()), None)
+            continue
+        if any(x.lower().startswith("gold etf") for x in txt[:3]) and col < len(cells):
+            try:
+                return round(float(cells[col]), 2)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
 def parse_gld_xlsx(raw: bytes) -> list[tuple[str, float]]:
     """GLD's archive (an XLSX: a zip of XML; no extra library) -> [(YYYY-MM-DD, tonnes)] in date order."""
     import zipfile
@@ -335,7 +372,7 @@ class Feeds:
         self.keys = keys
         db.script(SCHEMA)
         self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0,
-                         "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0, "sge": 0.0, "gld": 0.0}
+                         "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0, "sge": 0.0, "gld": 0.0, "amfi": 0.0}
         self.activity = None      # app.activity.Hub: where each collector reports its status
         db.script(surprise.SCHEMA)
 
@@ -514,6 +551,47 @@ class Feeds:
         except Exception as e:
             self._health("gld", False, f"GLD: {str(e)[:120]}")
 
+    async def amfi(self, client, now: float | None = None) -> None:
+        """India's gold ETF net flow per month from AMFI's official report: the newest months every six hours (the
+        report appears around the 10th), the history since 2019 twelve files per run (gentle on the site)."""
+        now = time.time() if now is None else now
+        self.db.script(AMFI_SCHEMA)
+        have = {r["month"] for r in self.db.execute("SELECT month FROM india_etf").fetchall()}
+        d = datetime.fromtimestamp(now, timezone.utc)
+        months, y, m = [], d.year, d.month
+        while (y, m) >= AMFI_FROM:
+            m -= 1
+            if m == 0:
+                y, m = y - 1, 12
+            if (y, m) >= AMFI_FROM:
+                months.append((y, m))
+        todo = [x for x in months[:2] if f"{x[0]}-{x[1]:02d}" not in have] + \
+            [x for x in months[2:] if f"{x[0]}-{x[1]:02d}" not in have][:12]
+        got, errors = 0, []
+        for y, m in todo:
+            url = AMFI_URL.format(mon=MONTHS3[m - 1], year=y)
+            try:
+                r = await client.get(url, headers=UA)
+                if r.status_code == 404:
+                    continue                                  # not published yet (or no xls that month)
+                if r.status_code != 200:
+                    raise ValueError(f"HTTP {r.status_code}")
+                net = parse_amfi_gold(r.content)
+                if net is None:
+                    errors.append(f"{y}-{m:02d}: qızıl ETF sətri tapılmadı")
+                    continue
+                ny, nm = (y + 1, 1) if m == 12 else (y, m + 1)
+                public = datetime(ny, nm, 15, tzinfo=timezone.utc).timestamp()     # AMFI publishes by ~the 12th
+                self.db.execute("INSERT OR IGNORE INTO india_etf VALUES(?,?,?)", (f"{y}-{m:02d}", net, min(now, public)))
+                got += 1
+            except Exception as e:
+                errors.append(f"{y}-{m:02d}: {str(e)[:80]}")
+        last = self.db.execute("SELECT month, net FROM india_etf ORDER BY month DESC LIMIT 1").fetchone()
+        n = self.db.execute("SELECT COUNT(*) n FROM india_etf").fetchone()["n"]
+        self._health("amfi", not errors and n > 0, f"AMFI: {n} ay" + (f", son {last['month']} = {last['net']:+,.0f} krore"
+                                                                       if last else "") +
+                     (f"; xəta: {'; '.join(errors[:3])}" if errors else ""), n)
+
     async def sge(self, client) -> None:
         """Shanghai Gold Exchange: Au99.99 daily close (yuan/gram) and volume (kg). The site's table shows about one
         day per page, so each day is asked on its own: the last ten days every run, and the two-year history filled
@@ -667,14 +745,14 @@ class Feeds:
                 # official actuals: every minute around a release (the agencies publish at the minute)
                 "official": (self.official, 60 if self._recent_release(now) else 900),
                 "kalshi": (self.kalshi, 900), "etf": (self.etf, 300), "imf": (self.imf_gold, 86400),
-                "sge": (self.sge, 3600), "gld": (self.gld, 6 * 3600)}
+                "sge": (self.sge, 3600), "gld": (self.gld, 6 * 3600), "amfi": (self.amfi, 6 * 3600)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
                     self.next_run[name] = now + every
                     task = {"news": "news", "alpaca": "news", "calendar": "calendar", "fmp": "calendar",
                             "macro": "macro", "cot": "macro", "official": "calendar", "kalshi": "macro",
-                            "etf": "macro", "imf": "macro", "sge": "macro", "gld": "macro"}[name]
+                            "etf": "macro", "imf": "macro", "sge": "macro", "gld": "macro", "amfi": "macro"}[name]
                     if self.activity:
                         self.activity.report(task, "working", note=name)
                     try:
