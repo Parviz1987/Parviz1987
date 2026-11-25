@@ -231,32 +231,54 @@ RULES = [
      "void": "Böyük xəbər ərəfəsində ATR keçmişi əks etdirir, gələcəyi yox.",
      "source": "Wilder; risk idarəsində standart."},
     # ---------------- Fundamental: qızıl ----------------
-    {"id": "FA-RY-1", "area": "Fundamental", "name": "Real faiz (10 illik TIPS)", "detector": False,
-     "how": "Real faiz qızıl saxlamağın alternativ xərcidir. Həftəlik dəyişməyə baxılır (FRED DFII10).",
+    {"id": "FA-RY-1", "area": "Fundamental", "name": "Real faiz (10 illik TIPS), 5 gün", "detector": True,
+     "how": "Real faiz qızıl saxlamağın alternativ xərcidir (GRAM: fürsət xərci). 10 illik TIPS gəlirinin (FRED DFII10) "
+            "son 5 müşahidədəki dəyişməsi ±0,10 pp-dən böyükdürsə (yalnız dərc olunmuş dəyərlər, 2 gün gecikmə ilə).",
      "signal": "Real faiz düşür → qızıl yuxarı; qalxır → aşağı.",
      "void": "2022-dən sonra mərkəzi bank alışları bu əlaqəni zəiflədib: tək başına həlledici deyil.",
      "source": "Erb-Harvey (2013); WGC modeli; əlaqə uzun müddət güclü, son illərdə zəifləyib."},
-    {"id": "FA-USD-1", "area": "Fundamental", "name": "Dollar", "detector": False,
-     "how": "Qızıl dollarla qiymətlənir: dollar indeksi (DXY) və EUR/USD hərəkəti.",
+    {"id": "FA-USD-1", "area": "Fundamental", "name": "Dollar (geniş indeks), 5 gün", "detector": True,
+     "how": "Qızıl dollarla qiymətlənir. Geniş dollar indeksinin (FRED DTWEXBGS, həftəlik dərc: 10 gün gecikmə ilə) son 5 "
+            "müşahidədəki dəyişməsi ±1 %-dən böyükdürsə. Gün içi dollar hərəkəti «Bazarlar arası» blokundadır.",
      "signal": "Dollar zəifləyir → qızıl yuxarı; güclənir → aşağı.",
      "void": "Böhran anında ikisi birlikdə qalxa bilər (hər ikisi sığınacaqdır).",
      "source": "Geniş sübut; qısa müddətdə güclü əks əlaqə."},
-    {"id": "FA-FED-1", "area": "Fundamental", "name": "Fed gözləntisi", "detector": False,
-     "how": "Faiz endirimi ehtimalının dəyişməsi (Kalshi, açıqlamalar). Mühüm olan səviyyə yox, GÖZLƏNTİNİN dəyişməsidir.",
+    {"id": "FA-FED-1", "area": "Fundamental", "name": "Fed gözləntisi (2 illik faiz), 5 gün", "detector": True,
+     "how": "2 illik ABŞ istiqraz gəliri (FRED DGS2) bazarın Fed faiz yolunu gözləməsini əks etdirir. Son 5 müşahidədə "
+            "±0,15 pp-dən çox dəyişmə: bazar daha çox (düşür) və ya daha az (qalxır) endirim gözləyir. Mühüm olan "
+            "GÖZLƏNTİNİN dəyişməsidir. Kalshi ehtimalları da toplanır (AI analitik mətn kimi oxuyur).",
      "signal": "Endirim ehtimalı artır → yuxarı; azalır → aşağı.",
      "void": "Bazar dəyişikliyi artıq qiymətə salıbsa (xəbər gözlənilən kimi çıxdı).",
      "source": "Pul siyasəti şokları ədəbiyyatı; FOMC sürprizləri qızılda güclü reaksiya yaradır."},
-    {"id": "FA-SURP-1", "area": "Fundamental", "name": "ABŞ rəqəmi sürprizi", "detector": False,
-     "how": "Fakt ilə gözlənti fərqi (CPI, qeyri-kənd iş yerləri, işsizlik, ÜDM, PCE). Reaksiyanın çoxu 90 saniyədə bitir.",
+    {"id": "FA-SURP-1", "area": "Fundamental", "name": "ABŞ sürpriz indeksi, 14 gün", "detector": True,
+     "how": "Fakt ilə gözlənti fərqi (CPI, qeyri-kənd iş yerləri, işsizlik, ÜDM, PCE): son 14 gündəki rəqəmlərin qızıl "
+            "üçün işarəsi və təsir çəkisi ilə cəmi (ən azı 3 rəqəm, |cəm| ≥ 2). Citi sürpriz indeksi fikri. Rəqəmin ilk "
+            "dəqiqələri «Hadisə sürprizi» üsulundadır.",
      "signal": "Zəif iqtisadiyyat / aşağı inflyasiya sürprizi → qızıl yuxarı; güclü → aşağı.",
      "void": "Gözlənti məlumatı yoxdursa — uydurulmur, qayda susur.",
      "source": "Smales-Yang (2015); Elder-Miao-Ramchander (2012)."},
-    {"id": "FA-COT-1", "area": "Fundamental", "name": "Fondların mövqeyi (COT) ifrat halda", "detector": False,
+    {"id": "FA-COT-1", "area": "Fundamental", "name": "Fondların mövqeyi (COT) ifrat halda", "detector": True,
      "how": "CFTC: idarə olunan fondların xalis mövqeyi son 3 ilin aralığında ən yüksək və ya ən aşağı 20 %-də "
             "(kodda «COT» üsulu eyni həddi işlədir).",
      "signal": "İfrat uzun mövqe → aşağı risk (əks fikir); ifrat qısa → yuxarı.",
      "void": "Həftəlik məlumat: qısa üfüq üçün deyil.",
      "source": "Sanders-Irwin-Merrin; sübutu qarışıqdır."},
+    {"id": "FA-RY-2", "area": "Fundamental", "name": "Real faiz trendi, 20 gün", "detector": True,
+     "how": "DFII10-un son 20 müşahidədəki dəyişməsi ±0,25 pp-dən böyükdürsə: fürsət xərcinin trendi.",
+     "signal": "Real faiz trendlə düşür → yuxarı; qalxır → aşağı.",
+     "void": "Mərkəzi bank alışları güclü olanda (2022-dən sonra) əlaqə zəifləyib.",
+     "source": "Erb-Harvey (2013); WGC GRAM."},
+    {"id": "FA-BE-1", "area": "Fundamental", "name": "İnflyasiya gözləntisi, 5 gün", "detector": True,
+     "how": "10 illik inflyasiya gözləntisi (FRED T10YIE) son 5 müşahidədə ±0,08 pp-dən çox dəyişəndə.",
+     "signal": "Gözlənti artır → yuxarı (inflyasiyadan qorunma); azalır → aşağı.",
+     "void": "Böhrandan sonra bu əlaqənin işarəsi dəyişib (Invesco): Hakim ölçür.",
+     "source": "Invesco «What is driving gold»; WGC."},
+    {"id": "FA-COT-2", "area": "Fundamental", "name": "Fondların axını (COT), 3 həftə", "detector": True,
+     "how": "İdarə olunan fondların xalis mövqeyi 3 həftədir ardıcıl eyni tərəfə dəyişir və cəmi adi həftəlik dəyişmənin "
+            "3 qatından böyükdür.",
+     "signal": "Fondlar ardıcıl alır → yuxarı; satır → aşağı.",
+     "void": "Mövqe artıq ifrat haldadırsa (FA-COT-1 əks deyir).",
+     "source": "Sanders-Irwin-Merrin (2009); sübutu qarışıqdır."},
     {"id": "FA-CB-1", "area": "Fundamental", "name": "Mərkəzi bank və ETF axını", "detector": False,
      "how": "Mərkəzi bankların alışı (WGC, aylıq) və ETF ehtiyatları uzun müddətli dəstəkdir.",
      "signal": "Güclü alış → uzun üfüqdə yuxarı.",
@@ -293,6 +315,7 @@ RULES = [
 
 BY_ID = {r["id"]: r for r in RULES}
 AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Fundamental", "Bazarlar arası")
+TA_AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Bazarlar arası")
 CHART_AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Bazarlar arası", "Öyrənilmiş")
 
 

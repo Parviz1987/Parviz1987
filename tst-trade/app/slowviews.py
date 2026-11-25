@@ -95,4 +95,4 @@ class Lookup:
     def views(self, metal: str, t: float, horizon: str) -> dict:
         if horizon not in SLOW_HORIZONS:
             return {}
-        return {"cot": self._cot(metal, t), "season": self._season(metal, t), "jewel": self._jewel(metal, t)}
+        return {"season": self._season(metal, t), "jewel": self._jewel(metal, t)}   # COT: fundamental block

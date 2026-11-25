@@ -333,8 +333,8 @@ def run(db: DB, now: float | None = None) -> dict:
         other = {tf: {r["t"]: r["c"] for r in _load(db, PAIR[sym], tf, now)} for tf in inds}
         for tf, ind in inds.items():
             cs = ind.cs
-            have = {r["t"] for r in db.execute("SELECT DISTINCT t FROM rule_signals WHERE metal=? AND tf=?",
-                                                 (sym, tf)).fetchall()}
+            have = {r["t"] for r in db.execute("SELECT DISTINCT t FROM rule_signals WHERE metal=? AND tf=? "
+                                                 "AND rule NOT LIKE 'FA-%' AND mode != 'futures'", (sym, tf)).fetchall()}
             # each metal and timeframe replays its own history once (a replay cut by a restart resumes here)
             first = db.execute("SELECT 1 FROM rule_signals WHERE metal=? AND tf=? AND mode='history' LIMIT 1",
                                (sym, tf)).fetchone() is None
@@ -396,7 +396,9 @@ def run(db: DB, now: float | None = None) -> dict:
                     db.execute("UPDATE rule_signals SET price1=? WHERE metal=? AND tf=? AND t=? AND price1 IS NULL",
                                (cs[j + 1]["c"], sym, tf, r["t"]))
     fut = run_futures_volume(db)
-    return {"added": added, "replay": first_any, "futures_volume": fut}
+    from . import fundamental
+    fa = fundamental.run(db)
+    return {"added": added, "replay": first_any, "futures_volume": fut, "fundamental": fa}
 
 
 FUT_VOL_VER = "2026-11-25"
@@ -614,14 +616,20 @@ class Lookup:
     replay never uses the future). A rule with no edge so far (hit rate <= 50 %) gets no voice. Futures-only volume
     firings are left out (on live they arrive a day late)."""
 
-    def __init__(self, db: DB):
+    TA_PREFIXES = ("TA-", "TH-", "PA-", "VOL-", "IM-")
+
+    def __init__(self, db: DB, prefixes: tuple = TA_PREFIXES, name: str = "qaydalar", tfs: tuple | None = None,
+                 families: dict | None = None):
+        """prefixes: which rules vote (the technical block by default; «FA-» for the fundamental block); tfs: fixed
+        timeframes to read (None: by horizon, RULE_TFS); families: one voice per idea."""
         ensure(db)
+        self.name, self.tfs, self.families = name, tfs, families if families is not None else RULE_FAMILY
         self.fire: dict[str, list] = {}                   # metal -> [(known_t, tf, rule, dir)] sorted
         out: dict[tuple, list] = {}                       # (rule, tf) -> [(outcome_known_t, hit)]
         for r in db.iterate("SELECT metal, tf, t, rule, dir, price0, price1, adx FROM rule_signals "
                             "WHERE mode != 'futures'"):
             step = TF_SEC.get(r["tf"])
-            if not step:
+            if not step or not r["rule"].startswith(prefixes):
                 continue
             g = regime(r["adx"])
             self.fire.setdefault(r["metal"], []).append((r["t"] + step, r["tf"], r["rule"], r["dir"], g))
@@ -659,7 +667,7 @@ class Lookup:
         return max(0.0, 2 * (hits - n / 2) / (n + 50)), n, hits / n
 
     def views(self, metal: str, t: float, horizon: str) -> dict:
-        tfs = RULE_TFS.get(horizon, ("4h", "1d"))
+        tfs = self.tfs or RULE_TFS.get(horizon, ("4h", "1d"))
         keys = self.fkeys.get(metal, [])
         now_t = t - LAG
         lo = bisect_left(keys, now_t - max(TF_SEC[x] for x in tfs) + 1)
@@ -672,21 +680,28 @@ class Lookup:
             w, n, hr = self.weight(rule, tf, now_t, g)
             if w <= 0:
                 continue
-            fam.setdefault(RULE_FAMILY.get(rule, rule), []).append(d * w)
+            fam.setdefault(self.families.get(rule, rule), []).append(d * w)
             used.append((w, f"{rule} {tf} {'↑' if d > 0 else '↓'} ({round(hr * 100)} %/{n})"))
         if not used:
-            return {"qaydalar": (0.5, "indi keçmişi müsbət olan qayda işə düşməyib")}
+            return {self.name: (0.5, "indi keçmişi müsbət olan qayda işə düşməyib")}
         vote = sum(sum(v) / len(v) for v in fam.values())          # one voice per idea
         p = round(0.5 + max(-0.15, min(0.15, 0.5 * vote)), 4)
         used.sort(reverse=True)
-        return {"qaydalar": (p, f"{len(used)} qayda, {len(fam)} fikir: " + ", ".join(x for _, x in used[:4]))}
+        return {self.name: (p, f"{len(used)} qayda, {len(fam)} fikir: " + ", ".join(x for _, x in used[:4]))}
 
 
-_LIVE: dict = {"ts": 0.0, "lk": None}
+_LIVE: dict = {}
 
 
-def live_lookup(db: DB) -> Lookup:
-    """Live forecasts reuse one Lookup for 10 minutes (it reads every rule firing)."""
-    if _LIVE["lk"] is None or time.time() - _LIVE["ts"] > 600:
-        _LIVE["lk"], _LIVE["ts"] = Lookup(db), time.time()
-    return _LIVE["lk"]
+def fa_lookup(db: DB) -> Lookup:
+    from . import fundamental
+    return Lookup(db, prefixes=("FA-",), name="fundamental", tfs=("1d",), families=fundamental.FAMILY)
+
+
+def live_lookup(db: DB, kind: str = "ta") -> Lookup:
+    """Live forecasts reuse one Lookup per block for 10 minutes (it reads every rule firing)."""
+    hit = _LIVE.get(kind)
+    if hit is None or time.time() - hit[0] > 600:
+        hit = (time.time(), Lookup(db) if kind == "ta" else fa_lookup(db))
+        _LIVE[kind] = hit
+    return hit[1]

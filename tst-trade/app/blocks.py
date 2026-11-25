@@ -20,10 +20,10 @@ BLOCKS = [
      "evidence": "12 növ, 34 qayda (Bilik kitabı). Güclü sübut yalnız uzun trendə aiddir (Moskowitz-Ooi-Pedersen 2012, "
                  "Hurst-Ooi-Pedersen); qısa qaydaların sübutu zəifdir — Hakim hər birini ayrıca ölçür.",
      "missing": "Order flow (hər əməliyyat): pullu Databento paketi tələb edir."},
-    {"id": "fund", "name": "Fundamental", "page": None,
+    {"id": "fund", "name": "Fundamental", "page": "/fundamental",
      "reads": "FRED (real faiz, dollar, inflyasiya gözləntisi, VIX), ABŞ rəqəmləri (təqvim + Rəqəm ovçusu), CFTC COT, "
               "ALFRED (ilk dərc olunan rəqəm)",
-     "methods": ["macro", "surprise", "cot"], "ai": "Strateq (Claude Sonnet) — fundamental şərh",
+     "methods": ["fundamental", "surprise"], "ai": "Strateq (Claude Sonnet) — fundamental şərh", 
      "evidence": "Dünya Qızıl Şurasının GRAM modeli: fürsət xərci (real faiz, dollar), risk, iqtisadi böyümə, mərkəzi "
                  "bank tələbi. Fed sürprizləri qızılı dəqiqələr içində tərpədir (Awartani-Hussain-Virk 2024); ABŞ "
                  "rəqəmi dəqiqəsində impuls bizim fyuçers sınağında 63,5 % (H13).",

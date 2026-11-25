@@ -37,7 +37,7 @@ def test_multi_day_horizons_score_against_kth_trading_day():
         i = by_t[f["issued_t"]]
         assert f["price1"] == rows[i + 2][4]
     st = {r["method"]: r for r in judge.stats(db, "XAU", "10d", "history")}
-    assert "reversal" not in st and "macro" in st and st["trendmix"]["n"] > 300
+    assert "reversal" not in st and "fundamental" in st and st["trendmix"]["n"] > 300
     # overlapping forecasts: the p-value uses about n/10 independent tests, so random data is never "proven"
     assert all(r["status"] != "sübut" for r in st.values())
 
@@ -56,12 +56,12 @@ def test_session_day_bucket():
     assert candles.bucket(mon + 3600, "1d") == mon
 
 
-def test_macro_method():
+def test_fundamental_voice_comes_from_the_block():
     up = [{"o": 100 + i, "h": 100.5 + i, "l": 99.5 + i, "c": 100 + i} for i in range(200)]
     fc = forecast.build(up, "1d")["methods"]
-    assert fc["macro"]["p_up"] == 0.5                         # no FRED data: no view
-    m = forecast.build(up, "1d", {"dfii10": -0.2, "dollar": -1.5})["methods"]["macro"]
-    assert m["p_up"] > 0.5
+    assert fc["fundamental"]["p_up"] == 0.5                   # no block view given: no view
+    m = forecast.build(up, "1d", views={"fundamental": (0.58, "test")})["methods"]["fundamental"]
+    assert m["p_up"] == 0.58 and "fundamental" not in forecast.build(up, "1h")["methods"]
 
 
 def test_macro_lookup_uses_only_past_values():

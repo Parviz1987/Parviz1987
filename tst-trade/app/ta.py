@@ -68,7 +68,7 @@ def build(db: DB, sym: str, tf: str, now: float | None = None) -> dict:
     idx = {c["t"]: i for i, c in enumerate(cs)}
     fired = []
     for r in db.execute("SELECT t, rule, dir, note FROM rule_signals WHERE metal=? AND tf=? AND t>=? AND mode!='futures' "
-                        "ORDER BY t", (sym, tf, cs[0]["t"])).fetchall():
+                        "AND rule NOT LIKE 'FA-%' ORDER BY t", (sym, tf, cs[0]["t"])).fetchall():
         if r["t"] in idx:
             fired.append({"i": idx[r["t"]], "t": r["t"], "rule": r["rule"], "dir": r["dir"], "note": r["note"]})
     out["fired"] = fired
@@ -82,7 +82,7 @@ def build(db: DB, sym: str, tf: str, now: float | None = None) -> dict:
         db.put("ta:records", json.dumps(rec, ensure_ascii=False))
     book = []
     for r in playbook.RULES:
-        if not r["detector"]:
+        if not r["detector"] or r["area"] not in playbook.TA_AREAS:
             continue
         x = rec["r"].get(r["id"], {}).get(tf)
         book.append({"id": r["id"], "name": r["name"], "area": r["area"], "family": rules.RULE_FAMILY.get(r["id"]),

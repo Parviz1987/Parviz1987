@@ -42,15 +42,16 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
 # ratio) were removed from the forecasts: each was a copy of a rule in the block (Ichimoku moved into it). «session»
 # was a copy of «seans». Their past forecasts stay in the database; the long-horizon trend (tsmom, trendmix) stays:
 # it works on weeks and months, which the block's candle rules do not cover.
-METHODS = ("rw", "up", "tsmom", "macro", "surprise", "dollar", "oil", "risk", "news", "strateq", "brain2", "debate", "cot",
+METHODS = ("rw", "up", "tsmom", "fundamental", "surprise", "dollar", "oil", "risk", "news", "strateq", "brain2", "debate",
            "season", "jewel", "seans", "trendmix", "consensus", "garch", "gvz", "chartist", "qaydalar", "terazi", "vahid")
-RETIRED = ("momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback", "session", "sam", "ichimoku", "pair")
+RETIRED = ("momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback", "session", "sam", "ichimoku", "pair",
+           "macro", "cot")      # macro and COT: now rules of the fundamental block (FA-RY-1, FA-USD-1, FA-COT-1)
 # Families = the blocks (owner 2026-11-25: «every block one organ, one voice»; app/blocks.py). Methods of one block
 # carry related ideas from the same kind of data: the consensus gives each block one voice and the Judge counts a
 # block once in its multiple-testing bar. The AI analysts that read every block (Strateq, the second brain, the
 # debate) are their own family.
 FAMILY = {"qaydalar": "ta", "chartist": "ta", "tsmom": "ta", "trendmix": "ta",
-          "macro": "fund", "surprise": "fund", "cot": "fund",
+          "fundamental": "fund", "surprise": "fund",
           "news": "news",
           "dollar": "cross", "oil": "cross", "risk": "cross",
           "seans": "time", "season": "time", "jewel": "time",
@@ -63,7 +64,7 @@ METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", 
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
                 "dollar": "Dollar impulsu", "oil": "Neft impulsu", "risk": "Risk əhvalı (VIX impulsu)",
                 "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)", "debate": "Müzakirə (yuxarı ↔ aşağı)",
-                "cot": "COT: fond mövqeləri", "seans": "Seans: Asiya ↑ / ABŞ ↓",
+                "fundamental": "Fundamental (blokun qaydaları: faiz, Fed, dollar, COT, sürprizlər)", "seans": "Seans: Asiya ↑ / ABŞ ↓",
                 "trendmix": "Çoxsürətli trend (dalğalanmaya görə)", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
                 "sam": "Şam fiqurları", "ichimoku": "Ichimoku buludu", "pair": "Metal nisbəti (qızıl/gümüş, platin/palladium)",
                 "garch": "GARCH dəyişkənlik aralığı", "gvz": "GVZ (opsionların gözlədiyi dəyişkənlik)",
@@ -89,8 +90,8 @@ def steps_of(h: str) -> int:
 
 def methods_for(h: str) -> tuple[str, ...]:
     out = list(METHODS)
-    if tf_of(h) != "1d":
-        out.remove("macro")      # FRED is daily: the macro view only for daily candles
+    if tf_of(h) not in ("1d", "1w"):
+        out.remove("fundamental")   # FRED, COT and the surprise index are daily-to-weekly drivers
     if h not in ("15m", "30m", "1h", "4h", "1d"):
         out.remove("surprise")
         out.remove("dollar")     # catch-up after a linked market's move: a short-horizon effect
@@ -107,8 +108,7 @@ def methods_for(h: str) -> tuple[str, ...]:
     if h not in ("1h", "4h"):
         out.remove("seans")      # the overnight/day pattern lives inside a day
     if h not in ("1w", "10d", "1mo"):
-        out.remove("trendmix")
-        out.remove("cot")        # weekly positions, monthly seasons, festival seasons: weeks-to-months effects
+        out.remove("trendmix")   # monthly seasons, festival seasons: weeks-to-months effects
         out.remove("season")
         out.remove("jewel")
         out.remove("tsmom")      # the 12-month trend is a weeks-to-months effect
@@ -392,21 +392,14 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
                 p, basis = 0.5, "bu bazarın şamı yoxdur"
             out[key] = {"p_up": p, "basis": basis}
 
-    for key in ("news", "strateq", "brain2", "debate", "cot", "season", "jewel"):   # brainviews.py, slowviews.py
+    for key in ("news", "strateq", "brain2", "debate", "season", "jewel"):   # brainviews.py, slowviews.py
         if key in methods_for(horizon):
             p, basis = (views or {}).get(key, (0.5, "beyin məlumatı yoxdur"))
             out[key] = {"p_up": p, "basis": basis}
 
-    if "macro" in methods_for(horizon):
-        if macro and macro.get("dfii10") is not None and macro.get("dollar") is not None:
-            # A falling real rate (-0.10 pp) and a falling dollar (-1 %) are each worth about +0.05 of P(up).
-            score = -macro["dfii10"] / 0.10 - macro["dollar"] / 1.0
-            pm = round(_clip(0.5 + 0.05 * max(min(score, 3), -3)), 4)
-            out["macro"] = {"p_up": pm if abs(score) >= 0.5 else 0.5,
-                            "basis": f"həftədə real faiz {macro['dfii10']:+.2f} pp, dollar {macro['dollar']:+.2f} %"}
-        else:
-            out["macro"] = {"p_up": 0.5, "basis": "FRED məlumatı yoxdur"}
-
+    if "fundamental" in methods_for(horizon):
+        p, basis = (views or {}).get("fundamental", (0.5, "fundamental məlumat yoxdur"))
+        out["fundamental"] = {"p_up": p, "basis": basis}
     mf = methods_for(horizon)
     if "garch" in mf:
         out["garch"] = {"p_up": 0.5, "basis": "yalnız aralıq: GARCH(1,1) dəyişkənliyi",
@@ -445,8 +438,6 @@ PASSPORT = {
                      "Pedersen 2012, 58 bazar, qızıl daxil). İstiqraz trendi qızıl üçün əlavə məlumat verir.",
               "expect": "1 həftə, 10 gün, 1 ay; qazancı əsasən böyük düşüşlərdən qaçmaqdan gəlir.",
               "else": "Bazar trendsiz dövrdədirsə zəifləyir; sübut olmasa konsensusdan çıxarılır."},
-    "macro": {"why": "Real faiz və dollar enəndə qızıl adətən qalxır (2022-dən zəifləyib).",
-              "expect": "1 gündən 1 aya qədər.", "else": "Dərc gecikməsi nəzərə alınıb; yenə yoxdursa, çıxarılır."},
     "surprise": {"why": "ABŞ rəqəmi gözləntidən fərqli çıxanda dollar və qızıl dəqiqələr ərzində reaksiya verir.",
                  "expect": "15 dəqiqədən 4 saata qədər — ən güclü qısa siqnal namizədi.",
                  "else": "Fakt mənbəyi: FMP və ya beyin agenti (Rəqəm ovçusu)."},
@@ -477,9 +468,6 @@ PASSPORT = {
     "trendmix": {"why": "Ən güclü sübutu olan fikir (trend) daha dürüst formada: üç sürət, dalğalanmaya görə ölçülür "
                         "(Carver pysystemtrade; Hurst-Ooi-Pedersen). Əsas fərziyyə: 4 metal birlikdə.",
                  "expect": "1 həftə – 1 ay; tək metalda 51–53 %.", "else": "12 aylıq trenddən yaxşı deyilsə, çıxarılır."},
-    "cot": {"why": "Böyük fondlar həddən çox alanda (3 ilin 80 %-dən yuxarı) mövqe adətən açılır və qiymət geri çəkilir; "
-                   "həddən çox satanda əksinə. Dostun 31 agentli layihəsindən (#15) ideya.",
-            "expect": "1 həftə – 1 ay; nadir siqnal.", "else": "Çıxarılır; COT «Fundamental» bölməsində ölçü kimi qalır."},
     "season": {"why": "Bəzi aylarda metal illər boyu eyni istiqamətdə gedib (məs. yanvar). Yalnız 5+ ilin 70 %-i razı olanda. "
                       "Dostun layihəsindən (#22) ideya.",
                "expect": "1 ay.", "else": "Çıxarılır."},
@@ -497,6 +485,12 @@ PASSPORT = {
                         "yaxşı olmayanın səsi yoxdur).",
                  "expect": "Tək qaydalardan və texniki düsturlardan yaxşı olmalıdır.",
                  "else": "Sübut olmasa, vahid proqnozda çəkisi 0-a düşür."},
+    "fundamental": {"why": "Fundamental blokun bir səsi: real faiz (5 və 20 gün), Fed gözləntisi (2 illik faiz), "
+                           "inflyasiya gözləntisi, geniş dollar, fondların mövqeyi və axını (COT), ABŞ sürpriz indeksi — "
+                           "hər biri Bilik kitabında qayda, Hakim hər birini ayrıca ölçür; səsin gücü qaydanın o ana qədər "
+                           "bilinən nəticəsidir.",
+                    "expect": "Gün və həftə üfüqündə; WGC-nin GRAM amilləri.",
+                    "else": "Sübut olmasa, vahid proqnozda çəkisi 0-a düşür."},
     "risk": {"why": "Risk və qeyri-müəyyənlik qızılın dörd əsas amilindən biridir (Dünya Qızıl Şurasının GRAM modeli): "
                     "qorxu indeksi (VIX) qəfil qalxanda sığınacaq tələbi artır. Qızıl hələ reaksiya verməyibsə, fərqin "
                     "bağlanması gözlənilir (dollar və neft impulsu ilə eyni üsul, əlaqə son 100 şamdan ölçülür).",

@@ -23,12 +23,13 @@ def test_cot_contrarian_only_after_the_report_is_public():
     days = [(date(2021, 1, 5) + timedelta(weeks=i)).isoformat() for i in range(150)]   # Tuesdays
     db.executemany("INSERT OR REPLACE INTO cot(symbol, d, oi, mm_long, mm_short) VALUES(?,?,?,?,?)",
                    [("XAU", d, 1, 300 if i == 149 else 100 + (i * 7 % 10), 50) for i, d in enumerate(days)])
-    lk = slowviews.Lookup(db)
-    p, why = lk.views("XAU", ts(days[-1]) + 4 * 86400, "1mo")["cot"]
-    assert p == 0.45 and "çox alıb" in why                     # the highest net in 3 years: crowded long
+    from app import fundamental                                # COT is a rule of the fundamental block now
+    data = fundamental.Data(db)
+    got = {r: (d, n) for r, d, n in fundamental.detect(data, "XAU", ts(days[-1]) + 4 * 86400)}
+    assert got["FA-COT-1"][0] == -1 and "çox alıb" in got["FA-COT-1"][1]   # the highest net in 3 years: crowded long
     # on Wednesday the newest report (the jump) is not public yet: the week before was ordinary
-    assert lk.views("XAU", ts(days[-1]) + 86400, "1mo")["cot"][0] != 0.45
-    assert lk.views("XAU", ts(days[-1]) + 4 * 86400, "1h") == {}
+    early = {r: d for r, d, _ in fundamental.detect(data, "XAU", ts(days[-1]) + 86400)}
+    assert early.get("FA-COT-1") != -1
 
 
 def test_season_needs_five_years_that_agree():
@@ -61,8 +62,8 @@ def test_scale_weighs_only_analysts_above_the_bar():
     v = forecast.weighted_view({"momentum": {"p_up": 0.6}, "fib": {"p_up": 0.3}}, w)
     assert v["p_up"] == 0.6 and "Momentum" in v["basis"]
     assert forecast.weighted_view({"momentum": {"p_up": 0.6}}, None)["p_up"] == 0.5
-    assert {"cot", "season", "jewel"} <= set(forecast.methods_for("1mo"))
-    assert "brain2" in forecast.methods_for("1h") and "cot" not in forecast.methods_for("1h")
+    assert {"fundamental", "season", "jewel"} <= set(forecast.methods_for("1mo"))
+    assert "brain2" in forecast.methods_for("1h") and "fundamental" not in forecast.methods_for("1h")
 
 
 def test_engine_weights_only_read_a_cache_filled_off_the_loop():

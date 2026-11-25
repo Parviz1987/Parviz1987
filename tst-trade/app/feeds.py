@@ -55,6 +55,7 @@ CAL_URLS = ["https://nfs.faireconomy.media/ff_calendar_thisweek.json",
 MACRO_SERIES = {
     "DFII10": "10 illik real faiz (TIPS), %",
     "DGS10": "10 illik nominal faiz, %",
+    "DGS2": "2 illik faiz (Fed gözləntisi), %",
     "T10YIE": "10 illik inflyasiya gözləntisi, %",
     "DTWEXBGS": "Dollar indeksi (geniş)",
     "VIXCLS": "VIX qorxu indeksi",

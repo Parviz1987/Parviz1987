@@ -20,8 +20,9 @@ def _series(closes, v=None):
 
 
 def test_every_detector_rule_in_the_book_is_detected_in_code():
-    code = Path(rules.__file__).read_text() + Path(patterns.__file__).read_text()
-    found = set(re.findall(r'"((?:TA|TH|PA|VOL|IM)-[A-Z0-9-]+)"', code))
+    from app import fundamental
+    code = Path(rules.__file__).read_text() + Path(patterns.__file__).read_text() + Path(fundamental.__file__).read_text()
+    found = set(re.findall(r'"((?:TA|TH|PA|VOL|IM|FA)-[A-Z0-9-]+)"', code))
     for r in playbook.RULES:
         if r["detector"]:
             assert r["id"] in found, r["id"]
@@ -204,9 +205,10 @@ def test_adx_measures_strength_and_every_rule_has_a_family():
     assert a_t[-1] > 25 and p_t[-1] > m_t[-1]
     assert a_f[-1] < 20
     assert rules.regime(15) == 0 and rules.regime(22) == 1 and rules.regime(40) == 2 and rules.regime(None) is None
+    from app import fundamental
     for r in playbook.RULES:
         if r["detector"]:
-            assert r["id"] in rules.RULE_FAMILY, r["id"]
+            assert r["id"] in (rules.RULE_FAMILY if r["area"] in playbook.TA_AREAS else fundamental.FAMILY), r["id"]
 
 
 def test_main_module_has_its_logger():
@@ -233,7 +235,7 @@ def test_ta_page_data_has_every_layer_and_the_rules_on_the_chart():
     L = d["layers"]
     assert len(L["ichimoku"]["a"]) == len(d["candles"]) == len(L["adx"]["adx"]) == len(L["vol"])
     assert d["fired"] and d["fired"][0]["rule"] == "TA-SR-1"
-    assert {r["id"] for r in d["book"]} == {r["id"] for r in playbook.RULES if r["detector"]}
+    assert {r["id"] for r in d["book"]} == {r["id"] for r in playbook.RULES if r["detector"] and r["area"] in playbook.TA_AREAS}
     assert "vote" in d["now"] and d["now"]["regime"]
 
 

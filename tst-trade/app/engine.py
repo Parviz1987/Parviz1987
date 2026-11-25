@@ -398,6 +398,7 @@ class Engine:
         bv = brainviews.Lookup(self.db)
         sv = slowviews.Lookup(self.db)
         rl = rules.live_lookup(self.db)
+        fl = rules.live_lookup(self.db, "fa")
         ev = EventLookup(self.db)
         bonds, gvz = BondLookup(self.db), GvzLookup(self.db)
         for h, tf in forecast.HORIZONS.items():
@@ -428,7 +429,7 @@ class Engine:
                     fc = forecast.build(past, h, macro.at(issued_t) if tf == "1d" else None, issued_t,
                                         rel.window(issued_t, h), linked_now,
                                         {**bv.views(sym, known, h), **sv.views(sym, issued_t, h),
-                                         **rl.views(sym, known, h),
+                                         **rl.views(sym, known, h), **fl.views(sym, known, h),
                                          "_weights": self.weights(sym, h, now) if mode == "live" else None,
                                          "_unified": unified.models(self.db).get(f"{sym}:{h}") if mode == "live" else None},
                                         ev.near(known))
@@ -575,6 +576,7 @@ class Engine:
         bv.calib = {}        # calibration bands come from recent outcomes: never applied to the past (look-ahead)
         sv = slowviews.Lookup(self.db)
         rl = rules.Lookup(self.db)
+        fl = rules.fa_lookup(self.db)
         ev = EventLookup(self.db)
         bonds, gvz = BondLookup(self.db), GvzLookup(self.db)
         first = macro.first_day()
@@ -614,7 +616,8 @@ class Engine:
                                         {**self.related_closes(window, tf, now, linked, sym), "bond": bonds.at(t),
                                          "gvz": gvz.at(t) if tf in ("1d", "1w") and sym == "XAU" else None},
                                         {**bv.views(sym, decision_time(t, tf), h), **sv.views(sym, t, h),
-                                         **rl.views(sym, decision_time(t, tf), h)},
+                                         **rl.views(sym, decision_time(t, tf), h),
+                                         **fl.views(sym, decision_time(t, tf), h)},
                                         ev.near(decision_time(t, tf)))
                     if fc is None:
                         continue
