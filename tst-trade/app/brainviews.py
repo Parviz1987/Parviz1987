@@ -70,20 +70,7 @@ class Lookup:
 
     def views(self, metal: str, t: float, horizon: str) -> dict:
         out = {}
-        w = NEWS_WINDOW.get(horizon)
-        if w:
-            ts, vs = self.news.get(metal, ([], []))
-            if not ts or t < ts[0]:
-                out["news"] = (0.5, "Oxuyucunun qiymətləndirməsi hələ yoxdur")
-            else:
-                lo, hi = bisect.bisect_left(ts, t - w), bisect.bisect_right(ts, t - 60)
-                score, n = sum(vs[lo:hi]), hi - lo
-                if abs(score) >= 2:
-                    p = min(max(0.5 + 0.03 * score, 0.35), 0.65)
-                    out["news"] = (round(p, 4), f"son {w // 3600} saatda {n} xəbər: əhval {score:+d} "
-                                                f"({'müsbət' if score > 0 else 'mənfi'})")
-                else:
-                    out["news"] = (0.5, f"son {w // 3600} saatda {n} xəbər: aydın əhval yoxdur ({score:+d})")
+        # (the headline sum «news» moved into the news block: app/newsblock.py, voice «xeber»)
         age = STRATEQ_FOR.get(horizon)
         if age:
             for src, who in (("strateq", "Strateq"), ("brain2", "İkinci beyin"), ("debate", "Müzakirə"),

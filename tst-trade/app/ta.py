@@ -68,7 +68,7 @@ def build(db: DB, sym: str, tf: str, now: float | None = None) -> dict:
     idx = {c["t"]: i for i, c in enumerate(cs)}
     fired = []
     for r in db.execute("SELECT t, rule, dir, note FROM rule_signals WHERE metal=? AND tf=? AND t>=? AND mode!='futures' "
-                        "AND rule NOT LIKE 'FA-%' ORDER BY t", (sym, tf, cs[0]["t"])).fetchall():
+                        "AND rule NOT LIKE 'FA-%' AND rule NOT LIKE 'NW-%' ORDER BY t", (sym, tf, cs[0]["t"])).fetchall():
         if r["t"] in idx:
             fired.append({"i": idx[r["t"]], "t": r["t"], "rule": r["rule"], "dir": r["dir"], "note": r["note"]})
     out["fired"] = fired

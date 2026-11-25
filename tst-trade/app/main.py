@@ -406,6 +406,19 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return await asyncio.to_thread(diag._slow, f"blocks:{symbol}:{horizon}",
                                        lambda: blocks.status(db, symbol, horizon), 60)
 
+    @app.get("/xeber")
+    async def news_page():
+        return FileResponse(STATIC / "xeber.html")
+
+    @app.get("/api/xeber")
+    async def news_api(symbol: str = "XAU"):
+        """The news block: 1-hour chart with the news rules' firings, the latest labelled headlines, the mood by
+        topic, the voice now and the book with the Judge's record."""
+        from . import newsblock
+        if symbol not in candles.METALS:
+            raise HTTPException(400, "naməlum metal")
+        return await asyncio.to_thread(diag._slow, f"nw:{symbol}", lambda: newsblock.page(db, symbol), 60)
+
     @app.get("/fundamental")
     async def fa_page():
         return FileResponse(STATIC / "fundamental.html")

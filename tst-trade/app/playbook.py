@@ -336,6 +336,43 @@ RULES = [
      "signal": "Təklif pozulur / tələb artır → yuxarı.",
      "void": "Məlumat aylıqdır; gün içi üçün deyil.",
      "source": "Johnson Matthey PGM hesabatları."},
+    # ---------------- Xəbər bloku (app/newsblock.py) ----------------
+    {"id": "NW-SENT-1", "area": "Xəbər", "name": "Xəbər əhvalı (asimmetrik, sönən)", "detector": True,
+     "how": "Oxuyucunun son 6 saatda qiymətləndirdiyi başlıqlar (hər hadisənin yalnız birinci başlığı): istiqamət × güc "
+            "(0–3); mənfi xəbər 1,5 qat ağır; hər başlığın təsiri 2 saatda yarıya sönür. Cəm ±3-dən böyükdürsə.",
+     "signal": "Müsbət əhval → yuxarı; mənfi → aşağı.",
+     "void": "Xəbər artıq qiymətdədirsə (bazar əvvəlcədən gözləyirdi).",
+     "source": "Smales (2014, 2015): mənfi xəbər qızılda daha güclü təsir edir; təsirin saatlarla sönməsi."},
+    {"id": "NW-FED-1", "area": "Xəbər", "name": "Fed xəbərləri, 4 saat", "detector": True,
+     "how": "Mövzusu Fed/faiz olan başlıqların son 4 saatdakı sönən cəmi ±2-dən böyükdürsə.",
+     "signal": "Yumşaq (endirim) xəbər → yuxarı; sərt → aşağı (Oxuyucunun istiqaməti).",
+     "void": "FOMC qərarı dəqiqəsi «Hadisə sürprizi» üsulundadır.",
+     "source": "Awartani-Hussain-Virk (2024): qızıl FOMC sürprizlərinə güclü reaksiya verir."},
+    {"id": "NW-DATA-1", "area": "Xəbər", "name": "ABŞ rəqəmi xəbərləri, 4 saat", "detector": True,
+     "how": "Mövzusu inflyasiya, iş yerləri, ÜDM olan başlıqların son 4 saatdakı sönən cəmi ±2-dən böyükdürsə.",
+     "signal": "Oxuyucunun istiqaməti.",
+     "void": "Rəqəmin özü (fakt − gözlənti) «Hadisə sürprizi» və FA-SURP-1-dədir.",
+     "source": "Elder-Miao-Ramchander (2012); Smales-Yang (2015)."},
+    {"id": "NW-GEO-1", "area": "Xəbər", "name": "Geosiyasi xəbərlər, 4 saat", "detector": True,
+     "how": "Mövzusu geosiyasət, müharibə, sanksiya olan başlıqların son 4 saatdakı sönən cəmi ±2-dən böyükdürsə.",
+     "signal": "Gərginlik artır → yuxarı (sığınacaq); azalır → aşağı.",
+     "void": "Likvidlik böhranının ilk saatlarında qızıl da satıla bilər.",
+     "source": "Baur-Smales (2020); Apergis-Hayat-Saeed (2021): geosiyasi xəbərin təsiri daha güclüdür."},
+    {"id": "NW-FLOW-1", "area": "Xəbər", "name": "Tələb-təklif xəbərləri, 4 saat", "detector": True,
+     "how": "Mövzusu tələb və ya təklif (mərkəzi bank, ETF, Çin/Hindistan, mədən, tətil) olan başlıqların cəmi ±2-dən böyükdürsə.",
+     "signal": "Oxuyucunun istiqaməti.",
+     "void": "Rəqəmlər fundamental blokda (FA-CB-1, FA-ETF, FA-SGE-1) daha dəqiqdir.",
+     "source": "WGC tələb hesabatları."},
+    {"id": "NW-SURGE-1", "area": "Xəbər", "name": "Xəbər axınının sıçrayışı", "detector": True,
+     "how": "Son 2 saatda qiymətləndirilmiş başlıq sayı ən azı 4 və son həftənin adi 2 saatlıq sayından 3 qat çox.",
+     "signal": "Sıçrayışdakı xəbərlərin əhvalı istiqamətində.",
+     "void": "Bir hadisənin çoxlu surəti sayılmır (yalnız birinci başlıq qiymətləndirilir).",
+     "source": "Diqqət (attention) ədəbiyyatı: xəbər axını dəyişkənliyi və davamı artırır."},
+    {"id": "NW-SHOCK-1", "area": "Xəbər", "name": "Böyük xəbər (güc 3)", "detector": True,
+     "how": "Son 1 saatda Oxuyucunun «böyük bazar hadisəsi» (güc 3) dediyi başlıq.",
+     "signal": "Onun istiqaməti.",
+     "void": "Başlıq qeyri-müəyyəndirsə Oxuyucu neytral deyir.",
+     "source": "Hadisə araşdırmaları."},
     # ---------------- Bazarlar arası ----------------
     {"id": "IM-RATIO-1", "area": "Bazarlar arası", "name": "Metal nisbəti ifrat halda", "detector": True,
      "how": "Qızıl/gümüş və platin/palladium nisbətinin z-dəyəri son 100 şamda |z| > 2.",
@@ -350,7 +387,7 @@ RULES = [
 ]
 
 BY_ID = {r["id"]: r for r in RULES}
-AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Fundamental", "Bazarlar arası")
+AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Fundamental", "Xəbər", "Bazarlar arası")
 TA_AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Bazarlar arası")
 CHART_AREAS = ("Texniki", "Fibonacci", "Nəzəriyyə", "Price action", "Həcm", "Bazarlar arası", "Öyrənilmiş")
 

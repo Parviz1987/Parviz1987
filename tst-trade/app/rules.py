@@ -334,7 +334,8 @@ def run(db: DB, now: float | None = None) -> dict:
         for tf, ind in inds.items():
             cs = ind.cs
             have = {r["t"] for r in db.execute("SELECT DISTINCT t FROM rule_signals WHERE metal=? AND tf=? "
-                                                 "AND rule NOT LIKE 'FA-%' AND mode != 'futures'", (sym, tf)).fetchall()}
+                                                 "AND rule NOT LIKE 'FA-%' AND rule NOT LIKE 'NW-%' AND mode != 'futures'",
+                                                 (sym, tf)).fetchall()}
             # each metal and timeframe replays its own history once (a replay cut by a restart resumes here)
             first = db.execute("SELECT 1 FROM rule_signals WHERE metal=? AND tf=? AND mode='history' LIMIT 1",
                                (sym, tf)).fetchone() is None
@@ -398,7 +399,9 @@ def run(db: DB, now: float | None = None) -> dict:
     fut = run_futures_volume(db)
     from . import fundamental
     fa = fundamental.run(db)
-    return {"added": added, "replay": first_any, "futures_volume": fut, "fundamental": fa}
+    from . import newsblock
+    nw = newsblock.run(db)
+    return {"added": added, "replay": first_any, "futures_volume": fut, "fundamental": fa, "news": nw}
 
 
 FUT_VOL_VER = "2026-11-25"

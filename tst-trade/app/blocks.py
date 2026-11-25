@@ -28,9 +28,9 @@ BLOCKS = [
                  "bank tələbi. Fed sürprizləri qızılı dəqiqələr içində tərpədir (Awartani-Hussain-Virk 2024); ABŞ "
                  "rəqəmi dəqiqəsində impuls bizim fyuçers sınağında 63,5 % (H13).",
      "missing": "Hindistan tələbi (yerli premium/endirim): pulsuz gündəlik rəsmi mənbə hələ qoşulmayıb."},
-    {"id": "news", "name": "Xəbər", "page": None,
+    {"id": "news", "name": "Xəbər", "page": "/xeber",
      "reads": "RSS və Benzinga başlıqları, Kəşfiyyatçı (Grok, X), Hadisə birləşdiricisi (eyni xəbər bir dəfə)",
-     "methods": ["news"], "ai": "Oxuyucu (Claude Haiku) — hər başlığı qiymətləndirir",
+     "methods": ["xeber"], "ai": "Oxuyucu (Claude Haiku) — hər başlığı qiymətləndirir",
      "evidence": "Xəbər əhvalı qızılın gəlirinə və dəyişkənliyinə təsir edir, mənfi xəbər daha güclü (Smales 2014, 2015; "
                  "Apergis-Hayat-Saeed 2021: geopolitik xəbər daha güclü).",
      "missing": "Geopolitik risk indeksi (Caldara-Iacoviello GPR): mənbəyə hələ qoşulmayıb."},

@@ -42,17 +42,18 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
 # ratio) were removed from the forecasts: each was a copy of a rule in the block (Ichimoku moved into it). «session»
 # was a copy of «seans». Their past forecasts stay in the database; the long-horizon trend (tsmom, trendmix) stays:
 # it works on weeks and months, which the block's candle rules do not cover.
-METHODS = ("rw", "up", "tsmom", "fundamental", "surprise", "dollar", "oil", "risk", "news", "strateq", "brain2", "debate",
+METHODS = ("rw", "up", "tsmom", "fundamental", "surprise", "dollar", "oil", "risk", "xeber", "strateq", "brain2", "debate",
            "season", "jewel", "seans", "trendmix", "consensus", "garch", "gvz", "chartist", "qaydalar", "terazi", "vahid")
 RETIRED = ("momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback", "session", "sam", "ichimoku", "pair",
-           "macro", "cot")      # macro and COT: now rules of the fundamental block (FA-RY-1, FA-USD-1, FA-COT-1)
+           "macro", "cot",      # macro and COT: now rules of the fundamental block (FA-RY-1, FA-USD-1, FA-COT-1)
+           "news")              # the headline sum: now the news block's rules (NW-*), its voice is «xeber»
 # Families = the blocks (owner 2026-11-25: «every block one organ, one voice»; app/blocks.py). Methods of one block
 # carry related ideas from the same kind of data: the consensus gives each block one voice and the Judge counts a
 # block once in its multiple-testing bar. The AI analysts that read every block (Strateq, the second brain, the
 # debate) are their own family.
 FAMILY = {"qaydalar": "ta", "chartist": "ta", "tsmom": "ta", "trendmix": "ta",
           "fundamental": "fund", "surprise": "fund",
-          "news": "news",
+          "xeber": "news",
           "dollar": "cross", "oil": "cross", "risk": "cross",
           "seans": "time", "season": "time", "jewel": "time",
           "strateq": "brain", "brain2": "brain", "debate": "brain"}
@@ -63,7 +64,7 @@ METHOD_NAMES = {"rw": "Dəyişməz (bazis)", "up": "Həmişə yuxarı (bazis)", 
                 "rsi": "RSI 30/70", "fib": "Fibonacci dönüşü", "pullback": "Trend içində geri çəkilmə", "macro": "Makro (real faiz + dollar)",
                 "session": "Saat effekti", "surprise": "Hadisə sürprizi (ABŞ rəqəmləri)",
                 "dollar": "Dollar impulsu", "oil": "Neft impulsu", "risk": "Risk əhvalı (VIX impulsu)",
-                "news": "Xəbər əhvalı (Oxuyucu)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)", "debate": "Müzakirə (yuxarı ↔ aşağı)",
+                "xeber": "Xəbər (blokun qaydaları: əhval, Fed, rəqəm, geosiyasət, axın)", "strateq": "Strateqin fikri", "brain2": "İkinci beyin (OpenAI)", "debate": "Müzakirə (yuxarı ↔ aşağı)",
                 "fundamental": "Fundamental (blokun qaydaları: faiz, Fed, dollar, COT, sürprizlər)", "seans": "Seans: Asiya ↑ / ABŞ ↓",
                 "trendmix": "Çoxsürətli trend (dalğalanmaya görə)", "season": "Mövsümilik", "jewel": "Zərgərlik təqvimi",
                 "sam": "Şam fiqurları", "ichimoku": "Ichimoku buludu", "pair": "Metal nisbəti (qızıl/gümüş, platin/palladium)",
@@ -97,7 +98,7 @@ def methods_for(h: str) -> tuple[str, ...]:
         out.remove("dollar")     # catch-up after a linked market's move: a short-horizon effect
         out.remove("oil")
         out.remove("risk")
-        out.remove("news")       # headlines move prices for hours, not weeks
+        out.remove("xeber")      # headlines move prices for hours, not weeks
     if tf_of(h) not in ("1d", "1w"):
         out.remove("gvz")        # GVZ is a daily close
     if h not in ("1h", "4h", "1d"):
@@ -392,7 +393,7 @@ def build(seq, horizon: str, macro: dict | None = None, next_t: int | None = Non
                 p, basis = 0.5, "bu bazarın şamı yoxdur"
             out[key] = {"p_up": p, "basis": basis}
 
-    for key in ("news", "strateq", "brain2", "debate", "season", "jewel"):   # brainviews.py, slowviews.py
+    for key in ("xeber", "strateq", "brain2", "debate", "season", "jewel"):   # brainviews.py, slowviews.py
         if key in methods_for(horizon):
             p, basis = (views or {}).get(key, (0.5, "beyin məlumatı yoxdur"))
             out[key] = {"p_up": p, "basis": basis}
@@ -448,9 +449,10 @@ PASSPORT = {
     "oil": {"why": "Neft inflyasiya gözləntisini və geosiyasi qorxunu daşıyır; qızıl ona gec qoşula bilər.",
             "expect": "1 saat – 1 gün, xüsusən Yaxın Şərq xəbərlərində.",
             "else": "Çıxarılır; neft «Bazarlar» bölməsində ölçü kimi qalır."},
-    "news": {"why": "Xəbərlər qiyməti saatlarla hərəkət etdirir; Oxuyucu hər başlığı metal, istiqamət və gücə görə qiymətləndirir.",
-             "expect": "15 dəqiqə – 4 saat, xüsusən böyük xəbərdən sonra.",
-             "else": "Oxuyucunun modeli dəyişdirilir və ya yalnız göstərici kimi qalır (xərc azalır)."},
+    "xeber": {"why": "Xəbər blokunun bir səsi: Oxuyucunun qiymətləndirdiyi başlıqlardan 7 qayda — əhval (mənfi xəbər 1,5 "
+                     "qat, təsir 2 saatda yarıya sönür), mövzu üzrə (Fed, ABŞ rəqəmləri, geosiyasət, tələb-təklif), xəbər "
+                     "axınının sıçrayışı və böyük xəbər; hər qayda Hakimdə ayrıca ölçülür, səsin gücü onun nəticəsidir.",
+              "expect": "15 dəqiqə – 1 gün üfüqündə.", "else": "Sübut olmasa, vahid proqnozda çəkisi 0-a düşür."},
     "strateq": {"why": "Claude hər saat faktları (son hərəkətlər, dollar, neft, istiqraz, ABŞ rəqəmləri, xəbər) oxuyub 1 saat, 4 saat və 1 gün üçün yuxarı ehtimalı deyir: beynin özünü ölçürük.",
                 "expect": "4 saat və 1 gün.",
                 "else": "Strateq yalnız izahçı qalır, istiqamət soruşulmur (xərc azalır)."},

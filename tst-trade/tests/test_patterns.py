@@ -20,9 +20,10 @@ def _series(closes, v=None):
 
 
 def test_every_detector_rule_in_the_book_is_detected_in_code():
-    from app import fundamental
-    code = Path(rules.__file__).read_text() + Path(patterns.__file__).read_text() + Path(fundamental.__file__).read_text()
-    found = set(re.findall(r'"((?:TA|TH|PA|VOL|IM|FA)-[A-Z0-9-]+)"', code))
+    from app import fundamental, newsblock
+    code = (Path(rules.__file__).read_text() + Path(patterns.__file__).read_text() + Path(fundamental.__file__).read_text()
+            + Path(newsblock.__file__).read_text())
+    found = set(re.findall(r'"((?:TA|TH|PA|VOL|IM|FA|NW)-[A-Z0-9-]+)"', code))
     for r in playbook.RULES:
         if r["detector"]:
             assert r["id"] in found, r["id"]
@@ -205,10 +206,11 @@ def test_adx_measures_strength_and_every_rule_has_a_family():
     assert a_t[-1] > 25 and p_t[-1] > m_t[-1]
     assert a_f[-1] < 20
     assert rules.regime(15) == 0 and rules.regime(22) == 1 and rules.regime(40) == 2 and rules.regime(None) is None
-    from app import fundamental
+    from app import fundamental, newsblock
+    fams = {"Fundamental": fundamental.FAMILY, "Xəbər": newsblock.FAMILY}
     for r in playbook.RULES:
         if r["detector"]:
-            assert r["id"] in (rules.RULE_FAMILY if r["area"] in playbook.TA_AREAS else fundamental.FAMILY), r["id"]
+            assert r["id"] in (rules.RULE_FAMILY if r["area"] in playbook.TA_AREAS else fams[r["area"]]), r["id"]
 
 
 def test_main_module_has_its_logger():
@@ -403,3 +405,19 @@ def test_gld_archive_parser_and_etf_rule():
     data = fundamental.Data(db)
     end = datetime(2025, 11, 20, tzinfo=timezone.utc).timestamp()       # after the last ten days of strong inflows
     assert {r: d for r, d, _ in fundamental.detect(data, "XAU", end)}.get("FA-ETF-1") == 1
+
+
+def test_news_page_data():
+    from app import newsblock
+    from app.brainjobs import BrainJobs
+    from app.feeds import Feeds
+    from app.keys import KeyStore
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    BrainJobs(db, ks, Feeds(db, ks))
+    t = 1_800_000_000
+    db.execute("INSERT INTO news (uid, source, url, title, ts) VALUES('n1','Reuters','u','Gold jumps on Middle East strike', ?)", (t - 600,))
+    db.execute("INSERT INTO news_ai VALUES('n1', ?, 'geopolitics', 'XAU', 'up', 3, 'b')", (t - 500,))
+    d = newsblock.page(db, "XAU", now=t)
+    assert d["headlines"][0]["topic"] == "geosiyasət" and d["topics"]["geosiyasət"]["up"] == 1
+    assert {r["id"] for r in d["book"]} == set(newsblock.FAMILY) and "vote" in d["now"]

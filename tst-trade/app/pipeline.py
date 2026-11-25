@@ -141,8 +141,8 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
 
     # 10. inputs of the methods: a method whose input never arrives is a dead link
     dead = []
-    for m, label in (("dollar", "Dollar impulsu"), ("oil", "Neft impulsu"), ("news", "Xəbər əhvalı"),
-                     ("strateq", "Strateqin fikri"), ("surprise", "Hadisə sürprizi"), ("macro", "Makro")):
+    for m, label in (("dollar", "Dollar impulsu"), ("oil", "Neft impulsu"), ("xeber", "Xəbər bloku"),
+                     ("strateq", "Strateqin fikri"), ("surprise", "Hadisə sürprizi"), ("fundamental", "Fundamental")):
         r = db.execute("SELECT COUNT(*) n, SUM(p_up != 0.5) v FROM forecasts WHERE method=? AND mode='live' "
                        "AND issued_t > ?", (m, now - 86400)).fetchone()
         if r["n"] and not r["v"]:

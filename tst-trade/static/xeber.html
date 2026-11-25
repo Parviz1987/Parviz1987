@@ -1,0 +1,28 @@
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TST Trade · Xəbər</title><link rel="stylesheet" href="/static/app.css">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0f1317">
+<link rel="icon" href="/static/icons/fav-64.png"><link rel="apple-touch-icon" href="/static/icons/apple-180.png">
+</head><body>
+<header class="top">
+  <div class="brand">TST <b>Trade</b> · Xəbər bloku</div><span class="sp"></span>
+  <span class="clock" id="upd"></span>
+<nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
+</header>
+<main class="wrap res ta">
+  <section class="box">
+    <h2>Qiymət (1 saat) və xəbər qaydalarının siqnalları <span class="sp"></span><span class="seg" id="sym"></span>
+      <span class="seg" id="cnt"></span><button class="tabtn" id="big">⛶ Böyüt</button></h2>
+    <div class="tachart" id="wrapc"><canvas id="cv" aria-label="Saatlıq şamlar və xəbər qaydalarının siqnalları"></canvas>
+      <div class="tip mono" id="tip"></div><button class="tabtn tclose" id="small">✕ Kiçilt</button></div>
+    <p class="note">▲ / ▼ — xəbər qaydasının həmin saatda verdiyi siqnal (üstünə gələndə adı və səbəbi). Hər başlıq yalnız Oxuyucu onu qiymətləndirəndən sonra sayılır; eyni xəbərin surətləri bir dəfə.
+       </p>
+  </section>
+  <section class="box"><h2>Blok indi nə deyir <span class="sp"></span><span class="note" id="nowt"></span></h2><div id="now"></div></section>
+  <section class="box"><h2>Son 24 saat mövzular üzrə və son başlıqlar</h2>
+    <div id="facs"></div></section>
+  <section class="box"><h2>Qaydalar və Hakimin hökmü</h2><div id="book"></div></section>
+</main>
+<script src="/static/chart.js"></script>
+<script src="/static/xeber.js"></script>
+<script src="/static/nav.js"></script>
+</body></html>
