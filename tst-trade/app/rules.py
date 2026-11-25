@@ -354,7 +354,7 @@ def records(db: DB) -> dict:
             frac = COST.get(r["metal"], 0.0) * (1 + SLIP) + \
                 r["held"] * TF_DAYS.get(r["tf"], 0.0) * SWAP.get(r["metal"], SWAP_GUESS)
             rr_cells.setdefault((r["rule"], r["tf"]), []).append(
-                (r["rr"] - frac * r["price0"] / r["atr"], r["rr"] >= RR_TARGET))
+                (r["rr"] - frac * r["price0"] / r["atr"], r["rr"] >= RR_TARGET, r["metal"], r["rr"]))
     bar = 0.05 / max(1, len(cells))
     out = {}
     for (rule, tf), v in cells.items():
@@ -378,14 +378,24 @@ def records(db: DB) -> dict:
         rr = None
         if rv:
             m = len(rv)
-            mean = sum(x for x, _ in rv) / m
-            sd = math.sqrt(sum((x - mean) ** 2 for x, _ in rv) / (m - 1)) if m > 1 else 0.0
+            mean = sum(x[0] for x in rv) / m
+            sd = math.sqrt(sum((x[0] - mean) ** 2 for x in rv) / (m - 1)) if m > 1 else 0.0
             half_r = m // 2
-            a1 = sum(x for x, _ in rv[:half_r]) / half_r if half_r else None
-            a2 = sum(x for x, _ in rv[half_r:]) / (m - half_r)
+            a1 = sum(x[0] for x in rv[:half_r]) / half_r if half_r else None
+            a2 = sum(x[0] for x in rv[half_r:]) / (m - half_r)
+            bym: dict[str, list] = {}
+            for net_r, win, mt, gross in rv:            # per metal: platinum's spread is ~30x gold's
+                b = bym.setdefault(mt, [0, 0, 0.0, 0.0])
+                b[0] += 1
+                b[1] += int(win)
+                b[2] += net_r
+                b[3] += gross
             z = mean / (sd / math.sqrt(m)) if sd else 0.0
             p_r = 0.5 * math.erfc(z / math.sqrt(2))
-            rr = {"n": m, "net_r": round(mean, 3), "target_share": round(sum(1 for _, w in rv if w) / m, 3),
+            rr = {"n": m, "net_r": round(mean, 3), "target_share": round(sum(1 for x in rv if x[1]) / m, 3),
+                  "gross_r": round(sum(x[3] for x in rv) / m, 3),
+                  "by_metal": {mt: {"n": b[0], "target_share": round(b[1] / b[0], 3), "net_r": round(b[2] / b[0], 3),
+                                    "gross_r": round(b[3] / b[0], 3)} for mt, b in bym.items()},
                   "p": round(p_r, 5), "status": ("az" if m < 100 else
                                                  "sübut" if p_r < bar and mean > 0 and a1 and a1 > 0 and a2 > 0 else
                                                  "yox")}
