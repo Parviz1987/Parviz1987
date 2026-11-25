@@ -515,32 +515,35 @@ class Feeds:
             self._health("gld", False, f"GLD: {str(e)[:120]}")
 
     async def sge(self, client) -> None:
-        """Shanghai Gold Exchange: Au99.99 daily close (yuan/gram) and volume (kg). The first run loads two years
-        month by month; then the last two weeks every six hours."""
+        """Shanghai Gold Exchange: Au99.99 daily close (yuan/gram) and volume (kg). The site's table shows about one
+        day per page, so each day is asked on its own: the last ten days every run, and the two-year history filled
+        in 60 days per hourly run (gentle on the site; complete in about ten hours)."""
         self.db.script("CREATE TABLE IF NOT EXISTS sge_gold (d TEXT PRIMARY KEY, close REAL, volume_kg REAL);")
         from datetime import date, timedelta
-        have = self.db.execute("SELECT MIN(d) a, COUNT(*) n FROM sge_gold").fetchone()
+        have = {r["d"] for r in self.db.execute("SELECT d FROM sge_gold").fetchall()}
+        tried = set(json.loads(self.db.get("sge:empty") or "[]"))          # holidays and weekends: asked once
         today = date.today()
-        if not have["n"]:
-            spans, d = [], today - timedelta(days=730)
-            while d < today:
-                e = min(today, d + timedelta(days=30))
-                spans.append((d, e))
-                d = e + timedelta(days=1)
-        else:
-            spans = [(today - timedelta(days=14), today)]
+        days = [today - timedelta(days=k) for k in range(10)]
+        back = [today - timedelta(days=k) for k in range(10, 730)]
+        days += [d for d in back if d.isoformat() not in have and d.isoformat() not in tried and d.weekday() < 5][:60]
         got, errors = 0, []
-        for a, b in spans:
+        for d in days:
+            if d.isoformat() in have and d < today - timedelta(days=3):
+                continue
             try:
-                raw = (await self._get(client, SGE_URL, params={"start_date": a.isoformat(), "end_date": b.isoformat()}))
+                raw = await self._get(client, SGE_URL, params={"start_date": d.isoformat(), "end_date": d.isoformat()})
                 rows = parse_sge(raw.decode("utf-8", "replace"))
-                self.db.executemany("INSERT OR REPLACE INTO sge_gold VALUES(?,?,?)", rows)
-                got += len(rows)
+                if rows:
+                    self.db.executemany("INSERT OR REPLACE INTO sge_gold VALUES(?,?,?)", rows)
+                    got += len(rows)
+                elif d < today - timedelta(days=3):
+                    tried.add(d.isoformat())
             except Exception as e:
-                errors.append(f"{a}: {str(e)[:60]}")
-        n = self.db.execute("SELECT COUNT(*) n, MAX(d) d FROM sge_gold").fetchone()
-        self._health("sge", n["n"] > 0, f"{n['n']} gün, son {n['d']}" + (f"; xəta: {'; '.join(errors[:3])}" if errors else ""),
-                     got)
+                errors.append(f"{d}: {str(e)[:60]}")
+        self.db.put("sge:empty", json.dumps(sorted(tried)[-800:]))
+        n = self.db.execute("SELECT COUNT(*) n, MIN(d) a, MAX(d) b FROM sge_gold").fetchone()
+        self._health("sge", n["n"] > 0, f"{n['n']} gün ({n['a']} – {n['b']})" +
+                     (f"; xəta: {'; '.join(errors[:3])}" if errors else ""), got)
 
     async def imf_gold(self, client) -> None:
         """Central banks' gold holdings (IMF), once a day: the monthly volume per country since 2014."""
@@ -664,7 +667,7 @@ class Feeds:
                 # official actuals: every minute around a release (the agencies publish at the minute)
                 "official": (self.official, 60 if self._recent_release(now) else 900),
                 "kalshi": (self.kalshi, 900), "etf": (self.etf, 300), "imf": (self.imf_gold, 86400),
-                "sge": (self.sge, 6 * 3600), "gld": (self.gld, 6 * 3600)}
+                "sge": (self.sge, 3600), "gld": (self.gld, 6 * 3600)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
