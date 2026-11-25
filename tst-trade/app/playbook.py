@@ -11,7 +11,7 @@ or is cancelled), source (where the idea comes from and how strong the evidence 
 in rules.py and the Judge measures it on its own; False: an analyst applies it by reading the facts)."""
 from __future__ import annotations
 
-VERSION = "2026-11-25.1"
+VERSION = "2026-11-25.2"
 
 RULES = [
     # ---------------- Texniki analiz: trend ----------------
@@ -126,6 +126,15 @@ RULES = [
      "signal": "Xəttdən sıçrayış → trend istiqamətində; xəttin qırılması → əks istiqamətdə.",
      "void": "Xətt yalnız iki nöqtəyə söykənir; üçüncü toxunuş olmadan etibarı azdır.",
      "source": "Edwards-Magee, Murphy (1999); sübutu zəif, praktikada çox yayılmış."},
+    {"id": "TA-ADX-1", "area": "Texniki", "name": "ADX: trendin gücü", "detector": True,
+     "how": "ADX 14 (Wilder) trendin gücünü ölçür, istiqamətini yox: 20-dən aşağı — trend yoxdur (yan-yana bazar), "
+            "20–25 — formalaşır, 25-dən yuxarı — güclü trend. İstiqaməti +DI və −DI verir. Qayda: ADX 25-i aşağıdan "
+            "yuxarı keçəndə. Hakim əlavə olaraq HƏR qaydanı üç ADX rejimində ayrıca ölçür (süzgəc): trend qaydaları "
+            "güclü trenddə, dönüş qaydaları trendsiz bazarda daha yaxşı olmalıdır; «Qaydalar» analitiki qaydanın "
+            "çəkisini indiki rejimdəki nəticəsindən götürür.",
+     "signal": "ADX 25-i keçdi, +DI > −DI → yuxarı; −DI > +DI → aşağı.",
+     "void": "ADX gec gələn göstəricidir: trendin sonunda da yüksək qala bilər.",
+     "source": "Wilder (1978); trend süzgəci kimi geniş işlənir, sübutu orta."},
     {"id": "TA-STOCH-1", "area": "Texniki", "name": "Stoxastik (14, 3)", "detector": True,
      "how": "%K son 14 şamın aralığında bağlanışın yeri, %D onun 3 şamlıq ortası. 20-dən aşağıda %K %D-ni yuxarı "
             "kəsir — həddən artıq satılmışdan çıxış; 80-dən yuxarıda aşağı kəsir — həddən artıq alınmışdan çıxış.",

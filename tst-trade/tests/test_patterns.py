@@ -191,3 +191,17 @@ def test_rules_analyst_votes_only_with_rules_that_had_an_edge_before_that_moment
     assert lk.weight("TA-X", "1h", 1_700_000_000 + 10 * H)[1] < 10     # outcomes count only after their candle
     from app import forecast
     assert "qaydalar" in forecast.methods_for("1h") and forecast.FAMILY["qaydalar"] in forecast.FAMILY_NAMES
+
+
+def test_adx_measures_strength_and_every_rule_has_a_family():
+    trend = _series([100 + k * 0.8 for k in range(120)])
+    import math
+    flat = _series([100 + 2 * math.sin(k / 2.0) for k in range(120)])
+    a_t, p_t, m_t = rules.adx_series(trend)
+    a_f, _, _ = rules.adx_series(flat)
+    assert a_t[-1] > 25 and p_t[-1] > m_t[-1]
+    assert a_f[-1] < 20
+    assert rules.regime(15) == 0 and rules.regime(22) == 1 and rules.regime(40) == 2 and rules.regime(None) is None
+    for r in playbook.RULES:
+        if r["detector"]:
+            assert r["id"] in rules.RULE_FAMILY, r["id"]

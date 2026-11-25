@@ -104,7 +104,7 @@ def _rules(db: DB) -> dict:
     ver = {k: db.get(f"rules:ver:{s}:{tf}") for s in ("XAU", "XAG", "XPT", "XPD") for tf in rules.TFS
            for k in (f"{s}:{tf}",)}
     return {"bar": rec.get("bar"), "version": rules.RULES_VER, "replayed": ver,
-            "rules": {r: {tf: {k: x.get(k) for k in ("n", "hit_rate", "net_avg", "status", "rr", "by_metal")} for tf, x in tfs.items()}
+            "rules": {r: {tf: {k: x.get(k) for k in ("n", "hit_rate", "net_avg", "status", "rr", "by_metal", "by_adx")} for tf, x in tfs.items()}
                       for r, tfs in rec.get("rules", {}).items()}}
 
 

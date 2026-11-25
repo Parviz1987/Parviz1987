@@ -111,7 +111,8 @@ DEBATE_JUDGE_SYSTEM = (
 CHARTIST_SYSTEM = (
     "You are a professional technical analyst of precious metals. You get, for each of XAU, XAG, XPT, XPD, recent "
     "candles on three timeframes (1 hour, 4 hours, 1 day: time, open, high, low, close, tick volume v when counted) "
-    "and computed indicators (EMA 20/50/200, RSI 14, MACD, Stochastic 14/3, Bollinger 20/2, ATR 14, yesterday's pivot "
+    "and computed indicators (EMA 20/50/200, RSI 14, MACD, Stochastic 14/3, Bollinger 20/2, ATR 14, ADX 14 with +DI/-DI "
+    "(trend strength: < 20 no trend, so trust reversal rules; > 25 strong trend, so trust trend rules), yesterday's pivot "
     "points P/R1/S1, the last swing highs and lows, Fibonacci levels of the recent swing). Read the charts like a "
     "complete trader, through every school: classic (trend lines, support and resistance, pivots), chart patterns "
     "(double top/bottom, head and shoulders, triangle, wedge, flag), candles, trend indicators, oscillators, volatility, "
@@ -193,6 +194,9 @@ def chart_facts(db: DB, now: float) -> str:
                      "stoch_k": None if ind.sk[-1] is None else round(ind.sk[-1], 1),
                      "stoch_d": None if ind.sd[-1] is None else round(ind.sd[-1], 1),
                      "boll_up": r_(ind.bbu[-1]), "boll_low": r_(ind.bbl[-1]), "atr14": r_(ind.atr[-1]),
+                     "adx14": None if ind.adx[-1] is None else round(ind.adx[-1], 1),
+                     "di_plus": None if ind.pdi[-1] is None else round(ind.pdi[-1], 1),
+                     "di_minus": None if ind.mdi[-1] is None else round(ind.mdi[-1], 1),
                      "pivot": piv,
                      "swings": [[time.strftime("%m-%d %H:%M", time.gmtime(rows[j]["t"])), k, r_(p)] for j, k, p in zz],
                      "ema20": r_(_ema(closes, 20)), "ema50": r_(_ema(closes, 50)), "ema200": r_(_ema(closes, 200)),

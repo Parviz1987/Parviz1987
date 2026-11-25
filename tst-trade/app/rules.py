@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS rule_signals (metal TEXT NOT NULL, tf TEXT NOT NULL, 
   dir INTEGER NOT NULL, price0 REAL, price1 REAL, mode TEXT NOT NULL, note TEXT, PRIMARY KEY (metal, tf, t, rule));
 CREATE INDEX IF NOT EXISTS rule_signals_r ON rule_signals(rule, tf);
 """
-RULES_VER = "2026-11-25"     # a new detector set: each metal x timeframe replays its history once more (old rows kept)
+RULES_VER = "2026-11-25.2"     # a new detector set: each metal x timeframe replays its history once more (old rows kept)
 RR_STOP, RR_TARGET, RR_BARS = 1.0, 2.0, 20      # the trader's test: stop 1 ATR, target 2 ATR, at most 20 candles
 TF_DAYS = {"1h": 1 / 24, "4h": 1 / 6, "1d": 1.0}
 PAIR = {"XAU": "XAG", "XAG": "XAU", "XPT": "XPD", "XPD": "XPT"}
@@ -32,7 +32,7 @@ PAIR = {"XAU": "XAG", "XAG": "XAU", "XPT": "XPD", "XPD": "XPT"}
 def ensure(db: DB) -> None:
     db.script(SCHEMA)
     cols = {r["name"] for r in db.execute("PRAGMA table_info(rule_signals)").fetchall()}
-    for col, typ in (("atr", "REAL"), ("rr", "REAL"), ("held", "INTEGER")):
+    for col, typ in (("atr", "REAL"), ("rr", "REAL"), ("held", "INTEGER"), ("adx", "REAL")):
         if col not in cols:          # stop + target outcome (2026-11-25), in units of risk (R)
             db.script(f"ALTER TABLE rule_signals ADD COLUMN {col} {typ};")
 
@@ -101,6 +101,55 @@ def atr_series(cs: list[dict], n: int = 14) -> list[float | None]:
     return out
 
 
+def adx_series(cs: list[dict], n: int = 14) -> tuple[list, list, list]:
+    """Wilder's ADX with +DI and -DI: how strong the trend is (not its direction). < 20 no trend, > 25 a strong one."""
+    L = len(cs)
+    adx: list = [None] * L
+    pdi: list = [None] * L
+    mdi: list = [None] * L
+    if L < 2 * n + 1:
+        return adx, pdi, mdi
+    tr_s = pdm_s = mdm_s = 0.0
+    dx_hist: list[float] = []
+    a = None
+    for i in range(1, L):
+        c, p = cs[i], cs[i - 1]
+        up, dn = c["h"] - p["h"], p["l"] - c["l"]
+        pdm = up if up > dn and up > 0 else 0.0
+        mdm = dn if dn > up and dn > 0 else 0.0
+        tr = max(c["h"] - c["l"], abs(c["h"] - p["c"]), abs(c["l"] - p["c"]))
+        if i <= n:
+            tr_s, pdm_s, mdm_s = tr_s + tr, pdm_s + pdm, mdm_s + mdm
+            if i < n:
+                continue
+        else:
+            tr_s, pdm_s, mdm_s = tr_s - tr_s / n + tr, pdm_s - pdm_s / n + pdm, mdm_s - mdm_s / n + mdm
+        if not tr_s:
+            continue
+        pdi[i], mdi[i] = 100 * pdm_s / tr_s, 100 * mdm_s / tr_s
+        sm = pdi[i] + mdi[i]
+        dx = 100 * abs(pdi[i] - mdi[i]) / sm if sm else 0.0
+        if a is None:
+            dx_hist.append(dx)
+            if len(dx_hist) == n:
+                a = sum(dx_hist) / n
+                adx[i] = a
+        else:
+            a = (a * (n - 1) + dx) / n
+            adx[i] = a
+    return adx, pdi, mdi
+
+
+def regime(adx: float | None) -> int | None:
+    """0: no trend (ADX < 20), 1: forming (20-25), 2: strong trend (> 25)."""
+    if adx is None:
+        return None
+    return 0 if adx < 20 else 1 if adx <= 25 else 2
+
+
+REGIME_NAMES = {0: "trend yox (ADX<20)", 1: "orta (ADX 20-25)", 2: "güclü trend (ADX>25)"}
+
+
 class Ind:
     def __init__(self, cs: list[dict]):
         self.cs = cs
@@ -128,6 +177,7 @@ class Ind:
                 sd = math.sqrt(max(s2 / 20 - m * m, 0))
                 self.bbu[i], self.bbl[i], self.bbw[i] = m + 2 * sd, m - 2 * sd, (4 * sd / m if m else None)
         from .patterns import obv, stochastic
+        self.adx, self.pdi, self.mdi = adx_series(cs)
         self.sk, self.sd = stochastic(cs)
         self.obv = obv(cs)
 
@@ -255,6 +305,11 @@ def detect(ind: Ind, i: int, higher: dict | None = None, pair: tuple | None = No
         pp, why = pair_view(pair)
         if pp != 0.5:
             out.append(("IM-RATIO-1", 1 if pp > 0.5 else -1, why))
+    # TA-ADX-1: the trend becomes strong (ADX crosses 25 upwards); direction from +DI / -DI
+    a0, a1 = ind.adx[i - 1], ind.adx[i]
+    if a0 is not None and a1 is not None and a0 < 25 <= a1 and ind.pdi[i] is not None:
+        d = 1 if ind.pdi[i] > ind.mdi[i] else -1
+        out.append(("TA-ADX-1", d, f"ADX 25-i keçdi ({a1:.0f}): güclü trend {'yuxarı' if d > 0 else 'aşağı'}"))
     from .patterns import more
     out.extend(more(ind, i, highs, lows, tf))
     return out
@@ -316,17 +371,23 @@ def run(db: DB, now: float | None = None) -> dict:
             # the trader's test (stop + target) for every firing whose 20 candles have closed
             idx = {x["t"]: k for k, x in enumerate(cs)}
             upd = []
-            for r in db.execute("SELECT t, rule, dir FROM rule_signals WHERE metal=? AND tf=? AND rr IS NULL AND t>=?",
-                                (sym, tf, cs[0]["t"])).fetchall():
+            adx_upd = []
+            for r in db.execute("SELECT t, rule, dir, rr, adx FROM rule_signals WHERE metal=? AND tf=? AND mode!='futures' "
+                                "AND (rr IS NULL OR adx IS NULL) AND t>=?", (sym, tf, cs[0]["t"])).fetchall():
                 k = idx.get(r["t"])
                 if k is None or ind.atr[k] is None:
                     continue
-                res = stop_target(cs, k, r["dir"], ind.atr[k])
-                if res:
-                    upd.append((ind.atr[k], res[0], res[1], sym, tf, r["t"], r["rule"]))
+                if r["adx"] is None and ind.adx[k] is not None:
+                    adx_upd.append((ind.adx[k], sym, tf, r["t"], r["rule"]))
+                if r["rr"] is None:
+                    res = stop_target(cs, k, r["dir"], ind.atr[k])
+                    if res:
+                        upd.append((ind.atr[k], res[0], res[1], sym, tf, r["t"], r["rule"]))
             if upd:
                 db.executemany("UPDATE rule_signals SET atr=?, rr=?, held=? WHERE metal=? AND tf=? AND t=? AND rule=?",
                                upd)
+            if adx_upd:
+                db.executemany("UPDATE rule_signals SET adx=? WHERE metal=? AND tf=? AND t=? AND rule=?", adx_upd)
             # score live firings whose next candle has closed since
             for r in db.execute("SELECT t FROM rule_signals WHERE metal=? AND tf=? AND price1 IS NULL",
                                 (sym, tf)).fetchall():
@@ -385,9 +446,9 @@ def run_futures_volume(db: DB) -> int:
                 for rule, d, note in detect(ind, i, None, None, tf):
                     if rule.startswith("VOL-"):
                         rows.append((sym, tf, cs[i]["t"], rule, d, cs[i]["c"], cs[i + 1]["c"], "futures",
-                                     ("fyuçers: " + note)[:120], ind.atr[i]))
-            db.executemany("INSERT OR IGNORE INTO rule_signals(metal, tf, t, rule, dir, price0, price1, mode, note, atr) "
-                           "VALUES(?,?,?,?,?,?,?,?,?,?)", rows)
+                                     ("fyuçers: " + note)[:120], ind.atr[i], ind.adx[i]))
+            db.executemany("INSERT OR IGNORE INTO rule_signals(metal, tf, t, rule, dir, price0, price1, mode, note, atr, "
+                           "adx) VALUES(?,?,?,?,?,?,?,?,?,?,?)", rows)
             added += len(rows)
             idx = {x["t"]: k for k, x in enumerate(cs)}
             upd = []
@@ -411,10 +472,21 @@ def records(db: DB) -> dict:
     from .judge import COST, SLIP, SWAP, SWAP_GUESS
     cells: dict[tuple, list] = {}
     rr_cells: dict[tuple, list] = {}
-    for r in db.iterate("SELECT metal, tf, t, rule, dir, price0, price1, atr, rr, held FROM rule_signals "
+    regimes: dict[tuple, dict] = {}
+    for r in db.iterate("SELECT metal, tf, t, rule, dir, price0, price1, atr, rr, held, adx FROM rule_signals "
                         "WHERE price1 IS NOT NULL AND price0 > 0 ORDER BY t"):
         ret = (r["price1"] / r["price0"] - 1) * r["dir"]
-        cells.setdefault((r["rule"], r["tf"]), []).append((r["t"], ret, ret - full_cost(r["metal"], r["tf"]), r["metal"]))
+        net_x = ret - full_cost(r["metal"], r["tf"])
+        cells.setdefault((r["rule"], r["tf"]), []).append((r["t"], ret, net_x, r["metal"]))
+        g = regime(r["adx"])
+        if g is not None:                    # the ADX filter: the same rule in each market regime
+            b = regimes.setdefault((r["rule"], r["tf"]), {}).setdefault(g, [0, 0, 0.0, 0, 0.0])
+            b[0] += 1
+            b[1] += int(ret > 0)
+            b[2] += net_x
+            if r["rr"] is not None:
+                b[3] += 1
+                b[4] += r["rr"]
         if r["rr"] is not None and r["atr"]:
             # cost in risk units: spread + slippage once, the overnight fee for the candles held
             frac = COST.get(r["metal"], 0.0) * (1 + SLIP) + \
@@ -465,7 +537,11 @@ def records(db: DB) -> dict:
                   "p": round(p_r, 5), "status": ("az" if m < 100 else
                                                  "sübut" if p_r < bar and mean > 0 and a1 and a1 > 0 and a2 > 0 else
                                                  "yox")}
+        by_adx = {REGIME_NAMES[g]: {"n": b[0], "hit_rate": round(b[1] / b[0], 4), "net_avg": round(b[2] / b[0], 6),
+                                    "gross_r": round(b[4] / b[3], 3) if b[3] else None}
+                  for g, b in sorted(regimes.get((rule, tf), {}).items())}
         out.setdefault(rule, {})[tf] = {"n": n, "hit_rate": round(hits / n, 4), "net_avg": round(net, 6), "rr": rr,
+                                        "by_adx": by_adx,
                                         "halves": [None if h1 is None else round(h1, 6),
                                                    None if h2 is None else round(h2, 6)],
                                         "p": None if p is None else round(p, 5), "status": st,
@@ -481,7 +557,10 @@ def short_records(rec: dict) -> dict:
         out[rule] = "; ".join(f"{tf} {round(x['hit_rate'] * 100)} %/{x['n']} xərcdən sonra {x['net_avg'] * 100:+.3f} % "
                               f"{x['status']}" + (f", stop+hədəf: hədəfə çatdı {round(x['rr']['target_share'] * 100)} %, "
                                                   f"xərcdən sonra {x['rr']['net_r']:+.2f} R {x['rr']['status']}"
-                                                  if x.get("rr") else "") for tf, x in sorted(tfs.items()))
+                                                  if x.get("rr") else "") +
+                              ("; ADX: " + ", ".join(f"{k.split(' (')[0]} {round(v['hit_rate'] * 100)} %/{v['n']}"
+                                                     for k, v in x.get("by_adx", {}).items()) if x.get("by_adx") else "")
+                              for tf, x in sorted(tfs.items()))
     return out
 
 
@@ -514,6 +593,21 @@ LAG = 1800      # the rules job runs every 15 min and the live lookup is cached 
                 # candle closed, in the replay exactly as live (no history advantage)
 
 
+# Rules that read the SAME idea (owner 2026-11-25: «what is the same thing under a different name?»). In the vote each
+# idea gets one voice (the average of its rules), so five trend rules cannot outvote one independent idea.
+RULE_FAMILY = {
+    "TA-TREND-1": "trend", "TA-TREND-2": "trend", "TH-DOW-1": "trend", "TA-ADX-1": "trend", "TA-MACD-1": "trend",
+    "TA-BRK-1": "qırılma", "PA-BOS-1": "qırılma", "TA-TL-1": "qırılma", "TA-PAT-TRI": "qırılma",
+    "TA-PAT-FLAG": "qırılma", "TA-PAT-WEDGE": "qırılma", "TA-BB-1": "qırılma", "TH-ELL-1": "qırılma",
+    "VOL-SPIKE-1": "qırılma",
+    "TA-SR-1": "səviyyə", "TA-PIVOT-1": "səviyyə", "TA-CDL-1": "səviyyə", "TA-FIB-1": "səviyyə", "TA-FIB-2": "səviyyə",
+    "TA-FIB-EXT": "səviyyə", "PA-OB-1": "səviyyə", "VOL-POC-1": "səviyyə",
+    "PA-LIQ-1": "yalançı qırılma", "TH-WYC-1": "yalançı qırılma",
+    "TA-RSI-1": "osilyator", "TA-STOCH-1": "osilyator", "TA-DIV-1": "osilyator", "VOL-OBV-1": "osilyator",
+    "TA-PAT-1": "dönüş fiquru", "TA-PAT-HS": "dönüş fiquru", "TH-ELL-2": "dönüş fiquru",
+    "IM-RATIO-1": "bazarlar arası", "VOL-VWAP-1": "həcm"}
+
+
 class Lookup:
     """«Qaydalar»: every Bilik kitabı rule that fired on the newest closed candles votes in its direction, weighted by
     its OWN record known at that moment (walk-forward: an outcome counts only after its candle has closed, so the
@@ -524,14 +618,18 @@ class Lookup:
         ensure(db)
         self.fire: dict[str, list] = {}                   # metal -> [(known_t, tf, rule, dir)] sorted
         out: dict[tuple, list] = {}                       # (rule, tf) -> [(outcome_known_t, hit)]
-        for r in db.iterate("SELECT metal, tf, t, rule, dir, price0, price1 FROM rule_signals WHERE mode != 'futures'"):
+        for r in db.iterate("SELECT metal, tf, t, rule, dir, price0, price1, adx FROM rule_signals "
+                            "WHERE mode != 'futures'"):
             step = TF_SEC.get(r["tf"])
             if not step:
                 continue
-            self.fire.setdefault(r["metal"], []).append((r["t"] + step, r["tf"], r["rule"], r["dir"]))
+            g = regime(r["adx"])
+            self.fire.setdefault(r["metal"], []).append((r["t"] + step, r["tf"], r["rule"], r["dir"], g))
             if r["price1"] is not None and r["price0"]:
-                out.setdefault((r["rule"], r["tf"]), []).append((r["t"] + 2 * step,
-                                                                 int((r["price1"] - r["price0"]) * r["dir"] > 0)))
+                hit = int((r["price1"] - r["price0"]) * r["dir"] > 0)
+                out.setdefault((r["rule"], r["tf"], None), []).append((r["t"] + 2 * step, hit))
+                if g is not None:       # ADX filter: the record in the same market regime as the firing
+                    out.setdefault((r["rule"], r["tf"], g), []).append((r["t"] + 2 * step, hit))
         for v in self.fire.values():
             v.sort()
         self.fkeys = {m: [x[0] for x in v] for m, v in self.fire.items()}
@@ -545,8 +643,15 @@ class Lookup:
                 cum.append(s)
             self.rec[k] = (ts, cum)
 
-    def weight(self, rule: str, tf: str, t: float) -> tuple[float, int, float]:
-        ts, cum = self.rec.get((rule, tf), ([], []))
+    def weight(self, rule: str, tf: str, t: float, g: int | None = None) -> tuple[float, int, float]:
+        """The rule's weight from its record known at t: in the same ADX regime when that record has 100 cases,
+        otherwise over all regimes."""
+        if g is not None:
+            ts, cum = self.rec.get((rule, tf, g), ([], []))
+            if bisect_left(ts, t + 1) < 100:
+                ts, cum = self.rec.get((rule, tf, None), ([], []))
+        else:
+            ts, cum = self.rec.get((rule, tf, None), ([], []))
         n = bisect_left(ts, t + 1)
         if not n:
             return 0.0, 0, 0.5
@@ -559,20 +664,22 @@ class Lookup:
         now_t = t - LAG
         lo = bisect_left(keys, now_t - max(TF_SEC[x] for x in tfs) + 1)
         hi = bisect_left(keys, now_t + 1)
-        vote, used = 0.0, []
-        for known, tf, rule, d in self.fire[metal][lo:hi] if keys else []:
+        fam: dict[str, list[float]] = {}
+        used = []
+        for known, tf, rule, d, g in self.fire[metal][lo:hi] if keys else []:
             if tf not in tfs or known <= now_t - TF_SEC[tf]:
                 continue                                  # only the newest closed candle of each timeframe
-            w, n, hr = self.weight(rule, tf, now_t)
+            w, n, hr = self.weight(rule, tf, now_t, g)
             if w <= 0:
                 continue
-            vote += d * w
+            fam.setdefault(RULE_FAMILY.get(rule, rule), []).append(d * w)
             used.append((w, f"{rule} {tf} {'↑' if d > 0 else '↓'} ({round(hr * 100)} %/{n})"))
         if not used:
             return {"qaydalar": (0.5, "indi keçmişi müsbət olan qayda işə düşməyib")}
+        vote = sum(sum(v) / len(v) for v in fam.values())          # one voice per idea
         p = round(0.5 + max(-0.15, min(0.15, 0.5 * vote)), 4)
         used.sort(reverse=True)
-        return {"qaydalar": (p, f"{len(used)} qayda: " + ", ".join(x for _, x in used[:4]))}
+        return {"qaydalar": (p, f"{len(used)} qayda, {len(fam)} fikir: " + ", ".join(x for _, x in used[:4]))}
 
 
 _LIVE: dict = {"ts": 0.0, "lk": None}
