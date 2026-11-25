@@ -123,5 +123,47 @@ def test_volume_rules_are_tested_once_on_futures_volume():
     n = rules.run_futures_volume(db)
     got = db.execute("SELECT DISTINCT rule, mode FROM rule_signals").fetchall()
     assert n > 0 and all(r["rule"].startswith("VOL-") and r["mode"] == "futures" for r in got)
-    assert rules.run_futures_volume(db) == 0               # once
+    assert rules.run_futures_volume(db) == 0               # nothing new: nothing twice
     assert "VOL-" in "".join(rules.records(db)["rules"])
+
+
+def test_daily_futures_refresh_needs_approval_and_respects_the_monthly_ceiling(monkeypatch):
+    import asyncio
+    import json
+    from app import futures
+    db = DB(":memory:")
+    futures.ensure(db)
+    db.execute("INSERT INTO fut_candles(symbol, t, o, h, l, c, v) VALUES('XAU', 1795305600, 1, 1, 1, 1, 1)")
+    now = 1795305600 + 3 * 86400
+    assert not asyncio.run(futures.daily_refresh(db, "k", now))["ok"]          # not approved: nothing bought
+    db.put("futures:daily_approved", json.dumps({"by": "test"}))
+
+    class R:
+        def __init__(self, status, body):
+            self.status_code, self._b, self.text = status, body, str(body)
+
+        def json(self):
+            return self._b
+    calls = []
+
+    class C:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, params=None, auth=None):
+            calls.append(url)
+            if "get_cost" in url:
+                return R(200, 0.9)
+            return R(200, "ts_event,open,high,low,close,volume\n2026-11-23T00:00:00Z,1,2,0.5,1.5,10\n")
+    monkeypatch.setattr(futures.httpx, "AsyncClient", C)
+    res = asyncio.run(futures.daily_refresh(db, "k", now))
+    assert res["ok"] and res["loaded"]["XAU"] == 1
+    db.execute("INSERT INTO fut_candles(symbol, t, o, h, l, c, v) VALUES('XAU', ?, 1, 1, 1, 1, 1)", (now + 60,))
+    res2 = asyncio.run(futures.daily_refresh(db, "k", now + 2 * 86400))        # 0.9 + 0.9 > 1.0 $: refused
+    assert not res2["ok"] and "hədd" in res2["msg"]

@@ -358,33 +358,48 @@ def _fut_candles(db: DB, sym: str, tf: str) -> list[dict]:
 
 
 def run_futures_volume(db: DB) -> int:
-    """Owner 2026-11-25: «don't wait months for volume». The volume rules are tested once on two years of COMEX
-    futures (real volume, already bought), stored as mode 'futures'. Live volume comes from the tick count."""
+    """Owner 2026-11-25: «don't wait months for volume». The volume rules run on COMEX futures candles (real volume):
+    the two years already bought once, then each new day from the daily top-up. Stored as mode 'futures'; the next
+    candle and the stop + target outcome are filled as soon as the candles exist. Live volume also comes from the
+    tick count."""
     ensure(db)
-    if db.get("rules:futvol:ver") == FUT_VOL_VER:
-        return 0
     if not db.execute("SELECT 1 FROM sqlite_master WHERE name='fut_candles'").fetchone():
         return 0
     added = 0
     from .candles import METALS
     for sym in METALS:
         for tf in TFS:
+            mark = f"rules:futvol:{FUT_VOL_VER}:{sym}:{tf}"
+            done = int(db.get(mark) or 0)
+            newest = db.execute("SELECT MAX(t) t FROM fut_candles WHERE symbol=?", (sym,)).fetchone()["t"]
+            if newest is None or newest <= done:
+                continue
             cs = _fut_candles(db, sym, tf)
             if len(cs) < 320:
                 continue
             ind = Ind(cs)
-            rows, upd = [], []
-            for i in range(210, len(cs) - 1):
+            rows = []
+            for i in range(210, len(cs) - 1):        # the last candle may still be filling: not judged yet
+                if cs[i]["t"] <= done:
+                    continue
                 for rule, d, note in detect(ind, i, None, None, tf):
-                    if not rule.startswith("VOL-"):
-                        continue
-                    res = stop_target(cs, i, d, ind.atr[i])
-                    rows.append((sym, tf, cs[i]["t"], rule, d, cs[i]["c"], cs[i + 1]["c"], "futures",
-                                 ("fyuçers: " + note)[:120], ind.atr[i], *(res or (None, None))))
-            db.executemany("INSERT OR IGNORE INTO rule_signals(metal, tf, t, rule, dir, price0, price1, mode, note, atr, "
-                           "rr, held) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+                    if rule.startswith("VOL-"):
+                        rows.append((sym, tf, cs[i]["t"], rule, d, cs[i]["c"], cs[i + 1]["c"], "futures",
+                                     ("fyuçers: " + note)[:120], ind.atr[i]))
+            db.executemany("INSERT OR IGNORE INTO rule_signals(metal, tf, t, rule, dir, price0, price1, mode, note, atr) "
+                           "VALUES(?,?,?,?,?,?,?,?,?,?)", rows)
             added += len(rows)
-    db.put("rules:futvol:ver", FUT_VOL_VER)
+            idx = {x["t"]: k for k, x in enumerate(cs)}
+            upd = []
+            for r in db.execute("SELECT t, rule, dir FROM rule_signals WHERE metal=? AND tf=? AND mode='futures' "
+                                "AND rr IS NULL", (sym, tf)).fetchall():
+                k = idx.get(r["t"])
+                res = stop_target(cs, k, r["dir"], ind.atr[k]) if k is not None and ind.atr[k] else None
+                if res:
+                    upd.append((res[0], res[1], sym, tf, r["t"], r["rule"]))
+            if upd:
+                db.executemany("UPDATE rule_signals SET rr=?, held=? WHERE metal=? AND tf=? AND t=? AND rule=?", upd)
+            db.put(mark, str(cs[-2]["t"]))
     return added
 
 
@@ -471,14 +486,22 @@ def short_records(rec: dict) -> dict:
 
 
 def active_now(db: DB, sym: str) -> list[dict]:
-    """The rules that fired on the latest closed candle of each timeframe (for the analysts and the page)."""
+    """The rules that fired on the latest closed candle of each timeframe (for the analysts and the page), and the
+    futures volume rules of the newest futures candle when it is less than two days old."""
     ensure(db)
     out = []
     for tf in TFS:
-        t = db.execute("SELECT MAX(t) t FROM rule_signals WHERE metal=? AND tf=?", (sym, tf)).fetchone()["t"]
+        t = db.execute("SELECT MAX(t) t FROM rule_signals WHERE metal=? AND tf=? AND mode='futures'",
+                       (sym, tf)).fetchone()["t"]
+        if t is not None and t > time.time() - 2 * 86400:
+            for r in db.execute("SELECT rule, dir, note FROM rule_signals WHERE metal=? AND tf=? AND t=? "
+                                "AND mode='futures'", (sym, tf, t)).fetchall():
+                out.append({"tf": tf, "t": t, "rule": r["rule"], "dir": r["dir"], "note": r["note"]})
+        t = db.execute("SELECT MAX(t) t FROM rule_signals WHERE metal=? AND tf=? AND mode!='futures'",
+                       (sym, tf)).fetchone()["t"]
         if t is None:
             continue
-        for r in db.execute("SELECT rule, dir, note FROM rule_signals WHERE metal=? AND tf=? AND t=?",
-                            (sym, tf, t)).fetchall():
+        for r in db.execute("SELECT rule, dir, note FROM rule_signals WHERE metal=? AND tf=? AND t=? "
+                            "AND mode!='futures'", (sym, tf, t)).fetchall():
             out.append({"tf": tf, "t": t, "rule": r["rule"], "dir": r["dir"], "note": r["note"]})
     return out

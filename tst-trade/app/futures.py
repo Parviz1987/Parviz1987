@@ -166,3 +166,68 @@ async def download(db: DB, key: str, limit_usd: float, report=None, now: float |
                note="Databento fyuçers: " + ", ".join(f"{k} {v} şam" for k, v in total.items()) +
                     (f"; {len(errors)} ay alınmadı" if errors else ""))
     return res
+
+
+# ---------- daily top-up (owner 2026-11-25: «buna icazə verirəm» — about 0.35 $ a month, from the free credit) ----------
+DAILY_CAP_USD = 1.0           # hard monthly ceiling for the daily top-up; above it nothing is bought that month
+
+
+def daily_window(db: DB, sym: str, now: float) -> tuple[str, str] | None:
+    """From the day of the newest stored bar to today 00:00 UTC (whole days only; nothing twice)."""
+    last = db.execute("SELECT MAX(t) t FROM fut_candles WHERE symbol=?", (sym,)).fetchone()["t"]
+    if last is None:
+        return None
+    start = datetime.fromtimestamp(last + 60, timezone.utc)
+    end = datetime.fromtimestamp(now, timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    if start >= end:
+        return None
+    return start.strftime("%Y-%m-%dT%H:%M"), end.strftime("%Y-%m-%d")
+
+
+async def daily_refresh(db: DB, key: str, now: float | None = None) -> dict:
+    """Load the bars since the last stored one for the 4 metals, only if the owner approved the daily top-up and the
+    month's spend stays under DAILY_CAP_USD (the price is asked first, free)."""
+    ensure(db)
+    now = time.time() if now is None else now
+    if not json.loads(db.get("futures:daily_approved") or "null"):
+        return {"ok": False, "msg": "gündəlik təzələmə təsdiqlənməyib"}
+    month = time.strftime("%Y-%m", time.gmtime(now))
+    spent = float(db.get(f"futures:daily_spent:{month}") or 0)
+    wins = {s: daily_window(db, s, now) for s in SYMBOLS}
+    wins = {s: w for s, w in wins.items() if w}
+    if not wins:
+        return {"ok": True, "msg": "yeni gün yoxdur", "loaded": {}}
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=180.0)) as c:
+        cost = 0.0
+        for sym, (a, b) in wins.items():
+            r = await c.get(f"{BASE}/metadata.get_cost", auth=(key, ""), params={
+                "dataset": DATASET, "symbols": SYMBOLS[sym], "stype_in": "continuous", "schema": "ohlcv-1m",
+                "start": a, "end": b})
+            if r.status_code != 200:
+                return {"ok": False, "msg": f"qiymət alınmadı: HTTP {r.status_code} {r.text[:120]}"}
+            cost += float(r.json())
+        if spent + cost > DAILY_CAP_USD:
+            return {"ok": False, "msg": f"aylıq hədd {DAILY_CAP_USD} $: bu ay {spent:.2f} $ + {cost:.2f} $ olardı — alınmadı"}
+        loaded, errors = {}, []
+        for sym, (a, b) in wins.items():
+            p = {"dataset": DATASET, "symbols": SYMBOLS[sym], "stype_in": "continuous", "schema": "ohlcv-1m",
+                 "start": a, "end": b, "encoding": "csv", "pretty_px": "true", "pretty_ts": "true",
+                 "map_symbols": "true", "compression": "none"}
+            try:
+                r = await c.get(f"{BASE}/timeseries.get_range", params=p, auth=(key, ""))
+            except httpx.HTTPError as e:
+                errors.append(f"{sym}: {type(e).__name__}")
+                continue
+            if r.status_code != 200:
+                errors.append(f"{sym}: HTTP {r.status_code} {r.text[:80]}")
+                continue
+            import asyncio
+            rows = await asyncio.to_thread(parse_ohlcv_csv, r.text)
+            await asyncio.to_thread(db.executemany, "INSERT OR REPLACE INTO fut_candles(symbol, t, o, h, l, c, v) "
+                                    "VALUES(?,?,?,?,?,?,?)", [(sym, *x) for x in rows])
+            loaded[sym] = len(rows)
+    db.put(f"futures:daily_spent:{month}", f"{spent + cost:.4f}")
+    res = {"ok": not errors, "ts": now, "cost_usd": round(cost, 4), "month_spent_usd": round(spent + cost, 4),
+           "loaded": loaded, "errors": errors}
+    db.put("futures:daily_last", json.dumps(res, ensure_ascii=False))
+    return res

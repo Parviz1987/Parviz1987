@@ -45,6 +45,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         if start_engine:
             engine.start()
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
+            asyncio.get_running_loop().create_task(app.state.futures_daily())
         yield
         if start_engine:
             await engine.stop()
@@ -767,6 +768,30 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     fut_busy = {"on": False}             # one Databento download at a time: never two paying for the same month
 
+    async def futures_daily():
+        """Owner-approved daily top-up of the COMEX bars (after 06:00 UTC, once a day), then the volume rules run on
+        the new candles. Never two downloads at once; the monthly ceiling is checked inside."""
+        from . import futures, rules
+        await asyncio.sleep(300)
+        while True:
+            try:
+                day = time.strftime("%Y-%m-%d", time.gmtime())
+                key = store.first("databento")
+                if time.gmtime().tm_hour >= 6 and db.get("futures:daily_day") != day and key and not fut_busy["on"]:
+                    fut_busy["on"] = True
+                    try:
+                        res = await futures.daily_refresh(db, key)
+                    finally:
+                        fut_busy["on"] = False
+                    if res.get("ok"):
+                        db.put("futures:daily_day", day)
+                        await asyncio.to_thread(rules.run_futures_volume, db)
+                    else:
+                        log.warning("futures daily: %s", res.get("msg") or res.get("errors"))
+            except Exception as e:
+                log.warning("futures daily: %s", e)
+            await asyncio.sleep(1800)
+
     async def futures_keeper():
         """An approved download that stopped (a restart, a timeout) is resumed every 30 minutes until it is complete."""
         while True:
@@ -812,6 +837,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             db.put("futures:last", json.dumps({"ok": False, "msg": f"{type(e).__name__}: {str(e)[:200]}"}))
     app.state.futures_resume = futures_resume
     app.state.futures_keeper = futures_keeper
+    app.state.futures_daily = futures_daily
 
     @app.get("/api/admin/futures/quote")
     async def futures_quote():

@@ -290,6 +290,13 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("futures:daily_approved"):
+            # The owner's decision (chat, 2026-11-25, «buna icazə verirəm»): top up the COMEX futures bars every day
+            # (about 0.35 $ a month from the Databento free credit), hard ceiling futures.DAILY_CAP_USD a month.
+            from . import futures as fut
+            self.db.put("futures:daily_approved", json.dumps(
+                {"ts": time.time(), "cap_usd_month": fut.DAILY_CAP_USD,
+                 "by": "sahib, Claude ilə çatda 2026-11-25 (ayda ~0,35 $, pulsuz kreditdən)"}, ensure_ascii=False))
         if not self.db.get("migr:limits50_1125"):
             # The owner's decision (chat, 2026-11-25): every brain's monthly limit 50 $. The counted cost of Grok and
             # the OpenAI nano model uses a deliberately high default price, so a 20 $ cap could stop them although
