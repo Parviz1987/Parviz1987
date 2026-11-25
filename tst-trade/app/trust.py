@@ -6,10 +6,12 @@ forecast reduced to ONE light and ONE sentence, from the same numbers the Judge 
 - ⚪ fərqi yoxdur   about as good as the simple model;
 - 🔴 etibar yoxdur  worse than the simple model (z ≤ −1);
 - ⏳ az            fewer than 10 cases: nothing to say yet.
-The simple model is the free rival on the same cases (for brains: «the move that already happened goes on»; for
-methods: the no-skill level from the method's own long share). Cases close together are not independent (one
-alarm covers four metals): the sample is halved before judging. «Need» is roughly how many cases would make the
-same margin a proof."""
+The simple model is the STRONGEST free rival on the same cases, the same rule the Judge uses (owner 2026-11-25:
+a brain that says «down» every time in a falling market looked 92 % right and lit yellow). For brains it is the best
+of: «the move that already happened goes on», «the last day's direction goes on», and «always say what the market
+did most often» (the majority share). For methods: the Judge's own bar. Cases close together are not independent
+(one alarm covers four metals): the sample is the number of separate events when known, otherwise half the cases.
+«Need» is roughly how many cases would make the same margin a proof."""
 from __future__ import annotations
 
 import math
@@ -23,17 +25,17 @@ LIGHT = {"green": "🟢 Etibarlı", "yellow": "🟡 Ümidverici", "white": "⚪ 
          "wait": "⏳ Az"}
 
 
-def light(hit: float | None, n: int, base: float | None, proven: bool = False) -> dict:
+def light(hit: float | None, n: int, base: float | None, proven: bool = False, events: int | None = None) -> dict:
     if proven:
         return {"light": "green", "z": None, "need": None}
     if hit is None or base is None or n < 10:
         return {"light": "wait", "z": None, "need": None}
-    n_eff = max(1.0, n / 2)
+    n_eff = max(1.0, min(n / 2, events) if events else n / 2)
     b = min(max(base, 0.05), 0.95)
     se = math.sqrt(b * (1 - b) / n_eff)
     diff = hit - base
     z = diff / se
-    need = int((2.6 * math.sqrt(b * (1 - b)) / diff) ** 2 * 2) if diff > 0.01 else None
+    need = int((2.6 * math.sqrt(b * (1 - b)) / diff) ** 2 * n / n_eff) if diff > 0.01 else None
     if z >= 1.5:
         lt = "yellow"
     elif z <= -1.0:
@@ -61,15 +63,28 @@ def sentence(name: str, hit: float | None, n: int, base: float | None, lt: dict)
     return f"{name}: {h} % düz, sadə model {b} % — fərq yoxdur."
 
 
+def brain_rival(r: dict) -> float | None:
+    """The strongest free rival for a brain row (see the module note)."""
+    opts = [r.get("baseline_hit"), r.get("trend_hit")]
+    if r.get("went_up") is not None and r.get("n"):
+        opts.append(max(r["went_up"], r["n"] - r["went_up"]) / r["n"])
+    opts = [x for x in opts if x is not None]
+    return max(opts) if opts else None
+
+
 def build(db: DB) -> dict:
     from . import brainviews, judge
     items = []
     for r in brainviews.score(db, time.time()):
         name = f"{NAMES.get(r['brain'], r['brain'])}, {HN.get(r['horizon'], r['horizon'])}" + (
             ", həyəcandan sonra" if r["when"] == "həyəcan" else "")
-        lt = light(r["hit_rate"], r["n"], r.get("baseline_hit"))
-        items.append({"who": name, "kind": "beyin", **lt, "text": sentence(name, r["hit_rate"], r["n"],
-                                                                              r.get("baseline_hit"), lt)})
+        base = brain_rival(r)
+        lt = light(r["hit_rate"], r["n"], base, events=r.get("events"))
+        text = sentence(name, r["hit_rate"], r["n"], base, lt)
+        if r.get("said_up") in (0, r["n"]) and r["n"] >= 10:      # one-sided: say so plainly
+            text += (" Diqqət: hər dəfə eyni istiqaməti deyib (" + ("həmişə «düşəcək»" if r["said_up"] == 0 else
+                     "həmişə «qalxacaq»") + "), dönüşü hələ heç tutmayıb.")
+        items.append({"who": name, "kind": "beyin", **lt, "text": text})
     for h in ("15m", "1h", "4h", "1d", "1w"):
         st = {x["method"]: x for x in judge.stats(db, "XAU", h, "live", ttl=600)}
         v = st.get("vahid")
