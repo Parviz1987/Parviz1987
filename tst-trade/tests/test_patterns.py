@@ -336,3 +336,42 @@ def test_fundamental_page_data():
     d = fundamental.page(db, "XAU", now=base + 301 * 86400)
     assert d["candles"] and {f["id"] for f in d["factors"]} >= {"DFII10", "DGS2", "COT"}
     assert {r["id"] for r in d["book"]} >= {"FA-RY-1", "FA-CB-1"} and "vote" in d["now"]
+
+
+def test_fed_odds_and_shanghai_premium_rules():
+    from app import fundamental
+    from datetime import date, timedelta, datetime, timezone
+    db = DB(":memory:")
+    from app.feeds import Feeds
+    from app.keys import KeyStore
+    Feeds(db, KeyStore(db, "s" * 64))
+    db.script("CREATE TABLE IF NOT EXISTS fed_odds (ts REAL, ticker TEXT, title TEXT, prob REAL, close_ts REAL, "
+              "PRIMARY KEY (ticker, ts));")
+    meet = 1_900_000_000
+    t0 = 1_800_000_000
+    for day, cut in ((0, 0.2), (3, 0.6)):         # the cut odds rise from 20 % to 60 % in three days
+        ts = t0 + day * 86400
+        db.executemany("INSERT INTO fed_odds VALUES(?,?,?,?,?)", [
+            (ts, "KXFEDDECISION-27JAN-C25", "", cut, meet), (ts, "KXFEDDECISION-27JAN-H0", "", 1 - cut, meet),
+            (ts, "KXFEDDECISION-27JAN-H25", "", 0.0, meet)])
+    data = fundamental.Data(db)
+    got = {r: d for r, d, _ in fundamental.detect(data, "XAU", t0 + 3 * 86400 + 60)}
+    assert got.get("FA-FED-2") == 1                 # more cuts expected: up for gold
+    # Shanghai premium: 200 days at par, then a week at +2 %
+    d0 = date(2026, 1, 1)
+    rows_c, sge, cny = [], [], []
+    for k in range(210):
+        d = d0 + timedelta(days=k)
+        ts = int(datetime(d.year, d.month, d.day, tzinfo=timezone.utc).timestamp())
+        rows_c.append((ts, 3000, 3000, 3000, 3000))
+        prem = 0.02 if k >= 203 else 0.0
+        sge.append((d.isoformat(), 3000 * (1 + prem) * 7.0 / 31.1035, 1000.0))
+        cny.append(("DEXCHUS", (d - timedelta(days=3)).isoformat(), 7.0))
+    candles.store_history(db, "XAU", "1d", rows_c)
+    db.script("CREATE TABLE IF NOT EXISTS sge_gold (d TEXT PRIMARY KEY, close REAL, volume_kg REAL);")
+    db.executemany("INSERT INTO sge_gold VALUES(?,?,?)", sge)
+    db.executemany("INSERT OR REPLACE INTO macro(series, d, v) VALUES(?,?,?)", cny)
+    data = fundamental.Data(db)
+    end = datetime(2026, 7, 31, tzinfo=timezone.utc).timestamp()
+    got = {r: d for r, d, _ in fundamental.detect(data, "XAU", end)}
+    assert got.get("FA-SGE-1") == 1

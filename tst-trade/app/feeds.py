@@ -57,6 +57,8 @@ MACRO_SERIES = {
     "DFII10": "10 illik real faiz (TIPS), %",
     "DGS10": "10 illik nominal faiz, %",
     "DGS2": "2 illik faiz (Fed gözləntisi), %",
+    "DEXCHUS": "Yuan / dollar məzənnəsi (Şanxay premiumu üçün)",
+    "CFNAIMA3": "Çikaqo Fed milli fəallıq indeksi, 3 aylıq orta (iqtisadi böyümə)",
     "T10YIE": "10 illik inflyasiya gözləntisi, %",
     "DTWEXBGS": "Dollar indeksi (geniş)",
     "VIXCLS": "VIX qorxu indeksi",
@@ -64,7 +66,7 @@ MACRO_SERIES = {
     "SP500": "S&P 500 səhm indeksi",
     "DCOILWTICO": "Neft WTI (gündəlik), $",
 }
-SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf", "imf")
+SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf", "imf", "sge")
 # Block 9. Kalshi: market-implied odds of the next Fed decisions (public market data, no key).
 KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
 KALSHI_SERIES = ("KXFEDDECISION", "KXFED", "FEDDECISION", "FED")
@@ -76,6 +78,8 @@ ETF_URL = "https://data.alpaca.markets/v2/stocks/bars"
 COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json"
 # Central banks' gold (IMF International Liquidity, «gold reserves, volume», fine troy ounces, monthly, free): the
 # largest holders and the buyers of recent years. The fundamental block's FA-CB-1 rule reads their net purchases.
+# Shanghai Gold Exchange daily quotes (free): Au99.99 close in yuan per gram and its volume — China's physical demand.
+SGE_URL = "https://en.sge.com.cn/data/data_daily_international_new"
 IMF_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,IL/{c}.RGV_REVS..M"
 CB_COUNTRIES = ("CHN", "IND", "TUR", "POL", "RUS", "KAZ", "UZB", "CZE", "QAT", "SGP", "HUN", "THA", "IRQ", "JPN", "PHL",
                 "EGY", "SAU", "BRA", "DEU", "FRA", "ITA", "NLD", "CHE", "GBR", "USA")
@@ -205,6 +209,21 @@ def parse_fred(data) -> list[tuple[str, float]]:
     return out
 
 
+def parse_sge(text: str) -> list[tuple[str, float, float]]:
+    """The SGE daily table -> (date, Au99.99 close yuan/g, volume kg)."""
+    import html as _html
+    out = []
+    for r in re.findall(r"<tr[^>]*>(.*?)</tr>", text, re.S):
+        cells = [re.sub(r"\s+", " ", _html.unescape(re.sub(r"<[^>]+>", "", c))).strip()
+                 for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", r, re.S)]
+        if len(cells) >= 11 and cells[2] == "Au99.99":
+            try:
+                out.append((cells[1], float(cells[6].replace(",", "")), float(cells[10].replace(",", ""))))
+            except ValueError:
+                continue
+    return out
+
+
 def kalshi_prob(m: dict) -> float | None:
     """A Kalshi market's implied probability: the last trade, else the middle of bid and ask. Kalshi sends prices in
     cents (last_price: 45) or, in newer replies, in dollars as text (last_price_dollars: "0.4500")."""
@@ -281,7 +300,7 @@ class Feeds:
         self.keys = keys
         db.script(SCHEMA)
         self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0,
-                         "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0}
+                         "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0, "sge": 0.0}
         self.activity = None      # app.activity.Hub: where each collector reports its status
         db.script(surprise.SCHEMA)
 
@@ -446,6 +465,34 @@ class Feeds:
         self._health("official", not errors, f"{found}/{len(due)} rəsmi rəqəm" +
                      (f"; xəta: {'; '.join(errors)}" if errors else ""), found)
 
+    async def sge(self, client) -> None:
+        """Shanghai Gold Exchange: Au99.99 daily close (yuan/gram) and volume (kg). The first run loads two years
+        month by month; then the last two weeks every six hours."""
+        self.db.script("CREATE TABLE IF NOT EXISTS sge_gold (d TEXT PRIMARY KEY, close REAL, volume_kg REAL);")
+        from datetime import date, timedelta
+        have = self.db.execute("SELECT MIN(d) a, COUNT(*) n FROM sge_gold").fetchone()
+        today = date.today()
+        if not have["n"]:
+            spans, d = [], today - timedelta(days=730)
+            while d < today:
+                e = min(today, d + timedelta(days=30))
+                spans.append((d, e))
+                d = e + timedelta(days=1)
+        else:
+            spans = [(today - timedelta(days=14), today)]
+        got, errors = 0, []
+        for a, b in spans:
+            try:
+                raw = (await self._get(client, SGE_URL, params={"start_date": a.isoformat(), "end_date": b.isoformat()}))
+                rows = parse_sge(raw.decode("utf-8", "replace"))
+                self.db.executemany("INSERT OR REPLACE INTO sge_gold VALUES(?,?,?)", rows)
+                got += len(rows)
+            except Exception as e:
+                errors.append(f"{a}: {str(e)[:60]}")
+        n = self.db.execute("SELECT COUNT(*) n, MAX(d) d FROM sge_gold").fetchone()
+        self._health("sge", n["n"] > 0, f"{n['n']} gün, son {n['d']}" + (f"; xəta: {'; '.join(errors[:3])}" if errors else ""),
+                     got)
+
     async def imf_gold(self, client) -> None:
         """Central banks' gold holdings (IMF), once a day: the monthly volume per country since 2014."""
         import csv
@@ -567,14 +614,15 @@ class Feeds:
                 "fmp": (self.fmp, 60 if self.event_mode(now) else 300),
                 # official actuals: every minute around a release (the agencies publish at the minute)
                 "official": (self.official, 60 if self._recent_release(now) else 900),
-                "kalshi": (self.kalshi, 900), "etf": (self.etf, 300), "imf": (self.imf_gold, 86400)}
+                "kalshi": (self.kalshi, 900), "etf": (self.etf, 300), "imf": (self.imf_gold, 86400),
+                "sge": (self.sge, 6 * 3600)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
                     self.next_run[name] = now + every
                     task = {"news": "news", "alpaca": "news", "calendar": "calendar", "fmp": "calendar",
                             "macro": "macro", "cot": "macro", "official": "calendar", "kalshi": "macro",
-                            "etf": "macro", "imf": "macro"}[name]
+                            "etf": "macro", "imf": "macro", "sge": "macro"}[name]
                     if self.activity:
                         self.activity.report(task, "working", note=name)
                     try:

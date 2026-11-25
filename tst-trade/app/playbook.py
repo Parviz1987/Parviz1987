@@ -279,6 +279,26 @@ RULES = [
      "signal": "Fondlar ardıcıl alır → yuxarı; satır → aşağı.",
      "void": "Mövqe artıq ifrat haldadırsa (FA-COT-1 əks deyir).",
      "source": "Sanders-Irwin-Merrin (2009); sübutu qarışıqdır."},
+    {"id": "FA-FED-2", "area": "Fundamental", "name": "Fed ehtimalları (Kalshi), 3 gün", "detector": True,
+     "how": "Kalshi proqnoz bazarında növbəti Fed iclası üçün beş nəticənin ehtimalı (artım >25, 25, dəyişməz, endirim "
+            "25, >25 bp): gözlənilən faiz dəyişməsi bp ilə. Son 3 gündə ±5 bp-dən çox dəyişəndə.",
+     "signal": "Bazar daha çox endirim gözləməyə başlayır → yuxarı; daha az → aşağı.",
+     "void": "İclas günü və ondan sonra nəticə məlumdur; bazar nazikdirsə ehtimallar səs-küylüdür.",
+     "source": "Pul siyasəti şokları ədəbiyyatı; proqnoz bazarlarının dəqiqliyi (Wolfers-Zitzewitz 2004)."},
+    {"id": "FA-SGE-1", "area": "Fundamental", "name": "Şanxay premiumu (Çinin fiziki tələbi)", "detector": True,
+     "how": "Şanxay Qızıl Birjasında Au99.99-un gündəlik qiyməti (yuan/qram) yuan/dollar məzənnəsi (FRED DEXCHUS) ilə "
+            "dollar/unsiyaya çevrilir və eyni günün beynəlxalq qiyməti ilə müqayisə edilir. 5 günlük orta premium ilin "
+            "ən yuxarı (≥ 80-ci faiz) və ya ən aşağı (≤ 20-ci faiz) hissəsində olanda.",
+     "signal": "Yüksək premium (Çin tələbi güclü) → yuxarı; endirim (tələb zəif) → aşağı.",
+     "void": "Çinin idxal kvotaları və valyuta nəzarəti premiumu süni saxlaya bilər.",
+     "source": "WGC Çin bazarı hesabatları (Şanxay premiumu Çin tələbinin əsas göstəricisi kimi); SGE rəsmi məlumatı."},
+    {"id": "FA-GROW-1", "area": "Fundamental", "name": "İqtisadi böyümə (Çikaqo Fed fəallıq indeksi)", "detector": True,
+     "how": "CFNAI-MA3 (85 ABŞ göstəricisinin 3 aylıq orta indeksi, FRED). +0,2-dən yuxarı — böyümə ortadan güclü; "
+            "−0,7-dən aşağı — tənəzzül həddi. Hər ay ay bitəndən 60 gün sonra «məlum» sayılır.",
+     "signal": "GRAM-a görə böyümə tələbi (zərgərlik, sənaye) artırır → yuxarı; tənəzzül → aşağı. Diqqət: tənəzzül "
+               "eyni zamanda faiz endirimi və qorxu ilə qızılı qaldıra bilər — Hakim hansı təsirin güclü olduğunu ölçür.",
+     "void": "Gecikmə ilə gəlir: həftəlik üfüqdən qısa üçün deyil.",
+     "source": "WGC GRAM («iqtisadi genişlənmə» amili); Chicago Fed CFNAI."},
     {"id": "FA-CB-1", "area": "Fundamental", "name": "Mərkəzi bankların alışı (IMF), 3 ay", "detector": True,
      "how": "IMF-in rəsmi statistikası (International Liquidity, qızıl ehtiyatının həcmi): 25 mərkəzi bankın (Çin, "
             "Hindistan, Türkiyə, Polşa, Rusiya, Qazaxıstan, Özbəkistan, Çexiya, Qətər, Sinqapur və b.) aylıq xalis alışı "
