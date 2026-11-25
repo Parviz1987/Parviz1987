@@ -290,6 +290,15 @@ class Engine:
             # A new forecast method: the history is replayed now for it (old forecasts stay as issued).
             self.history_state["ts"] = 0
             self.db.put("methods_sig", sig)
+        if not self.db.get("migr:limits50_1125"):
+            # The owner's decision (chat, 2026-11-25): every brain's monthly limit 50 $. The counted cost of Grok and
+            # the OpenAI nano model uses a deliberately high default price, so a 20 $ cap could stop them although
+            # the real bill is lower; real prices are to be compared with the providers' bills after 4-5 days.
+            from . import brains, registry
+            for slot in registry.BRAIN_IDS:
+                if float(brains.config(self.db, slot)["month_usd"]) < 50:
+                    brains.save(self.db, slot, {"month_usd": 50})
+            self.db.put("migr:limits50_1125", "1")
         if not self.db.get("migr:audit_1124"):
             # Audit 2026-11-24, honest history: (1) daily-candle forecasts used news and brain views up to 2 h after
             # they were made — those methods are replayed with the right time; (2) the replay issued intraday
