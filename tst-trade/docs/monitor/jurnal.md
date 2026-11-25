@@ -135,3 +135,9 @@
 - **AMFI xətası tapıldı və düzəldildi:** 2025-ci ilin bəzi ayları .xls adı altında yeni .xlsx formatındadır, oxunmurdu.
   İndi hər iki format oxunur (may 2025 = +291,9 krore, xəbərlərlə eyni), test əlavə olundu.
 - **Rəqəm ovçusu «warn»:** əvvəlki kimi (iki beyin eyni rəqəmi tapmadı) — qaydaya uyğundur.
+
+## 2026-11-25 16:47 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** sakit. 24 saatda 3 uğursuz giriş (hədd 20), tanınan tək ünvan; başlıqlar yerindədir.
+- **Server:** versiya 90b19b0, 2,9 saatdır fasiləsiz; yeni xəta yoxdur. Boş yaddaş 418 MB, baza 1051 MB.
+- **AMFI düzəlişi serverdə təsdiqləndi:** xəta yoxdur, 28 ay yığılıb (əvvəl 16 + .xlsx aylar).
+- «Qiymət axını 3/4»: 17:00–18:00 NY bazarların gündəlik fasiləsidir, xəta deyil.
