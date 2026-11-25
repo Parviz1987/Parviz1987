@@ -334,7 +334,58 @@ def run(db: DB, now: float | None = None) -> dict:
                 if j + 1 < len(cs) and cs[j]["t"] == r["t"]:
                     db.execute("UPDATE rule_signals SET price1=? WHERE metal=? AND tf=? AND t=? AND price1 IS NULL",
                                (cs[j + 1]["c"], sym, tf, r["t"]))
-    return {"added": added, "replay": first_any}
+    fut = run_futures_volume(db)
+    return {"added": added, "replay": first_any, "futures_volume": fut}
+
+
+FUT_VOL_VER = "2026-11-25"
+
+
+def _fut_candles(db: DB, sym: str, tf: str) -> list[dict]:
+    """COMEX one-minute bars (Databento, real exchange volume) folded into 1 h / 4 h / 1 d candles (same buckets as
+    ours: the daily candle follows the trading session)."""
+    from .candles import bucket
+    out: list[dict] = []
+    for r in db.iterate("SELECT t, o, h, l, c, v FROM fut_candles WHERE symbol=? ORDER BY t", (sym,)):
+        b = bucket(r["t"], tf)
+        if out and out[-1]["t"] == b:
+            x = out[-1]
+            x["h"], x["l"], x["c"] = max(x["h"], r["h"]), min(x["l"], r["l"]), r["c"]
+            x["v"] += r["v"] or 0
+        else:
+            out.append({"t": b, "o": r["o"], "h": r["h"], "l": r["l"], "c": r["c"], "v": r["v"] or 0})
+    return [x for x in out if x["v"] > 0]
+
+
+def run_futures_volume(db: DB) -> int:
+    """Owner 2026-11-25: «don't wait months for volume». The volume rules are tested once on two years of COMEX
+    futures (real volume, already bought), stored as mode 'futures'. Live volume comes from the tick count."""
+    ensure(db)
+    if db.get("rules:futvol:ver") == FUT_VOL_VER:
+        return 0
+    if not db.execute("SELECT 1 FROM sqlite_master WHERE name='fut_candles'").fetchone():
+        return 0
+    added = 0
+    from .candles import METALS
+    for sym in METALS:
+        for tf in TFS:
+            cs = _fut_candles(db, sym, tf)
+            if len(cs) < 320:
+                continue
+            ind = Ind(cs)
+            rows, upd = [], []
+            for i in range(210, len(cs) - 1):
+                for rule, d, note in detect(ind, i, None, None, tf):
+                    if not rule.startswith("VOL-"):
+                        continue
+                    res = stop_target(cs, i, d, ind.atr[i])
+                    rows.append((sym, tf, cs[i]["t"], rule, d, cs[i]["c"], cs[i + 1]["c"], "futures",
+                                 ("fyuçers: " + note)[:120], ind.atr[i], *(res or (None, None))))
+            db.executemany("INSERT OR IGNORE INTO rule_signals(metal, tf, t, rule, dir, price0, price1, mode, note, atr, "
+                           "rr, held) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+            added += len(rows)
+    db.put("rules:futvol:ver", FUT_VOL_VER)
+    return added
 
 
 def records(db: DB) -> dict:

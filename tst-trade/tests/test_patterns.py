@@ -105,3 +105,23 @@ def test_new_detector_version_replays_old_history_once(monkeypatch):
     assert min(seen.get("1h", [10 ** 9])) >= 370               # then only the newest candles
     rec = rules.records(db)
     assert "rules" in rec
+
+
+def test_volume_rules_are_tested_once_on_futures_volume():
+    import random
+    from app import futures
+    db = DB(":memory:")
+    db.script(futures.SCHEMA)
+    random.seed(3)
+    x, rows = 3000.0, []
+    for k in range(60 * 24 * 40):                         # 40 days of one-minute bars with real volume
+        o = x
+        x *= 1 + random.gauss(0, 0.0006)
+        rows.append(("XAU", 1_790_000_040 + 60 * k, o, max(o, x), min(o, x), x, random.randint(1, 50) *
+                     (20 if k % 997 == 0 else 1)))
+    db.executemany("INSERT INTO fut_candles(symbol, t, o, h, l, c, v) VALUES(?,?,?,?,?,?,?)", rows)
+    n = rules.run_futures_volume(db)
+    got = db.execute("SELECT DISTINCT rule, mode FROM rule_signals").fetchall()
+    assert n > 0 and all(r["rule"].startswith("VOL-") and r["mode"] == "futures" for r in got)
+    assert rules.run_futures_volume(db) == 0               # once
+    assert "VOL-" in "".join(rules.records(db)["rules"])
