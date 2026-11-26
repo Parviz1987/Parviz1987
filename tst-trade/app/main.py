@@ -31,6 +31,8 @@ PUBLIC = ("/login", "/healthz", "/version", "/api/diag", "/static/", "/sw.js", "
 def create_app(settings: Settings | None = None, start_engine: bool = True) -> FastAPI:
     s = settings or load_settings()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    # httpx logs every request URL at INFO: the watcher's ping addresses (and any key in a query) stay out of the log
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     db = DB(s.db_path)
     store = KeyStore(db, s.session_secret)
     feeds = Feeds(db, store)
@@ -92,10 +94,10 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 n = 0
                 while True:
                     n += 1
-                    if n % 288 == 0:            # once a day: the deploy check hears «still fine» (period 30 days)
-                        heartbeat.deploy_signal(heart, os.path.join(os.path.dirname(os.path.abspath(s.db_path)),
-                                                                    "update.log"))
                     try:
+                        if n % 288 == 0:        # once a day: the deploy check hears «still fine» (period 30 days)
+                            heartbeat.deploy_signal(heart, os.path.join(os.path.dirname(os.path.abspath(s.db_path)),
+                                                                        "update.log"))
                         heartbeat.alive_signals(heart, engine)
                     except Exception:
                         log.exception("alive signal failed")

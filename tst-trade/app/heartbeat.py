@@ -14,9 +14,13 @@ texts carry no key, password or personal data."""
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
+import threading
 import time
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -29,6 +33,9 @@ SLOT = "healthchecks"
 URLS_KEY, LAST_KEY, SPEC_KEY = "hc:urls", "hc:last", "hc:spec"
 TIMEOUT, TRIES = 10.0, 3
 H = 3600
+OK_EVERY = 300               # an «ok» of one check is sent at most every 5 minutes (fail/start always go)
+BAD_IN_ROW = 3               # app-alive / price-feed: «fail» only after 3 bad samples in a row (15 minutes)
+WARMUP = 600                 # no panel/price verdict in the first 10 minutes after a start (quotes still arriving)
 
 # id, name shown on the account, period (s), grace (s), urgent (Telegram at once), what it means
 CHECKS: list[dict] = [
@@ -64,13 +71,25 @@ class Heart:
     def __init__(self, db: DB, keys):
         self.db, self.keys = db, keys
         self.queue: list[tuple[str, str, str]] = []
-        self._task: asyncio.Task | None = None
+        self._lock = threading.Lock()         # jobs in worker threads (the nightly backup) beat too
+        self._ok_t: dict[str, float] = {}
+        self.started = time.time()
+        self.bad: dict[str, int] = {}
 
     # ---------- the jobs call this ----------
     def beat(self, check: str, state: str = "ok", msg: str = "") -> None:
         """Queue a signal: state «ok», «start» or «fail». Never blocks, never raises."""
         try:
-            if check in IDS and state in ("ok", "start", "fail"):
+            if check not in IDS or state not in ("ok", "start", "fail"):
+                return
+            now = time.time()
+            with self._lock:
+                if state == "ok":
+                    if now - self._ok_t.get(check, 0.0) < OK_EVERY:
+                        return                 # a busy job (scoring every 15 s) does not flood the service
+                    self._ok_t[check] = now
+                else:
+                    self._ok_t.pop(check, None)
                 self.queue = [q for q in self.queue if q[0] != check or q[1] == "start"][-50:]
                 self.queue.append((check, state, str(msg)[:500]))
         except Exception:                      # a signal must never break the job that sends it
@@ -89,21 +108,27 @@ class Heart:
         key = self._key()
         if not key:
             return {"ok": False, "note": "Healthchecks.io açarı saxlanmayıb"}
-        spec = json.dumps(CHECKS, sort_keys=True) + key[-6:]
-        if self.db.get(SPEC_KEY) == spec and self.db.get(URLS_KEY):
-            return {"ok": True, "note": "hazırdır"}
         hdr = {"X-Api-Key": key}
         r = await client.get(f"{API}/channels/", headers=hdr, timeout=TIMEOUT)
+        if r.status_code in (401, 403):
+            return {"ok": False, "note": "açar qəbul olunmadı: layihənin yazma icazəli API açarı lazımdır"}
         r.raise_for_status()
         chans = r.json().get("channels", [])
         tg = [c["id"] for c in chans if c.get("kind") == "telegram"]
         mail = [c["id"] for c in chans if c.get("kind") == "email"]
+        # the owner may add Telegram after saving the key: the channels are part of what is checked every hour
+        spec = hashlib.sha256((json.dumps(CHECKS, sort_keys=True) + key + ",".join(sorted(tg + mail)))
+                              .encode()).hexdigest()
+        if self.db.get(SPEC_KEY) == spec and self.db.get(URLS_KEY):
+            return {"ok": True, "note": f"hazırdır; Telegram kanalı: {'var' if tg else 'YOXDUR'}"}
         urls = {}
         for c in CHECKS:
             body = {"name": f"tst {c['id']}", "slug": f"tst-{c['id']}", "timeout": c["timeout"], "grace": c["grace"],
                     "desc": c["desc"], "tags": "tst " + ("urgent" if c["urgent"] else "summary"),
                     "channels": ",".join((tg + mail) if c["urgent"] else mail), "unique": ["name"]}
             r = await client.post(f"{API}/checks/", headers=hdr, json=body, timeout=TIMEOUT)
+            if r.status_code in (401, 403):
+                return {"ok": False, "note": "açar yalnız oxuma icazəlidir: yazma icazəli API açarı lazımdır"}
             r.raise_for_status()
             urls[c["id"]] = r.json()["ping_url"]
         self.db.put(URLS_KEY, json.dumps(urls))
@@ -111,12 +136,15 @@ class Heart:
         return {"ok": True, "note": f"{len(urls)} yoxlama quruldu; Telegram kanalı: {'var' if tg else 'YOXDUR'}"}
 
     # ---------- sending ----------
-    async def _send(self, client: httpx.AsyncClient, url: str, state: str, msg: str) -> bool:
+    async def _send(self, client: httpx.AsyncClient, url: str, state: str, msg: str) -> bool | None:
+        """True sent; False to try again later; None: the check is gone on the account (set up again)."""
         suffix = {"ok": "", "start": "/start", "fail": "/fail"}[state]
         for i in range(TRIES):
             try:
                 r = await client.post(url + suffix, content=msg.encode(), timeout=TIMEOUT)
-                if r.status_code < 500:
+                if r.status_code == 404:
+                    return None
+                if r.status_code < 500 and r.status_code != 429:
                     return r.status_code == 200
             except httpx.HTTPError:
                 pass
@@ -130,15 +158,29 @@ class Heart:
             urls = {}
         if not urls or not self.queue:
             return 0
-        batch, self.queue = self.queue, []
-        last = json.loads(self.db.get(LAST_KEY) or "{}")
-        sent = 0
+        with self._lock:
+            batch, self.queue = self.queue, []
+        try:
+            last = json.loads(self.db.get(LAST_KEY) or "{}")
+        except ValueError:
+            last = {}
+        sent, again = 0, []
         for check, state, msg in batch:
             if check not in urls:
                 continue
             ok = await self._send(client, urls[check], state, msg)
-            sent += int(ok)
-            last[check] = {"ts": time.time(), "state": state, "msg": msg[:120], "delivered": ok}
+            if ok is None and time.time() - getattr(self, "_forced", 0.0) > 600:
+                self._forced = time.time()     # deleted on the dashboard: set up again (at most every 10 minutes)
+                self.db.delete(SPEC_KEY)
+                self.need_setup = True
+            if not ok:
+                again.append((check, state, msg))
+            sent += int(bool(ok))
+            last[check] = {"ts": time.time(), "state": state, "msg": msg[:120], "delivered": bool(ok)}
+        if again:                              # not lost: back in the queue unless a newer signal came meanwhile
+            with self._lock:
+                newer = {q[0] for q in self.queue}
+                self.queue = [q for q in again if q[0] not in newer] + self.queue
         self.db.put(LAST_KEY, json.dumps(last, ensure_ascii=False))
         return sent
 
@@ -146,9 +188,11 @@ class Heart:
         """Background loop: set the account up when needed, then send queued signals every 5 seconds."""
         async with httpx.AsyncClient() as client:
             next_setup = 0.0
+            self.need_setup = False
             while True:
                 try:
-                    if time.time() >= next_setup:
+                    if time.time() >= next_setup or self.need_setup:
+                        self.need_setup = False
                         res = await self.setup(client)
                         self.db.put("hc:setup", json.dumps({"ts": time.time(), **res}, ensure_ascii=False))
                         next_setup = time.time() + (3600 if res.get("ok") else 600)
@@ -173,24 +217,67 @@ class Heart:
 
 # ---------- what «alive» means for the panel and the price ----------
 def alive_signals(heart: Heart, engine, now: float | None = None) -> None:
-    """Every 5 minutes: app-alive (fresh price while the market is open) and price-feed (no metal OFFLINE)."""
+    """Every 5 minutes: app-alive (fresh price while the market is open) and price-feed (no metal OFFLINE). Quiet
+    times are «skipped», not judged: the first 10 minutes after a start, the first 15 minutes after the market opens
+    (daily and on Sunday), full exchange holidays; a «fail» needs 3 bad samples in a row."""
     from .candles import METALS
     from .engine import market_open
     now = time.time() if now is None else now
-    if not market_open(now):
-        heart.skip("app-alive", "bazar bağlıdır")
-        heart.skip("price-feed", "bazar bağlıdır")
+    why = ("bazar bağlıdır" if not market_open(now) else
+           "bazar təzə açılıb" if not market_open(now - 900) else
+           "birja bayramı" if holiday(now) or holiday(now + 6 * 3600) or early_close(now) else
+           "panel təzə başlayıb" if now - heart.started < WARMUP else None)
+    if why:
+        heart.bad.clear()
+        heart.skip("app-alive", why)
+        heart.skip("price-feed", why)
         return
-    age = now - (engine.last_ok or 0)
-    if age > 600:
-        heart.beat("app-alive", "fail", f"son qiymət {round(age / 60)} dəqiqə əvvəl")
-    else:
-        heart.beat("app-alive", "ok", f"son qiymət {round(age)} san əvvəl")
+    age = now - (engine.last_ok if engine.last_ok is not None else heart.started)   # never a quote since the start
     off = [s for s in METALS if engine.status(s, now) == "OFFLINE"]
-    if off:
-        heart.beat("price-feed", "fail", "OFFLINE: " + ", ".join(off))
-    else:
-        heart.beat("price-feed", "ok", "4/4 metal gəlir")
+    for check, bad, ok_msg, bad_msg in (
+            ("app-alive", age > 600, f"son qiymət {round(age)} san əvvəl", f"son qiymət {round(age / 60)} dəqiqə əvvəl"),
+            ("price-feed", bool(off), "4/4 metal gəlir", "OFFLINE: " + ", ".join(off))):
+        heart.bad[check] = heart.bad.get(check, 0) + 1 if bad else 0
+        if heart.bad[check] >= BAD_IN_ROW:
+            heart.beat(check, "fail", bad_msg)
+        elif not bad:
+            heart.beat(check, "ok", ok_msg)
+
+
+_NY = ZoneInfo("America/New_York")
+
+
+def _easter(y: int) -> date:
+    a, b, c = y % 19, y // 100, y % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l_ = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l_) // 451
+    month = (h + l_ - 7 * m + 114) // 31
+    return date(y, month, (h + l_ - 7 * m + 114) % 31 + 1)
+
+
+def early_close(ts: float) -> bool:
+    """The afternoon of a short day before a full holiday (24 Dec, 31 Dec, the Thursday before Good Friday): the
+    market stops early, so from 13:00 New York a stale price is expected, not an outage."""
+    d = datetime.fromtimestamp(ts, _NY)
+    nxt = d + timedelta(days=1)
+    return d.hour >= 13 and d.weekday() < 5 and holiday(nxt.replace(hour=12).timestamp())
+
+
+def holiday(ts: float) -> bool:
+    """Days the metals do not trade at all (New Year, Good Friday, Christmas; the observed weekday when they fall on a
+    weekend). Shortened days (Thanksgiving, July 4th ...) trade, so they are not here."""
+    d = datetime.fromtimestamp(ts, _NY).date()
+    days = set()
+    for y in (d.year, d.year + 1):
+        for x in (date(y, 1, 1), date(y, 12, 25)):
+            days.add(x + timedelta(days=1) if x.weekday() == 6 else x - timedelta(days=1) if x.weekday() == 5 else x)
+        days.add(_easter(y) - timedelta(days=2))
+    return d in days
 
 
 def deploy_signal(heart: Heart, log_path: str) -> None:
