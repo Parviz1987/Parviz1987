@@ -117,10 +117,95 @@ def festival_vol(db: DB, symbols=("XAU", "XAG")) -> dict:
     return out
 
 
+# ---------- 3. technical block: the «unfamiliar day» gate (FreqAI-style dissimilarity) ----------
+def unfamiliar(db: DB, symbol: str = "XAU", method: str = "qaydalar", horizon: str = "1d") -> dict:
+    """Each day is described by 4 numbers known that morning (20-day volatility percentile, 20-day trend in standard
+    deviations, the last day's and the last 5 days' move). Its dissimilarity = distance to the nearest of the PAST
+    250 days / their average distance to each other. Is the voice's hit rate lower on the most unfamiliar fifth of
+    days? If clearly so, a gate that quiets voices on such days is worth a trial (never switched on from here)."""
+    from . import candles, conductor
+    cs = candles.get(db, symbol, "1d", limit=4000)
+    if len(cs) < 400:
+        return {"note": "az şam"}
+    d = conductor.Daily(cs)
+    cl = [c["c"] for c in cs]
+    feats = {}
+    for i in range(300, len(cs)):
+        if d.pct[i] is None or d.z[i] is None or d.vol[i] is None:
+            continue
+        r1 = math.log(cl[i] / cl[i - 1]) / d.vol[i]
+        r5 = math.log(cl[i] / cl[i - 5]) / (d.vol[i] * math.sqrt(5))
+        feats[cs[i]["t"]] = (d.pct[i], d.z[i] / 3, r1 / 3, r5 / 3)
+    ts = sorted(feats)
+    di = {}
+    for k in range(250, len(ts)):
+        past = [feats[t] for t in ts[k - 250:k]]
+        x = feats[ts[k]]
+        near = min(math.dist(x, p) for p in past)
+        sample = past[::10]
+        avg = sum(math.dist(a, b) for a in sample for b in sample) / max(1, len(sample) ** 2 - len(sample))
+        di[ts[k]] = near / avg if avg else 0.0
+    rows = db.execute("SELECT issued_t, hit FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND hit IS NOT NULL "
+                      "AND p_up != 0.5", (symbol, horizon, method)).fetchall()
+    pairs = []
+    for r in rows:
+        k = conductor.Daily.at(d, r["issued_t"])
+        if k is not None and cs[k]["t"] in di:
+            pairs.append((di[cs[k]["t"]], int(r["hit"])))
+    if len(pairs) < 200:
+        return {"note": f"az proqnoz ({len(pairs)})"}
+    pairs.sort()
+    cut = int(len(pairs) * 0.8)
+    fam, unf = pairs[:cut], pairs[cut:]
+    hf, hu = sum(h for _, h in fam) / len(fam), sum(h for _, h in unf) / len(unf)
+    se = math.sqrt(hf * (1 - hf) / len(fam) + hu * (1 - hu) / len(unf))
+    z = (hf - hu) / se if se else 0.0
+    return {"method": method, "horizon": horizon, "familiar_hit": round(hf, 4), "unfamiliar_hit": round(hu, 4),
+            "n_unfamiliar": len(unf), "z": round(z, 2),
+            "verdict": "tanış olmayan günlərdə aydın zəifdir (z > 2): darvaza sınağa dəyər" if z > 2 else
+                       "fərq sübut olunmayıb: darvaza lazım deyil"}
+
+
+# ---------- 4. cross-market: which market moves first ----------
+def lead_lag(db: DB, symbol: str = "XAU") -> dict:
+    """For each related market: does its 1-hour move predict gold's NEXT hour (lead), compared with the same hour
+    (together)? Correlation with a t-statistic over the common closed hours."""
+    from . import candles
+    from .markets import RELATED
+    g = {c["t"]: c["c"] for c in candles.get(db, symbol, "1h", limit=6000)}
+    gt = sorted(g)
+    gr = {gt[i]: math.log(g[gt[i]] / g[gt[i - 1]]) for i in range(1, len(gt)) if gt[i] - gt[i - 1] == 3600}
+    out = {}
+    for sym in RELATED:
+        m = {c["t"]: c["c"] for c in candles.get(db, sym, "1h", limit=6000)}
+        mt = sorted(m)
+        mr = {mt[i]: math.log(m[mt[i]] / m[mt[i - 1]]) for i in range(1, len(mt)) if mt[i] - mt[i - 1] == 3600
+              and m[mt[i - 1]] > 0 and m[mt[i]] > 0}
+        lead = [(mr[t], gr[t + 3600]) for t in mr if t + 3600 in gr]
+        same = [(mr[t], gr[t]) for t in mr if t in gr]
+        if len(lead) < 300:
+            out[sym] = {"note": f"az ortaq saat ({len(lead)})"}
+            continue
+        def corr(xy):
+            n = len(xy)
+            mx, my = sum(x for x, _ in xy) / n, sum(y for _, y in xy) / n
+            sx = math.sqrt(sum((x - mx) ** 2 for x, _ in xy))
+            sy = math.sqrt(sum((y - my) ** 2 for _, y in xy))
+            r = sum((x - mx) * (y - my) for x, y in xy) / (sx * sy) if sx and sy else 0.0
+            return round(r, 4), round(r * math.sqrt(max(1, n - 2) / max(1e-12, 1 - r * r)), 2), n
+        rl, tl, nl = corr(lead)
+        rs, ts_, ns = corr(same)
+        out[sym] = {"lead_r": rl, "lead_t": tl, "same_r": rs, "same_t": ts_, "hours": nl,
+                    "verdict": "qızıldan bir saat əvvəl hərəkət edir (|t| > 3)" if abs(tl) > 3 else
+                               "öncül deyil (eyni saatda birlikdə hərəkət edə bilər)"}
+    return out
+
+
 def run(db: DB) -> dict:
     t0 = time.time()
     out: dict = {"computed": None}
-    for name, fn in (("fa_window", fa_window), ("festival_vol", festival_vol)):
+    for name, fn in (("fa_window", fa_window), ("festival_vol", festival_vol), ("unfamiliar", unfamiliar),
+                     ("lead_lag", lead_lag)):
         try:
             out[name] = fn(db)
         except Exception as e:          # one experiment failing never stops the other

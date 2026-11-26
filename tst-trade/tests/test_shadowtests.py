@@ -59,3 +59,22 @@ def test_festival_volatility_found_and_not_invented():
             assert r["t"] > 2 and r["ratio"] > 1.5 and "yüksəkdir" in r["verdict"]
         else:
             assert "sübut olunmayıb" in r["verdict"]
+
+
+def test_unfamiliar_and_lead_lag_run_and_find_a_planted_lead():
+    db = DB(":memory:")
+    random.seed(8)
+    t0 = 1_600_000_000 // 3600 * 3600
+    g, m, rows = 1800.0, 100.0, []
+    prev_m = 0.0
+    for i in range(2000):
+        dm = random.gauss(0, 0.002)
+        g *= math.exp(0.6 * prev_m + random.gauss(0, 0.001))       # gold follows the dollar index one hour later
+        m *= math.exp(dm)
+        prev_m = dm
+        rows.append(("XAU", "1h", t0 + i * 3600, g, g, g, g))
+        rows.append(("DXY", "1h", t0 + i * 3600, m, m, m, m))
+    db.executemany("INSERT INTO candles(symbol, tf, t, o, h, l, c, origin) VALUES(?,?,?,?,?,?,?,'history')", rows)
+    out = shadowtests.lead_lag(db)
+    assert out["DXY"]["lead_t"] > 3 and "əvvəl" in out["DXY"]["verdict"]
+    assert "note" in shadowtests.unfamiliar(db)                       # no daily candles here: says so, no crash
