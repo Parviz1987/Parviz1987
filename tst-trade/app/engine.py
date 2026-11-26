@@ -818,8 +818,8 @@ class Engine:
 
     async def run(self) -> None:
         last_prune = 0.0
-        if self.jobs is not None:
-            self._jobs_task = asyncio.create_task(self._jobs_loop())
+        if self.jobs is not None and (getattr(self, "_jobs_task", None) is None or self._jobs_task.done()):
+            self._jobs_task = asyncio.create_task(self._jobs_loop())   # a restarted engine never runs two of these
         try:
             # Off the event loop: a large one-time clean-up must not keep /healthz from answering after an update.
             await asyncio.to_thread(self.migrate)

@@ -108,7 +108,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 while True:
                     await asyncio.sleep(60)
                     try:
-                        for x in rep.check():
+                        for x in await rep.check():
                             log.info("repair: %s", x)
                     except Exception:
                         log.exception("repair check failed")
@@ -990,7 +990,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         note = str(b.get("note") or "").strip()
         if not note:
             raise HTTPException(400, "səbəbi yazın: «düzəldildi» (nə ilə) və ya «qəbul edildi» (niyə)")
-        repair.close_review(db, rid, note)
+        if not repair.close_review(db, rid, note):
+            raise HTTPException(404, "belə açıq araşdırma yoxdur")
         sec.log("review_closed", _ip(request), f"{rid}: {note[:80]}")
         return {"ok": True}
 

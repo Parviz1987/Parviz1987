@@ -15,6 +15,7 @@ The same fault twice within 7 days opens a review (ops_reviews) that the owner c
 7 days the step is no longer taken automatically (it waits for the owner)."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -36,7 +37,9 @@ WAL_MAX = 300e6
 
 
 def _ensure(db: DB) -> None:
-    db.script(SCHEMA)
+    if not getattr(db, "_repair_ready", False):   # the schema once per database (executescript commits)
+        db.script(SCHEMA)
+        db._repair_ready = True
 
 
 def allowed(db: DB, action: str, fault: str, now: float | None = None) -> tuple[bool, str]:
@@ -50,7 +53,11 @@ def allowed(db: DB, action: str, fault: str, now: float | None = None) -> tuple[
         done = db.execute("SELECT COUNT(*) n FROM ops_actions WHERE action=? AND ts > ?", (action, now - span)).fetchone()["n"]
         if done >= n:
             return False, f"limit: {n} dəfə / {round(span / 3600)} saat"
-    rep = db.execute("SELECT COUNT(*) n FROM ops_actions WHERE fault=? AND ts > ?", (fault, now - WEEK)).fetchone()["n"]
+    # counted since the owner last closed a review of this fault: closing it is the owner's «go on»
+    closed = db.execute("SELECT MAX(closed_ts) t FROM ops_reviews WHERE fault=? AND status='bağlanıb'",
+                        (fault,)).fetchone()["t"] or 0
+    rep = db.execute("SELECT COUNT(*) n FROM ops_actions WHERE fault=? AND ts > ?",
+                     (fault, max(now - WEEK, closed))).fetchone()["n"]
     if rep >= 2:
         return False, "eyni nasazlıq 7 gündə 3-cü dəfədir: sahibin qərarını gözləyir"
     return True, ""
@@ -60,14 +67,18 @@ def record(db: DB, action: str, fault: str, evidence: str, result: str, now: flo
     _ensure(db)
     now = time.time() if now is None else now
     db.execute("INSERT INTO ops_actions VALUES(?,?,?,?,?,NULL)", (now, action, fault, evidence[:300], result[:200]))
-    n = db.execute("SELECT COUNT(*) n FROM ops_actions WHERE fault=? AND ts > ?", (fault, now - WEEK)).fetchone()["n"]
+    closed = db.execute("SELECT MAX(closed_ts) t FROM ops_reviews WHERE fault=? AND status='bağlanıb'",
+                        (fault,)).fetchone()["t"] or 0
+    n = db.execute("SELECT COUNT(*) n FROM ops_actions WHERE fault=? AND ts > ?",
+                   (fault, max(now - WEEK, closed))).fetchone()["n"]
     if n >= 2 and not db.execute("SELECT 1 FROM ops_reviews WHERE fault=? AND status='açıq'", (fault,)).fetchone():
         db.execute("INSERT INTO ops_reviews(ts, fault, count, status) VALUES(?,?,?,'açıq')", (now, fault, n))
 
 
-def close_review(db: DB, rid: int, note: str) -> None:
+def close_review(db: DB, rid: int, note: str) -> bool:
     _ensure(db)
-    db.execute("UPDATE ops_reviews SET status='bağlanıb', closed_ts=?, note=? WHERE id=?", (time.time(), note[:300], rid))
+    return db.execute("UPDATE ops_reviews SET status='bağlanıb', closed_ts=?, note=? WHERE id=? AND status='açıq'",
+                      (time.time(), note[:300], rid)).rowcount > 0
 
 
 # ---------- the steps ----------
@@ -77,17 +88,23 @@ class Repairer:
         self.silent = 0
         self.started = time.time()
 
-    def check(self, now: float | None = None) -> list[str]:
+    async def check(self, now: float | None = None) -> list[str]:
         """Every minute. Returns the steps taken (for the log)."""
         now = time.time() if now is None else now
         done = []
-        for step in (self._price, self._wal, self._engine_alive):
+        for step in (self._price, self._engine_alive):
             try:
                 r = step(now)
                 if r:
                     done.append(r)
             except Exception as e:          # a repair step never breaks the panel
                 done.append(f"{step.__name__}: {type(e).__name__}")
+        try:
+            r = await self._wal(now)
+            if r:
+                done.append(r)
+        except Exception as e:
+            done.append(f"_wal: {type(e).__name__}")
         return done
 
     def _price(self, now: float) -> str | None:
@@ -95,9 +112,9 @@ class Repairer:
         from .heartbeat import holiday
         eng = self.engine
         if eng.fallback_until and now >= eng.fallback_until:
-            eng.fallback_until = 0.0                          # 30 minutes over: back to the main source
-            eng.reset_provider()
-            record(self.db, "price_fallback", "price:primary_offline", "30 dəqiqə bitdi", "əsas mənbəyə qayıtdı", now)
+            # 30 minutes over: chosen_provider() is the main source again by itself (the provider is rebuilt at the
+            # next poll, never in the middle of one); the return is not a new fault and is not counted
+            eng.fallback_until = 0.0
             return "price_fallback: əsas mənbəyə qayıtdı"
         if eng.chosen_provider() in ("goldapi", "demo") or eng.fallback_until:
             self.silent = 0
@@ -112,18 +129,18 @@ class Repairer:
         ok, why = allowed(self.db, "price_fallback", "price:primary_offline", now)
         if not ok:
             return None
-        eng.fallback_until = now + FALLBACK_FOR
-        eng.reset_provider()
+        eng.fallback_until = now + FALLBACK_FOR     # chosen_provider() changes; rebuilt at the next poll
         self.silent = 0
         record(self.db, "price_fallback", "price:primary_offline", f"əsas mənbədən {round(age)} san qiymət yoxdur",
                "30 dəqiqəlik gold-api.com", now)
         return "price_fallback: gold-api.com 30 dəqiqə"
 
-    def _wal(self, now: float) -> str | None:
+    async def _wal(self, now: float) -> str | None:
         if self.db.path == ":memory:":
             return None
+        wal = str(self.db.path) + "-wal"
         try:
-            size = os.path.getsize(str(self.db.path) + "-wal")
+            size = os.path.getsize(wal)
         except OSError:
             return None
         if size < WAL_MAX:
@@ -131,9 +148,16 @@ class Repairer:
         ok, _ = allowed(self.db, "wal_checkpoint", "db:wal_big", now)
         if not ok:
             return None
-        r = self.db.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
-        record(self.db, "wal_checkpoint", "db:wal_big", f"WAL {round(size / 1e6)} MB", f"checkpoint: {tuple(r) if r else ''}",
-               now)
+        # in a worker thread (copying hundreds of MB must not freeze the panel); TRUNCATE gives the space back
+        r = await asyncio.to_thread(lambda: self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone())
+        try:
+            after = os.path.getsize(wal)
+        except OSError:
+            after = 0
+        record(self.db, "wal_checkpoint", "db:wal_big", f"WAL {round(size / 1e6)} MB",
+               f"sonra {round(after / 1e6)} MB ({'kiçildi' if after < WAL_MAX else 'kiçilmədi: oxuyan var'})", now)
+        self.db.execute("UPDATE ops_actions SET verified=? WHERE action='wal_checkpoint' AND ts=?",
+                        (int(after < WAL_MAX), now))
         return "wal_checkpoint"
 
     def _engine_alive(self, now: float) -> str | None:
