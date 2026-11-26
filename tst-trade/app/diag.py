@@ -129,6 +129,16 @@ def _tables(db: DB) -> list[dict]:
     return sorted(out, key=lambda x: -x["mb"])[:25]
 
 
+def _forecast_rows(db: DB) -> list[dict]:
+    """The forecast archive per method and mode (history = the replay, live = issued in real time), biggest first,
+    with whether the method is still used — the base for any clean-up decision (owner decides)."""
+    from . import forecast
+    rows = db.execute("SELECT method, mode, COUNT(*) n FROM forecasts GROUP BY method, mode").fetchall()
+    return sorted(({"method": r["method"], "mode": r["mode"], "n": r["n"],
+                    "retired": r["method"] in getattr(forecast, "RETIRED", ()),
+                    "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
+
+
 def _update_log(db_path: str) -> list[str]:
     """The auto-update's own lines (deploy/update.sh writes data/update.log): updated, rolled back, slow start."""
     try:
@@ -250,6 +260,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "version": version, "now": now, "uptime_s": round(now - STARTED),
         "boots": json.loads(db.get("boot:log") or "[]")[-10:], "updates": _update_log(db_path),
         "tables": _slow("tables", lambda: _tables(db), 6 * 3600),
+        "forecast_rows": _slow("forecast_rows", lambda: _forecast_rows(db), 6 * 3600),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},
