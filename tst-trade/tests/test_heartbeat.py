@@ -212,3 +212,11 @@ def test_a_held_deploy_is_urgent(tmp_path):
     p.write_text("2026-11-26T20:49:38Z held 68a8dcb: protected files changed without owner approval: tst-trade/app/judge.py\n")
     heartbeat.deploy_signal(h, str(p))
     assert [q[1] for q in h.queue if q[0] == "deploy"] == ["fail"]
+
+
+def test_thanksgiving_afternoon_is_quiet():
+    import datetime as dt
+    assert heartbeat.early_close(dt.datetime(2026, 11, 26, 21, 30, tzinfo=dt.timezone.utc).timestamp())
+    assert heartbeat.early_close(dt.datetime(2026, 11, 27, 19, 0, tzinfo=dt.timezone.utc).timestamp())
+    assert not heartbeat.early_close(dt.datetime(2026, 11, 26, 15, 0, tzinfo=dt.timezone.utc).timestamp())
+    assert not heartbeat.early_close(dt.datetime(2026, 11, 19, 21, 30, tzinfo=dt.timezone.utc).timestamp())

@@ -265,7 +265,12 @@ def early_close(ts: float) -> bool:
     market stops early, so from 13:00 New York a stale price is expected, not an outage."""
     d = datetime.fromtimestamp(ts, _NY)
     nxt = d + timedelta(days=1)
-    return d.hour >= 13 and d.weekday() < 5 and holiday(nxt.replace(hour=12).timestamp())
+    if d.hour >= 13 and d.weekday() < 5 and holiday(nxt.replace(hour=12).timestamp()):
+        return True
+    # Thanksgiving (4th Thursday of November) and the day after: the US session stops early (seen 2026-11-26: the
+    # Capital stream went quiet in the afternoon), so a quiet afternoon is not an outage
+    tg = date(d.year, 11, 1) + timedelta(days=(3 - date(d.year, 11, 1).weekday()) % 7 + 21)
+    return d.hour >= 13 and d.date() in (tg, tg + timedelta(days=1))
 
 
 def holiday(ts: float) -> bool:

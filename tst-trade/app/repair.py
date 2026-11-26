@@ -109,7 +109,7 @@ class Repairer:
 
     def _price(self, now: float) -> str | None:
         from .engine import market_open
-        from .heartbeat import holiday
+        from .heartbeat import early_close, holiday
         eng = self.engine
         if eng.fallback_until and now >= eng.fallback_until:
             # 30 minutes over: chosen_provider() is the main source again by itself (the provider is rebuilt at the
@@ -119,7 +119,8 @@ class Repairer:
         if eng.chosen_provider() in ("goldapi", "demo") or eng.fallback_until:
             self.silent = 0
             return None
-        if not market_open(now) or not market_open(now - 900) or holiday(now) or now - self.started < 600:
+        if (not market_open(now) or not market_open(now - 900) or holiday(now) or holiday(now + 6 * 3600)
+                or early_close(now) or now - self.started < 600):
             self.silent = 0
             return None
         age = now - (eng.last_ok or self.started)
