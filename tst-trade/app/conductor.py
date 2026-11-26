@@ -42,7 +42,7 @@ MIN_DAYS = 20                        # a voice/state cell needs at least this ma
 EVENT_RE = ("cpi", "consumer price", "non farm", "nonfarm", "non-farm", "payroll", "fomc", "fed interest rate",
             "interest rate decision", "pce", "gdp")
 AUDIT_KEY = "conductor:audit"
-VER = "2026-11-26.3"            # a new version recomputes at once instead of waiting a day
+VER = "2026-11-26.4"            # a new version recomputes at once instead of waiting a day
 
 
 # ---------- market state ----------
