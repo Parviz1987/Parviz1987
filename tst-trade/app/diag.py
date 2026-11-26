@@ -352,6 +352,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "experiments": _experiments(db),
         "aci": _aci(db),
         "autopsy": _autopsy(db),
+        "judge_canary": json.loads(db.get("judge:canary") or "null"),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

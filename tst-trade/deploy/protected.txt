@@ -11,3 +11,4 @@ tst-trade/deploy/update.sh
 tst-trade/tests/fingerprint.json
 tst-trade/scripts/guard_tests.py
 .github/workflows/tests.yml
+tst-trade/app/judgeplus.py

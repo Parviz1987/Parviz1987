@@ -41,6 +41,14 @@ def trials(db: DB) -> int:
         if r["detector"]:
             for tf in rules.TFS:
                 seen.add(f"r:{r['id']}:{tf}")
+    # plan step 12: the real number of attempts — the weekly agent's ideas and the shadow experiments count too
+    try:
+        for r in db.execute("SELECT id FROM ideas WHERE rule IS NULL").fetchall():   # with a rule: counted as r:
+            seen.add(f"i:{r['id']}")
+    except Exception:
+        pass
+    for x in ("conductor:dirijor", "conductor:ümumi", "shadow:fa_window", "shadow:festival_vol", "aci:shadow"):
+        seen.add(f"x:{x}")
     for group in ("HYPOTHESES", "FOCUS", "V_TESTS"):
         for x in getattr(hypotheses, group, []) or []:
             if isinstance(x, dict) and x.get("id"):
@@ -92,13 +100,28 @@ def method_final(db: DB, sym: str, horizon: str, method: str, now: float | None 
     if len(rows) < need:
         db.put(key, json.dumps(st))
         return st
-    rets = [(r["price1"] / r["price0"] - 1) * (1 if r["p_up"] > 0.5 else -1) for r in rows if r["price0"]]
+    rows = [r for r in rows if r["price0"]]
+    rets = [(r["price1"] / r["price0"] - 1) * (1 if r["p_up"] > 0.5 else -1) for r in rows]
     net, p = _money_test(rets, full_cost(sym, horizon), steps_of(horizon))
     passed = p is not None and p < ALPHA and net > 0
+    # plan step 12 (owner 2026-11-26): the strengthened gates, all on the same after-finalist cases
+    from . import judgeplus
+    cost = full_cost(sym, horizon)
+    ys = [int(r["price1"] > r["price0"]) for r in rows]
+    hits = [int((r["p_up"] > 0.5) == bool(y)) for r, y in zip(rows, ys)]
+    up = sum(ys) / len(ys) if ys else 0.5
+    srs, matrix = judgeplus.desk_evidence(db, sym, horizon)
+    n_trials = trials(db)
+    st["gates"] = judgeplus.gates([x - cost for x in rets], hits, [r["p_up"] for r in rows], ys, max(0.5, up, 1 - up),
+                                  steps_of(horizon), n_trials, srs, matrix)
+    st["too_good"] = judgeplus.too_good(sum(hits) / len(hits) if hits else None, horizon)
+    st["trials"], st["data_fp"] = n_trials, judgeplus.fingerprint([tuple(r) for r in rows])
+    passed = passed and st["gates"]["ok"] and not st["too_good"]
     if passed:                                      # the independent re-check must agree (R5)
         st["verify"] = verify_method(db, sym, horizon, method, st["since"])
         passed = st["verify"]["ok"]
     st.update({"status": "keçdi" if passed else "keçmədi", "p": p, "net": net, "tested": now})
+    st["card"] = judgeplus.card(st, n_trials)
     db.put(key, json.dumps(st))
     log_experiment(db, "final", f"method:{method}:{sym}:{horizon}", st)
     if passed:
@@ -125,8 +148,22 @@ def rule_final(db: DB, rule: str, tf: str, now: float | None = None) -> dict:
         return st
     nets = [(r["price1"] / r["price0"] - 1) * r["dir"] - full_cost(r["metal"], tf) for r in rows]
     net, p = _money_test(nets, 0.0, 1)
-    st.update({"status": "keçdi" if p is not None and p < ALPHA and net > 0 else "keçmədi", "p": p, "net": net,
-               "tested": now})
+    # plan step 12: t >= 3, the Deflated Sharpe over every attempt ever made, the anytime e-value, not too good
+    from . import judgeplus
+    hits = [int((r["price1"] - r["price0"]) * r["dir"] > 0) for r in rows]
+    n_trials = trials(db)
+    t = judgeplus.t_stat(nets)
+    d = judgeplus.dsr(nets, n_trials)
+    e = judgeplus.evalue_hits(hits, 0.5)
+    tg = judgeplus.too_good(sum(hits) / len(hits) if hits else None, tf)
+    st["gates"] = {"checks": {"t>=3": t is not None and t >= judgeplus.T_MIN,
+                              "DSR>=0.95": d is not None and d >= judgeplus.DSR_MIN, "e>=20": e >= judgeplus.E_MIN},
+                   "t": t, "dsr": d, "e": round(e, 3)}
+    st["gates"]["ok"] = all(st["gates"]["checks"].values())
+    st["too_good"], st["trials"] = tg, n_trials
+    ok = p is not None and p < ALPHA and net > 0 and st["gates"]["ok"] and not tg
+    st.update({"status": "keçdi" if ok else "keçmədi", "p": p, "net": net, "tested": now})
+    st["card"] = judgeplus.card(st, n_trials)
     db.put(key, json.dumps(st))
     log_experiment(db, "final", f"rule:{rule}:{tf}", st)
     if st["status"] == "keçdi":
