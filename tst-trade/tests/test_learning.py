@@ -37,7 +37,24 @@ def test_calibration_moves_an_overconfident_brain_towards_reality():
     assert learning.apply_calibration(bands, "strateq", "4h", 0.7) == 0.7    # no data: unchanged
 
 
+def test_nightly_lessons_are_off_by_the_owners_decision(monkeypatch):
+    import asyncio
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    jobs = BrainJobs(db, ks, Feeds(db, ks))
+    monkeypatch.setattr(learning, "day_errors", lambda db_, now: [{"brain": "strateq"}] * 5)
+    called = []
+
+    async def no_brain(*a, **k):
+        called.append(1)
+        return None, ""
+    monkeypatch.setattr(brains, "run", no_brain)
+    assert asyncio.run(jobs.sleep(1_800_000_000.0)) == 0 and not called
+    assert learning.active_lessons(db) == []
+
+
 def test_nightly_review_writes_lessons_and_ab_days_alternate(monkeypatch):
+    monkeypatch.setattr(learning, "LESSONS_OFF", False)      # the mechanism itself still works if switched back on
     db = DB(":memory:")
     ks = KeyStore(db, "s" * 64)
     jobs = BrainJobs(db, ks, Feeds(db, ks))

@@ -22,6 +22,9 @@ from datetime import datetime, timezone
 from .db import DB
 
 ETA, FLOOR = 0.05, 0.05
+# owner 2026-11-26: the nightly brain lessons are stopped — over 526 cases the days with lessons were no better
+# (44.5 % vs 44.9 %); the error autopsy (plan step 11, rule-based, no brain) takes their place. Calibration stays.
+LESSONS_OFF = True
 MAX_ROWS = 20000
 WINDOW = {"15m": 20, "30m": 30, "1h": 60, "4h": 180, "1d": 1100, "3d": 1100, "1w": 1100, "10d": 1100, "1mo": 1100}
 SKIP = ("rw", "up", "consensus", "terazi", "vahid")
@@ -144,6 +147,8 @@ def day_errors(db: DB, now: float) -> list[dict]:
 
 
 def active_lessons(db: DB, now: float | None = None) -> list[str]:
+    if LESSONS_OFF:
+        return []
     db.script(LESSONS_SCHEMA)
     now = time.time() if now is None else now
     return [r["text"] for r in db.execute("SELECT text FROM lessons WHERE active=1 AND ts > ? ORDER BY ts DESC LIMIT 3",

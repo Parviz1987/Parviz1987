@@ -266,3 +266,10 @@ Sahib 12 addımı bir-bir müzakirə edib təsdiqlədi («12 keç»). Plan səhi
 - **s12:** Hakim: real sınaq sayı, enməyən hədd, DSR ≥ 0,95, PBO ≤ 0,10 (purge/embargo), gələcəyə baxma qadağası.
 
 İcra sırası dəyişmir: A → B → C → D → E → F. Sahibdən gözlənən: Gemini açarı (ödənişli), healthchecks.io hesabı, 2FA-nı açmaq.
+
+### 5.1 Blok qərarları (sahib, 26.11.2026: «3 qərarı sənin təkliflərinlə razıyam»)
+1. **Mövsüm və zərgərlik tələbi** (`season`, `jewel`): istiqamət səsi yox, dalğalılıq işarəsi kimi — əvvəl kölgədə, Hakimin
+   nəticəsi ilə qərar.
+2. **Gecə dərsləri dayandırılır** (526 halda fayda yoxdur: 44,5 % və 44,9 %): beyin pulu xərclənmir; yerinə addım 11-in
+   beyinsiz səhv yarılması.
+3. **Fundamental çəkilər** son 2–3 ilin hərəkət edən pəncərəsi ilə yenidən hesablanır (2022 qırılması) — əvvəl kölgədə.

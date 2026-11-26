@@ -427,6 +427,11 @@ class BrainJobs:
         self.db.execute("UPDATE lessons SET active=0 WHERE ts < ?", (now - 7 * 86400,))
         self.db.script(learning.PROPOSALS_SCHEMA)
         await asyncio.to_thread(learning.judge_proposals, self.db, now)   # decided every night, quiet or not
+        if learning.LESSONS_OFF:     # owner 2026-11-26: no effect in 526 cases (44.5 % vs 44.9 %) -> no brain spend
+            self.db.execute("UPDATE lessons SET active=0")
+            self.db.put("sleep:last", json.dumps({"ts": now, "errors": len(errors), "lessons": 0,
+                                                  "note": "gecə dərsləri dayandırılıb (sahibin qərarı)"}))
+            return 0
         if len(errors) < 2:
             self.db.put("sleep:last", json.dumps({"ts": now, "errors": len(errors), "lessons": 0}))
             return 0
