@@ -78,3 +78,12 @@ def test_hunter_stage_counts_official_actuals_too():
                          "previous": None, "actual": 1.8, "raw_date": "", "known_ts": now}])
     assert official.plan("Prelim GDP Price Index q/q")[1] == "A191RI1Q225SBEA"
     assert pipeline.release_counts(db, now, now - 86400) == (1, 1, 0)       # known from the agency, not missed
+
+
+def test_geo_place_is_local_and_never_for_private_addresses(tmp_path):
+    from app import geo
+    assert geo.place("192.168.1.5", tmp_path / "x.sqlite3") is None
+    assert geo.place("not-an-ip", tmp_path / "x.sqlite3") is None
+    assert geo.place("8.8.8.8", tmp_path / "x.sqlite3") is None            # no file yet: no place, no error
+    assert geo.stale(tmp_path / "x.sqlite3")
+    assert geo.label({"city": "Baku", "country": "Azerbaijan"}) == "Baku, Azerbaijan" and geo.label(None) == "—"

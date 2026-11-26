@@ -67,7 +67,7 @@ MACRO_SERIES = {
     "DCOILWTICO": "Neft WTI (gündəlik), $",
 }
 SOURCE_IDS = ("rss", "forexfactory", "fred", "cot", "alpaca", "fmp", "official", "kalshi", "etf", "imf", "sge", "gld",
-              "amfi")
+              "amfi", "geo")
 # Block 9. Kalshi: market-implied odds of the next Fed decisions (public market data, no key).
 KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
 KALSHI_SERIES = ("KXFEDDECISION", "KXFED", "FEDDECISION", "FED")
@@ -415,7 +415,7 @@ class Feeds:
         self.keys = keys
         db.script(SCHEMA)
         self.next_run = {"news": 0.0, "calendar": 0.0, "macro": 0.0, "cot": 0.0, "alpaca": 0.0, "fmp": 0.0,
-                         "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0, "sge": 0.0, "gld": 0.0, "amfi": 0.0}
+                         "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0, "sge": 0.0, "gld": 0.0, "amfi": 0.0, "geo": 0.0}
         self.activity = None      # app.activity.Hub: where each collector reports its status
         db.script(surprise.SCHEMA)
 
@@ -593,6 +593,15 @@ class Feeds:
                          if rows else "GLD faylında sətir yoxdur", len(rows))
         except Exception as e:
             self._health("gld", False, f"GLD: {str(e)[:120]}")
+
+    async def geo(self, client) -> None:
+        """DB-IP's free city database for the security journal's places, refreshed once a month (read locally only)."""
+        from . import geo
+        try:
+            msg = await geo.refresh(client, self.db.path)
+            self._health("geo", True, f"DB-IP şəhər bazası: {msg} (ünvanlar heç yerə göndərilmir)", 1)
+        except Exception as e:
+            self._health("geo", False, f"DB-IP: {str(e)[:120]}")
 
     async def amfi(self, client, now: float | None = None) -> None:
         """India's gold ETF net flow per month from AMFI's official report: the newest months every six hours (the
@@ -788,14 +797,14 @@ class Feeds:
                 # official actuals: every minute around a release (the agencies publish at the minute)
                 "official": (self.official, 60 if self._recent_release(now) else 900),
                 "kalshi": (self.kalshi, 900), "etf": (self.etf, 300), "imf": (self.imf_gold, 86400),
-                "sge": (self.sge, 3600), "gld": (self.gld, 6 * 3600), "amfi": (self.amfi, 6 * 3600)}
+                "sge": (self.sge, 3600), "gld": (self.gld, 6 * 3600), "amfi": (self.amfi, 6 * 3600), "geo": (self.geo, 86400)}
         async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
             for name, (fn, every) in jobs.items():
                 if force == name or (force is None and now >= self.next_run[name]):
                     self.next_run[name] = now + every
                     task = {"news": "news", "alpaca": "news", "calendar": "calendar", "fmp": "calendar",
                             "macro": "macro", "cot": "macro", "official": "calendar", "kalshi": "macro",
-                            "etf": "macro", "imf": "macro", "sge": "macro", "gld": "macro", "amfi": "macro"}[name]
+                            "etf": "macro", "imf": "macro", "sge": "macro", "gld": "macro", "amfi": "macro", "geo": "macro"}[name]
                     if self.activity:
                         self.activity.report(task, "working", note=name)
                     try:

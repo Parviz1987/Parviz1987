@@ -139,8 +139,21 @@ def _update_log(db_path: str) -> list[str]:
 
 
 def _security(db: DB) -> dict:
+    """The counts and alerts; for the failed logins of the last day only the PLACE (city, country), never the address:
+    the outside reviewer must not see anyone's IP."""
+    from . import geo
     from .security import Guard
-    return Guard(db).summary()
+    out = Guard(db).summary()
+    places: dict[str, int] = {}
+    for r in db.execute("SELECT ip FROM sec_events WHERE kind IN ('login_fail', 'login_blocked', 'diag_bad_token') "
+                        "AND ts > ?", (time.time() - 86400,)).fetchall():
+        k = geo.label(geo.place(r["ip"], db.path)) if r["ip"] else "—"
+        places[k] = places.get(k, 0) + 1
+    out["fail_places"] = places
+    for a in out.get("alerts", []):
+        a["place"] = geo.label(geo.place(a.get("ip"), db.path))
+        a.pop("ip", None)
+    return out
 
 
 def _memory() -> dict:

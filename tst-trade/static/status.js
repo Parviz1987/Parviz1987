@@ -70,8 +70,9 @@ async function load() {
   $("s-sec").innerHTML = `<p>${pill((sec.alerts || []).length ? null : true, (sec.alerts || []).length ? "baxın" : "sakit")}
       Son 24 saat: səhv parol ${cnt.login_fail || 0}, bloklanan ${cnt.login_blocked || 0}, giriş ${(cnt.login_ok || 0) + (cnt.login_new_ip || 0)},
       yeni ünvandan giriş ${cnt.login_new_ip || 0}. İndi bloklu ünvan: ${(sec.blocked_now || []).length}. Tanınan ünvan: ${sec.known_ips || 0}.</p>` +
-    ((d.security_events || []).length ? `<table><tr><th>Vaxt</th><th>Hadisə</th><th>Ünvan</th><th>Qeyd</th></tr>` +
-      d.security_events.map((e) => `<tr><td>${ago(e.ts)}</td><td>${esc(e.kind_az)}</td><td class="n">${esc(e.ip)}</td><td>${esc(e.detail)}</td></tr>`).join("") + "</table>" : "") +
+    ((d.security_events || []).length ? `<table><tr><th>Vaxt</th><th>Hadisə</th><th>Ünvan</th><th>Yer</th><th>Qeyd</th></tr>` +
+      d.security_events.map((e) => `<tr><td>${ago(e.ts)}</td><td>${esc(e.kind_az)}</td><td class="n">${esc(e.ip)}</td><td>${esc(e.place || "—")}</td><td>${esc(e.detail)}</td></tr>`).join("") + "</table>" +
+      `<p class="note">Yer (şəhər, ölkə): <a href="https://db-ip.com" rel="noopener" target="_blank">IP Geolocation by DB-IP</a> — pulsuz baza serverdə saxlanır, ünvanlar heç yerə göndərilmir; dəqiqliyi təxminidir.</p>` : "") +
     `<p class="note">Server firewall-u: internetdən yalnız sayt (80/443) açıqdır, SSH bağlıdır. 15 dəqiqədə 5 səhv parol → həmin ünvan 15 dəqiqə bloklanır.</p>`;
   $("sumbar").hidden = false;
   $("sumbar").className = "evbanner" + (problems.length ? "" : " okbar");

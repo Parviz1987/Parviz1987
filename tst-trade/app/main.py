@@ -195,7 +195,11 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.get("/api/admin/status")
     async def status_data():
         rep = await asyncio.to_thread(diag.report, db, store, engine, feeds, jobs, _commit())
-        return {**rep, "security_events": sec.recent(30)}
+        from . import geo
+        ev = sec.recent(30)
+        for e in ev:
+            e["place"] = geo.label(geo.place(e.get("ip"), db.path))
+        return {**rep, "security_events": ev}
 
     @app.get("/api/diag")
     async def diagnostics(request: Request):
