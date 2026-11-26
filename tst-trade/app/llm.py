@@ -54,7 +54,10 @@ def _anthropic_err(e, model: str) -> LLMError:
     if isinstance(e, anthropic.APITimeoutError):
         return LLMError("Anthropic: cavab vaxtında gəlmədi", None, hint="timeout")
     if isinstance(e, anthropic.APIConnectionError):
-        return LLMError("Anthropic: qoşulmaq alınmadı", None, hint="connect")
+        # «connect» (nothing sent) only when the connection itself failed; a dropped answer may already be billed
+        sent = not isinstance(getattr(e, "__cause__", None), (httpx.ConnectError, httpx.ConnectTimeout))
+        return LLMError("Anthropic: bağlantı kəsildi" if sent else "Anthropic: qoşulmaq alınmadı", None,
+                        hint="timeout" if sent else "connect")
     st = getattr(e, "status_code", None)
     resp = getattr(e, "response", None)
     ra = _retry_after(getattr(resp, "headers", None)) if resp is not None else None
@@ -167,7 +170,7 @@ async def _responses_search(base: str, key: str, model: str, system: str, user: 
                             max_tokens: int) -> tuple[dict, int, int, int]:
     """OpenAI-style Responses API with server-side search tools (xAI and OpenAI share the shape)."""
     body = {"model": model, "input": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "tools": tools, "max_output_tokens": max_tokens}
+            "tools": tools, "max_output_tokens": max_tokens, "max_tool_calls": 5}
     async with httpx.AsyncClient(timeout=180.0) as c:
         r = await c.post(f"{base}/v1/responses", headers={"Authorization": f"Bearer {key}"}, json=body)
     if r.status_code != 200:
@@ -211,7 +214,9 @@ async def _anthropic_search(key: str, model: str, system: str, user: str, max_to
                 break
             messages.append({"role": "assistant", "content": r.content})
     except (anthropic.APIStatusError, anthropic.APIConnectionError) as e:
-        raise _anthropic_err(e, model) from e
+        err = _anthropic_err(e, model)
+        err.partial = (tin, tout, calls)             # earlier rounds were paid
+        raise err from e
     finally:
         await client.close()
     if r.stop_reason == "refusal":

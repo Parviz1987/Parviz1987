@@ -166,6 +166,9 @@ def _caller(db: DB, slot: str, system: str, user: str, schema: dict | None, max_
             from . import llmrouter
             kind = "timeout" if isinstance(e, asyncio.CancelledError) else llmrouter.classify(e)[0]
             usd = worst if kind in ("timeout", "output", "refusal", "other") else 0.0
+            part = getattr(e, "partial", None)          # rounds of a search that were paid before it failed
+            if part and not usd:
+                usd = llm.cost(model, part[0], part[1]) + part[2] * llm.SEARCH_CALL_USD
             try:
                 db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,?,?)",
                            (_time.time(), slot, provider, model, usd,
@@ -219,19 +222,20 @@ async def run_both(db: DB, keys: KeyStore, slot: str, system: str, user: str,
     if spent(db, slot) >= float(cfg["month_usd"]):
         return [(None, f"aylıq limit doldu ({cfg['month_usd']} $)")]
     fn = _caller(db, slot, system, user, None, max_tokens, True)
-    ctx = llmrouter.budget()           # one request: 4 calls and 120 s across all three brains
-    out = []
-    for provider, model in ((cfg["provider"], cfg["model"]), (cfg.get("fallback"), cfg.get("fallback_model"))):
+
+    async def one(provider, model):
         if not provider or not model:
-            out.append((None, "ikinci beyin seçilməyib"))
-            continue
-        data, p, m, _, errors = await llmrouter.call(db, slot, [(provider, model, keys.first(provider))], fn, ctx)
-        out.append((data, f"{p} · {m}") if data is not None else (None, "; ".join(errors)))
+            return None, "ikinci beyin seçilməyib"
+        # each brain its own limits (4 calls, 120 s): the two independent answers are asked at the same time
+        data, p, m, _, errors = await llmrouter.call(db, slot, [(provider, model, keys.first(provider))], fn)
+        return (data, f"{p} · {m}") if data is not None else (None, "; ".join(errors) or f"{provider}: cavab yoxdur")
+    out = list(await asyncio.gather(one(cfg["provider"], cfg["model"]),
+                                    one(cfg.get("fallback"), cfg.get("fallback_model"))))
     # 2026-11-26: Gemini answered «quota exceeded» — one company's technical failure must not silence the agent.
     # The spare brain (a third company, not one already asked) stands in, so two DIFFERENT companies still agree.
     asked = {cfg.get("provider"), cfg.get("fallback")}
     if any(d is None for d, _ in out) and SPARE[0] not in asked and keys.first(SPARE[0]):
-        data, p, m, _, errors = await llmrouter.call(db, slot, [(SPARE[0], SPARE[1], keys.first(SPARE[0]))], fn, ctx)
+        data, p, m, _, errors = await llmrouter.call(db, slot, [(SPARE[0], SPARE[1], keys.first(SPARE[0]))], fn)
         if data is not None:
             k = next(n for n, (d, _) in enumerate(out) if d is None)
             out[k] = (data, f"{p} · {m} (əvəzedici)")

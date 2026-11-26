@@ -35,6 +35,21 @@
       return `<tr><td>${esc(NAMES[c.id] || c.id)}${c.urgent ? " <b>(təcili)</b>" : ""}</td><td>${st2}</td><td>${esc(when(l.ts))}</td><td>${esc(l.msg || "")}</td></tr>`;
     }).join("");
     $("ops-watch").innerHTML = head + (w.key ? `<table><tr><th>Yoxlama</th><th>Son siqnal</th><th>Vaxt</th><th>Qeyd</th></tr>${rows}</table>` : "");
+    const rp = st.repair || {};
+    const revs = (rp.reviews || []).filter((r) => r.status === "açıq").map((r) => `<tr><td>${esc(when(r.ts))}</td><td>${esc(r.fault)}</td>
+      <td>${r.count} dəfə / 7 gün</td><td><input class="inp" id="rv-${r.id}" placeholder="düzəldildi: ... / qəbul edildi: ..."><button class="btn" data-rv="${r.id}">Bağla</button></td></tr>`).join("");
+    const acts = (rp.actions || []).slice(0, 8).map((a) => `<tr><td>${esc(when(a.ts))}</td><td>${esc(a.action)}</td><td>${esc(a.evidence)}</td><td>${esc(a.result)}</td></tr>`).join("");
+    $("ops-watch").innerHTML += (revs ? `<h3>Açıq araşdırmalar</h3><table><tr><th>Vaxt</th><th>Nasazlıq</th><th>Təkrar</th><th></th></tr>${revs}</table>` : "") +
+      `<h3>Avtomatik təmir jurnalı</h3>` + (acts ? `<table><tr><th>Vaxt</th><th>Addım</th><th>Sübut</th><th>Nəticə</th></tr>${acts}</table>` : `<p class="note">Hələ heç bir addım atılmayıb.</p>`);
+    $("ops-watch").querySelectorAll("button[data-rv]").forEach((b) => {
+      b.onclick = async () => {
+        const id = b.dataset.rv;
+        const r = await fetch("/api/admin/ops/review/" + id, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: $("rv-" + id).value }) });
+        const d = await r.json().catch(() => ({}));
+        $("ops-msg").textContent = r.ok ? "Bağlandı." : (d.detail || "xəta");
+        load();
+      };
+    });
   }
   async function load() {
     try { render(await call("GET")); } catch (e) { /* the admin page shows other sections anyway */ }

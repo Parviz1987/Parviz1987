@@ -120,7 +120,7 @@ class Router:
         («half open»); the others wait until it has answered."""
         now = time.time() if now is None else now
         r = self._row(provider, model)
-        if r["off"] and r["key_fp"] and r["key_fp"] != _fp(key):
+        if r["off"] and r["off"] != "model" and r["key_fp"] and r["key_fp"] != _fp(key):
             r.update(off=None, note=None, until=0)       # a new key was saved: whatever the cause, try again
             self._save(r)
             return True, ""
@@ -134,8 +134,12 @@ class Router:
             h = self._half(provider, model)
             if h is not None and now - h < HALF_TEST:
                 return False, "sınaq sorğusu gedir"
-            self.db.execute("INSERT OR REPLACE INTO llm_half VALUES(?,?,?)", (provider, model, now))
+            return True, "test"                          # the caller marks it just before the call goes out
         return True, ""
+
+    def mark_test(self, provider: str, model: str, now: float | None = None) -> None:
+        self.db.execute("INSERT OR REPLACE INTO llm_half VALUES(?,?,?)",
+                        (provider, model, time.time() if now is None else now))
 
     def ok(self, provider: str, model: str) -> None:
         self.db.execute("DELETE FROM llm_half WHERE provider=? AND model=?", (provider, model))
@@ -165,7 +169,7 @@ class Router:
             if kind == "model" and suggested:
                 self.propose(provider, model, suggested)
         elif kind == "daily":
-            r.update(until=now + (wait or _to_pacific_midnight(now)), note="gündəlik kvota bitib")
+            r.update(until=now + max(wait or 0, _to_pacific_midnight(now)), note="gündəlik kvota bitib")
         elif kind == "rate" and wait and wait > 30:
             r.update(until=now + wait, note="sorğu limiti")
         elif kind == "timeout":
@@ -230,6 +234,8 @@ async def call(db: DB, slot: str, chain: list[tuple[str, str, str | None]], fn, 
                 return None, None, None, False, errors
             ctx["calls"] += 1
             tries += 1
+            if why == "test" and tries == 1:
+                rt.mark_test(provider, model)          # only now: the one half-open test is really going out
             try:
                 res = await asyncio.wait_for(fn(provider, model, key), timeout=left)
             except asyncio.CancelledError:

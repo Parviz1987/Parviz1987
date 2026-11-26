@@ -132,7 +132,8 @@ def test_half_open_lets_exactly_one_test_call_and_a_failed_test_reopens_longer()
     r = rt._row("a", "m")
     assert r["until"] > now and r["backoff"] == 600
     later = r["until"] + 1
-    assert rt.usable("a", "m", "k", later)[0]                     # the one test call
+    assert rt.usable("a", "m", "k", later) == (True, "test")      # the one test call...
+    rt.mark_test("a", "m", later)                                 # ...marked when it really goes out
     assert not rt.usable("a", "m", "k", later + 1)[0]             # others wait for it
     rt.failed("a", "m", "overload", None, "k", "busy", now=later + 2)
     r2 = rt._row("a", "m")
@@ -155,7 +156,7 @@ def test_billing_off_is_tested_again_after_six_hours_and_a_new_key_clears_it():
     assert rt2.usable("gemini", "g", "k2")[0]                      # the owner saved a new (paid) key
 
 
-def test_run_both_shares_one_budget_of_calls():
+def test_run_both_asks_both_brains_side_by_side_with_one_retry_each():
     import asyncio as aio
     from app.keys import KeyStore
     db = DB(":memory:")
@@ -179,7 +180,8 @@ def test_run_both_shares_one_budget_of_calls():
     finally:
         llm.search = real
         llmrouter.asyncio.sleep = rs
-    assert all(d is None for d, _ in out) and len(n) <= llmrouter.MAX_CALLS
+    assert all(d is None for d, _ in out) and all(lbl for _, lbl in out)
+    assert n.count("gemini") == 2 and n.count("openai") == 2       # one retry each, asked side by side
 
 
 def test_a_timed_out_call_counts_its_worst_cost():

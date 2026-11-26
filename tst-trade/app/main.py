@@ -102,7 +102,18 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                     except Exception:
                         log.exception("alive signal failed")
                     await asyncio.sleep(300)
+            async def _repair():               # plan step 4: the allowed-steps catalogue, every minute
+                from . import repair
+                rep = repair.Repairer(db, engine)
+                while True:
+                    await asyncio.sleep(60)
+                    try:
+                        for x in rep.check():
+                            log.info("repair: %s", x)
+                    except Exception:
+                        log.exception("repair check failed")
             asyncio.get_running_loop().create_task(heart.run())
+            asyncio.get_running_loop().create_task(_repair())
             asyncio.get_running_loop().create_task(_alive())
             asyncio.get_running_loop().create_task(_cleanup())
             asyncio.get_running_loop().create_task(_conductor())
@@ -968,9 +979,20 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     @app.get("/api/admin/ops")
     async def ops_state():
-        """The «stop automatic repair» switch and the outside watcher's state (no addresses, no key)."""
-        from . import ops
-        return {**ops.state(db), "watcher": heart.view()}
+        """The «stop automatic repair» switch, the repair journal and the outside watcher's state (no addresses)."""
+        from . import ops, repair
+        return {**ops.state(db), "watcher": heart.view(), "repair": repair.view(db)}
+
+    @app.post("/api/admin/ops/review/{rid}")
+    async def ops_review_close(rid: int, request: Request):
+        from . import repair
+        b = await request.json()
+        note = str(b.get("note") or "").strip()
+        if not note:
+            raise HTTPException(400, "səbəbi yazın: «düzəldildi» (nə ilə) və ya «qəbul edildi» (niyə)")
+        repair.close_review(db, rid, note)
+        sec.log("review_closed", _ip(request), f"{rid}: {note[:80]}")
+        return {"ok": True}
 
     @app.post("/api/admin/ops")
     async def ops_set(request: Request):

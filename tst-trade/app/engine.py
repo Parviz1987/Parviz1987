@@ -179,7 +179,11 @@ class Engine:
         self._stop = asyncio.Event()
 
     # ---------- price source ----------
+    fallback_until = 0.0        # the repair catalogue's price_fallback: gold-api.com until this time (repair.py)
+
     def chosen_provider(self) -> str:
+        if self.fallback_until and time.time() < self.fallback_until:
+            return "goldapi"
         return self.db.get("setting:price_provider") or self.default_provider
 
     def _make_provider(self):

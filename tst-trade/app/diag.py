@@ -150,8 +150,8 @@ def _experiments(db: DB) -> dict | None:
 
 def _ops(db: DB) -> dict:
     """The owner's «stop automatic repair» switch: while it is on, the duty check only reads and reports."""
-    from . import ops
-    return ops.state(db)
+    from . import ops, repair
+    return {**ops.state(db), "repair": repair.view(db)}
 
 
 def _router(db: DB) -> dict:
