@@ -520,5 +520,8 @@ def run(db: DB) -> dict:
     x = shadowtests.run(db)
     from . import aci                  # plan step 9: the range correction, tested on the past first
     c = aci.shadow(db)
+    from . import autopsy              # plan step 11: once a month, why the forecasts missed
+    if autopsy.due(db):
+        autopsy.run(db)
     return {"audit_s": a.get("seconds"), "shadow_s": s.get("seconds"), "experiments_s": x.get("seconds"),
             "aci_s": c.get("seconds")}

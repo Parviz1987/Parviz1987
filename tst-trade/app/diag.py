@@ -139,6 +139,18 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _autopsy(db: DB) -> dict | None:
+    """Plan step 11: why the headline forecasts missed (monthly; causes, slices, who misled, four boxes)."""
+    try:
+        from . import autopsy
+        v = autopsy.view(db)
+        return v and {"computed": v.get("computed"), "totals": v.get("totals"), "hints": v.get("hints"),
+                      "desks": {k: {x: d.get(x) for x in ("n", "miss_rate", "causes", "boxes", "range_drift")}
+                                for k, d in (v.get("desks") or {}).items()}}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _aci(db: DB) -> dict | None:
     """Plan step 9: the 80 % range with the adaptive correction, replayed on the past (shadow)."""
     try:
@@ -339,6 +351,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "ops": _ops(db),
         "experiments": _experiments(db),
         "aci": _aci(db),
+        "autopsy": _autopsy(db),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

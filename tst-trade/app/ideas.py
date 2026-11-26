@@ -202,6 +202,13 @@ def memory(db: DB, records: dict) -> str:
                                       f"adx={ {k: (v['n'], v['hit_rate']) for k, v in (x.get('by_adx') or {}).items()} } "
                                       f"metals={ {m: (v['n'], v['hit_rate']) for m, v in (x.get('by_metal') or {}).items()} }"))
     cells.sort(reverse=True)
+    try:                                # plan step 11: a miss cause far more frequent than before is a lead to test
+        from . import autopsy
+        for h in (autopsy.view(db) or {}).get("hints") or []:
+            cells.insert(0, (10 ** 9, f"SƏHV YARILMASI: «{h['cause']}» səbəbli qaçırışlar {h['share']} (əvvəl "
+                                      f"{h['before']}), z={h['z']} — bunu aradan qaldıran filtr fikri sınana bilər"))
+    except Exception:
+        pass
     mem = [f"{r['rule'] or '-'} ({r['status']}): {r['spec']} — {r['why'] or ''} {('[' + r['reason'] + ']') if r['reason'] else ''}"
            for r in db.execute("SELECT * FROM ideas ORDER BY id DESC LIMIT 30").fetchall()]
     return ("Rule records (net = average result after the full cost per firing; R_net = stop+target result in risk "
