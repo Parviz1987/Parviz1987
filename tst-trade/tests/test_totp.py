@@ -47,3 +47,25 @@ def test_login_needs_the_code_when_on(tmp_path):
     assert anon.post("/login", data={"password": "pw", "code": "000000"}, follow_redirects=False).headers["location"] == "/login?e=code"
     ok = anon.post("/login", data={"password": "pw", "code": rec[0]}, follow_redirects=False)
     assert ok.headers["location"] == "/" and auth.COOKIE in ok.cookies
+
+
+def test_gemini_search_reads_json_from_a_grounded_answer(monkeypatch):
+    import asyncio
+    import httpx
+    from app import llm
+
+    class R:
+        status_code = 200
+
+        def json(self):
+            return {"candidates": [{"content": {"parts": [{"text": 'Found it: {"found": true, "value": 128450, '
+                                                                    '"period": "2026-11-26", "source_url": "https://x"}'}]},
+                                    "groundingMetadata": {"webSearchQueries": ["ibja rate today", "ibja 999"]}}],
+                    "usageMetadata": {"promptTokenCount": 100, "candidatesTokenCount": 20}}
+
+    async def post(self, url, headers=None, json=None):
+        assert json["tools"] == [{"google_search": {}}] and "gemini-2.5-flash" in url
+        return R()
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    data, tin, tout, calls = asyncio.run(llm.search("gemini", "k", "gemini-2.5-flash", "s", "u"))
+    assert data["value"] == 128450 and calls == 2 and tin == 100

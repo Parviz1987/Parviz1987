@@ -301,6 +301,13 @@ class Engine:
             from . import brains as brain_cfg
             brain_cfg.save(self.db, "ideas", {"month_usd": 3})
             self.db.put("migr:ideas3_1125", "1")
+        if not self.db.get("migr:agents_gemini_1126"):
+            # The owner's decision (chat, 2026-11-26: «the idle APIs should be used»): the data agents search with
+            # Gemini (Google Search) and OpenAI (web search), two companies; the 10 $ monthly limit stays.
+            from . import brains as brain_cfg
+            brain_cfg.save(self.db, "reporter", {"provider": "gemini", "model": "gemini-2.5-flash",
+                                                 "fallback": "openai", "fallback_model": "gpt-5.4-nano"})
+            self.db.put("migr:agents_gemini_1126", "1")
         if not self.db.get("migr:reporter10_1125"):
             # The owner's decision (chat, 2026-11-25): the new «Bazar müxbiri» slot gets a 10 $ monthly limit.
             from . import brains as brain_cfg

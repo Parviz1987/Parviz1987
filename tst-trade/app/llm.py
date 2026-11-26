@@ -11,6 +11,7 @@ import httpx
 TIMEOUT = 60.0
 PRICES = {   # USD per 1M tokens (input, output)
     "claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50),
+    "gemini-2.5-flash": (0.30, 2.50), "gemini-2.5-flash-lite": (0.10, 0.40),
 }
 UNKNOWN_PRICE = (5.0, 25.0)
 
@@ -210,4 +211,31 @@ async def search(provider: str, key: str, model: str, system: str, user: str,
                                        [{"type": "web_search"}], max_tokens)
     if provider == "anthropic":
         return await _anthropic_search(key, model, system, user, max_tokens)
+    if provider == "gemini":
+        return await _gemini_search(key, model, system, user, max_tokens)
     raise LLMError(f"{provider}: canlı axtarış bu provayderdə qoşulmayıb")
+
+
+async def _gemini_search(key, model, system, user, max_tokens):
+    """Gemini with Google Search grounding (owner 2026-11-26: use the idle Gemini key for the data agents). A grounded
+    answer cannot be forced to JSON, so the JSON is read from the text; the number of Google queries is counted."""
+    body = {"systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": user}]}],
+            "tools": [{"google_search": {}}],
+            "generationConfig": {"maxOutputTokens": max_tokens}}
+    async with httpx.AsyncClient(timeout=TIMEOUT) as c:
+        r = await c.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                         headers={"x-goog-api-key": key}, json=body)
+    if r.status_code in (401, 403):
+        raise LLMError("Gemini: açar qəbul olunmadı")
+    if r.status_code != 200:
+        raise LLMError(f"Gemini: HTTP {r.status_code}: {r.text[:160]}")
+    j = r.json()
+    try:
+        cand = j["candidates"][0]
+        text = "".join(p.get("text", "") for p in cand["content"]["parts"])
+    except (KeyError, IndexError, TypeError) as e:
+        raise LLMError("Gemini: boş cavab") from e
+    calls = len((cand.get("groundingMetadata") or {}).get("webSearchQueries") or [])
+    u = j.get("usageMetadata") or {}
+    return _json(text), int(u.get("promptTokenCount") or 0), int(u.get("candidatesTokenCount") or 0), calls

@@ -244,4 +244,6 @@ def page(db: DB, sym: str, now: float | None = None) -> dict:
     out["now"] = {"vote": {"p": v[0], "basis": v[1]},
                   "rules": [{"rule": r, "dir": d, "note": n} for r, d, n in detect(data, sym, now)],
                   "judge": {m: {k: pick(m).get(k) for k in ("nh", "hit_rate", "bar", "status")} for m in ("xeber", "surprise")}}
+    from . import reporter
+    out["agents"] = reporter.agents_view(db, now)          # Məlumat agentləri: figures found on the web by two brains
     return out

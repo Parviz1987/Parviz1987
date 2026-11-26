@@ -447,14 +447,19 @@ def test_market_reporter_accepts_only_agreeing_figures_and_has_a_10_dollar_limit
 
     async def fake(db_, keys, slot, system, user, max_tokens=2000):
         assert slot == "reporter"
-        topic = "india_premium" if "Indian gold dealers" in user else "china_premium"
+        topic = next(t for t, x in reporter.TOPICS.items() if x["q"] in user)
         calls.append(topic)
-        return answers[topic]
+        return answers.get(topic, [({"found": False}, "a"), ({"found": False}, "b")])
     monkeypatch.setattr(brains, "run_both", fake)
     fri = datetime(2026, 11, 20, 14, tzinfo=timezone.utc).timestamp()
     r = reporter.Reporter(db, ks)
     assert asyncio.run(r.tick(fri)) == 1                       # India agreed (−12 / −13); China did not (10 / 30)
-    assert asyncio.run(r.tick(fri + 600)) == 0 and len(calls) == 2   # asked once a day
+    n_calls = len(calls)
+    assert {"india_premium", "china_premium", "ibja_rate", "pboc_gold"} <= set(calls)   # Friday's agents
+    assert asyncio.run(r.tick(fri + 600)) == 0 and len(calls) == n_calls             # asked once a day
+    view = {a["id"]: a for a in reporter.agents_view(db, fri + 700)}
+    assert view["india_premium"]["value"] == -12.5 and len(view["india_premium"]["sources"]) == 2
+    assert view["china_premium"]["value"] is None and not view["china_premium"]["last_ok"]
     got = reporter.accepted(db, "india_premium")
     assert got and got[0][1] == "2026-11-20" and got[0][2] == -12.5
     assert reporter.accepted(db, "china_premium") == []

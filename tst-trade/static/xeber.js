@@ -49,6 +49,20 @@
         <p class="note">Başlıqları Oxuyucu (AI) qiymətləndirir: metal, istiqamət, güc 0–3, mövzu. Eyni xəbərin surətləri bir dəfə oxunur.</p></div></div>
       <p class="note">Bu, sübut olmayan fikirdir: AL / SAT yalnız Hakimin sübutu ilə göstərilir.</p>`;
   }
+  function agentsBox() {
+    const ny = (t) => (t ? new Date(t * 1000).toLocaleString("en-GB", { timeZone: "America/New_York", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + " NY" : "—");
+    const num = (a) => a.value == null ? "—" : a.unit === "tarix" ? String(Math.round(a.value)).replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")
+      : Number(a.value).toLocaleString("en-US", { maximumFractionDigits: 3 }) + " " + a.unit;
+    const groups = {};
+    (data.agents || []).forEach((a) => (groups[a.group] = groups[a.group] || []).push(a));
+    $("agents").innerHTML = Object.entries(groups).map(([g, list]) => `<p><b>${esc(g)}</b></p><div class="tbl"><table class="sc">
+      <tr><th>Agent</th><th>Son təsdiqlənmiş rəqəm</th><th>Dövr</th><th>Mənbələr</th><th>Son cəhd</th><th>Növbəti</th></tr>` +
+      list.map((a) => `<tr><td>${esc(a.name)}</td><td><b>${esc(num(a))}</b></td><td>${esc(a.period || "—")}</td>
+        <td class="note">${(a.sources || []).map((s, i) => `<a href="${esc(s.url)}" rel="noopener noreferrer" target="_blank">${i + 1}</a>`).join(" · ") || "—"}</td>
+        <td class="note">${a.last_ts ? (a.last_ok ? "✅ " : "⚠️ ") + esc(a.last_note) + " · " + ny(a.last_ts) : "hələ axtarmayıb"}</td>
+        <td class="note">${ny(a.next_ts)}</td></tr>`).join("") + "</table></div>").join("") ||
+      "<p class='note'>agent yoxdur</p>";
+  }
   function bookBox() {
     $("book").innerHTML = (data.book || []).map((r) => {
       const x = r.record, rr = x && x.rr;
@@ -68,7 +82,7 @@
     seg($("cnt"), [[60, "60"], [120, "120"], [250, "250"]], cnt, (k) => { cnt = +k; save("cnt", cnt); go(); });
     try { const r = await fetch(`/api/xeber?symbol=${sym}`, { credentials: "same-origin" }); if (!r.ok) return; data = await r.json(); } catch (e) { return; }
     $("upd").textContent = "yeniləndi " + new Date().toLocaleTimeString("en-GB", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" }) + " NY";
-    draw(); nowBox(); topics(); bookBox();
+    draw(); nowBox(); agentsBox(); topics(); bookBox();
   }
   go(); setInterval(go, 120000);
 })();

@@ -108,15 +108,16 @@ BRAIN_SLOTS: list[dict] = [
      "requirements": [("Uydurmamaq", 50), ("Veb axtarışı", 30), ("Qiymət", 20)],
      "provider": "openai", "model": "gpt-5.4-nano", "fallback": "anthropic", "fallback_model": "claude-opus-5-5",
      "why": "İki fərqli şirkətin beyni bir-birini yoxlayır; FMP təqvimi olmadan faktı gətirmək üçün."},
-    {"id": "reporter", "name": "Bazar müxbiri",
+    {"id": "reporter", "name": "Məlumat agentləri (Bazar müxbiri)",
      "job": "Pulsuz rəsmi lenti olmayan fiziki bazar rəqəmlərini dərc olunmuş xəbərlərdə tapır: Hindistan və Çin "
             "premiumu (həftəlik), Hindistanın qızıl ETF axını və idxalı (aylıq). İki beyin ayrı-ayrı tapır, mənbə linki "
             "ilə; rəqəm və dövr üst-üstə düşməsə, heç biri istifadə olunmur.",
      "may_not": "Rəqəmi təxmin etmək və ya hesablamaq; tək beynin tapdığını istifadə etmək; qiymət yazmaq.",
      "requirements": [("Uydurmamaq", 50), ("Veb axtarışı", 30), ("Qiymət", 20)],
-     "provider": "openai", "model": "gpt-5.4-nano", "fallback": "anthropic", "fallback_model": "claude-haiku-5-5",
+     "provider": "gemini", "model": "gemini-2.5-flash", "fallback": "openai", "fallback_model": "gpt-5.4-nano",
      "why": "Hindistan tələbi üçün pulsuz rəsmi gündəlik mənbə yoxdur (IBJA pullu API); həftəlik xəbərlər var. "
-            "Sahibin qərarı (2026-11-25): aylıq limit 10 $."},
+            "Sahibin qərarı (2026-11-25): aylıq limit 10 $. 2026-11-26 (sahib: boş duran açarlardan istifadə et): "
+            "Gemini Google axtarışı ilə (ayda ~1 500 sorğuya qədər pulsuz) + OpenAI veb axtarışı — iki şirkət."},
     {"id": "ideas", "name": "Fərziyyə agenti",
      "job": "Həftədə bir dəfə tədqiqat yaddaşını oxuyur (hər qaydanın xərcdən sonrakı nəticəsi, rejim və metal üzrə, "
             "əvvəlki fikirlərin taleyi) və ən çox 2 yeni ölçülə bilən fikir təklif edir. Proqram fikri sərt şablonla "

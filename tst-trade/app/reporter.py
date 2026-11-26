@@ -5,11 +5,9 @@ brains from two companies independently (the Rəqəm ovçusu way): each figure m
 used only when both brains found the same figure for the same period. Nothing is estimated; no price comes from a
 brain — only a number printed in a news report (premium in dollars per ounce, tonnes, rupees).
 
-Topics and when they are asked (most reports come out on Friday; monthly figures in the first half of the month):
-- India premium/discount of local dealers over the official domestic price (Reuters «Asia gold», weekly)  Fri, Mon
-- China premium over the global price (cross-check of the Shanghai Gold Exchange data)                     Fri, Mon
-(India's gold ETF flow is no longer asked here: it comes from AMFI's official monthly report, feeds.amfi.)
-- India's gold imports for the last month (tonnes)                                                        Wed
+The data agents (Məlumat agentləri, owner 2026-11-26) are listed in TOPICS below with their days and hours: India
+(IBJA daily rate, premium, imports, RBI gold), China (premium, PBoC gold), the world (WGC ETF flows, COMEX stocks), the
+US (next FOMC date). India's gold ETF flow is not asked here: it comes from AMFI's official report (feeds.amfi).
 Monthly limit: the slot «reporter» (10 $ a month, the owner's decision)."""
 from __future__ import annotations
 
@@ -25,26 +23,61 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS market_reports (topic TEXT NOT NULL, period TEXT NOT NULL, value REAL, unit TEXT,
   ts REAL NOT NULL, a TEXT, b TEXT, accepted INTEGER NOT NULL, note TEXT, PRIMARY KEY (topic, period, ts));
 """
+# Each data agent: what it looks for, when (weekdays, UTC hour), the unit, how close the two brains must agree
+# (absolute, or relative with "rel"), its group on the page and what it feeds. Owner 2026-11-26: «build an agents
+# block inside the news block: what we cannot download, our idle brains find on the internet» — only figures printed
+# in news reports or official releases; never a site's members-only file or a page whose terms forbid automated use.
 TOPICS = {
-    "india_premium": {"days": (4, 0), "unit": "$/oz", "tol": 2.0,
+    "ibja_rate": {"days": (0, 1, 2, 3, 4), "hour": 8, "unit": "INR/10g", "tol": 0.002, "rel": True, "group": "Hindistan",
+                  "name": "IBJA qızıl qiyməti (999, 10 qram)",
+                  "q": "The India Bullion and Jewellers Association (IBJA) benchmark rate for 24-carat (999 purity) gold, "
+                       "in Indian rupees per 10 grams, for today's date (or the latest trading day), as printed in a news "
+                       "report (for example Economic Times, Business Standard, Moneycontrol). Use the opening/AM rate if "
+                       "two are quoted. Do not read ibjarates.com itself."},
+    "india_premium": {"days": (4, 0), "hour": 13, "unit": "$/oz", "tol": 2.0, "group": "Hindistan",
+                      "name": "Hindistan premiumu / endirimi",
                       "q": "Indian gold dealers' premium (positive) or discount (negative) over official domestic "
                            "prices (which include import and sales taxes), as reported in the most recent weekly "
                            "report (for example Reuters 'Asia Gold'). In US dollars per ounce. If a range is quoted, "
                            "give the mid-point (e.g. a discount of $10-$20 is -15)."},
-    "china_premium": {"days": (4, 0), "unit": "$/oz", "tol": 3.0,
+    "india_imports": {"days": (2,), "hour": 13, "unit": "tonnes", "tol": 0.10, "rel": True, "group": "Hindistan",
+                      "name": "Hindistanın aylıq qızıl idxalı",
+                      "q": "India's gold imports in the most recent month for which a figure has been published "
+                           "(government data or a major news report), in metric tonnes."},
+    "rbi_gold": {"days": (3,), "hour": 13, "unit": "tonnes", "tol": 0.01, "rel": True, "group": "Hindistan",
+                 "name": "Hindistan Mərkəzi Bankının (RBI) qızılı",
+                 "q": "The Reserve Bank of India's total gold reserves in metric tonnes, latest figure reported "
+                      "(RBI release or a major news report), with the month or date it refers to."},
+    "china_premium": {"days": (4, 0), "hour": 13, "unit": "$/oz", "tol": 3.0, "group": "Çin",
+                      "name": "Çin premiumu",
                       "q": "Chinese gold dealers' premium (positive) or discount (negative) over the global benchmark "
                            "spot price, as reported in the most recent weekly report (for example Reuters 'Asia Gold'). "
                            "In US dollars per ounce; mid-point if a range is quoted."},
-    "india_imports": {"days": (2,), "unit": "tonnes", "tol": 0.10, "rel": True,
-                      "q": "India's gold imports in the most recent month for which a figure has been published "
-                           "(government data or a major news report), in metric tonnes."},
+    "pboc_gold": {"days": (1, 4), "hour": 13, "unit": "mln oz", "tol": 0.001, "rel": True, "group": "Çin",
+                  "name": "Çin Mərkəzi Bankının (PBoC) qızılı",
+                  "q": "The People's Bank of China's official gold reserves at the end of the most recent month, in "
+                       "million fine troy ounces, as published by the PBoC / SAFE or reported by Reuters or Bloomberg."},
+    "wgc_etf": {"days": (1, 3), "hour": 14, "unit": "tonnes", "tol": 0.10, "rel": True, "group": "Dünya",
+                "name": "Dünya qızıl ETF axını (aylıq, WGC)",
+                "q": "Global gold ETF net flows in the most recent month in metric tonnes (positive = inflow), as "
+                     "published by the World Gold Council in its public press release or as reported by news "
+                     "(Reuters, Bloomberg, Kitco). Do not use members-only Goldhub downloads."},
+    "comex_stocks": {"days": (2,), "hour": 22, "unit": "mln oz", "tol": 0.02, "rel": True, "group": "Dünya",
+                     "name": "COMEX qızıl anbarı (registered + eligible)",
+                     "q": "Total COMEX gold warehouse stocks (registered plus eligible) in million troy ounces, the "
+                          "latest daily figure reported by CME Group or in a news report, with its date."},
+    "fomc_next": {"days": (0,), "hour": 14, "unit": "tarix", "tol": 0.0, "group": "ABŞ",
+                  "name": "Növbəti Fed (FOMC) qərar günü",
+                  "q": "The date of the next scheduled FOMC (Federal Reserve) policy decision announcement after today, "
+                       "from the Federal Reserve's published meeting calendar. Give value as a number YYYYMMDD and "
+                       "period as YYYY-MM."},
 }
 SYSTEM = ("You look up published figures about the physical gold market on the web. Report only a figure you actually "
           "find printed in a news report or official release, for the exact item asked, with the period it refers "
           "to. Never estimate or compute it yourself. If you cannot find it, set found to false. Answer ONLY with one "
           'JSON object: {"found": true|false, "value": number, "unit": "...", "period": "the week ending YYYY-MM-DD '
           'or the month YYYY-MM the figure refers to", "source_url": "the page you read it on"}')
-HOUR_UTC = 13          # asked once on the scheduled days, after Asian and European reports are out
+HOUR_UTC = 13          # the default hour; each agent has its own (IBJA in the Indian morning, COMEX after the close)
 
 
 def ensure(db: DB) -> None:
@@ -74,19 +107,18 @@ class Reporter:
 
     def due(self, now: float) -> list[str]:
         d = datetime.fromtimestamp(now, timezone.utc)
-        if d.hour < HOUR_UTC:
-            return []
         day = d.strftime("%Y-%m-%d")
         out = []
         for topic, t in TOPICS.items():
-            if d.weekday() in t["days"] and self.db.get(f"reporter:{topic}:day") != day:
+            if d.hour >= t.get("hour", HOUR_UTC) and d.weekday() in t["days"] and \
+                    self.db.get(f"reporter:{topic}:day") != day:
                 out.append(topic)
         return out
 
     async def tick(self, now: float | None = None) -> int:
         now = time.time() if now is None else now
         due = self.due(now)
-        if not due or not (self.keys.first("openai") or self.keys.first("anthropic")):
+        if not due or not (self.keys.first("gemini") or self.keys.first("openai") or self.keys.first("anthropic")):
             return 0
         rep = self.activity.report if self.activity else (lambda *a, **k: None)
         day = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%d")
@@ -124,6 +156,43 @@ class Reporter:
     def recent(self, limit: int = 12) -> list[dict]:
         return [{**dict(r), "a": json.loads(r["a"] or "null"), "b": json.loads(r["b"] or "null")}
                 for r in self.db.execute("SELECT * FROM market_reports ORDER BY ts DESC LIMIT ?", (limit,)).fetchall()]
+
+
+def agents_view(db: DB, now: float | None = None) -> list[dict]:
+    """The data agents for the news page: each one's last confirmed figure (period, value, both sources) and its last
+    attempt (found / not agreed / not found), and when it asks next."""
+    ensure(db)
+    now = time.time() if now is None else now
+    out = []
+    for topic, t in TOPICS.items():
+        acc = db.execute("SELECT * FROM market_reports WHERE topic=? AND accepted=1 ORDER BY ts DESC LIMIT 1",
+                         (topic,)).fetchone()
+        last = db.execute("SELECT * FROM market_reports WHERE topic=? ORDER BY ts DESC LIMIT 1", (topic,)).fetchone()
+        src = []
+        if acc:
+            for side in ("a", "b"):
+                try:
+                    x = json.loads(acc[side] or "null") or {}
+                except ValueError:
+                    x = {}
+                if x.get("url"):
+                    src.append({"url": x["url"], "brain": x.get("brain")})
+        d = datetime.fromtimestamp(now, timezone.utc)
+        nxt = None
+        for k in range(0, 8):
+            day = datetime.fromtimestamp(now + k * 86400, timezone.utc)
+            if day.weekday() in t["days"] and not (k == 0 and (d.hour >= t.get("hour", HOUR_UTC) and
+                                                           db.get(f"reporter:{topic}:day") == day.strftime("%Y-%m-%d"))):
+                nxt = day.replace(hour=t.get("hour", HOUR_UTC), minute=0, second=0).timestamp()
+                if nxt < now and k == 0 and db.get(f"reporter:{topic}:day") != day.strftime("%Y-%m-%d"):
+                    nxt = now
+                break
+        out.append({"id": topic, "name": t.get("name", topic), "group": t.get("group", ""), "unit": t["unit"],
+                    "value": acc["value"] if acc else None, "period": acc["period"] if acc else None,
+                    "found_ts": acc["ts"] if acc else None, "sources": src,
+                    "last_ts": last["ts"] if last else None, "last_ok": bool(last and last["accepted"]),
+                    "last_note": last["note"] if last else "hələ axtarmayıb", "next_ts": nxt})
+    return out
 
 
 def accepted(db: DB, topic: str) -> list[tuple[float, str, float]]:
