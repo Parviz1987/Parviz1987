@@ -139,6 +139,12 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _ops(db: DB) -> dict:
+    """The owner's «stop automatic repair» switch: while it is on, the duty check only reads and reports."""
+    from . import ops
+    return ops.state(db)
+
+
 def _heartbeat(db: DB) -> dict | None:
     """The outside watcher: is it set up, and each check's last signal (never the ping addresses)."""
     try:
@@ -302,6 +308,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "agents": _agents(db),
         "conductor": _conductor(db),
         "heartbeat": _heartbeat(db),
+        "ops": _ops(db),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

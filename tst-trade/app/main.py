@@ -949,6 +949,20 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         db.put("auth:guest_hash", auth.hash_password(pw))
         return {"guest": True}
 
+    @app.get("/api/admin/ops")
+    async def ops_state():
+        """The «stop automatic repair» switch and the outside watcher's state (no addresses, no key)."""
+        from . import ops
+        return {**ops.state(db), "watcher": heart.view()}
+
+    @app.post("/api/admin/ops")
+    async def ops_set(request: Request):
+        from . import ops
+        body = await request.json()
+        on = bool(body.get("paused"))
+        sec.log("ops_pause" if on else "ops_resume", _ip(request))
+        return ops.set_paused(db, on)
+
     @app.get("/api/admin/2fa")
     async def tfa_status():
         from . import totp

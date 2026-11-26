@@ -50,6 +50,14 @@
       <p id="tfa-state" class="note"></p>
       <div id="tfa-box"></div>
       <div class="msg" id="tfa-msg"></div></div></section>
+  <section class="adm"><h2>Avtomatik təmir və kənar nəzarətçi</h2>
+    <div class="box" style="max-width:620px;display:flex;flex-direction:column;gap:6px">
+      <p class="note">«Dayandır» basılı olanda sistem özü heç nəyi dəyişmir: avtomatik təmir addım atmır, növbətçi Claude yalnız
+        oxuyur və sizə yazır. Kənar nəzarətçi izləməyə davam edir.</p>
+      <p id="ops-state" class="note"></p>
+      <div class="btns"><button class="btn dan" id="ops-btn"></button></div>
+      <div id="ops-watch" class="tbl"></div>
+      <div class="msg" id="ops-msg"></div></div></section>
   <section class="adm"><h2>Tarixçə</h2>
     <div class="box"><p class="note">Tarixçə 1 gün və 1 həftəlik proqnozları keçmiş üzərində yoxlamaq üçündür. Twelve Data açarı ilə yüklənir (6 saatda bir özü də yenilənir).</p>
       <div class="btns"><button class="btn" id="hist">İndi yüklə və yoxla</button></div><div class="tbl" id="histres"></div></div></section>
@@ -68,5 +76,6 @@
 <script src="/static/admin_registry.js"></script>
 <script src="/static/admin_paper.js"></script>
 <script src="/static/admin_2fa.js"></script>
+<script src="/static/admin_ops.js"></script>
 <script src="/static/nav.js"></script>
 </body></html>

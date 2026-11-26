@@ -1,4 +1,5 @@
 import asyncio
+import json
 import math
 from pathlib import Path
 
@@ -383,3 +384,18 @@ def test_backtest_fills_only_the_methods_a_moment_lacks():
     assert db.execute("SELECT COUNT(*) n FROM forecasts WHERE method='vaxt' AND horizon='1h'").fetchone()["n"] == n_vx
     assert db.execute("SELECT COUNT(*) n FROM forecasts WHERE method='rw' AND horizon='1h'").fetchone()["n"] == n_rw
     assert db.execute("SELECT COUNT(*) n FROM forecasts WHERE method='rw' AND basis!='old'").fetchone()["n"] == 0
+
+
+def test_pause_switch_in_admin_and_diag(tmp_path):
+    from app import ops
+    c = TestClient(_app(tmp_path))
+    assert c.get("/api/admin/ops").status_code in (302, 303, 307, 401, 403)   # owner only
+    r = c.post("/login", data={"password": "pw"}, follow_redirects=False)
+    c.cookies.set(auth.COOKIE, r.cookies[auth.COOKIE])
+    st = c.get("/api/admin/ops").json()
+    assert st["paused"] is False and st["watcher"]["key"] is False and "hc-ping" not in json.dumps(st)
+    assert c.post("/api/admin/ops", json={"paused": True}).json()["paused"] is True
+    assert ops.paused(c.app.state.db)
+    assert c.post("/api/admin/ops", json={"paused": False}).json()["paused"] is False
+    kinds = [r["kind"] for r in c.app.state.db.execute("SELECT kind FROM sec_events").fetchall()]
+    assert "ops_pause" in kinds and "ops_resume" in kinds
