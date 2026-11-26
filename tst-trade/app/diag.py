@@ -229,7 +229,7 @@ def _agents(db: DB) -> dict:
     except Exception:
         calls = []
     from . import llm
-    return {"agents": [{k: a[k] for k in ("id", "value", "period", "last_ok", "last_note", "last_ts")}
+    return {"agents": [{k: a[k] for k in ("id", "value", "period", "last_ok", "last_note", "last_ts", "sources")}
                        for a in reporter.agents_view(db)], "calls": calls, "router": _router(db)}
 
 

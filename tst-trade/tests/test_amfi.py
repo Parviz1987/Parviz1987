@@ -87,3 +87,9 @@ def test_geo_place_is_local_and_never_for_private_addresses(tmp_path):
     assert geo.place("8.8.8.8", tmp_path / "x.sqlite3") is None            # no file yet: no place, no error
     assert geo.stale(tmp_path / "x.sqlite3")
     assert geo.label({"city": "Baku", "country": "Azerbaijan"}) == "Baku, Azerbaijan" and geo.label(None) == "—"
+
+
+def test_agent_periods_match_at_the_coarser_precision():
+    from app.reporter import _same_period
+    assert _same_period("2026-10", "2026-10-31") and _same_period("2026-11-26", "2026-11-26")
+    assert not _same_period("2026-10", "2026-11-02") and not _same_period("2026-11-25", "2026-11-26")

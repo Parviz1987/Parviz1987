@@ -91,6 +91,13 @@ def _period(p: str | None) -> str | None:
     return m.group(0)
 
 
+def _same_period(a: str, b: str) -> bool:
+    """The same period at the coarser of the two precisions: «2026-10» and «2026-10-31» are the same month (one brain
+    names the month, the other the day the monthly figure was published)."""
+    n = min(len(a), len(b))
+    return a[:n] == b[:n]
+
+
 def _agree(topic: str, a: float, b: float) -> bool:
     t = TOPICS[topic]
     if t.get("rel"):
@@ -148,12 +155,16 @@ class Reporter:
                 self.db.delete(f"reporter:{topic}:day")
                 self.db.put(f"reporter:{topic}:retry", str(now + 2 * 3600))
             a, b = (vals + [{}, {}])[:2]
-            accepted = (a.get("value") is not None and b.get("value") is not None and a.get("period")
-                        and a.get("period") == b.get("period") and _agree(topic, a["value"], b["value"]))
+            same_period = bool(a.get("period") and b.get("period") and _same_period(a["period"], b["period"]))
+            both = a.get("value") is not None and b.get("value") is not None
+            accepted = both and same_period and _agree(topic, a["value"], b["value"])
             value = round((a["value"] + b["value"]) / 2, 3) if accepted else None
+            # say exactly which part failed (2026-11-26: «numbers or periods differ» told nobody what to fix)
             note = ("iki beyin eyni rəqəmi eyni dövr üçün tapdı" if accepted else
                     f"{broken} beyin texniki xəta verdi: 2 saatdan sonra yenidən" if broken and tries < 3 else
-                    "rəqəmlər və ya dövrlər üst-üstə düşmür, ya biri tapmadı: istifadə olunmur")
+                    "bir beyin tapmadı: istifadə olunmur" if not both else
+                    f"dövrlər fərqlidir ({a.get('period')} və {b.get('period')}): istifadə olunmur" if not same_period
+                    else f"rəqəmlər fərqlidir ({a['value']} və {b['value']}): istifadə olunmur")
             self.db.execute("INSERT OR REPLACE INTO market_reports VALUES(?,?,?,?,?,?,?,?,?)",
                             (topic, (a.get("period") if accepted else day) or day, value, TOPICS[topic]["unit"], now,
                              json.dumps(a, ensure_ascii=False), json.dumps(b, ensure_ascii=False), int(bool(accepted)),
