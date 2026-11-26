@@ -566,7 +566,7 @@ class Feeds:
     async def release_dates(self, client, key: str) -> None:
         """The past dates of the big US releases (the conductor's «event» state needs them for the history, the
         calendar table only reaches a few days back). Once a day; stored as timestamps in kv «calendar:history»."""
-        if time.time() - float(self.db.get("calendar:history_ts") or 0) < 86400:
+        if time.time() - float(self.db.get("calendar:history_ts2") or 0) < 86400:
             return
         from zoneinfo import ZoneInfo
         ny = ZoneInfo("America/New_York")
@@ -578,8 +578,12 @@ class Feeds:
                                        params={"release_id": rid, "api_key": key, "file_type": "json",
                                                "include_release_dates_with_no_data": "false",
                                                "sort_order": "asc", "limit": 10000})
+                if isinstance(data, (bytes, str)):    # _get returns the raw body (2026-11-26: read as a dict, failed)
+                    data = json.loads(data)
+                if not isinstance(data, dict) or "release_dates" not in data:
+                    raise ValueError(str(data.get("error_message") if isinstance(data, dict) else "cavab başa düşülmədi"))
                 ts = []
-                for r in (data or {}).get("release_dates", []):
+                for r in data.get("release_dates", []):
                     d = datetime.strptime(r["date"], "%Y-%m-%d")
                     if d.year >= 2010:
                         ts.append(datetime(d.year, d.month, d.day, 8, 30, tzinfo=ny).timestamp())
@@ -587,8 +591,10 @@ class Feeds:
             except Exception as e:
                 errors.append(f"{name}: {str(e).replace(key, '***')}"[:120])
         if out:
-            self.db.put("calendar:history", json.dumps(out))
-        self.db.put("calendar:history_ts", str(time.time()))
+            hist = json.loads(self.db.get("calendar:history") or "{}")
+            hist.update(out)                           # keep the FOMC days stored by fomc_dates
+            self.db.put("calendar:history", json.dumps(hist))
+        self.db.put("calendar:history_ts2", str(time.time()))
         if errors:
             log.warning("release dates: %s", "; ".join(errors))
 

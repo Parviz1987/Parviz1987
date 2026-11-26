@@ -166,3 +166,20 @@ def test_fomc_calendar_page_is_parsed_and_a_strange_page_stores_nothing():
     d = datetime.fromtimestamp(ts[0], ZoneInfo("America/New_York"))
     assert (d.month, d.day, d.hour) == (1, 29, 14)
     assert parse_fomc("<h4>2025 FOMC Meetings</h4><p>redesigned</p>") == []
+
+
+def test_fred_release_dates_are_read_from_the_raw_body():
+    import asyncio
+    import json as _j
+    from app.feeds import Feeds
+    from app.keys import KeyStore
+    db = DB(":memory:")
+    f = Feeds(db, KeyStore(db, "s" * 64))
+    db.put("calendar:history", _j.dumps({"FOMC": [1.0]}))
+
+    async def fake_get(client, url, headers=None, **kw):
+        return _j.dumps({"release_dates": [{"release_id": 10, "date": "2026-11-13"}]}).encode()
+    f._get = fake_get
+    asyncio.run(f.release_dates(None, "k"))
+    hist = _j.loads(db.get("calendar:history"))
+    assert hist["FOMC"] == [1.0] and len(hist["CPI"]) == 1 and len(hist["Employment Situation"]) == 1

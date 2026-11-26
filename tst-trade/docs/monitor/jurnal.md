@@ -174,3 +174,15 @@
   xəbər bloku bir gündür şərt tapmayıb.
 - **Məlumat agentləri:** ehtiyat beyin texniki xətanı aradan qaldırdı (rbi_gold artıq «texniki xəta» yox, «rəqəmlər üst-üstə
   düşmür» yazır) — iki şirkət cavab verir, amma razılaşmır, ona görə qayda üzrə istifadə olunmur. Hələ uğurlu agent yoxdur.
+
+### 2026-11-26 16:48 (New York) — növbətçi yoxlama
+- **Təhlükəsizlik:** sakit (24 saatda uğursuz giriş yoxdur, başlıqlar yerində); 2FA hələ açılmayıb.
+- **Qiymət 0/4:** Şükran günü — ABŞ sessiyası tez bağlanıb, 18:00 NY-də açılmalıdır; avtomatik təmir (qısa gün) haqlı
+  olaraq toxunmadı. Növbəti yoxlamada yoxlanacaq.
+- **Tapılan və düzəldilən səhv:** FRED-dən keçmiş CPI/NFP/ÜDM/PCE tarixləri heç yazılmırdı (cavab xam mətn idi, mən
+  onu hazır obyekt kimi oxuyurdum) — test + düzəliş; FOMC tarixləri artıq gəlir.
+- **İlk kölgə nəticələri:** fundamental «son 3 il» bütün keçmişdən yaxşı deyil; bayram öncəsi dalğalılıq fərqi sübut
+  olunmayıb (qızıl 1,09x, t=0,9); ACI düzəlişi 16 masanın 14-ündə 77–83 %, indiki 15-ində — üstün deyil; Hakimin öz
+  yoxlaması: 20 təsadüfi qaydanın heç biri keçmədi, tam gələcəyə baxan tutuldu, 30 % baxan (64 % düz) tutulmadı.
+- **Xəbər bloku «qırıq» görünür:** 7 gündə səsin fikri yoxdur. 295 başlıq gəlir, amma Oxuyucu sutkada az işləyir və NW
+  qaydalarının qeydi görünmür — Faza E-də araşdırılacaq.
