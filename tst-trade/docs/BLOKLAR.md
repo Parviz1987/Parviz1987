@@ -4,9 +4,12 @@
 > **əvvəl bu faylı oxuyur**, sonra işləyir və işi bitirəndə bu faylı yeniləyir (vəziyyət, tarix, nə qaldı).
 > Blok sayı dəyişə bilər (6, 10, 25 — fərq etməz): yeni blok bu fayla eyni şablonla əlavə olunur.
 >
-> Əlaqəli fayllar: ümumi plan `docs/IS-PLANI.md` (12 addım və sahibin qərarları, bölmə 5), növbətçi təlimatı
-> `.claude/skills/temirci/SKILL.md`, səhvlər `docs/monitor/sehvlerim.md`, jurnal `docs/monitor/jurnal.md`,
-> araşdırmalar `/home/user/reports/` (sessiyadan kənarda saxlanmır — əsas nəticələri bu faylda yazılıb).
+> **Qərarlar harada:** sahibin bütün qərarları `docs/IS-PLANI.md` bölmə 5 (12 addım) və 5.1 (blok qərarları);
+> hər qərarın qısası həm də plan səhifəsində (claude.ai/artifact/TdikyZXX1gG51oqyw38YGt, «decisions»).
+> **Araşdırmalar:** `docs/research/` (özünü təmir edən sistem; dirijor və rejim çəkiləri).
+> **Canlı vəziyyət:** serverdə `/api/diag` → `blocks_audit`, `conductor`, `experiments`, `aci`, `autopsy`,
+> `judge_canary`, `heartbeat`, `ops`. Növbətçi təlimatı `.claude/skills/temirci/SKILL.md`, səhvlər
+> `docs/monitor/sehvlerim.md`, jurnal `docs/monitor/jurnal.md`.
 >
 > Son yeniləmə: **2026-11-26** (Claude). Vəziyyət işarələri: ✅ hazır və işləyir · 🟡 qurulub, sübut/məlumat
 > gözləyir · 🔧 qismən, işi var · ⛔ yoxdur / dayandırılıb · 👤 sahibin addımı lazımdır.
