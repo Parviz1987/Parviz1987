@@ -26,7 +26,9 @@ CREATE TABLE IF NOT EXISTS paper_orders (id INTEGER PRIMARY KEY AUTOINCREMENT, t
   method TEXT, dir INTEGER, oz REAL, entry REAL, stop REAL, target REAL, expires REAL, status TEXT, reason TEXT,
   exit REAL, exit_ts REAL, pnl REAL, cost REAL);
 """
-DEFAULTS = {"start_usd": 10000.0, "risk_pct": 0.5, "daily_loss_pct": 2.0, "open_risk_pct": 2.0}
+DEFAULTS = {"start_usd": 10000.0, "risk_pct": 0.5, "daily_loss_pct": 2.0, "open_risk_pct": 2.0, "max_drawdown_pct": 10.0}
+# owner's policy 2026-11-26: one method at most 25 % of the account (and never above half Kelly of its record), 2 % a
+# day, everything stops at a 10 % fall from the peak (it restarts only when the owner releases the stop)
 
 
 def ensure(db: DB) -> None:
@@ -71,8 +73,17 @@ def _day_pnl(db: DB, now: float) -> float:
                       (day0,)).fetchone()["p"]
 
 
+def _peak_drawdown(db: DB, s: dict) -> float:
+    eq = peak = s["start_usd"]
+    for r in db.execute("SELECT pnl FROM paper_orders WHERE status='bağlandı' ORDER BY exit_ts").fetchall():
+        eq += r["pnl"] or 0
+        peak = max(peak, eq)
+    return (peak - eq) / peak if peak > 0 else 0.0
+
+
 def propose(db: DB, sym: str, horizon: str, method: str, p_up: float, price: float | None, price_age: float,
-            lo80: float, hi80: float, expires: float, now: float) -> dict:
+            lo80: float, hi80: float, expires: float, now: float, size: float = 1.0, cap: float | None = None,
+            method_id: str | None = None) -> dict:
     """The risk engine: accept (filled at once in the simulator) or reject with the reason. Every proposal is kept."""
     from .judge import COST, SLIP
     ensure(db)
@@ -88,6 +99,11 @@ def propose(db: DB, sym: str, horizon: str, method: str, p_up: float, price: flo
     eq = _equity(db, s)
     if not why and -_day_pnl(db, now) >= eq * s["daily_loss_pct"] / 100:
         why = "günlük zərər limiti doldu"
+    if not why and _peak_drawdown(db, s) * 100 >= s.get("max_drawdown_pct", 10.0):
+        emergency(db, True)
+        why = f"zirvədən {s.get('max_drawdown_pct', 10.0):.0f} % düşüb: hər şey avtomatik dayandı"
+    if not why and size <= 0:
+        why = "Avtomatik Hakimin payı 0-dır"
     stop = lo80 if d > 0 else hi80
     dist = abs(price - stop) if price else 0
     if not why and (dist <= 0 or dist / price > 0.2):
@@ -95,8 +111,14 @@ def propose(db: DB, sym: str, horizon: str, method: str, p_up: float, price: flo
     cost_oz = price * COST.get(sym, 0) * (1 + SLIP) if price else 0
     oz = 0.0
     if not why:
-        budget = eq * s["risk_pct"] / 100
+        budget = eq * s["risk_pct"] / 100 * min(1.0, size)      # the automatic Judge's share (small step = quarter)
         oz = math.floor(budget / (dist + cost_oz) * 100) / 100
+        mid = method_id or method
+        held = db.execute("SELECT COALESCE(SUM(entry * oz), 0) v FROM paper_orders WHERE status='açıq' AND method=?",
+                          (mid,)).fetchone()["v"]
+        room = max(0.0, cap * eq - held) if cap is not None else None   # one method: half Kelly, ≤ 25 % of the account
+        if price and room is not None and oz * price > room:
+            oz = math.floor(room / price * 100) / 100
         open_risk = db.execute("SELECT COALESCE(SUM(ABS(entry - stop) * oz), 0) r FROM paper_orders WHERE status='açıq'"
                                ).fetchone()["r"]
         if oz <= 0:
@@ -168,8 +190,9 @@ def step(db: DB, engine, decisions: dict, now: float) -> None:
                                    (sym, h, now - 3600)).fetchone():
                 continue
             q = (engine.quotes or {}).get(sym) or {}
-            propose(db, sym, h, str(d.get("method")), d["p_up"], q.get("price"), now - (q.get("recv_ts") or 0),
-                    f["lo80"], f["hi80"], f["target_t"], now)
+            propose(db, sym, h, str(d.get("method_id") or d.get("method")), d["p_up"], q.get("price"),
+                    now - (q.get("recv_ts") or 0), f["lo80"], f["hi80"], f["target_t"], now,
+                    size=float(d.get("size", 1.0)), cap=float(d.get("cap", 0.25)))
     manage(db, now)
 
 

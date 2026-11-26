@@ -90,10 +90,12 @@ def method_final(db: DB, sym: str, horizon: str, method: str, now: float | None 
     if st is None:
         st = {"since": now, "status": "namizəd"}
         db.put(key, json.dumps(st))
-    if st["status"] in ("keçdi", "keçmədi", "insan yoxlaması"):
-        return st                                  # looked at once: never again (a possible leak waits for a person)
-    rows = db.execute("SELECT issued_t, p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND method=? "
-                      "AND mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5 ORDER BY issued_t",
+    if st["status"] in ("keçdi", "keçmədi"):
+        return st                                  # looked at once: never again
+    if st["status"] == "insan yoxlaması":          # an entry from before the policy: the Judge decides it itself now
+        st["status"] = "namizəd"
+    rows = db.execute("SELECT issued_t, target_t, p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND "
+                      "method=? AND mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5 ORDER BY issued_t",
                       (sym, horizon, method, st["since"])).fetchall()
     need = MIN_N.get(horizon, 100)
     st["n"], st["need"] = len(rows), need
@@ -122,16 +124,22 @@ def method_final(db: DB, sym: str, horizon: str, method: str, now: float | None 
         st["gates"] = judgeplus.gates([x - cost for x in rets], hits, [r["p_up"] for r in rows], ys,
                                       max(0.5, up, 1 - up), k, n_trials, srs, matrix, base_up=up,
                                       times=[r["issued_t"] for r in rows], span=k * TF[HORIZONS[horizon]])
-        st["too_good"] = judgeplus.too_good(sum(hits) / len(hits) if hits else None, horizon, max(0.5, up, 1 - up))
+        bar = max(0.5, up, 1 - up)
+        st["too_good"] = judgeplus.too_good(sum(hits) / len(hits) if hits else None, horizon, bar,
+                                            judgeplus.delta(db))
+        if st["too_good"]:            # owner's policy: no person — the Judge checks a possible leak itself
+            st["lag_test"] = lag_test(db, sym, horizon, rows, bar)
         st["trials"], st["data_fp"] = n_trials, judgeplus.fingerprint([tuple(r) for r in rows])
     except Exception as e:             # the gates failing to compute is never a pass; the final waits for the next run
         st["gates_error"] = f"{type(e).__name__}: {str(e)[:120]}"
         db.put(key, json.dumps(st))
         return st
-    if st["too_good"]:                 # a possible leak goes to a person, it is not a one-look verdict
-        st["status"] = "insan yoxlaması"
+    if st["too_good"] and not (st.get("lag_test") or {}).get("cleared"):
+        st.update({"status": "keçmədi", "p": p, "net": net, "tested": now,
+                   "reason": "gələcəyə baxma şübhəsi: bir şam gecikmə testində üstünlük yox oldu"})
         st["card"] = judgeplus.card(st, n_trials)
         db.put(key, json.dumps(st))
+        log_experiment(db, "final", f"method:{method}:{sym}:{horizon}", st)
         return st
     passed = passed and st["gates"]["ok"]
     if passed:                                      # the independent re-check must agree (R5)
@@ -144,6 +152,25 @@ def method_final(db: DB, sym: str, horizon: str, method: str, now: float | None 
     if passed:
         register(db, "method", method, sym, horizon, f"son sınaq: {st['n']} hal, p={p:.4f}")
     return st
+
+
+def lag_test(db: DB, sym: str, horizon: str, rows, bar: float) -> dict:
+    """The automatic leak check (owner's policy 2026-11-26): each forecast's direction is scored once more against the
+    move ONE candle later than its target. A method that read the future (its own target candle) loses its edge
+    there; a real, slower edge keeps some of it. Cleared when the shifted hit rate stays 3 points above the bar."""
+    from .candles import TF
+    from .forecast import HORIZONS
+    step = TF[HORIZONS[horizon]]
+    closes = {r["t"]: r["c"] for r in db.execute("SELECT t, c FROM candles WHERE symbol=? AND tf=?",
+                                                 (sym, HORIZONS[horizon])).fetchall()}
+    hits = []
+    for r in rows:                     # the target's close is the candle labelled target_t - step; one candle later:
+        a = r["price1"]
+        b = closes.get(r["target_t"])
+        if a and b:
+            hits.append(int((b > a) == (r["p_up"] > 0.5)))
+    hr = sum(hits) / len(hits) if len(hits) >= 30 else None
+    return {"n": len(hits), "shifted_hit": hr, "cleared": hr is not None and hr >= bar + 0.03}
 
 
 def rule_final(db: DB, rule: str, tf: str, now: float | None = None) -> dict:
@@ -178,7 +205,7 @@ def rule_final(db: DB, rule: str, tf: str, now: float | None = None) -> dict:
     t = judgeplus.t_stat([a for a, _ in one])
     d = judgeplus.dsr([a for a, _ in one], n_trials)
     e = judgeplus.evalue_hits(hits, 0.5)
-    tg = judgeplus.too_good(sum(hits) / len(hits) if hits else None, tf)
+    tg = judgeplus.too_good(sum(hits) / len(hits) if hits else None, tf, 0.5, judgeplus.delta(db))
     st["gates"] = {"checks": {"t>=3": t is not None and t >= judgeplus.T_MIN,
                               "DSR>=0.95": d is not None and d >= judgeplus.DSR_MIN, "e>=20": e >= judgeplus.E_MIN},
                    "t": t, "dsr": d, "e": round(e, 3)}
@@ -258,9 +285,13 @@ def log_experiment(db: DB, kind: str, name: str, result: dict, data_fp: str = ""
 
 
 def register(db: DB, kind: str, name: str, sym: str, horizon: str, note: str = "") -> None:
+    """A finalist that passed every gate is approved by the owner's one-time policy (2026-11-26, «Avtomatik Hakim
+    siyasəti»): no per-item approval. It can still go back to the shadow by itself (judgeplus.demote_check)."""
     ensure(db)
+    now = time.time()
     db.execute("INSERT OR IGNORE INTO strategy_registry VALUES(?,?,?,?,?,?,?,?,?)",
-               (kind, name, sym, horizon, version(db), "təsdiq gözləyir", time.time(), None, note[:300]))
+               (kind, name, sym, horizon, version(db), "təsdiqlənib", now, now,
+                ("avtomatik: sahibin siyasəti (26.11) · " + note)[:300]))
 
 
 def registry_status(db: DB, kind: str, name: str, sym: str, horizon: str) -> str | None:

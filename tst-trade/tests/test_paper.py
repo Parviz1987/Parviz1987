@@ -111,3 +111,16 @@ def test_llm_json_with_text_after_the_object():
     import pytest
     with pytest.raises(llm.LLMError):
         llm._json('{"found": false, "actual": "')
+
+
+def test_owner_policy_limits_one_method_and_the_fall_from_the_peak():
+    from app import paper
+    db = DB(":memory:")
+    now = 1_800_000_000.0
+    r = paper.propose(db, "XAU", "1h", "tsmom", 0.6, 2000.0, 5, 1980.0, 2020.0, now + 3600, now, size=0.25, cap=0.25)
+    assert r["status"] == "açıq" and r["oz"] * 2000.0 <= 0.25 * 10000.0 + 1e-6
+    db.execute("INSERT INTO paper_orders(ts, symbol, horizon, method, dir, oz, entry, stop, target, expires, status, "
+               "reason, pnl, exit_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+               (now, "XAG", "1h", "x", 1, 1, 30, 29, 31, now, "bağlandı", "", -1200.0, now - 86400 * 3))
+    r2 = paper.propose(db, "XPT", "1h", "tsmom", 0.6, 1000.0, 5, 990.0, 1010.0, now + 3600, now)
+    assert r2["status"] == "rədd" and "zirvədən" in r2["reason"] and paper.settings(db)["stopped"]

@@ -139,6 +139,15 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _autojudge(db: DB) -> dict | None:
+    """The owner's policy: every method's score 0-100 and its ladder step (off / shadow / small / full paper share)."""
+    try:
+        from . import autojudge
+        return autojudge.view(db)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _blockaudit(db: DB) -> dict | None:
     """Plan phase E: per block — inputs, rule firings, voice views, the Judge, its value, links; plain verdict."""
     try:
@@ -366,6 +375,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "autopsy": _autopsy(db),
         "blocks_audit": _blockaudit(db),
         "judge_canary": json.loads(db.get("judge:canary") or "null"),
+        "autojudge": _autojudge(db),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

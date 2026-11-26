@@ -110,6 +110,13 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 while True:
                     await asyncio.sleep(60)
                     k += 1
+                    if time.time() - float(db.get("autojudge:last") or 0) > 3600:    # the automatic Judge's ladder
+                        db.put("autojudge:last", str(time.time()))
+                        try:
+                            from . import autojudge
+                            await asyncio.to_thread(autojudge.refresh, db)
+                        except Exception:
+                            log.exception("automatic judge failed")
                     if time.time() - float(db.get("braintrial:last") or 0) > 3600:   # hourly, across restarts
                         db.put("braintrial:last", str(time.time()))
                         try:

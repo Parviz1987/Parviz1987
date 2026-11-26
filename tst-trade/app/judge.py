@@ -491,9 +491,14 @@ def _final_gate(db: DB, symbol: str, horizon: str, v: dict, now: float) -> dict:
     v["final"] = fin
     if fin.get("status") != "keçdi":
         return {**v, "status": "namizəd" if fin.get("status") != "keçmədi" else "yox", "candidate": v["status"]}
-    from .rigor import registry_status                # the owner approves a finalist before it may act (registry)
+    from .rigor import registry_status                # the owner's one-time policy approves it (2026-11-26)
     reg = registry_status(db, "method", v["method"], symbol, horizon)
-    if reg != "təsdiqlənib":
-        return {**v, "status": "təsdiq gözləyir" if reg != "rədd edilib" else "yox", "candidate": "sübut",
-                "registry": reg}
+    if reg in ("rədd edilib", "kölgəyə qaytarıldı"):
+        return {**v, "status": "yox", "candidate": "sübut", "registry": reg}
+    if reg == "təsdiq gözləyir":                      # an older entry from before the policy: approved by the policy
+        from .rigor import decide
+        try:
+            decide(db, "method", v["method"], symbol, horizon, True, "avtomatik: sahibin siyasəti (26.11)")
+        except ValueError:
+            pass
     return v

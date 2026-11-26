@@ -224,25 +224,49 @@ def canary(db: DB, symbol: str = "XAU", seed: int | None = None) -> dict:
     except Exception:
         n_trials = 1000
     m = len(cs) - 1
-    passed = 0
+    passed, coin_best = 0, 0.0
+    ys = [int(cs[i + 1]["c"] > cs[i]["c"]) for i in range(m)]
+    half = len(ys) // 2
+    up = sum(ys[:half]) / half if half else 0.5
+    bar = max(0.5, up, 1 - up)
     for _ in range(20):
-        g, _, _ = _rule_gates(cs, [rnd.choice((1, -1)) for _ in range(m)], cost, n_trials)
+        g, hr, _ = _rule_gates(cs, [rnd.choice((1, -1)) for _ in range(m)], cost, n_trials)
         passed += int(g["ok"])
+        coin_best = max(coin_best, hr)
     truth = [1 if cs[i + 1]["c"] > cs[i]["c"] else -1 for i in range(m)]
     partial = [t if rnd.random() < 0.3 else rnd.choice((1, -1)) for t in truth]
-    _, hr_p, caught_p = _rule_gates(cs, partial, cost, n_trials)
-    _, hr_f, caught_f = _rule_gates(cs, truth, cost, n_trials)
-    out = {"ts": time.time(), "random_passed": passed, "random_n": 20, "peek30_hit": round(hr_p, 3),
-           "peek30_caught": caught_p, "peek_caught": caught_f, "ok": passed <= 1 and caught_p and caught_f}
+    _, hr_p, _ = _rule_gates(cs, partial, cost, n_trials)
+    _, hr_f, _ = _rule_gates(cs, truth, cost, n_trials)
+    # the margin is set here, by the Judge itself: above the luckiest coin, below the 30 % peeker
+    lo, hi = coin_best - bar + 0.02, hr_p - bar - 0.005
+    margin = max(0.05, min(0.15, max(lo, min(0.12, hi))))
+    db.put(DELTA_KEY, str(round(margin, 4)))
+    caught_p, caught_f = too_good(hr_p, "1d", bar, margin), too_good(hr_f, "1d", bar, margin)
+    out = {"ts": time.time(), "random_passed": passed, "random_n": 20, "coin_best_hit": round(coin_best, 3),
+           "peek30_hit": round(hr_p, 3), "peek30_caught": caught_p, "peek_caught": caught_f, "margin": round(margin, 4),
+           "ok": passed <= 1 and caught_p and caught_f}
     db.put("judge:canary", json.dumps(out))
     return out
 
 
-def too_good(hit_rate: float | None, horizon: str, bar: float = 0.5) -> bool:
-    """Right far more often than the market's own lean allows (12 points above the bar for a day or longer, 15 for
-    shorter): beyond anything published for metals, so it is treated as a possible look-ahead leak and sent to a
-    person, not counted as a discovery."""
-    return hit_rate is not None and hit_rate > bar + (0.12 if horizon in ("1d", "3d", "1w", "10d", "1mo") else 0.15)
+DELTA_KEY = "judge:too_good_delta"
+LONG = ("1d", "3d", "1w", "10d", "1mo")
+
+
+def delta(db: DB | None) -> float:
+    """The «too good» margin for a day or longer, set by the Judge's own weekly check (owner's policy: no person picks
+    it): between the best coin-flip rule (+2 points) and a rule that peeks on 30 % of the days (-0.5 point)."""
+    try:
+        return float(db.get(DELTA_KEY)) if db is not None and db.get(DELTA_KEY) else 0.12
+    except (TypeError, ValueError):
+        return 0.12
+
+
+def too_good(hit_rate: float | None, horizon: str, bar: float = 0.5, margin: float | None = None) -> bool:
+    """Right far more often than the market's own lean allows (the self-set margin above the bar for a day or longer,
+    3 points more for shorter horizons): a possible look-ahead leak, checked automatically (rigor: lag test)."""
+    m = 0.12 if margin is None else margin
+    return hit_rate is not None and hit_rate > bar + (m if horizon in LONG else m + 0.03)
 
 
 # ---------- demotion ----------

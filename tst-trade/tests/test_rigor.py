@@ -103,15 +103,17 @@ def test_guest_cannot_open_the_stock():
     assert "/api/stock" in open(main.__file__).read() and '"/ehtiyat", "/api/stock"' in open(main.__file__).read()
 
 
-def test_registry_approval_gates_the_verdict(monkeypatch):
+def test_registry_follows_the_owners_one_time_policy(monkeypatch):
+    """Owner 2026-11-26 («Avtomatik Hakim siyasəti»): a finalist that passed is approved by the policy itself; an
+    owner's explicit rejection or an automatic demotion still keeps it out."""
     from app import judge
     db = _db()
     monkeypatch.setattr(judge, "stats", lambda *a, **k: [{"method": "seans", "status": "sübut", "bss": 0.1}])
     monkeypatch.setattr(rigor, "method_final", lambda *a, **k: {"status": "keçdi"})
     rigor.register(db, "method", "seans", "XAU", "1h")
-    assert judge.verdict(db, "XAU", "1h", now=1_800_000_000)["status"] == "təsdiq gözləyir"
-    rigor.decide(db, "method", "seans", "XAU", "1h", True, "test")
     assert judge.verdict(db, "XAU", "1h", now=1_800_000_000)["status"] == "sübut"
+    rigor.decide(db, "method", "seans", "XAU", "1h", False, "sahib rədd etdi")
+    assert judge.verdict(db, "XAU", "1h", now=1_800_000_000)["status"] == "yox"
     assert rigor.experiments(db)[0]["kind"] == "decision"
 
 
