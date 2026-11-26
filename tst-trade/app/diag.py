@@ -139,6 +139,15 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _experiments(db: DB) -> dict | None:
+    """Shadow tests of the owner's block decisions (fundamental 3-year window, festival volatility)."""
+    try:
+        from . import shadowtests
+        return shadowtests.view(db)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _ops(db: DB) -> dict:
     """The owner's «stop automatic repair» switch: while it is on, the duty check only reads and reports."""
     from . import ops
@@ -318,6 +327,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "conductor": _conductor(db),
         "heartbeat": _heartbeat(db),
         "ops": _ops(db),
+        "experiments": _experiments(db),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

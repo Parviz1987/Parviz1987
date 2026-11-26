@@ -1,0 +1,138 @@
+"""Kölgə sınaqları (owner 2026-11-26, block decisions 1 and 3): two changes the research suggested, measured first in
+the shadow — nothing here reaches a live forecast; the owner decides on the result.
+
+1. Fundamental weights from the last 3 years only (the 2022 break: gold's link to real yields collapsed while central
+   banks bought ~1,000 t a year). The same walk-forward vote as the live «fundamental» voice, with each rule's record
+   counted over the whole history (live) or over the last 3 years (shadow); both scored on the same daily moments,
+   next-day direction, after the full cost; the daily Brier difference with a 95 % interval.
+2. Festival seasons as a volatility flag, not a direction (the 21 days before Diwali and Chinese New Year): is the
+   average absolute daily move in those days really larger than on other days, overall and year by year?"""
+from __future__ import annotations
+
+import json
+import math
+import time
+from datetime import date, datetime, timedelta, timezone
+
+from .db import DB
+
+KEY = "shadow:experiments"
+YEARS3 = 3 * 365 * 86400
+
+
+def _ci(xs: list[float]) -> dict | None:
+    if len(xs) < 30:
+        return None
+    n = len(xs)
+    mu = sum(xs) / n
+    sd = math.sqrt(sum((x - mu) ** 2 for x in xs) / (n - 1))
+    h = 1.96 * sd / math.sqrt(n)
+    return {"mean": round(mu, 5), "lo": round(mu - h, 5), "hi": round(mu + h, 5), "n": n}
+
+
+# ---------- 1. fundamental: whole record vs the last 3 years ----------
+def fa_window(db: DB, symbols=("XAU", "XAG", "XPT", "XPD")) -> dict:
+    from . import fundamental, rules
+    from .judge import full_cost
+    live = rules.Lookup(db, prefixes=("FA-",), name="fundamental", tfs=("1d",), families=fundamental.FAMILY)
+    win = rules.Lookup(db, prefixes=("FA-",), name="fundamental", tfs=("1d",), families=fundamental.FAMILY,
+                       window=YEARS3)
+    out = {}
+    for s in symbols:
+        rows = db.execute("SELECT t, MAX(price0) p0, MAX(price1) p1 FROM rule_signals WHERE metal=? AND tf='1d' AND "
+                          "rule LIKE 'FA-%' AND price1 IS NOT NULL AND mode != 'futures' GROUP BY t ORDER BY t",
+                          (s,)).fetchall()
+        cost = full_cost(s, "1d")
+        sc = {"bütün keçmiş": {"n": 0, "viewed": 0, "hits": 0, "brier": 0.0, "net": 0.0},
+              "son 3 il": {"n": 0, "viewed": 0, "hits": 0, "brier": 0.0, "net": 0.0}}
+        diffs = []
+        for r in rows:
+            if not r["p0"] or r["p1"] == r["p0"]:
+                continue
+            t = r["t"] + 86400 + rules.LAG + 1           # the vote is read after the candle has closed
+            y = 1.0 if r["p1"] > r["p0"] else 0.0
+            ret = r["p1"] / r["p0"] - 1
+            ps = {}
+            for name, lk in (("bütün keçmiş", live), ("son 3 il", win)):
+                p = lk.views(s, t, "1d")["fundamental"][0]
+                ps[name] = p
+                x = sc[name]
+                x["n"] += 1
+                x["brier"] += (p - y) ** 2
+                if abs(p - 0.5) >= 0.01:
+                    x["viewed"] += 1
+                    x["hits"] += int((p > 0.5) == (y == 1.0))
+                    x["net"] += (ret if p > 0.5 else -ret) - cost
+            diffs.append((ps["son 3 il"] - y) ** 2 - (ps["bütün keçmiş"] - y) ** 2)
+        out[s] = {k: {"n": v["n"], "viewed": v["viewed"],
+                      "hit_rate": round(v["hits"] / v["viewed"], 4) if v["viewed"] else None,
+                      "brier": round(v["brier"] / v["n"], 5) if v["n"] else None,
+                      "net_avg": round(v["net"] / v["viewed"], 6) if v["viewed"] else None} for k, v in sc.items()}
+        out[s]["3il_minus_hamisi_brier"] = _ci(diffs)      # below 0 = the 3-year record forecast better
+    return out
+
+
+# ---------- 2. festivals: a volatility flag ----------
+def _festival_days(metal: str) -> set[date]:
+    from .slowviews import BEFORE_DAYS, DIWALI, LUNAR_NY
+    fests = [(DIWALI, ("XAU", "XAG")), (LUNAR_NY, ("XAU",))]
+    out = set()
+    for days, metals in fests:
+        if metal not in metals:
+            continue
+        for d in days:
+            f = date.fromisoformat(d)
+            out.update(f - timedelta(days=k) for k in range(1, BEFORE_DAYS + 1))
+    return out
+
+
+def festival_vol(db: DB, symbols=("XAU", "XAG")) -> dict:
+    from . import candles
+    out = {}
+    for s in symbols:
+        cs = candles.get(db, s, "1d", limit=4000)
+        flag = _festival_days(s)
+        a, b, by_year = [], [], {}
+        for i in range(1, len(cs)):
+            if cs[i - 1]["c"] <= 0 or cs[i]["c"] <= 0:
+                continue
+            m = abs(math.log(cs[i]["c"] / cs[i - 1]["c"]))
+            d = datetime.fromtimestamp(cs[i]["t"] + candles.SESSION_SHIFT, timezone.utc).date()
+            yr = by_year.setdefault(d.year, [[], []])
+            (a if d in flag else b).append(m)
+            yr[0 if d in flag else 1].append(m)
+        if len(a) < 20 or len(b) < 20:
+            out[s] = {"note": f"az məlumat ({len(a)} bayram öncəsi gün)"}
+            continue
+        ma, mb = sum(a) / len(a), sum(b) / len(b)
+        va = sum((x - ma) ** 2 for x in a) / (len(a) - 1)
+        vb = sum((x - mb) ** 2 for x in b) / (len(b) - 1)
+        tstat = (ma - mb) / math.sqrt(va / len(a) + vb / len(b))
+        years = [(y, sum(v[0]) / len(v[0]) / (sum(v[1]) / len(v[1]))) for y, v in sorted(by_year.items())
+                 if len(v[0]) >= 10 and len(v[1]) >= 50]
+        out[s] = {"festival_days": len(a), "other_days": len(b), "ratio": round(ma / mb, 3), "t": round(tstat, 2),
+                  "years": len(years), "years_higher": sum(1 for _, r in years if r > 1),
+                  "verdict": ("bayram öncəsi dalğalılıq daha yüksəkdir (t > 2)" if tstat > 2 else
+                              "fərq sübut olunmayıb" if tstat > -2 else "bayram öncəsi daha sakitdir (t < -2)")}
+    return out
+
+
+def run(db: DB) -> dict:
+    t0 = time.time()
+    out: dict = {"computed": None}
+    for name, fn in (("fa_window", fa_window), ("festival_vol", festival_vol)):
+        try:
+            out[name] = fn(db)
+        except Exception as e:          # one experiment failing never stops the other
+            out[name] = {"error": f"{type(e).__name__}: {str(e)[:150]}"}
+    out["computed"] = time.time()
+    out["seconds"] = round(time.time() - t0, 1)
+    db.put(KEY, json.dumps(out, ensure_ascii=False))
+    return out
+
+
+def view(db: DB) -> dict | None:
+    try:
+        return json.loads(db.get(KEY) or "null")
+    except ValueError:
+        return None

@@ -24,7 +24,7 @@ class LLMError(Exception):
     def __init__(self, msg: str, status: int | None = None, retry_after: float | None = None, body: str = "",
                  hint: str | None = None, suggested: str | None = None):
         super().__init__(msg)
-        self.status, self.retry_after, self.body = status, retry_after, (body or "")[:800]
+        self.status, self.retry_after, self.body = status, retry_after, (body or "")[:3000]
         self.hint, self.suggested = hint, suggested
 
 
@@ -141,8 +141,9 @@ async def _gemini(key, model, system, user, schema, max_tokens):
         text = j["candidates"][0]["content"]["parts"][0]["text"]
     except (KeyError, IndexError, TypeError) as e:
         raise LLMError("Gemini: boş cavab", 200, hint="output") from e
-    u = j.get("usageMetadata") or {}
-    return _json(text), int(u.get("promptTokenCount") or 0), int(u.get("candidatesTokenCount") or 0)
+    u = j.get("usageMetadata") or {}     # thinking tokens are billed as output
+    return (_json(text), int(u.get("promptTokenCount") or 0),
+            int(u.get("candidatesTokenCount") or 0) + int(u.get("thoughtsTokenCount") or 0))
 
 
 async def ask(provider: str, key: str, model: str, system: str, user: str, schema: dict,
@@ -295,5 +296,6 @@ async def _gemini_search_once(key, model, system, user, max_tokens):
     except (KeyError, IndexError, TypeError) as e:
         raise LLMError("Gemini: boş cavab", 200, hint="output") from e
     calls = len((cand.get("groundingMetadata") or {}).get("webSearchQueries") or [])
-    u = j.get("usageMetadata") or {}
-    return _json(text), int(u.get("promptTokenCount") or 0), int(u.get("candidatesTokenCount") or 0), calls
+    u = j.get("usageMetadata") or {}     # thinking tokens are billed as output
+    return (_json(text), int(u.get("promptTokenCount") or 0),
+            int(u.get("candidatesTokenCount") or 0) + int(u.get("thoughtsTokenCount") or 0), calls)

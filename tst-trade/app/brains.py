@@ -3,6 +3,8 @@ on the admin page. In this first version no slot takes part in forecasts yet: th
 slot is connected and measured by the Judge in its own next step."""
 from __future__ import annotations
 
+import asyncio
+
 import json
 
 from . import registry
@@ -121,8 +123,13 @@ _RESERVED: dict[str, float] = {}      # money held back for calls in flight, per
 
 
 def _worst(model: str, system: str, user: str, max_tokens: int, search: bool) -> float:
-    """The most a call can cost: its input (about 3 characters per token) and every output token, plus searches."""
-    return llm.cost(model, (len(system) + len(user)) // 3 + 200, max_tokens) + (5 * llm.SEARCH_CALL_USD if search else 0)
+    """The most a call can cost: its input (2 characters per token: safe for Azerbaijani and Cyrillic) and every
+    output token; a search may take up to 4 rounds (Claude's pause_turn), each re-reading the input, with up to 12
+    searches."""
+    tin = (len(system) + len(user)) // 2 + 200
+    if not search:
+        return llm.cost(model, tin, max_tokens)
+    return llm.cost(model, 4 * (tin + max_tokens), 4 * max_tokens) + 12 * llm.SEARCH_CALL_USD
 
 
 def _reserve(db: DB, slot: str, usd: float) -> bool:
@@ -153,9 +160,18 @@ def _caller(db: DB, slot: str, system: str, user: str, schema: dict | None, max_
                        (_time.time(), slot, provider, model, tin, tout,
                         llm.cost(model, tin, tout) + calls * llm.SEARCH_CALL_USD))
             return data
-        except Exception as e:
-            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)",
-                       (_time.time(), slot, provider, model, str(e).replace(key, "***")[:200]))
+        except BaseException as e:
+            # sent and probably billed (no answer in time, cancelled, a refusal or a broken answer): the worst case
+            # is counted as spent, so the monthly cap holds; an HTTP error before any work costs nothing
+            from . import llmrouter
+            kind = "timeout" if isinstance(e, asyncio.CancelledError) else llmrouter.classify(e)[0]
+            usd = worst if kind in ("timeout", "output", "refusal", "other") else 0.0
+            try:
+                db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,?,?)",
+                           (_time.time(), slot, provider, model, usd,
+                            (str(e) or type(e).__name__).replace(key, "***")[:200]))
+            except Exception:
+                pass
             raise
         finally:
             _release(slot, worst)
@@ -179,12 +195,15 @@ async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema:
                                                              _caller(db, slot, system, user, schema, max_tokens, search))
     if data is None:
         return None, "; ".join(errors) or "beyin seçilməyib"
-    if not search:      # Block 17: count numbers the brain wrote that it was not given
-        from . import checker
-        checker.record(db, slot, data, user + "\n" + system)
-    from . import heartbeat
-    heartbeat.beat("ai-brains", "ok", f"{slot}: {provider}")
-    return data, f"{provider} · {model}" + (" (ehtiyat)" if fb else "")
+    try:
+        if not search:      # Block 17: count numbers the brain wrote that it was not given
+            from . import checker
+            checker.record(db, slot, data, user + "\n" + system)
+        from . import heartbeat
+        heartbeat.beat("ai-brains", "ok", f"{slot}: {provider}")
+    except Exception:       # a paid answer is never thrown away for a bookkeeping error
+        pass
+    return data, f"{provider} · {model}"      # cards read the model from this label: no suffix (fallback: llm_events)
 
 
 SPARE = ("anthropic", "claude-haiku-5-5")      # a third company, used only when one of the two fails technically
@@ -200,18 +219,19 @@ async def run_both(db: DB, keys: KeyStore, slot: str, system: str, user: str,
     if spent(db, slot) >= float(cfg["month_usd"]):
         return [(None, f"aylıq limit doldu ({cfg['month_usd']} $)")]
     fn = _caller(db, slot, system, user, None, max_tokens, True)
+    ctx = llmrouter.budget()           # one request: 4 calls and 120 s across all three brains
     out = []
     for provider, model in ((cfg["provider"], cfg["model"]), (cfg.get("fallback"), cfg.get("fallback_model"))):
         if not provider or not model:
             out.append((None, "ikinci beyin seçilməyib"))
             continue
-        data, p, m, _, errors = await llmrouter.call(db, slot, [(provider, model, keys.first(provider))], fn)
+        data, p, m, _, errors = await llmrouter.call(db, slot, [(provider, model, keys.first(provider))], fn, ctx)
         out.append((data, f"{p} · {m}") if data is not None else (None, "; ".join(errors)))
     # 2026-11-26: Gemini answered «quota exceeded» — one company's technical failure must not silence the agent.
     # The spare brain (a third company, not one already asked) stands in, so two DIFFERENT companies still agree.
     asked = {cfg.get("provider"), cfg.get("fallback")}
     if any(d is None for d, _ in out) and SPARE[0] not in asked and keys.first(SPARE[0]):
-        data, p, m, _, errors = await llmrouter.call(db, slot, [(SPARE[0], SPARE[1], keys.first(SPARE[0]))], fn)
+        data, p, m, _, errors = await llmrouter.call(db, slot, [(SPARE[0], SPARE[1], keys.first(SPARE[0]))], fn, ctx)
         if data is not None:
             k = next(n for n, (d, _) in enumerate(out) if d is None)
             out[k] = (data, f"{p} · {m} (əvəzedici)")

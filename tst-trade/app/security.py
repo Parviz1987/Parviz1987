@@ -25,7 +25,9 @@ KIND_AZ = {"login_fail": "səhv parol", "login_blocked": "bloklanıb (çox səhv
            "provider_changed": "qiymət mənbəyi dəyişib", "diag_token_changed": "diaqnostika açarı dəyişib",
            "login_code_fail": "parol düz, 2FA kodu səhv", "recovery_used": "2FA ehtiyat kodu istifadə olundu",
            "2fa_on": "2FA açıldı", "2fa_off": "2FA söndürüldü",
-           "ops_pause": "Avtomatik təmir dayandırıldı", "ops_resume": "Avtomatik təmir davam etdirildi"}
+           "ops_pause": "Avtomatik təmir dayandırıldı", "ops_resume": "Avtomatik təmir davam etdirildi",
+           "model_approve": "yeni model təsdiqləndi", "model_reject": "model təklifi rədd edildi",
+           "model_reset": "model yenidən sınanır"}
 ALERT = ("login_blocked", "login_new_ip", "key_deleted", "password_changed", "diag_token_changed", "key_saved",
          "login_code_fail", "recovery_used", "2fa_off")
 

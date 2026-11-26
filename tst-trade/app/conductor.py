@@ -516,4 +516,6 @@ def run(db: DB) -> dict:
     """The daily job: first the evidence, then the shadow conductor."""
     a = audit(db)
     s = shadow(db)
-    return {"audit_s": a.get("seconds"), "shadow_s": s.get("seconds")}
+    from . import shadowtests          # owner's block decisions 1 and 3, measured in the shadow
+    x = shadowtests.run(db)
+    return {"audit_s": a.get("seconds"), "shadow_s": s.get("seconds"), "experiments_s": x.get("seconds")}

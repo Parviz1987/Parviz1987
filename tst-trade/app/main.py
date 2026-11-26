@@ -949,6 +949,23 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         db.put("auth:guest_hash", auth.hash_password(pw))
         return {"guest": True}
 
+    @app.get("/api/admin/router")
+    async def router_state():
+        from . import llmrouter
+        return llmrouter.view(db)
+
+    @app.post("/api/admin/router")
+    async def router_decide(request: Request):
+        """The owner's model decisions: try a switched-off model again, approve or reject a proposed replacement."""
+        from . import llmrouter
+        b = await request.json()
+        try:
+            out = llmrouter.decide(db, store, str(b.get("action")), str(b.get("provider")), str(b.get("model")))
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        sec.log("model_" + str(b.get("action")), _ip(request), f"{b.get('provider')} {b.get('model')}")
+        return out
+
     @app.get("/api/admin/ops")
     async def ops_state():
         """The «stop automatic repair» switch and the outside watcher's state (no addresses, no key)."""

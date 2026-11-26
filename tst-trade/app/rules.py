@@ -693,9 +693,11 @@ class Lookup:
     TA_PREFIXES = ("TA-", "TH-", "PA-", "VOL-", "IM-")
 
     def __init__(self, db: DB, prefixes: tuple = TA_PREFIXES, name: str = "qaydalar", tfs: tuple | None = None,
-                 families: dict | None = None):
+                 families: dict | None = None, window: float | None = None):
         """prefixes: which rules vote (the technical block by default; «FA-» for the fundamental block); tfs: fixed
-        timeframes to read (None: by horizon, RULE_TFS); families: one voice per idea."""
+        timeframes to read (None: by horizon, RULE_TFS); families: one voice per idea; window: count only the record
+        of the last `window` seconds (None: the whole record — the live setting; a window is a shadow test)."""
+        self.window = window
         ensure(db)
         self.name, self.tfs, self.families = name, tfs, families if families is not None else RULE_FAMILY
         self.fire: dict[str, list] = {}                   # metal -> [(known_t, tf, rule, dir)] sorted
@@ -745,10 +747,12 @@ class Lookup:
                 ts, cum = self.rec.get((rule, tf, None), ([], []))
         else:
             ts, cum = self.rec.get((rule, tf, None), ([], []))
-        n = bisect_left(ts, t + 1)
-        if not n:
+        end = bisect_left(ts, t + 1)
+        start = bisect_left(ts, t - self.window + 1) if self.window else 0
+        n = end - start
+        if n <= 0:
             return 0.0, 0, 0.5
-        hits = cum[n - 1]
+        hits = cum[end - 1] - (cum[start - 1] if start else 0)
         return max(0.0, 2 * (hits - n / 2) / (n + 50)), n, hits / n
 
     def views(self, metal: str, t: float, horizon: str) -> dict:
