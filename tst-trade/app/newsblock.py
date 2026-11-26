@@ -247,3 +247,33 @@ def page(db: DB, sym: str, now: float | None = None) -> dict:
     from . import reporter
     out["agents"] = reporter.agents_view(db, now)          # Məlumat agentləri: figures found on the web by two brains
     return out
+
+
+def debug(db: DB, now: float | None = None) -> dict:
+    """Why the news voice is quiet (for the diagnostics): the Reader's labels per metal (all, last 7 days, first and
+    last time, by direction and strength), the news rules' stored firings, and what the rules see right now."""
+    import time as _t
+    from . import rules
+    rules.ensure(db)
+    now = _t.time() if now is None else now
+    out: dict = {"metals": {}}
+    try:
+        r = db.execute("SELECT COUNT(*) n, MIN(ts) f, MAX(ts) l, SUM(ts > ?) w FROM news_ai", (now - 7 * 86400,)).fetchone()
+        out["labels"] = {"all": r["n"], "first": r["f"], "last": r["l"], "last_7d": r["w"] or 0}
+        dist = db.execute("SELECT direction, strength, COUNT(*) n FROM news_ai WHERE ts > ? GROUP BY direction, strength",
+                          (now - 7 * 86400,)).fetchall()
+        out["by_direction_strength_7d"] = {f"{x['direction']}:{x['strength']}": x["n"] for x in dist}
+        out["no_metal_7d"] = db.execute("SELECT COUNT(*) n FROM news_ai WHERE ts > ? AND (metals IS NULL OR metals='')",
+                                        (now - 7 * 86400,)).fetchone()["n"]
+    except Exception as e:
+        out["labels_error"] = f"{type(e).__name__}: {str(e)[:120]}"
+    data = Data(db)
+    for m in ("XAU", "XAG", "XPT", "XPD"):
+        items = data.by.get(m, [])
+        recent = data.window(m, now, 6 * 3600)
+        out["metals"][m] = {"labels": len(items), "first": data.first(m), "last_6h": len(recent),
+                            "score_6h": round(_score(recent, now), 2), "fires_now": [f[0] for f in detect(data, m, now)],
+                            "stored_firings": db.execute("SELECT COUNT(*) n FROM rule_signals WHERE metal=? AND rule LIKE "
+                                                         "'NW-%'", (m,)).fetchone()["n"],
+                            "replay_mark": db.get(f"nw:ver:{NW_VER}:{m}")}
+    return out

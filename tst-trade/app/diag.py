@@ -139,6 +139,14 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _news_debug(db: DB) -> dict:
+    try:
+        from . import newsblock
+        return newsblock.debug(db)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _autojudge(db: DB) -> dict | None:
     """The owner's policy: every method's score 0-100 and its ladder step (off / shadow / small / full paper share)."""
     try:
@@ -376,6 +384,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "blocks_audit": _blockaudit(db),
         "judge_canary": json.loads(db.get("judge:canary") or "null"),
         "autojudge": _autojudge(db),
+        "news_debug": _slow("news_debug", lambda: _news_debug(db), 600),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},
