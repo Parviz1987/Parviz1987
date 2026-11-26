@@ -53,6 +53,16 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         db.put("boot:log", json.dumps(boots))
         if start_engine:
             engine.start()
+
+            async def _cleanup():              # owner 2026-11-26: the retired methods' archive goes (record kept)
+                await asyncio.sleep(120)
+                try:
+                    from . import cleanup
+                    res = await asyncio.to_thread(cleanup.run, db)
+                    log.info("cleanup: %s", res)
+                except Exception:
+                    log.exception("cleanup failed")
+            asyncio.get_running_loop().create_task(_cleanup())
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
             asyncio.get_running_loop().create_task(app.state.futures_daily())
             asyncio.get_running_loop().create_task(app.state.rigor_daily())

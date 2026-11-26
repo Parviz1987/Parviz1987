@@ -94,9 +94,6 @@ def test_cost_thermostat_slows_a_slot_heading_over_its_limit():
 
 def test_session_and_multispeed_trend_methods():
     from app import forecast
-    assert forecast.seans_view(2 * 3600, "1h")[0] == 0.53          # 02:00 UTC: Asian hours
-    assert forecast.seans_view(15 * 3600, "4h")[0] == 0.47         # 15:00 UTC: US hours
-    assert forecast.seans_view(10 * 3600, "1h")[0] == 0.5          # London
     up = [{"o": 100 * 1.002 ** i, "h": 100 * 1.002 ** i, "l": 100 * 1.002 ** i, "c": 100 * 1.002 ** i * (1 + 0.003 * (-1) ** i)}
           for i in range(300)]
     p, why = forecast.trendmix_view(up, "1d")

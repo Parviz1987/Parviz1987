@@ -19,7 +19,7 @@ import time
 
 from .db import DB
 
-NW_VER = "2026-11-25"
+NW_VER = "2026-11-26"     # a replay deletes the old replayed rows first (owner: clean wrong data)
 TOPIC = {"fed": "fed", "monetary": "fed", "rates": "fed", "inflation": "data", "jobs": "data", "gdp": "data",
          "data": "data", "geopolitics": "geo", "war": "geo", "sanctions": "geo", "supply": "flow", "demand": "flow"}
 FAMILY = {"NW-SENT-1": "əhval", "NW-FED-1": "Fed", "NW-DATA-1": "ABŞ rəqəmi", "NW-GEO-1": "geosiyasət",
@@ -115,6 +115,8 @@ def run(db: DB, now: float | None = None) -> int:
         ind = rules.Ind(cs)
         mark = f"nw:ver:{NW_VER}:{sym}"
         done = int(db.get(mark) or 0)
+        if not done:          # a new version: the old replayed history goes (live firings are kept)
+            db.execute("DELETE FROM rule_signals WHERE metal=? AND mode='history' AND rule LIKE 'NW-%'", (sym,))
         rows = []
         for i in range(20, len(cs)):
             t = cs[i]["t"]

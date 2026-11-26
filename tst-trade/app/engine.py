@@ -269,12 +269,6 @@ class Engine:
             self._rel_cache = (now, surprise.Lookup(self.db))
         return self._rel_cache[1]
 
-    def _drop_unlinked(self) -> None:
-        """History impulse forecasts replayed before the linked market's candles existed said "no candles"; they are
-        replayed with the data now (only these rows)."""
-        self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method IN ('dollar', 'oil') AND basis=?",
-                        ("bu bazarın şamı yoxdur",))
-
     def migrate(self) -> None:
         """Once per start: daily candles labelled Saturday or Sunday came from the old bucketing (Sunday-evening
         ticks before the session shift); the forecasts issued on them over a weekend are duplicates."""
@@ -374,10 +368,6 @@ class Engine:
             self.db.execute("DELETE FROM forecasts WHERE mode='history' AND method='dollar'")
             self.history_state["ts"] = 0
             self.db.put("migr:dollar_pick_v1", "1")
-        if not self.db.get("migr:linked_v1"):
-            self._drop_unlinked()
-            self.history_state["ts"] = 0
-            self.db.put("migr:linked_v1", "1")
         if not self.db.get("migr:no_1m_desk"):
             # The one-minute desk was removed: its history replay goes (derived data); its live results stay
             # until the normal 30-day clean-up, as the record of why it was removed.
@@ -696,36 +686,6 @@ class Engine:
         if epics != st.get("epics"):
             self.reset_provider()
             self.history_state["ts"] = 0
-            self._drop_unlinked()
-
-    def related_closes(self, past: list[dict], tf: str, now: float, rows_by_code: dict | None = None,
-                       sym: str | None = None) -> dict:
-        """For the impulse methods: the dollar and oil closes aligned with the metal's candles (same candle times),
-        only when the linked market has the metal's last candle too (else no view)."""
-        epics = markets.saved(self.db).get("epics", {})
-        out = {}
-        for key, codes in (("dollar", ("DXY", "EURUSD", "USDJPY")), ("oil", ("OIL", "BRENT")), ("risk", ("VIX", "US500"))):
-            # Of the markets that carry this driver and have the metal's last candle, the one most linked to the
-            # metal over the last 100 candles (past only): the dollar index can drift apart from gold for weeks
-            # while EUR/USD still moves with it. A quiet market never silences the method.
-            best = None
-            for c in codes:
-                if c not in epics or not past:
-                    continue
-                if rows_by_code is not None and c in rows_by_code:
-                    m = rows_by_code[c]
-                else:
-                    m = {r["t"]: r["c"] for r in candles.closed(self.db, c, tf, now, limit=150)}
-                if past[-1]["t"] not in m:
-                    continue
-                pairs = [(x["c"], m[x["t"]]) for x in past[-101:] if x["t"] in m]
-                g, o = [p[0] for p in pairs], [p[1] for p in pairs]
-                strength = abs(markets.link(g, o) or 0)
-                if best is None or strength > best[0]:
-                    best = (strength, g, o, markets.RELATED[c]["name"])
-            if best is not None:
-                out[key] = best[1:]
-        return out
 
     _rules_busy = False
 

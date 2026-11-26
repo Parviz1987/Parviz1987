@@ -1,75 +1,38 @@
-import json
+"""The old impulse methods became the cross-market rule CM-USD-2 / CM-OIL-1: a linked market moved and the metal has
+not followed yet; of the dollar markets the one most linked to the metal is used."""
 import math
 import random
 
-from app import candles, forecast, markets
-from app.db import DB
-from app.engine import Engine
-from app.keys import KeyStore
+from app import crossmarket as cm, forecast
 
 
-def test_impulse_sees_a_move_the_metal_has_not_followed():
-    rng = random.Random(2)
+def _pair(n=140, beta=1.0, seed=2, noise=0.0002):
+    rng = random.Random(seed)
     x, g = [100.0], [100.0]
-    for _ in range(120):                       # gold moves with the dollar proxy in the same candle (beta 1)
+    for _ in range(n):
         r = rng.gauss(0, 0.001)
         x.append(x[-1] * math.exp(r))
-        g.append(g[-1] * math.exp(r + rng.gauss(0, 0.0003)))
-    x.append(x[-1] * math.exp(0.004))          # the proxy jumps, gold stays flat
-    g.append(g[-1])
-    p, basis = markets.impulse_view(g, x, "EUR/USD")
-    assert p > 0.55 and "yetişməsi" in basis
-    p2, _ = markets.impulse_view(g[:-1] + [g[-2] * math.exp(0.004)], x, "EUR/USD")   # gold followed: no view
-    assert p2 == 0.5
-    noise = [100 * math.exp(rng.gauss(0, 0.001)) for _ in range(122)]
-    assert markets.impulse_view(noise, x, "EUR/USD")[0] == 0.5                       # no link: no view
+        g.append(g[-1] * math.exp(beta * r + rng.gauss(0, noise)))
+    return x, g
 
 
-def test_related_closes_align_and_feed_the_methods():
-    db = DB(":memory:")
-    eng = Engine(db, KeyStore(db, "s" * 64), "demo", 15)
-    db.put("related:epics", json.dumps({"ts": 1, "epics": {"EURUSD": "EURUSD"}}))
-    t0 = 1_700_000_000 // 900 * 900
-    for i in range(130):
-        candles.store_history(db, "XAU", "15m", [(t0 + i * 900, 100, 100, 100, 100 + i * 0.01)])
-        candles.store_history(db, "EURUSD", "15m", [(t0 + i * 900, 1, 1, 1, 1 + i * 0.0001)])
-    now = t0 + 130 * 900 + 5
-    past = candles.closed(db, "XAU", "15m", now, limit=200)
-    rel = eng.related_closes(past, "15m", now)
-    assert "dollar" in rel and "oil" not in rel and len(rel["dollar"][0]) == len(rel["dollar"][1]) == 101
-    m = forecast.build(past, "15m", related=rel)["methods"]
-    assert "dollar" not in m and "bazarlar" in m          # the impulse is now the cross-market rule CM-USD-2
+def test_catch_up_sees_a_move_the_metal_has_not_followed():
+    x, g = _pair()
+    x[-1] = x[-2] * math.exp(0.004)                 # the market jumps, the metal stays
+    g[-1] = g[-2]
+    out = cm.detect("XAU", len(g) - 1, {"_metal": cm.Series(g), "EURUSD": cm.Series(x)})
+    assert ("CM-USD-2", 1) in [(r, d) for r, d, _ in out]
+    g[-1] = g[-2] * math.exp(0.004)                 # the metal followed: no catch-up
+    out = cm.detect("XAU", len(g) - 1, {"_metal": cm.Series(g), "EURUSD": cm.Series(x)})
+    assert "CM-USD-2" not in [r for r, _, _ in out]
 
 
-def test_dollar_falls_back_to_eurusd_when_the_index_is_quiet():
-    db = DB(":memory:")
-    eng = Engine(db, KeyStore(db, "s" * 64), "demo", 15)
-    db.put("related:epics", json.dumps({"ts": 1, "epics": {"DXY": "DXY", "EURUSD": "EURUSD"}}))
-    t0 = 1_700_000_000 // 900 * 900
-    for i in range(130):
-        candles.store_history(db, "XAU", "15m", [(t0 + i * 900, 100, 100, 100, 100 + i * 0.01)])
-        candles.store_history(db, "EURUSD", "15m", [(t0 + i * 900, 1, 1, 1, 1 + i * 0.0001)])
-        if i < 120:                                   # the index stopped quoting 10 candles ago
-            candles.store_history(db, "DXY", "15m", [(t0 + i * 900, 99, 99, 99, 99 - i * 0.01)])
-    now = t0 + 130 * 900 + 5
-    rel = eng.related_closes(candles.closed(db, "XAU", "15m", now, limit=200), "15m", now)
-    assert rel["dollar"][2] == "EUR/USD"
-
-
-def test_dollar_takes_the_market_most_linked_to_the_metal():
-    rng = random.Random(4)
-    db = DB(":memory:")
-    eng = Engine(db, KeyStore(db, "s" * 64), "demo", 15)
-    db.put("related:epics", json.dumps({"ts": 1, "epics": {"DXY": "DXY", "EURUSD": "EURUSD"}}))
-    t0 = 1_700_000_000 // 900 * 900
-    g = e = d = 100.0
-    for i in range(130):
-        r = rng.gauss(0, 0.001)
-        g *= math.exp(r)
-        e *= math.exp(r + rng.gauss(0, 0.0002))           # EUR/USD moves with gold
-        d *= math.exp(rng.gauss(0, 0.001))                # the index wanders on its own
-        for sym, px in (("XAU", g), ("EURUSD", e), ("DXY", d)):
-            candles.store_history(db, sym, "15m", [(t0 + i * 900, px, px, px, px)])
-    now = t0 + 130 * 900 + 5
-    rel = eng.related_closes(candles.closed(db, "XAU", "15m", now, limit=200), "15m", now)
-    assert rel["dollar"][2] == "EUR/USD"
+def test_the_most_linked_dollar_market_is_used_and_old_methods_are_retired():
+    x, g = _pair()
+    noise = [100.0 * math.exp(random.Random(9).gauss(0, 0.001) * k) for k in range(len(g))]
+    x[-1] = x[-2] * math.exp(0.004)
+    g[-1] = g[-2]
+    out = cm.detect("XAU", len(g) - 1, {"_metal": cm.Series(g), "DXY": cm.Series(noise), "EURUSD": cm.Series(x)})
+    assert any(r == "CM-USD-2" and "EURUSD" in note for r, _, note in out)
+    assert {"dollar", "oil", "risk", "seans"} <= set(forecast.RETIRED)
+    assert not {"dollar", "oil", "risk", "seans"} & set(forecast.METHODS)

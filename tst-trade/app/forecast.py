@@ -207,23 +207,6 @@ def tsmom_view(longer: list[dict], tf: str, bond: float | None) -> tuple[float, 
     return 0.5, f"qızıl 12 ayda {g * 100:+.1f} %, istiqraz {bond * 100:+.1f} %: razı deyil"
 
 
-ASIA_HOURS, US_HOURS = set(range(22, 24)) | set(range(0, 7)), set(range(14, 20))   # UTC
-
-
-def seans_view(next_t: int | None, horizon: str) -> tuple[float, str]:
-    """Overnight (Asian hours) gold has tended to rise and US-day gold to fall (Blose, Gondhalekar & Kort 2018; WGC
-    2024 session attribution). Fixed in advance, never tuned: a window that starts in Asian hours leans up, one in US
-    hours leans down, a little; London hours: no view."""
-    if next_t is None:
-        return 0.5, "vaxt məlumatı yoxdur"
-    hour = (next_t // 3600) % 24
-    if hour in ASIA_HOURS:
-        return 0.53, f"{hour:02d}:00 UTC Asiya saatlarıdır: tarixən qızıl bu saatlarda qalxmağa meyllidir"
-    if hour in US_HOURS:
-        return 0.47, f"{hour:02d}:00 UTC ABŞ saatlarıdır: tarixən qızıl bu saatlarda zəifləməyə meyllidir"
-    return 0.5, f"{hour:02d}:00 UTC London saatları: bu üsulun fikri yoxdur"
-
-
 def trendmix_view(longer: list[dict], tf: str) -> tuple[float, str]:
     """Multi-speed, volatility-scaled trend (EWMAC, as in Carver's pysystemtrade; Hurst-Ooi-Pedersen): three pairs of
     exponential averages, each difference divided by the price's own volatility, averaged; scaled so a strong trend

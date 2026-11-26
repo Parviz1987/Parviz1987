@@ -23,7 +23,12 @@ CREATE TABLE IF NOT EXISTS rule_signals (metal TEXT NOT NULL, tf TEXT NOT NULL, 
   dir INTEGER NOT NULL, price0 REAL, price1 REAL, mode TEXT NOT NULL, note TEXT, PRIMARY KEY (metal, tf, t, rule));
 CREATE INDEX IF NOT EXISTS rule_signals_r ON rule_signals(rule, tf);
 """
-RULES_VER = "2026-11-25.4"     # a new detector set: each metal x timeframe replays its history once more (old rows kept)
+RULES_VER = "2026-11-26.1"     # a new detector set: each metal x timeframe replays its history once more
+# 2026-11-26 (owner: «clean wrong data»): a replay used to KEEP the old version's history rows (insert-or-ignore), so a
+# rule's record mixed firings of its old and new definition. Now a new version first deletes the block's REPLAYED
+# history (mode 'history') and computes it again; firings recorded live, in real time, are kept as they were.
+TA_HISTORY_SQL = ("DELETE FROM rule_signals WHERE metal=? AND tf=? AND mode='history' AND (rule LIKE 'TA-%' OR rule "
+                  "LIKE 'TH-%' OR rule LIKE 'PA-%' OR rule LIKE 'VOL-%' OR rule LIKE 'IM-%')")
 RR_STOP, RR_TARGET, RR_BARS = 1.0, 2.0, 20      # the trader's test: stop 1 ATR, target 2 ATR, at most 20 candles
 TF_DAYS = {"1h": 1 / 24, "4h": 1 / 6, "1d": 1.0}
 PAIR = {"XAU": "XAG", "XAG": "XAU", "XPT": "XPD", "XPD": "XPT"}
@@ -344,7 +349,8 @@ def run(db: DB, now: float | None = None) -> dict:
                                (sym, tf)).fetchone() is None
             ver_key = f"rules:ver:{sym}:{tf}"
             if not first and db.get(ver_key) != RULES_VER:
-                first, have = True, set()        # new detectors: replay; rows already there are kept (INSERT OR IGNORE)
+                first, have = True, set()        # new detectors: the old replayed history goes, then a clean replay
+                db.execute(TA_HISTORY_SQL, (sym, tf))
             first_any = first_any or first
             start = 210 if first else max(210, len(cs) - 30)
             rows = []

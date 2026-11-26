@@ -26,7 +26,7 @@ from zoneinfo import ZoneInfo
 
 from .db import DB
 
-TM_VER = "2026-11-25.2"     # .2: after Friday comes Monday (the Monday rule never fired)
+TM_VER = "2026-11-26.1"     # .2: after Friday comes Monday; 26.1: a replay deletes the old replayed rows first
 TFS = ("1h", "1d")                # the calendar rules speak about the next hour or the next day
 NY = ZoneInfo("America/New_York")
 LON = ZoneInfo("Europe/London")
@@ -152,6 +152,9 @@ def run(db: DB, now: float | None = None) -> int:
                 continue
             mark = f"tm:ver:{TM_VER}:{sym}:{tf}"
             done = int(db.get(mark) or 0)
+            if not done:      # a new version: the old replayed history goes (live firings are kept)
+                db.execute("DELETE FROM rule_signals WHERE metal=? AND tf=? AND mode='history' AND rule LIKE 'TM-%'",
+                           (sym, tf))
             ind = rules.Ind(cs)
             rows = []
             for i in range(110, len(cs)):

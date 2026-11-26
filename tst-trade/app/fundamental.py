@@ -20,7 +20,7 @@ LAG_DAYS = {"DFII10": 2, "DGS2": 2, "T10YIE": 2, "DTWEXBGS": 10, "DEXCHUS": 2}
 GROW_PUBLIC_DAYS = 60     # CFNAI for a month (dated its first day) comes out about three to four weeks after it ends
 OZ_G = 31.1035
 COT_PUBLIC = 3 * 86400 + 20 * 3600 + 1800        # Tuesday 00:00 UTC -> Friday 20:30 UTC
-FA_VER = "2026-11-25.6"     # .6: India gold ETF from AMFI (official)
+FA_VER = "2026-11-26.1"     # .6: India gold ETF from AMFI (official); 26.1: a replay deletes the old replayed rows first
 FAMILY = {"FA-RY-1": "faiz", "FA-RY-2": "faiz", "FA-FED-1": "faiz", "FA-BE-1": "faiz", "FA-USD-1": "dollar",
           "FA-COT-1": "mövqe", "FA-COT-2": "mövqe", "FA-SURP-1": "sürpriz", "FA-CB-1": "mərkəzi bank",
           "FA-FED-2": "faiz", "FA-SGE-1": "fiziki tələb", "FA-GROW-1": "böyümə",
@@ -277,6 +277,8 @@ def run(db: DB, now: float | None = None) -> int:
                                          ("i", data.ind_prem)) if ok) + (f"a{len(data.ind_etf) // 24}" if data.ind_etf else "")
         mark = f"fa:ver:{FA_VER}:{have}:{sym}"
         done = int(db.get(mark) or 0)
+        if not done:          # a new version or new data: the old replayed history goes (live firings are kept)
+            db.execute("DELETE FROM rule_signals WHERE metal=? AND tf='1d' AND mode='history' AND rule LIKE 'FA-%'", (sym,))
         rows = []
         for i in range(20, len(cs)):
             t = cs[i]["t"]

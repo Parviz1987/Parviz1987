@@ -32,7 +32,7 @@ import time
 
 from .db import DB
 
-CM_VER = "2026-11-25.1"
+CM_VER = "2026-11-26.1"     # 26.1: a replay deletes the old replayed rows first
 TFS = ("1h", "4h", "1d")
 FAMILY = {"CM-USD-1": "dollar", "CM-USD-2": "dollar", "CM-JPY-1": "dollar", "CM-CNH-1": "dollar",
           "CM-YLD-1": "faiz", "CM-OIL-1": "neft", "CM-RISK-1": "risk", "CM-RISK-2": "risk", "CM-CORR-1": "risk",
@@ -250,6 +250,9 @@ def run(db: DB, now: float | None = None) -> int:
                 continue
             mark = f"cm:ver:{CM_VER}:{sym}:{tf}"
             done = int(db.get(mark) or 0)
+            if not done:      # a new version: the old replayed history goes (live firings are kept)
+                db.execute("DELETE FROM rule_signals WHERE metal=? AND tf=? AND mode='history' AND rule LIKE 'CM-%'",
+                           (sym, tf))
             m = _series(db, sym, tf, cs, now)
             ind = rules.Ind(cs)
             rows = []
