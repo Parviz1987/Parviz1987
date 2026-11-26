@@ -151,3 +151,10 @@
 - **Yenidən başlamalar:** açılış jurnalı (`boots`) 9de1174-ün iki dəfə başladığını göstərir; xəta izində işləyən kod ilə
   diskdəki kodun fərqli olması diskin bir anlıq köhnə versiyaya qayıtdığını göstərir (yeniləmə skriptinin geri qaytarması
   ehtimalı). Yeniləmə jurnalı (`data/update.log`) növbəti yeniləmədən etibarən sübut verəcək.
+
+## 2026-11-26 01:47 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** yeni hadisə yoxdur (24 saatda 3 səhv parol — Çin, Haidian; blok yoxdur). 2FA kodu serverdədir, sahib hələ açmayıb.
+- **Yenidən başlamalar həll olunub:** səbəb — yeniləmədən sonra ilk cavab 35 san, köhnə skript 30 san gözləyib geri qaytarırdı.
+  İndi 120 san; son iki yeniləmə 35 və 30 saniyədə keçib, sonra 2,4 saatdır fasiləsiz.
+- **Baza 1157 MB** (+89 MB): «bazarlar» və «vaxt» səslərinin keçmiş hesabı yazılır (gözlənilən). Köhnə üsulların arxivini
+  (1,15 milyon sətir) silmək təklifi sahibin cavabını gözləyir.
