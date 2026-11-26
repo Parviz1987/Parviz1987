@@ -165,3 +165,12 @@
 - **Məlumat agentləri:** Gemini-nin bağlanmış modeli avtomatik `gemini-3.8-flash` ilə əvəzləndi, amma Google «kvota bitib»
   (HTTP 429) qaytarır — Gemini açarının hesabında ödəniş (billing) qurulmayıb. Agentlər susmasın deyə: iki beyindən biri
   texniki xəta verəndə üçüncü şirkətin beyni (Anthropic Haiku, veb axtarışı) əvəz edir; yenə iki fərqli şirkət razılaşmalıdır.
+
+### 2026-11-26 13:48 (New York) — növbətçi yoxlama
+- **Təhlükəsizlik:** sakit — 24 saatda uğursuz giriş yoxdur, bloklanan ünvan yoxdur, başlıqlar yerindədir; 2FA hələ açılmayıb.
+- **Server:** versiya 3ea851f (son), 28 dəqiqə əvvəl yeniləndi (cavab 25 saniyədə), boş yaddaş 440 MB, xəta yoxdur.
+  Baza 1157 MB — sabah 04:30 UTC-də VACUUM planlıdır (sahib təsdiqləyib).
+- **İki «warn» normaldır:** bu gün ABŞ-da Şükran günüdür (Thanksgiving), birjalar bağlıdır — VIX gəlmir, dollar indeksi sakitdir;
+  xəbər bloku bir gündür şərt tapmayıb.
+- **Məlumat agentləri:** ehtiyat beyin texniki xətanı aradan qaldırdı (rbi_gold artıq «texniki xəta» yox, «rəqəmlər üst-üstə
+  düşmür» yazır) — iki şirkət cavab verir, amma razılaşmır, ona görə qayda üzrə istifadə olunmur. Hələ uğurlu agent yoxdur.

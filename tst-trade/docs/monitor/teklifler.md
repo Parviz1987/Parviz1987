@@ -21,3 +21,8 @@
 1. **Bazanın ölçüsü üçün saxlama müddəti.**
    - Sübut: baza 24 noyabrda 567 → 792 → 999 MB, bu gün 1014 MB. Böyümə yavaşlayıb (8 saatda +15 MB), amma 500 MB həddindən iki dəfə böyükdür; gündəlik ehtiyat nüsxə də bu qədər böyüyür.
    - Təklif: `rule_signals`-in köhnə tarixçəsini qayda versiyası dəyişəndə silmək (yenisi onsuz da yenidən hesablanır) və kağız ticarətin rədd edilmiş təkliflərini 90 gün saxlamaq. Geri qaytarıla bilir: tarixçə hər an yenidən hesablanır.
+
+### 2026-11-26
+1. **/api/diag cavabı 63–64 saniyə çəkir** (bu gün iki ölçü: 63,7 s və 60 s-də kəsildi). Növbətçi yoxlama və gələcək kənar
+   izləmə (plan A1) üçün bu çox uzundur. Təklif: ağır hissələri (cədvəl ölçüləri, proqnoz sayları) 10 dəqiqəlik keşdən vermək.
+   Sübut: `curl -w %{time_total}` ölçüləri. Həyata keçirilməyib — sahib qərar verir (plan B2 ilə birlikdə etmək olar).
