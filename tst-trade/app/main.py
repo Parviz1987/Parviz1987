@@ -56,12 +56,21 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
             async def _cleanup():              # owner 2026-11-26: the retired methods' archive goes (record kept)
                 await asyncio.sleep(120)
+                from . import cleanup
                 try:
-                    from . import cleanup
                     res = await asyncio.to_thread(cleanup.run, db)
                     log.info("cleanup: %s", res)
                 except Exception:
                     log.exception("cleanup failed")
+                while not db.get(cleanup.VACUUM_MARK):      # the file shrinks once, after the night's backup
+                    if cleanup.vacuum_due(db):
+                        try:
+                            log.info("vacuum: %s", await asyncio.to_thread(cleanup.vacuum, db))
+                        except Exception:
+                            log.exception("vacuum failed")
+                            db.put(cleanup.VACUUM_MARK, json.dumps({"error": "bax: xəta jurnalı", "ts": time.time()}))
+                        break
+                    await asyncio.sleep(300)
             asyncio.get_running_loop().create_task(_cleanup())
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
             asyncio.get_running_loop().create_task(app.state.futures_daily())

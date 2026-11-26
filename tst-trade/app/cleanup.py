@@ -52,5 +52,29 @@ def retired_archive(db: DB, pause: float = 0.2) -> dict:
     return out
 
 
+VACUUM_AT = 1795753800        # 2026-11-27 04:30 UTC: right after DigitalOcean's daily backup (owner approved «ha ed»)
+VACUUM_MARK = "cleanup:vacuum_v1"
+
+
+def vacuum_due(db: DB, now: float | None = None) -> bool:
+    return (time.time() if now is None else now) >= VACUUM_AT and not db.get(VACUUM_MARK)
+
+
+def vacuum(db: DB) -> dict:
+    """Once: give the space freed by the clean-up back to the disk (the file shrinks). Writes wait meanwhile; reads
+    go on. The size before and after and the time it took are kept for the diagnostics."""
+    import os
+    before = os.path.getsize(db.path) if db.path != ":memory:" else 0
+    t0 = time.time()
+    db.execute("PRAGMA busy_timeout=60000")      # wait for a reader to finish rather than fail
+    db.execute("VACUUM")
+    db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    after = os.path.getsize(db.path) if db.path != ":memory:" else 0
+    out = {"ts": time.time(), "mb_before": round(before / 1e6), "mb_after": round(after / 1e6),
+           "seconds": round(time.time() - t0, 1)}
+    db.put(VACUUM_MARK, json.dumps(out))
+    return out
+
+
 def run(db: DB) -> dict:
     return {"retired": retired_archive(db)}

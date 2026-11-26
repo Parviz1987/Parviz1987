@@ -262,6 +262,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "tables": _slow("tables", lambda: _tables(db), 6 * 3600),
         "forecast_rows": _slow("forecast_rows", lambda: _forecast_rows(db), 6 * 3600),
         "cleanup": json.loads(db.get("cleanup:retired_v1") or "null"),
+        "vacuum": json.loads(db.get("cleanup:vacuum_v1") or "null"),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

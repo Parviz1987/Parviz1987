@@ -36,3 +36,11 @@ def test_new_rule_version_deletes_old_replayed_rows_only():
     db.execute(rules.TA_HISTORY_SQL, ("XAU", "1h"))
     left = {(r["t"], r["mode"]) for r in db.execute("SELECT t, mode FROM rule_signals").fetchall()}
     assert left == {(2, "live"), (3, "history"), (4, "futures")}
+
+
+def test_vacuum_waits_for_its_time_and_runs_once(tmp_path):
+    db = DB(tmp_path / "v.sqlite3")
+    rules.ensure(db)
+    assert not cleanup.vacuum_due(db, cleanup.VACUUM_AT - 1) and cleanup.vacuum_due(db, cleanup.VACUUM_AT)
+    out = cleanup.vacuum(db)
+    assert out["mb_after"] <= out["mb_before"] + 1 and not cleanup.vacuum_due(db, cleanup.VACUUM_AT + 10)
