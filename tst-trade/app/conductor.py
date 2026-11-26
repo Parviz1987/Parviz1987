@@ -518,4 +518,7 @@ def run(db: DB) -> dict:
     s = shadow(db)
     from . import shadowtests          # owner's block decisions 1 and 3, measured in the shadow
     x = shadowtests.run(db)
-    return {"audit_s": a.get("seconds"), "shadow_s": s.get("seconds"), "experiments_s": x.get("seconds")}
+    from . import aci                  # plan step 9: the range correction, tested on the past first
+    c = aci.shadow(db)
+    return {"audit_s": a.get("seconds"), "shadow_s": s.get("seconds"), "experiments_s": x.get("seconds"),
+            "aci_s": c.get("seconds")}

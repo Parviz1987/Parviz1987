@@ -139,6 +139,16 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _aci(db: DB) -> dict | None:
+    """Plan step 9: the 80 % range with the adaptive correction, replayed on the past (shadow)."""
+    try:
+        from . import aci
+        v = aci.view(db)
+        return v and {"computed": v.get("computed"), "summary": v.get("summary"), "desks": v.get("desks")}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _experiments(db: DB) -> dict | None:
     """Shadow tests of the owner's block decisions (fundamental 3-year window, festival volatility)."""
     try:
@@ -328,6 +338,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "heartbeat": _heartbeat(db),
         "ops": _ops(db),
         "experiments": _experiments(db),
+        "aci": _aci(db),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},
