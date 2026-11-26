@@ -139,6 +139,19 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _agents(db: DB) -> dict:
+    """The data agents: each one's last confirmed figure and last attempt, and the last calls of their two brains
+    (provider, model, ok, error) — whether each company's search really answers."""
+    from . import reporter
+    try:
+        calls = [dict(r) for r in db.execute("SELECT ts, provider, model, ok, error FROM brain_calls WHERE slot='reporter' "
+                                             "ORDER BY ts DESC LIMIT 8").fetchall()]
+    except Exception:
+        calls = []
+    return {"agents": [{k: a[k] for k in ("id", "value", "period", "last_ok", "last_note", "last_ts")}
+                       for a in reporter.agents_view(db)], "calls": calls}
+
+
 def _update_log(db_path: str) -> list[str]:
     """The auto-update's own lines (deploy/update.sh writes data/update.log): updated, rolled back, slow start."""
     try:
@@ -263,6 +276,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "forecast_rows": _slow("forecast_rows", lambda: _forecast_rows(db), 6 * 3600),
         "cleanup": json.loads(db.get("cleanup:retired_v1") or "null"),
         "vacuum": json.loads(db.get("cleanup:vacuum_v1") or "null"),
+        "agents": _agents(db),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

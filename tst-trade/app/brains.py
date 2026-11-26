@@ -10,7 +10,7 @@ from .db import DB
 from .keys import KeyStore
 
 EDITABLE = ("provider", "model", "fallback", "fallback_model", "month_usd")
-IN_USE = ("scout", "hunter", "reader", "strategist", "analyst2", "reviewer", "chartist", "ideas")   # slots that already do their job; the others are configured and checked only
+IN_USE = ("scout", "hunter", "reader", "strategist", "analyst2", "reviewer", "chartist", "ideas", "reporter")   # slots that already do their job; the others are configured and checked only
 
 
 def config(db: DB, slot: str) -> dict:
