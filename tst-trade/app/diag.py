@@ -148,8 +148,9 @@ def _agents(db: DB) -> dict:
                                              "ORDER BY ts DESC LIMIT 8").fetchall()]
     except Exception:
         calls = []
+    from . import llm
     return {"agents": [{k: a[k] for k in ("id", "value", "period", "last_ok", "last_note", "last_ts")}
-                       for a in reporter.agents_view(db)], "calls": calls}
+                       for a in reporter.agents_view(db)], "calls": calls, "gemini_swap": dict(llm._GEMINI_SWAP)}
 
 
 def _update_log(db_path: str) -> list[str]:

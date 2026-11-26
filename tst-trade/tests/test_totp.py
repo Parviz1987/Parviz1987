@@ -69,3 +69,31 @@ def test_gemini_search_reads_json_from_a_grounded_answer(monkeypatch):
     monkeypatch.setattr(httpx.AsyncClient, "post", post)
     data, tin, tout, calls = asyncio.run(llm.search("gemini", "k", "gemini-2.5-flash", "s", "u"))
     assert data["value"] == 128450 and calls == 2 and tin == 100
+
+
+def test_gemini_retired_model_is_swapped_for_the_one_google_names(monkeypatch):
+    import asyncio
+    import httpx
+    from app import llm
+    llm._GEMINI_SWAP.clear()
+
+    class R:
+        def __init__(self, code, body):
+            self.status_code, self._b = code, body
+            self.text = str(body)
+
+        def json(self):
+            return self._b
+    used = []
+
+    async def post(self, url, headers=None, json=None):
+        used.append(url.split("/models/")[1].split(":")[0])
+        if "gemini-2.5-flash:" in url:
+            return R(404, {"error": {"message": "This model models/gemini-2.5-flash is no longer available to new users. "
+                                                "Please update your code to use models/gemini-3-flash."}})
+        return R(200, {"candidates": [{"content": {"parts": [{"text": '{"found": false}'}]}}], "usageMetadata": {}})
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    data, *_ = asyncio.run(llm.search("gemini", "k", "gemini-2.5-flash", "s", "u"))
+    assert data == {"found": False} and used == ["gemini-2.5-flash", "gemini-3-flash"]
+    asyncio.run(llm.search("gemini", "k", "gemini-2.5-flash", "s", "u"))
+    assert used[-1] == "gemini-3-flash"                       # remembered: the retired model is not asked again

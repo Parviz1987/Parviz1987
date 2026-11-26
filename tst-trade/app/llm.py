@@ -216,7 +216,46 @@ async def search(provider: str, key: str, model: str, system: str, user: str,
     raise LLMError(f"{provider}: canlı axtarış bu provayderdə qoşulmayıb")
 
 
+_GEMINI_SWAP: dict[str, str] = {}      # a retired model -> the model Google told us (or listed) to use instead
+
+
+async def _gemini_current(key: str, model: str, text: str) -> str | None:
+    """Google retires Gemini models for new keys (2026-11-26: «gemini-2.5-flash is no longer available»). The model it
+    names in its error, or else the newest «flash» model this key may use for generateContent."""
+    import re
+    m = re.search(r"use (?:models/)?(gemini-[A-Za-z0-9.\-]+)", text or "")
+    if m and m.group(1) != model:
+        return m.group(1).rstrip(".")
+    async with httpx.AsyncClient(timeout=TIMEOUT) as c:
+        r = await c.get("https://generativelanguage.googleapis.com/v1beta/models", headers={"x-goog-api-key": key},
+                        params={"pageSize": 200})
+    if r.status_code != 200:
+        return None
+    names = [x["name"].split("/")[-1] for x in r.json().get("models", [])
+             if "generateContent" in (x.get("supportedGenerationMethods") or [])]
+    flash = [n for n in names if "flash" in n and not re.search(r"lite|image|tts|live|audio|preview|exp|thinking", n)]
+    def ver(n):
+        v = re.search(r"gemini-(\d+(?:\.\d+)?)", n)
+        return float(v.group(1)) if v else 0.0
+    flash.sort(key=lambda n: (ver(n), n), reverse=True)
+    return flash[0] if flash else None
+
+
 async def _gemini_search(key, model, system, user, max_tokens):
+    model = _GEMINI_SWAP.get(model, model)
+    try:
+        return await _gemini_search_once(key, model, system, user, max_tokens)
+    except LLMError as e:
+        if "HTTP 404" not in str(e):
+            raise
+        new = await _gemini_current(key, model, str(e))
+        if not new or new == model:
+            raise
+        _GEMINI_SWAP[model] = new
+        return await _gemini_search_once(key, new, system, user, max_tokens)
+
+
+async def _gemini_search_once(key, model, system, user, max_tokens):
     """Gemini with Google Search grounding (owner 2026-11-26: use the idle Gemini key for the data agents). A grounded
     answer cannot be forced to JSON, so the JSON is read from the text; the number of Google queries is counted."""
     body = {"systemInstruction": {"parts": [{"text": system}]},
@@ -229,7 +268,7 @@ async def _gemini_search(key, model, system, user, max_tokens):
     if r.status_code in (401, 403):
         raise LLMError("Gemini: açar qəbul olunmadı")
     if r.status_code != 200:
-        raise LLMError(f"Gemini: HTTP {r.status_code}: {r.text[:160]}")
+        raise LLMError(f"Gemini: HTTP {r.status_code}: {r.text[:400]}")
     j = r.json()
     try:
         cand = j["candidates"][0]

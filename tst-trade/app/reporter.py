@@ -111,7 +111,7 @@ class Reporter:
         out = []
         for topic, t in TOPICS.items():
             if d.hour >= t.get("hour", HOUR_UTC) and d.weekday() in t["days"] and \
-                    self.db.get(f"reporter:{topic}:day") != day:
+                    self.db.get(f"reporter:{topic}:day") != day and now >= float(self.db.get(f"reporter:{topic}:retry") or 0):
                 out.append(topic)
         return out
 
@@ -139,11 +139,20 @@ class Reporter:
                 vals.append({"value": v, "period": _period(data.get("period")) if ok else None,
                              "url": str(data.get("source_url"))[:300] if ok else None, "brain": how})
             rep("reporter", "working", "W2 Müqayisə", 0.85, topic)
+            # a brain that failed technically (a retired model, a timeout) does not use up the day: one more try in
+            # two hours, at most three tries a day (2026-11-26: Gemini's retired model cost the day's IBJA figure)
+            broken = sum(1 for data, how in answers if data is None)
+            tries = int(self.db.get(f"reporter:{topic}:tries:{day}") or 0) + 1
+            self.db.put(f"reporter:{topic}:tries:{day}", str(tries))
+            if broken and tries < 3:
+                self.db.delete(f"reporter:{topic}:day")
+                self.db.put(f"reporter:{topic}:retry", str(now + 2 * 3600))
             a, b = (vals + [{}, {}])[:2]
             accepted = (a.get("value") is not None and b.get("value") is not None and a.get("period")
                         and a.get("period") == b.get("period") and _agree(topic, a["value"], b["value"]))
             value = round((a["value"] + b["value"]) / 2, 3) if accepted else None
             note = ("iki beyin eyni rəqəmi eyni dövr üçün tapdı" if accepted else
+                    f"{broken} beyin texniki xəta verdi: 2 saatdan sonra yenidən" if broken and tries < 3 else
                     "rəqəmlər və ya dövrlər üst-üstə düşmür, ya biri tapmadı: istifadə olunmur")
             self.db.execute("INSERT OR REPLACE INTO market_reports VALUES(?,?,?,?,?,?,?,?,?)",
                             (topic, (a.get("period") if accepted else day) or day, value, TOPICS[topic]["unit"], now,
