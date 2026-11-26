@@ -89,20 +89,23 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   əhatə edir; XAG eyni) → canlı çəkilər dəyişmir (bütün keçmiş qalır). Kölgə hər gün davam edir.
 - **Nə qalıb:** mərkəzi bank aylıq məlumatı yoxdur (WGC avtomatik yükləməni qadağan edir; IMF gecikmə ilə var).
 
-### 3. Xəbər + məlumat agentləri — `news` 🔧 (ən zəif)
+### 3. Xəbər + məlumat agentləri — `news` 🟡
 - **Nə edir:** RSS / Benzinga başlıqları, Kəşfiyyatçı (Grok, X), hadisə birləşdiricisi (eyni xəbər bir dəfə),
-  Oxuyucu (Haiku) hər başlığı qiymətləndirir → NW qaydaları → səs `xeber`. İçində **9 məlumat agenti**
-  (`app/reporter.py`): ibja_rate, india_premium, india_imports, rbi_gold, china_premium, pboc_gold, wgc_etf,
-  comex_stocks, fomc_next — iki fərqli şirkətin beyni internetdə tapır, **ikisi razılaşanda** istifadə olunur
-  (mənbə linki ilə); biri texniki xəta verəndə ehtiyat beyin (Anthropic Haiku) əvəz edir.
-- **Vəziyyət (26.11):** 7 gündə səsin fikri **yoxdur**, NW qaydaları heç işə düşməyib: qaydalar **bir həftəlik**
-  başlıq qiymətləndirməsi tələb edir (`detect`: ilk etiketdən 7 gün). Blok yoxlaması indi etiketlərin sayını və
-  həftənin nə vaxt dolduğunu göstərir (verdict «gözləyir»). Agentlərin **hələ bir uğurlu nəticəsi yoxdur**: Gemini
-  ödənişsizdir (429); «dövr» müqayisəsi səhvi düzəldildi (ay və gün eyni dövr), qeydlər səbəbi dəqiq deyir.
-- **Nə qalıb:** 👤 Gemini ödənişli açarı; həftə dolandan sonra NW qaydalarının ilk işə düşmələrini yoxlamaq; agentlərin
-  ilk uğurlarını yoxlamaq.
-- **Necə:** Smales 2014/2015 (xəbər əhvalı), Lopez-Lira & Tang 2023; agent rəqəmi yalnız iki şirkət razılaşanda;
-  WGC/BlackRock saytlarını avtomatik oxumaq qadağandır (şərtlər); IBJA yalnız rəsmi API.
+  Oxuyucu (Haiku) hər başlığı qiymətləndirir (istiqamət, güc 0–3, mövzu, metallar) → 7 NW qaydası → səs `xeber`.
+  İçində **9 məlumat agenti** (`app/reporter.py`): ibja_rate, india_premium, india_imports, rbi_gold, china_premium,
+  pboc_gold, wgc_etf, comex_stocks, fomc_next — iki fərqli şirkətin beyni tapır, **ikisi razılaşanda** istifadə olunur.
+- **26.11 tapılan əsl səbəb və düzəliş:** etiketlər 23.11-də başlayıb (2341 başlıq, qızılda 1880). Kod **bütün** NW
+  qaydalarını ilk etiketdən 7 gün gözlədirdi — səs bütün ilk həftə susurdu (qızılın 6 saatlıq əhvalı −6,8 olduğu
+  halda). İndi yalnız «axın sıçrayışı» (NW-SURGE-1) həftə gözləyir (adi axını bilmək üçün); qalanları dərhal.
+  Araşdırmaya görə planlı ABŞ rəqəmi və Fed xəbərlərinin çəkisi 1 saatda yarıya sönür (qızıl onları dəqiqələrdə
+  qəbul edir), digərləri 2 saatda. NW_VER 2026-11-26.2 — keçmiş yenidən hesablanır. Canlı diaqnostika: diag
+  `news_debug`.
+- **Araşdırma (docs/research, 26.11):** mənfi xəbər güclüdür (Smales 2014/2015) ✓ bizdə 1,5x; yalnız yüksək
+  əlaqəli xəbər işləyir (Groß-Klußmann & Hautsch) ✓ metalı olmayan etiket sayılmır; LLM lüğətdən xeyli dəqiqdir;
+  qızıl üçün 1 saat–1 gün xəbər proqnozunun kənar sınaqda sübutu tapılmayıb — sübutu bizim Hakim verəcək.
+- **Nə qalıb:** (a) qaydaların öz qeydi yığılmalıdır (çəki yalnız müsbət qeydlə); (b) NW-SHOCK-1-i istiqamət yox,
+  dalğalılıq/gözlə işarəsinə çevirmək — kölgədə ölçüldükdən sonra; (c) gündəlik geosiyasi risk indeksi (GPR) —
+  lisenziya aydınlaşanda; (d) agentlər: Gemini açarı saxlanıb ✅, ilk uğurlar yoxlanacaq.
 
 ### 4. Bazarlar arası — `cross` 🟡
 - **Nə edir:** dollar (DXY, EUR/USD), JPY, CNH, istiqrazlar, neft, risk (S&P, VIX), korrelyasiya, mis, öncül bazar.

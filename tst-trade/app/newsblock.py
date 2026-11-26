@@ -19,12 +19,15 @@ import time
 
 from .db import DB
 
-NW_VER = "2026-11-26"     # a replay deletes the old replayed rows first (owner: clean wrong data)
+NW_VER = "2026-11-26.2"   # .2: only the burst rule waits for a week of labels; scheduled news fades faster (replay)
 TOPIC = {"fed": "fed", "monetary": "fed", "rates": "fed", "inflation": "data", "jobs": "data", "gdp": "data",
          "data": "data", "geopolitics": "geo", "war": "geo", "sanctions": "geo", "supply": "flow", "demand": "flow"}
 FAMILY = {"NW-SENT-1": "əhval", "NW-FED-1": "Fed", "NW-DATA-1": "ABŞ rəqəmi", "NW-GEO-1": "geosiyasət",
           "NW-FLOW-1": "tələb-təklif", "NW-SURGE-1": "axın sıçrayışı", "NW-SHOCK-1": "böyük xəbər"}
 HALF_LIFE = 2 * 3600
+# scheduled US data and Fed news are absorbed by gold within minutes (Smales 2015: ~90 s; Awartani et al. 2024: some
+# drift past 5 min) — their weight halves every hour, other news every 2 hours (research 2026-11-26)
+HALF_LIFE_TOPIC = {"data": 3600, "fed": 3600}
 NEG = 1.5               # a negative headline weighs 1.5 times a positive one (asymmetry)
 
 
@@ -64,14 +67,17 @@ class Data:
 
 
 def _score(items, t: float) -> float:
-    return sum(d * s * (NEG if d < 0 else 1.0) * math.exp(-(t - k) * math.log(2) / HALF_LIFE) for k, d, s, _ in items)
+    return sum(d * s * (NEG if d < 0 else 1.0) * math.exp(-(t - k) * math.log(2) / HALF_LIFE_TOPIC.get(top, HALF_LIFE))
+               for k, d, s, top in items)
 
 
 def detect(data: Data, metal: str, t: float) -> list[tuple[str, int, str]]:
     out = []
     first = data.first(metal)
-    if first is None or t - first < 7 * 86400:          # a week of labels is needed for the usual flow
+    if first is None:
         return out
+    week_known = t - first >= 7 * 86400   # only the burst rule needs a week of labels (its «usual flow»): 2026-11-26
+    # the other rules used to wait for it too, so the voice stayed silent for its whole first week
     recent = data.window(metal, t, 6 * 3600)
     sc = _score(recent, t)
     if abs(sc) >= 3:
@@ -86,7 +92,7 @@ def detect(data: Data, metal: str, t: float) -> list[tuple[str, int, str]]:
     burst = [x for x in data.window(metal, t, 2 * 3600) if x[2] > 0]
     week = [x for x in data.window(metal, t - 2 * 3600, 7 * 86400) if x[2] > 0]
     usual = len(week) / (7 * 12)                     # labelled headlines per 2 hours over the last week
-    if len(burst) >= 4 and len(burst) >= 3 * max(usual, 0.5):
+    if week_known and len(burst) >= 4 and len(burst) >= 3 * max(usual, 0.5):
         net = sum(d * s for _, d, s, _ in burst)
         if net:
             out.append(("NW-SURGE-1", 1 if net > 0 else -1, f"2 saatda {len(burst)} xəbər (adi {usual:.1f}): axın "

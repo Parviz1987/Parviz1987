@@ -90,8 +90,8 @@ def build(db: DB, now: float | None = None) -> dict:
             try:
                 r = db.execute("SELECT MIN(ts) f, SUM(ts > ?) w, COUNT(*) n FROM news_ai", (now - 7 * 86400,)).fetchone()
                 sheet["labels"] = {"first": r["f"], "last_7d": r["w"] or 0, "all": r["n"]}
-                if r["f"] and now - r["f"] < 7 * 86400:
-                    wait_until = r["f"] + 7 * 86400
+                if r["n"] == 0:          # no labels at all yet: the Reader has not started
+                    wait_until = now
             except Exception:
                 sheet["labels"] = None
         silent_src = [k for k, v in src.items() if v["ok"] is False]
@@ -100,8 +100,7 @@ def build(db: DB, now: float | None = None) -> dict:
             from datetime import datetime
             from zoneinfo import ZoneInfo
             verdict = "gözləyir"
-            why = ("qaydalar bir həftəlik başlıq qiymətləndirməsi tələb edir: "
-                   + datetime.fromtimestamp(wait_until, ZoneInfo("America/New_York")).strftime("%d.%m %H:%M") + " NY")
+            why = "Oxuyucu hələ heç bir başlığı qiymətləndirməyib"
         elif silent_src or (views and any_view == 0):
             verdict = "qırıq"
             why = ("mənbə işləmir: " + ", ".join(silent_src)) if silent_src else "son 7 gündə səsin heç fikri olmayıb"
