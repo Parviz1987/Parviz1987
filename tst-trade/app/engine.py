@@ -620,11 +620,15 @@ class Engine:
                 rows = candles.closed(self.db, sym, tf, now, limit=BACKTEST_MAX + forecast.MIN_CANDLES)
                 k = forecast.steps_of(h)
                 batch: list = []
-                linked = {c: {r["t"]: r["c"] for r in candles.closed(self.db, c, tf, now, limit=BACKTEST_MAX)}
-                          for c in list(markets.saved(self.db).get("epics", {}))}
-                done = {r["issued_t"] for r in self.db.execute(
-                    "SELECT issued_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='history' "
-                    "GROUP BY issued_t HAVING COUNT(*) >= ?", (sym, h, len(forecast.methods_for(h)))).fetchall()}
+                # Which methods each past moment already has (2026-11-26: a moment counted as replayed by its NUMBER of
+                # methods, so new methods that replaced retired ones — «bazarlar», «vaxt» — never got a history).
+                # A moment is replayed again only for the methods it lacks; the rows it has never change.
+                mf = forecast.methods_for(h)
+                have: dict[int, set] = {}
+                for r in self.db.iterate("SELECT issued_t, method FROM forecasts WHERE symbol=? AND horizon=? AND "
+                                         f"mode='history' AND method IN ({','.join('?' * len(mf))})", (sym, h, *mf)):
+                    have.setdefault(r["issued_t"], set()).add(r["method"])
+                done = {t for t, ms in have.items() if len(ms) >= len(mf)}
                 live_ts = {r["issued_t"] for r in self.db.execute(
                     "SELECT DISTINCT issued_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='live'",
                     (sym, h)).fetchall()}
@@ -652,6 +656,8 @@ class Engine:
                     if fc is None:
                         continue
                     target = rows[i + k - 1]["t"] + step if i + k - 1 < len(rows) else target_time(t, h)
+                    if t in have:          # only what this moment lacks (small batches, nothing old rewritten)
+                        fc = {**fc, "methods": {m: v for m, v in fc["methods"].items() if m not in have[t]}}
                     batch += judge.issue_rows(sym, h, t, target, fc, "history")
                 # one transaction per metal and horizon (thousands of small commits are slow on a small disk)
                 judge.insert(self.db, batch)

@@ -43,6 +43,14 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         hub.attach_loop(asyncio.get_running_loop())
+        # every start of the process, with its commit and how long the start took (2026-11-26: the server restarted
+        # once without a new version; this journal shows when and why — a slow start, a rollback or a crash)
+        try:
+            boots = json.loads(db.get("boot:log") or "[]")[-19:]
+        except ValueError:
+            boots = []
+        boots.append({"ts": time.time(), "commit": _commit(), "startup_s": round(time.time() - diag.STARTED, 1)})
+        db.put("boot:log", json.dumps(boots))
         if start_engine:
             engine.start()
             asyncio.get_running_loop().create_task(app.state.futures_keeper())

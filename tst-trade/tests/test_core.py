@@ -354,3 +354,19 @@ def test_results_board_api(tmp_path):
     assert {"cover80", "dir_hit", "bar"} <= set(d["score"][0])
     assert c.get("/results").status_code == 200
     assert c.get("/api/results?symbol=XXX").status_code == 400
+
+
+def test_backtest_fills_only_the_methods_a_moment_lacks():
+    db = mem()
+    rows = _seed(db, 400)
+    eng = Engine(db, KeyStore(db, SECRET), "demo", 15)
+    now = rows[-1][0] + 2 * 3600
+    eng.backtest(now)
+    n_rw = db.execute("SELECT COUNT(*) n FROM forecasts WHERE method='rw' AND horizon='1h'").fetchone()["n"]
+    n_vx = db.execute("SELECT COUNT(*) n FROM forecasts WHERE method='vaxt' AND horizon='1h'").fetchone()["n"]
+    db.execute("UPDATE forecasts SET basis='old' WHERE method='rw'")
+    db.execute("DELETE FROM forecasts WHERE method='vaxt'")          # a new voice that has no history yet
+    eng.backtest(now)
+    assert db.execute("SELECT COUNT(*) n FROM forecasts WHERE method='vaxt' AND horizon='1h'").fetchone()["n"] == n_vx
+    assert db.execute("SELECT COUNT(*) n FROM forecasts WHERE method='rw' AND horizon='1h'").fetchone()["n"] == n_rw
+    assert db.execute("SELECT COUNT(*) n FROM forecasts WHERE method='rw' AND basis!='old'").fetchone()["n"] == 0

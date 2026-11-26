@@ -46,11 +46,20 @@ main() {
   sudo -u $APP_USER git -C $REPO reset -q --hard "$NEW"
   sudo -u $APP_USER $APP_DIR/.venv/bin/pip install -q -r $APP_DIR/requirements.txt
   systemctl restart tst-trade
-  for i in 1 2 3 4 5 6; do
+  # up to 2 minutes for the first answer (2026-11-26: a 1 GB database can make the start slower than the old 30 s,
+  # which rolled a good version back and restarted the panel twice); every outcome goes to data/update.log
+  local LOG=$APP_DIR/data/update.log
+  for i in $(seq 1 24); do
     sleep 5
-    if curl -fsS http://127.0.0.1:8100/healthz >/dev/null; then echo "updated to ${NEW:0:7}"; return 0; fi
+    if curl -fsS http://127.0.0.1:8100/healthz >/dev/null; then
+      echo "updated to ${NEW:0:7}"
+      echo "$(date -u +%FT%TZ) updated ${OLD:0:7} -> ${NEW:0:7}, answered after $((i * 5)) s" >> "$LOG"
+      tail -n 50 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"; chmod 644 "$LOG"
+      return 0
+    fi
   done
   echo "new version did not answer: rolling back to ${OLD:0:7}"
+  echo "$(date -u +%FT%TZ) ${NEW:0:7} did not answer in 120 s: rolled back to ${OLD:0:7}" >> "$LOG"; chmod 644 "$LOG"
   sudo -u $APP_USER git -C $REPO reset -q --hard "$OLD"
   systemctl restart tst-trade
   return 1

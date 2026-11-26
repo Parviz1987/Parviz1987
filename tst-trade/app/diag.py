@@ -108,6 +108,36 @@ def _rules(db: DB) -> dict:
                       for r, tfs in rec.get("rules", {}).items()}}
 
 
+def _tables(db: DB) -> list[dict]:
+    """Where the database's size is: megabytes per table and index (sqlite's dbstat), biggest first; rows from the
+    largest rowid (instant). Computed at most every 6 hours (dbstat reads the whole file)."""
+    sizes = {}
+    try:
+        sizes = {r["name"]: r["b"] for r in db.execute("SELECT name, SUM(pgsize) b FROM dbstat GROUP BY name").fetchall()}
+    except Exception:
+        pass
+    out = []
+    for r in db.execute("SELECT name, type, tbl_name FROM sqlite_master WHERE type IN ('table', 'index')").fetchall():
+        rows = None
+        if r["type"] == "table":
+            try:
+                rows = db.execute(f'SELECT MAX(rowid) n FROM "{r["name"]}"').fetchone()["n"]
+            except Exception:
+                rows = None
+        out.append({"name": r["name"], "type": r["type"], "table": r["tbl_name"],
+                    "mb": round(sizes.get(r["name"], 0) / 1e6, 1), "rows": rows})
+    return sorted(out, key=lambda x: -x["mb"])[:25]
+
+
+def _update_log(db_path: str) -> list[str]:
+    """The auto-update's own lines (deploy/update.sh writes data/update.log): updated, rolled back, slow start."""
+    try:
+        from pathlib import Path
+        return Path(db_path).parent.joinpath("update.log").read_text().splitlines()[-15:]
+    except (OSError, TypeError):
+        return []
+
+
 def _security(db: DB) -> dict:
     from .security import Guard
     return Guard(db).summary()
@@ -200,6 +230,8 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
                                           "ORDER BY last_ts DESC LIMIT 50").fetchall()]
     return {
         "version": version, "now": now, "uptime_s": round(now - STARTED),
+        "boots": json.loads(db.get("boot:log") or "[]")[-10:], "updates": _update_log(db_path),
+        "tables": _slow("tables", lambda: _tables(db), 6 * 3600),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},
