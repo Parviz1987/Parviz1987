@@ -154,6 +154,9 @@ async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema:
     return None, "; ".join(errors) or "beyin seçilməyib"
 
 
+SPARE = ("anthropic", "claude-haiku-5-5")      # a third company, used only when one of the two fails technically
+
+
 async def run_both(db: DB, keys: KeyStore, slot: str, system: str, user: str,
                    max_tokens: int = 2000) -> list[tuple[dict | None, str]]:
     """Ask the slot's main brain AND its second brain independently, both with live web search: for jobs where two
@@ -181,4 +184,19 @@ async def run_both(db: DB, keys: KeyStore, slot: str, system: str, user: str,
             msg = str(e).replace(key, "***")[:200]
             db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)", (_time.time(), slot, provider, model, msg))
             out.append((None, f"{provider}: {msg}"))
+    # 2026-11-26: Gemini answered «quota exceeded» — one company's technical failure must not silence the agent.
+    # The spare brain (a third company, not one already asked) stands in, so two DIFFERENT companies still agree.
+    asked = {cfg.get("provider"), cfg.get("fallback")}
+    if any(d is None for d, _ in out) and SPARE[0] not in asked and keys.first(SPARE[0]):
+        key = keys.first(SPARE[0])
+        try:
+            data, tin, tout, calls = await llm.search(SPARE[0], key, SPARE[1], system, user, max_tokens)
+            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,1,?,?,?,NULL)",
+                       (_time.time(), slot, SPARE[0], SPARE[1], tin, tout,
+                        llm.cost(SPARE[1], tin, tout) + calls * llm.SEARCH_CALL_USD))
+            k = next(n for n, (d, _) in enumerate(out) if d is None)
+            out[k] = (data, f"{SPARE[0]} · {SPARE[1]} (əvəzedici)")
+        except Exception as e:
+            msg = str(e).replace(key, "***")[:200]
+            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)", (_time.time(), slot, SPARE[0], SPARE[1], msg))
     return out

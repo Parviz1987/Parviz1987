@@ -97,3 +97,23 @@ def test_gemini_retired_model_is_swapped_for_the_one_google_names(monkeypatch):
     assert data == {"found": False} and used == ["gemini-2.5-flash", "gemini-3-flash"]
     asyncio.run(llm.search("gemini", "k", "gemini-2.5-flash", "s", "u"))
     assert used[-1] == "gemini-3-flash"                       # remembered: the retired model is not asked again
+
+
+def test_spare_brain_stands_in_when_one_company_fails(monkeypatch):
+    import asyncio
+    from app import brains, llm
+    from app.keys import KeyStore
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    monkeypatch.setattr(ks, "first", lambda p: "k")
+    brains.save(db, "reporter", {"provider": "gemini", "model": "gemini-2.5-flash", "fallback": "openai",
+                                 "fallback_model": "gpt-5.4-nano"})
+
+    async def search(provider, key, model, system, user, max_tokens=0):
+        if provider == "gemini":
+            raise llm.LLMError("Gemini: HTTP 429: quota")
+        return {"found": True, "value": 1}, 10, 5, 1
+    monkeypatch.setattr(llm, "search", search)
+    out = asyncio.run(brains.run_both(db, ks, "reporter", "s", "u"))
+    assert [d is not None for d, _ in out] == [True, True]
+    assert "anthropic" in out[0][1] and "əvəzedici" in out[0][1] and "openai" in out[1][1]

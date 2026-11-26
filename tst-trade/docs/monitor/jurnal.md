@@ -158,3 +158,10 @@
   İndi 120 san; son iki yeniləmə 35 və 30 saniyədə keçib, sonra 2,4 saatdır fasiləsiz.
 - **Baza 1157 MB** (+89 MB): «bazarlar» və «vaxt» səslərinin keçmiş hesabı yazılır (gözlənilən). Köhnə üsulların arxivini
   (1,15 milyon sətir) silmək təklifi sahibin cavabını gözləyir.
+
+## 2026-11-26 10:48 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** sakit — 24 saatda uğursuz giriş yoxdur (Çin cəhdləri 24 saatdan çıxdı); 2FA hələ açılmayıb.
+- **Server:** 7,3 saat fasiləsiz, xəta yoxdur; yeniləmədən sonra cavab artıq 5 saniyədə (köhnə arxiv silindikdən sonra).
+- **Məlumat agentləri:** Gemini-nin bağlanmış modeli avtomatik `gemini-3.8-flash` ilə əvəzləndi, amma Google «kvota bitib»
+  (HTTP 429) qaytarır — Gemini açarının hesabında ödəniş (billing) qurulmayıb. Agentlər susmasın deyə: iki beyindən biri
+  texniki xəta verəndə üçüncü şirkətin beyni (Anthropic Haiku, veb axtarışı) əvəz edir; yenə iki fərqli şirkət razılaşmalıdır.
