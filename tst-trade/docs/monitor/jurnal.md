@@ -141,3 +141,13 @@
 - **Server:** versiya 90b19b0, 2,9 saatdır fasiləsiz; yeni xəta yoxdur. Boş yaddaş 418 MB, baza 1051 MB.
 - **AMFI düzəlişi serverdə təsdiqləndi:** xəta yoxdur, 28 ay yığılıb (əvvəl 16 + .xlsx aylar).
 - «Qiymət axını 3/4»: 17:00–18:00 NY bazarların gündəlik fasiləsidir, xəta deyil.
+
+## 2026-11-26 00:30 NY — vacib qeydlər
+- **Təhlükəsizlik:** 25-26 noyabrda 3 uğursuz giriş cəhdi **Çindən (Pekin, Haidian)** olub — sahibin ünvanı deyil (əvvəlki
+  jurnal qeydlərində «tanınan ünvandan» yazılmışdı: bu, yoxlanmamış ehtimal idi, səhvdir). Blok həddinə (15 dəqiqədə 5)
+  çatmayıb. Yer DB-IP City Lite bazası ilə serverdə tapılır; diaqnostika ünvan yox, yalnız yer göstərir.
+- **Sahibin qərarı:** «Sahibin kompüterindən istifadə etmə» qaydası ləğv olundu — lazım olanda Claude Remote Control ilə
+  sahibin paylaşdığı qovluqda işləyə bilər (hər qoşulma sahibin təsdiqi ilə).
+- **Yenidən başlamalar:** açılış jurnalı (`boots`) 9de1174-ün iki dəfə başladığını göstərir; xəta izində işləyən kod ilə
+  diskdəki kodun fərqli olması diskin bir anlıq köhnə versiyaya qayıtdığını göstərir (yeniləmə skriptinin geri qaytarması
+  ehtimalı). Yeniləmə jurnalı (`data/update.log`) növbəti yeniləmədən etibarən sübut verəcək.
