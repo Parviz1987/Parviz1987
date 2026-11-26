@@ -104,9 +104,18 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                     await asyncio.sleep(300)
             async def _repair():               # plan step 4: the allowed-steps catalogue, every minute
                 from . import repair
+                from . import braintrial
                 rep = repair.Repairer(db, engine)
+                k = 0
                 while True:
                     await asyncio.sleep(60)
+                    k += 1
+                    if k % 60 == 0:             # hourly: a retired model's proposed replacement gets its trial
+                        try:
+                            for x in await braintrial.handle_proposals(db, store):
+                                log.info("model pre-approved: %s", x)
+                        except Exception:
+                            log.exception("brain trial failed")
                     try:
                         for x in await rep.check():
                             log.info("repair: %s", x)

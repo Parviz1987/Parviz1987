@@ -288,8 +288,16 @@ def view(db: DB) -> dict:
     for s in slots.values():
         s["fallback_rate"] = round(s["fallback_ok"] / s["ok"], 3) if s["ok"] else None
         s["alert"] = bool(s["ok"] >= 10 and s["fallback_rate"] and s["fallback_rate"] > 0.2)
+    month = {}                         # plan step 7: the brains' monthly report (cost, answers, errors per slot)
+    try:
+        for r in db.execute("SELECT slot, provider, model, SUM(ok) ok, COUNT(*) n, ROUND(SUM(usd), 4) usd FROM "
+                            "brain_calls WHERE ts > ? GROUP BY slot, provider, model", (now - 30 * 86400,)).fetchall():
+            month.setdefault(r["slot"], []).append({"brain": f"{r['provider']} · {r['model']}", "ok": r["ok"],
+                                                    "calls": r["n"], "usd": r["usd"]})
+    except Exception:
+        pass
     return {"models": [x for x in state if x["state"] != "işləyir"], "proposals":
-            json.loads(db.get("llm:proposals") or "{}"), "slots_24h": slots}
+            json.loads(db.get("llm:proposals") or "{}"), "slots_24h": slots, "month": month}
 
 
 def decide(db: DB, keys, action: str, provider: str, model: str) -> dict:
