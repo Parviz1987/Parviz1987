@@ -239,3 +239,30 @@ Təmiz yenidən hesablama bitəndən sonra hər blok üçün **Hakimin təmiz r�
 1. A3 (düzəlişlər sizin təsdiqinizlə): əvvəldə, yoxsa sonda?
 2. Gemini-yə ödəniş qurulsunmu?
 3. A1 üçün healthchecks.io hesabını nə vaxt açacaqsınız? Mən kodu hazırlayıram, hesab açılana qədər siqnallar sadəcə göndərilmir.
+
+## 5. Razılaşdırılmış qərarlar (çatda, 26.11.2026) — icra bunlara əsaslanır
+
+Sahib 12 addımı bir-bir müzakirə edib təsdiqlədi («12 keç»). Plan səhifəsində də qeyd olunub.
+
+- **İş bölgüsü (s2, sahibin öz variantı):** Merge düyməsi yoxdur. Texniki işi Claude özü edir, 8 qoruyucu qatla:
+  əvvəl xətanı göstərən test, kiçik addım, ikinci göz (ayrı yoxlayıcı), bütün testlər, brauzer «dünən/bu gün», **nəticə izi**
+  (dəyişiklikdən əvvəl/sonra eyni məlumatla proqnoz — rəqəm dəyişirsə dayan, sahibə izahla yaz), serverdə hazırlıq
+  yoxlaması + bir dəfə geri qayıtma, «səhvlərim siyahısı». Sahibdən soruşulur: pul, nəticə izini dəyişən hər şey,
+  ticarət, açar və model, məlumat silmək, blok/səhifə/düymə çıxarmaq. Qorunan fayllara toxunan commit «Sahib-təsdiqi:»
+  qeydi olmadan serverə düşmür.
+- **s1:** 13 siqnal; Telegram-a dərhal yalnız 4 təcili hal (server, qiymət, backup, deploy geri qaytarıldı), qalanı gündəlik
+  icmal; gecə mesajı səsli; saatda bir GitHub Actions-dan ehtiyat yoxlama. Bazar saatı New York vaxtı ilə (qış/yay, fasilə).
+- **s3:** qorunan siyahını Claude müəyyən etdi (Hakim hədləri, sınaq qaydaları, xərc hesabı, öyrənmə sabitləri, ticarət qatı,
+  açar/limit/model, LIVE/DELAYED/OFFLINE məntiqi, CLAUDE.md, spesifikasiya).
+- **s4, s5, s8:** texniki — Claude özü (kataloq + limitlər + «Dayandır»; canlı/hazır yoxlaması; növbətçi təlimatı).
+- **s6:** Gemini qalır (Google axtarışı). Sahib ödənişli layihədən açarı sonda Admin-ə qoyacaq. Limitlər indiki kimi.
+- **s7:** qabaqcadan icazə: eyni şirkət + sınaqda keyfiyyət aşağı deyil + xərc ≤ +20% → avtomatik keçid və xəbər; qalanı
+  müqayisə kartı ilə sahibə. Sınaq sürüşü (20–30 sual), 1 həftə kölgə (10%), işə uyğun beyin, aylıq beyin hesabatı.
+- **s9:** aralığın avtomatik tənzimlənməsi (ACI) — əvvəl keçmişdə sınaq, sonra canlı.
+- **s10:** dirijor kimi dərinləşdirildi və kölgədə quruldu (`app/conductor.py`). İlk nəticə: sadə ortanı keçmədi; canlıya
+  qoşma qərarı sahibdə.
+- **s11:** gücləndirilmiş səhv yarılması: 8 səbəb + 6 qat (Murphy bölgüsü, dilimlər, «kim yanlış apardı», qərar/nəticə
+  4 qutu, ayın 5 ən böyük səhvi kartı, aralıq sürüşməsi). Canlıya toxunmur.
+- **s12:** Hakim: real sınaq sayı, enməyən hədd, DSR ≥ 0,95, PBO ≤ 0,10 (purge/embargo), gələcəyə baxma qadağası.
+
+İcra sırası dəyişmir: A → B → C → D → E → F. Sahibdən gözlənən: Gemini açarı (ödənişli), healthchecks.io hesabı, 2FA-nı açmaq.
