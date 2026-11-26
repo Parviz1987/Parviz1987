@@ -523,6 +523,11 @@ def run(db: DB) -> dict:
     from . import autopsy              # plan step 11: once a month, why the forecasts missed
     if autopsy.due(db):
         autopsy.run(db)
+    from . import blockaudit           # plan phase E: one sheet per block, every day
+    try:
+        blockaudit.build(db)
+    except Exception:
+        pass
     import logging
     from . import judgeplus            # plan step 12: weekly, the Judge checks itself and decayed approvals go back
     if time.time() - float(db.get("judge:weekly_ts") or 0) > 7 * 86400:

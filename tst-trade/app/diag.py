@@ -139,6 +139,18 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _blockaudit(db: DB) -> dict | None:
+    """Plan phase E: per block — inputs, rule firings, voice views, the Judge, its value, links; plain verdict."""
+    try:
+        from . import blockaudit
+        v = blockaudit.view(db)
+        return v and {"computed": v.get("computed"), "blocks": [{k: b.get(k) for k in (
+            "id", "verdict", "why", "sources", "rules", "views_7d", "judge_best", "value_bss_drop", "state_dependent",
+            "feeds")} for b in v.get("blocks", [])]}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _autopsy(db: DB) -> dict | None:
     """Plan step 11: why the headline forecasts missed (monthly; causes, slices, who misled, four boxes)."""
     try:
@@ -352,6 +364,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "experiments": _experiments(db),
         "aci": _aci(db),
         "autopsy": _autopsy(db),
+        "blocks_audit": _blockaudit(db),
         "judge_canary": json.loads(db.get("judge:canary") or "null"),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
