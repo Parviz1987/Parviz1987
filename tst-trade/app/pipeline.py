@@ -20,6 +20,21 @@ def _row(stage, feeds_into, status, msg, n=None):
     return {"stage": stage, "into": feeds_into, "status": status, "msg": msg, "n": n}
 
 
+def release_counts(db: DB, now: float, since: float) -> tuple[int, int, int]:
+    """US releases of the last day (after the 25-minute grace): how many, how many have an actual from EITHER source
+    (the agency itself, «Rəsmi rəqəmlər», or the two brains), and how many the brains confirmed."""
+    from . import official as off
+    evs = db.execute("SELECT title, ts FROM events WHERE country='USD' AND impact IN ('High','Medium') AND forecast "
+                     "IS NOT NULL AND ts BETWEEN ? AND ?", (max(now - 86400, since), now - 1500)).fetchall()
+    known = sum(1 for e in evs if db.execute("SELECT 1 FROM releases WHERE uid=? AND actual IS NOT NULL",
+                                             (off.uid_of(e["title"], e["ts"]),)).fetchone())
+    try:
+        found = db.execute("SELECT COUNT(*) FROM hunter_log WHERE accepted=1 AND ts > ?", (now - 86400,)).fetchone()[0]
+    except Exception:
+        found = 0
+    return len(evs), known, found
+
+
 def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[dict]:
     from .engine import market_open
     now = time.time() if now is None else now
@@ -105,17 +120,17 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
 
     # 6. calendar -> hunter -> 7. surprise
     since = float(db.get("hunter:since") or now)   # releases before the hunter existed are not its misses
+    # A release counts as found when its actual is known from EITHER source: the agency itself (BLS / FRED, «Rəsmi
+    # rəqəmlər») or the two brains (2026-11-26: GDP and PCE came from FRED, but only the brains were counted).
     try:
-        missed = db.execute(
-            "SELECT COUNT(*) FROM events e WHERE e.country='USD' AND e.impact IN ('High','Medium') AND e.forecast IS "
-            "NOT NULL AND e.ts BETWEEN ? AND ? AND NOT EXISTS (SELECT 1 FROM hunter_log h WHERE h.event=e.title "
-            "AND h.accepted=1 AND h.ts > e.ts)", (max(now - 86400, since), now - 1500)).fetchone()[0]
-        found = db.execute("SELECT COUNT(*) FROM hunter_log WHERE accepted=1 AND ts > ?", (now - 86400,)).fetchone()[0]
+        n_ev, n_known, found = release_counts(db, now, since)
     except Exception:
-        missed, found = 0, 0
+        n_ev, n_known, found = 0, 0, 0
+    missed = n_ev - n_known
     out.append(_row("Rəqəm ovçusu (ABŞ rəqəmləri)", "Hadisə sürprizi üsulu",
                     "ok" if not missed else "warn",
-                    f"son gündə {found} rəqəm təsdiqləndi; tapılmayan {missed}", missed))
+                    f"son gündə {n_ev} rəqəm: {n_known} məlum (iki beyin {found}, qalanı rəsmi mənbədən); "
+                    f"tapılmayan {missed}", missed))
 
     # 8. forecasts issued per horizon (a desk that stopped issuing is a broken link)
     if open_:

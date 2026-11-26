@@ -61,3 +61,20 @@ def test_xlsx_under_an_xls_name():
         z.writestr("xl/sharedStrings.xml", ss)
         z.writestr("xl/worksheets/sheet1.xml", sh)
     assert feeds.parse_amfi_gold(b.getvalue()) == 291.91
+
+
+def test_hunter_stage_counts_official_actuals_too():
+    import time
+    from app import official, pipeline, surprise
+    db = DB(":memory:")
+    feeds.Feeds(db, KeyStore(db, "s" * 64))
+    surprise.ensure(db)
+    now = time.time()
+    db.put("hunter:since", str(now - 86400))
+    ts = now - 3 * 3600
+    db.execute("INSERT INTO events(uid, ts, country, impact, title, forecast) VALUES('x', ?, 'USD', 'High', 'Prelim GDP q/q', '1.5%')", (ts,))
+    uid = official.uid_of("Prelim GDP q/q", ts)
+    surprise.store(db, [{"uid": uid, "ts": ts, "event": "Prelim GDP q/q", "impact": "High", "estimate": 1.5,
+                         "previous": None, "actual": 1.8, "raw_date": "", "known_ts": now}])
+    assert official.plan("Prelim GDP Price Index q/q")[1] == "A191RI1Q225SBEA"
+    assert pipeline.release_counts(db, now, now - 86400) == (1, 1, 0)       # known from the agency, not missed

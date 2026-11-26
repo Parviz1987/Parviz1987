@@ -27,6 +27,7 @@ MAP = [
     (r"^core pce price index m/m$", "fred", "PCEPILFE", "mm"),
     (r"^pce price index m/m$", "fred", "PCEPI", "mm"),
     (r"^(advance |prelim |final )?gdp q/q$", "fred", "A191RL1Q225SBEA", "lvl"),
+    (r"^(advance |prelim |final )?gdp price index q/q$", "fred", "A191RI1Q225SBEA", "lvl"),   # the GDP deflator
 ]
 
 
