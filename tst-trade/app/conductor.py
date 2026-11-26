@@ -36,6 +36,7 @@ MIN_DAYS = 20                        # a voice/state cell needs at least this ma
 EVENT_RE = ("cpi", "consumer price", "non farm", "nonfarm", "non-farm", "payroll", "fomc", "fed interest rate",
             "interest rate decision", "pce", "gdp")
 AUDIT_KEY = "conductor:audit"
+VER = "2026-11-26.2"            # a new version recomputes at once instead of waiting a day
 
 
 # ---------- market state ----------
@@ -101,7 +102,9 @@ def _payroll_inside(t0: float, t1: float) -> bool:
 
 def state(daily: Daily, events: Events, t0: float, t1: float) -> str | None:
     """The market state of a forecast issued at t0 for t1, from what was known at t0 (calendar dates are known ahead)."""
-    if events.inside(t0, t1):
+    # a day-or-longer forecast is an «event» one only when the release comes within its first day: otherwise almost
+    # every weekly forecast would be one (research review 2026-11-26)
+    if events.inside(t0, min(t1, t0 + 86400)):
         return "hadisə"
     i = daily.at(t0)
     if i is None or daily.pct[i] is None:
@@ -232,7 +235,7 @@ def audit(db: DB, symbols: tuple[str, ...] = ("XAU", "XAG", "XPT", "XPD")) -> di
     from . import candles
     t0 = time.time()
     events = Events(db)
-    out: dict = {"computed": None, "states": list(STATES), "events_from": events.covered_from, "desks": {}}
+    out: dict = {"computed": None, "ver": VER, "states": list(STATES), "events_from": events.covered_from, "desks": {}}
     for s in symbols:
         daily = Daily(candles.get(db, s, "1d", limit=4000))
         for h in AUDIT_HORIZONS:
@@ -251,7 +254,8 @@ def audit_due(db: DB, now: float | None = None) -> bool:
     if not raw:
         return True
     try:
-        return (time.time() if now is None else now) - (json.loads(raw).get("computed") or 0) > 86400
+        a = json.loads(raw)
+        return a.get("ver") != VER or (time.time() if now is None else now) - (a.get("computed") or 0) > 86400
     except ValueError:
         return True
 
@@ -291,8 +295,9 @@ def audit_view(db: DB) -> dict | None:
 # live forecast: the owner decides, on this evidence, whether it ever does.
 ETA_C = 2.0                  # learning rate on the Brier loss (0..1)
 ALPHA = 0.005                # Fixed Share: the share of weight returned to all voices each round
-SHRINK_N = 50                # a state's own weights count fully only after ~this many resolved moments in it
-ABSTAIN = 0.02               # |p - 0.5| below this: «bilmirəm» (no direction), fixed in advance
+SHRINK_N = 100               # a state's own weights reach half weight after this many separate trading days in it
+ABSTAIN = 0.02               # |p - 0.5| below this: «bilmirəm» (no direction), fixed in advance; also below the cost
+                             # break-even 0.5 + cost / (2 x average move), whichever is larger
 SIM_MOMENTS = 6000
 SIM_KEY = "conductor:shadow"
 ARMS = ("orta", "ümumi", "dirijor")     # plain average, weights without states, weights per state
@@ -361,12 +366,21 @@ def _ci(xs: list[float]) -> tuple[float, float, float] | None:
     return round(mu, 5), round(mu - half, 5), round(mu + half, 5)
 
 
-def simulate(seq: list[dict], states: list[str | None], cost: float) -> dict:
+def _blocks(xs: list[float], k: int) -> list[float]:
+    """Means of consecutive blocks of k days: forecasts whose horizons overlap are not independent day to day."""
+    if k <= 1:
+        return xs
+    return [sum(xs[i:i + k]) / len(xs[i:i + k]) for i in range(0, len(xs), k)]
+
+
+def simulate(seq: list[dict], states: list[str | None], cost: float, block_days: int = 1) -> dict:
     """Walk-forward: at each moment the three arms predict first (only outcomes already known are learned), then the
     moment waits for its outcome. Scores per arm, and per trading day the Brier difference against the plain average."""
     g = _Weights()
     per: dict[str, _Weights] = {s: _Weights() for s in STATES}
-    seen = {s: 0 for s in STATES}
+    seen = {s: 0 for s in STATES}            # separate trading days with a resolved moment, per state
+    seen_day: dict[str, set] = {s: set() for s in STATES}
+    moves = [0.0, 0]                         # running average |return| of resolved moments (for the cost break-even)
     pending: list[tuple[dict, str | None]] = []
     sc = {a: {"n": 0, "viewed": 0, "hits": 0, "brier": 0.0, "net": 0.0, "ups": 0} for a in ARMS}
     by_day: dict[str, dict[str, list]] = {}
@@ -377,9 +391,12 @@ def simulate(seq: list[dict], states: list[str | None], cost: float) -> dict:
             if q["target"] <= m["t"]:
                 y = 1.0 if q["p1"] > q["p0"] else 0.0
                 g.learn(q["v"], y)
+                moves[0] += abs(q["p1"] / q["p0"] - 1)
+                moves[1] += 1
                 if qs is not None:
                     per[qs].learn(q["v"], y)
-                    seen[qs] += 1
+                    seen_day[qs].add(_ny_day(q["t"]))
+                    seen[qs] = len(seen_day[qs])
             else:
                 still.append((q, qs))
         pending = still
@@ -396,13 +413,15 @@ def simulate(seq: list[dict], states: list[str | None], cost: float) -> dict:
         day = _ny_day(m["t"])
         dd = by_day.setdefault(day, {a: [] for a in ARMS})
         ret = m["p1"] / m["p0"] - 1
+        avg_move = moves[0] / moves[1] if moves[1] else 0.0
+        need = max(ABSTAIN, cost / (2 * avg_move)) if avg_move > 0 else ABSTAIN
         for a, p in (("orta", p_avg), ("ümumi", p_g), ("dirijor", p_c)):
             r = sc[a]
             r["n"] += 1
             r["ups"] += int(y)
             r["brier"] += (p - y) ** 2
             dd[a].append((p - y) ** 2)
-            if abs(p - 0.5) >= ABSTAIN:
+            if abs(p - 0.5) >= need:
                 r["viewed"] += 1
                 r["hits"] += int((p > 0.5) == (y == 1.0))
                 r["net"] += (ret if p > 0.5 else -ret) - cost
@@ -416,7 +435,7 @@ def simulate(seq: list[dict], states: list[str | None], cost: float) -> dict:
                   "net_avg": round(r["net"] / r["viewed"], 6) if r["viewed"] else None}
     diffs = {a: [sum(d[a]) / len(d[a]) - sum(d["orta"]) / len(d["orta"]) for d in by_day.values()]
              for a in ("ümumi", "dirijor")}
-    vs = {a: _ci(x) for a, x in diffs.items()}           # negative = lower Brier than the plain average (better)
+    vs = {a: _ci(_blocks(x, block_days)) for a, x in diffs.items()}           # negative = lower Brier than the plain average (better)
     return {"arms": out, "vs_orta": {a: (None if c is None else {"mean": c[0], "lo": c[1], "hi": c[2]})
                                      for a, c in vs.items()}, "days": len(by_day), "seen": seen,
             "weights_now": {s: per[s].rel({k: 0 for k in per[s].logw}) for s in STATES}, "hist": hist}
@@ -451,7 +470,8 @@ def shadow(db: DB, symbols: tuple[str, ...] = ("XAU", "XAG", "XPT", "XPD")) -> d
                 if not seq:
                     continue
                 sts = [state(daily, events, m["t"], m["target"]) for m in seq]
-                r = simulate(seq, sts, full_cost(s, h))
+                span = (seq[-1]["target"] - seq[-1]["t"]) / 86400
+                r = simulate(seq, sts, full_cost(s, h), block_days=max(1, round(span)))
                 now_state = state(daily, events, time.time(), time.time() + (seq[-1]["target"] - seq[-1]["t"]))
                 wn = r["weights_now"].get(now_state) or {}
                 lead = max(wn.items(), key=lambda kv: kv[1])[0] if wn else None
