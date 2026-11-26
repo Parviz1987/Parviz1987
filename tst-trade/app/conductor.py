@@ -270,6 +270,8 @@ def audit_due(db: DB, now: float | None = None) -> bool:
         return True
     try:
         a = json.loads(raw)
+        if not a.get("event_sources") and db.get("calendar:history"):    # the past release dates have just arrived
+            return True
         return a.get("ver") != VER or (time.time() if now is None else now) - (a.get("computed") or 0) > 86400
     except ValueError:
         return True
