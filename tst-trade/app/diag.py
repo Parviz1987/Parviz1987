@@ -139,6 +139,15 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _conductor(db: DB) -> dict | None:
+    """The conductor's evidence: does each voice do better in some market states (stored once a day)."""
+    try:
+        from . import conductor
+        return conductor.audit_view(db)
+    except Exception as e:          # the diagnostics never fail on one section
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _agents(db: DB) -> dict:
     """The data agents: each one's last confirmed figure and last attempt, and the last calls of their two brains
     (provider, model, ok, error) — whether each company's search really answers."""
@@ -278,6 +287,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "cleanup": json.loads(db.get("cleanup:retired_v1") or "null"),
         "vacuum": json.loads(db.get("cleanup:vacuum_v1") or "null"),
         "agents": _agents(db),
+        "conductor": _conductor(db),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

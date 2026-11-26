@@ -71,7 +71,20 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                             db.put(cleanup.VACUUM_MARK, json.dumps({"error": "bax: xəta jurnalı", "ts": time.time()}))
                         break
                     await asyncio.sleep(300)
+            async def _conductor():            # owner 2026-11-26: does each voice do better in some market states?
+                from . import conductor
+                await asyncio.sleep(600)
+                while True:
+                    hour = time.gmtime().tm_hour
+                    if conductor.audit_due(db) and hour not in (4, 5):   # never during the night's backup / vacuum
+                        try:
+                            res = await asyncio.to_thread(conductor.audit, db)
+                            log.info("conductor audit: %s s", res.get("seconds"))
+                        except Exception:
+                            log.exception("conductor audit failed")
+                    await asyncio.sleep(3600)
             asyncio.get_running_loop().create_task(_cleanup())
+            asyncio.get_running_loop().create_task(_conductor())
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
             asyncio.get_running_loop().create_task(app.state.futures_daily())
             asyncio.get_running_loop().create_task(app.state.rigor_daily())
