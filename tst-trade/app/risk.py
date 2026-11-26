@@ -96,12 +96,21 @@ def decision(db: DB, engine, symbol: str, now: float | None = None) -> dict:
             elif not g["open"] and not (verdict["method"] in EVENT_METHODS and g["reasons"] == [EVENT_REASON]):
                 row["why"] = "risk qapısı bağlıdır: " + "; ".join(g["reasons"])
             else:
+                import json as _json
                 from . import autojudge
-                full = ((__import__("json").loads(db.get(autojudge.KEY) or "{}").get("desks") or {})
-                        .get(f"{symbol}:{h}") or {}).get(verdict["method"]) or {}
-                row.update({"call": "AL" if f["p_up"] > 0.5 else "SAT", "p_up": f["p_up"], "method_id": verdict["method"],
-                            "size": 1.0, "cap": full.get("cap", autojudge.MAX_SHARE), "stage": autojudge.FULL,
-                            "why": f"{row['method']} sübutludur; risk qapısı açıqdır"})
+                try:
+                    lad = ((_json.loads(db.get(autojudge.KEY) or "{}").get("desks") or {})
+                           .get(f"{symbol}:{h}") or {}).get(verdict["method"]) or {}
+                except ValueError:
+                    lad = {}
+                if lad.get("stage") not in (autojudge.SMALL, autojudge.FULL) or not lad.get("size"):
+                    row["why"] = (f"{row['method']} sübutludur, amma Avtomatik Hakimin balı indi aşağıdır "
+                                  f"({lad.get('score', '—')}): pay verilmir")
+                else:
+                    row.update({"call": "AL" if f["p_up"] > 0.5 else "SAT", "p_up": f["p_up"],
+                                "method_id": verdict["method"], "size": lad["size"], "cap": lad.get("cap", 0.25),
+                                "stage": lad["stage"], "why": f"{row['method']} sübutludur; bal {lad['score']} "
+                                                              f"({lad['stage']}); risk qapısı açıqdır"})
         desks.append(row)
     terazi = db.execute("SELECT horizon, p_up FROM forecasts WHERE symbol=? AND method='terazi' AND mode='live' "
                         "AND issued_t > ? ORDER BY issued_t", (symbol, now - 86400)).fetchall()

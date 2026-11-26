@@ -134,6 +134,10 @@ def method_final(db: DB, sym: str, horizon: str, method: str, now: float | None 
         st["gates_error"] = f"{type(e).__name__}: {str(e)[:120]}"
         db.put(key, json.dumps(st))
         return st
+    if st["too_good"] and (st.get("lag_test") or {}).get("undecided"):
+        st["status"] = "namizəd"              # too few shifted cases yet: decided at a later run, not failed
+        db.put(key, json.dumps(st))
+        return st
     if st["too_good"] and not (st.get("lag_test") or {}).get("cleared"):
         st.update({"status": "keçmədi", "p": p, "net": net, "tested": now,
                    "reason": "gələcəyə baxma şübhəsi: bir şam gecikmə testində üstünlük yox oldu"})
@@ -164,13 +168,15 @@ def lag_test(db: DB, sym: str, horizon: str, rows, bar: float) -> dict:
     closes = {r["t"]: r["c"] for r in db.execute("SELECT t, c FROM candles WHERE symbol=? AND tf=?",
                                                  (sym, HORIZONS[horizon])).fetchall()}
     hits = []
-    for r in rows:                     # the target's close is the candle labelled target_t - step; one candle later:
-        a = r["price1"]
-        b = closes.get(r["target_t"])
+    for r in rows:
+        # the whole window one candle later: from the close of the candle labelled issued_t (price0 was the one
+        # before) to the close of the candle labelled target_t (price1 was the one before)
+        a, b = closes.get(r["issued_t"]), closes.get(r["target_t"])
         if a and b:
             hits.append(int((b > a) == (r["p_up"] > 0.5)))
     hr = sum(hits) / len(hits) if len(hits) >= 30 else None
-    return {"n": len(hits), "shifted_hit": hr, "cleared": hr is not None and hr >= bar + 0.03}
+    return {"n": len(hits), "shifted_hit": hr, "undecided": hr is None,
+            "cleared": hr is not None and hr >= bar + 0.03}
 
 
 def rule_final(db: DB, rule: str, tf: str, now: float | None = None) -> dict:

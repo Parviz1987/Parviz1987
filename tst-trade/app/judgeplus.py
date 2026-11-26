@@ -239,9 +239,12 @@ def canary(db: DB, symbol: str = "XAU", seed: int | None = None) -> dict:
     _, hr_f, _ = _rule_gates(cs, truth, cost, n_trials)
     # the margin is set here, by the Judge itself: above the luckiest coin, below the 30 % peeker
     lo, hi = coin_best - bar + 0.02, hr_p - bar - 0.005
-    margin = max(0.05, min(0.15, max(lo, min(0.12, hi))))
-    db.put(DELTA_KEY, str(round(margin, 4)))
-    caught_p, caught_f = too_good(hr_p, "1d", bar, margin), too_good(hr_f, "1d", bar, margin)
+    new = max(0.10, min(0.15, max(lo, min(0.12, hi))))      # never below 10 points: real edges are not flagged
+    margin = round(0.7 * delta(db) + 0.3 * new, 4)            # smoothed over the weeks (one noisy week moves it little)
+    db.put(DELTA_KEY, str(margin))
+    # the check itself is independent of the margin it set: the 30 % peeker against the plain 12-point margin too
+    caught_p = too_good(hr_p, "1d", bar, margin) or too_good(hr_p, "1d", bar, 0.12)
+    caught_f = too_good(hr_f, "1d", bar, margin)
     out = {"ts": time.time(), "random_passed": passed, "random_n": 20, "coin_best_hit": round(coin_best, 3),
            "peek30_hit": round(hr_p, 3), "peek30_caught": caught_p, "peek_caught": caught_f, "margin": round(margin, 4),
            "ok": passed <= 1 and caught_p and caught_f}

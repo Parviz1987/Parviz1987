@@ -38,8 +38,23 @@ def _clip(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, x))
 
 
+RECENT = 100               # independent cases in the «recent» score (a method that decays steps down quickly)
+
+
+def skill_vs_lean(ps: list[float], ys: list[int]) -> float | None:
+    """Brier skill against the market's own lean (a constant forecast of its up share), not against a coin: in a
+    rising market leaning long is no skill."""
+    if len(ps) < 30:
+        return None
+    base = sum(ys) / len(ys)
+    b = sum((p - y) ** 2 for p, y in zip(ps, ys)) / len(ys)
+    b0 = sum((base - y) ** 2 for y in ys) / len(ys)
+    return 1 - b / b0 if b0 > 0 else None
+
+
 def score_method(nets: list[float], bss: float | None, k: int, min_n: int, n_trials: int) -> dict:
-    """The five parts and the weakest of them (all from the method's live after-cost record on one desk)."""
+    """The five parts and the weakest of them (all from the method's live after-cost record on one desk). `min_n`
+    counts independent cases; overlapping horizons count n / k."""
     from . import judgeplus
     n = len(nets)
     t = judgeplus.t_stat(nets, k) if n >= 3 else None
@@ -48,7 +63,7 @@ def score_method(nets: list[float], bss: float | None, k: int, min_n: int, n_tri
     d = judgeplus.dsr(nets, n_trials, None, k) if n >= 30 * k else None
     parts = {"nəticə": _clip((t or 0) / 3 * 100), "bacarıq": _clip((bss or 0) / 0.02 * 100),
              "sabitlik": 100.0 if all(halves) else 50.0 if any(halves) else 0.0,
-             "sübut həcmi": _clip(n / max(1, k) / max(1, min_n / max(1, k)) * 100),
+             "sübut həcmi": _clip(n / max(1, k) / max(1, min_n) * 100),
              "DSR": _clip((d or 0) * 100)}
     weakest = min(parts, key=parts.get)
     mu = sum(nets) / n if n else 0.0
@@ -105,14 +120,28 @@ def refresh(db: DB, now: float | None = None) -> dict:
                 if not judge.is_candidate(m, h):
                     continue
                 q = db.execute("SELECT p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND "
-                               "mode='live' AND price1 IS NOT NULL AND price0 > 0 AND p_up != 0.5 ORDER BY issued_t",
-                               (s, h, m)).fetchall()
+                               "mode='live' AND price1 IS NOT NULL AND price0 > 0 AND p_up != 0.5 ORDER BY issued_t "
+                               "DESC LIMIT ?", (s, h, m, 4000 * max(1, k))).fetchall()[::-1]
                 nets = [(x["price1"] / x["price0"] - 1) * (1 if x["p_up"] > 0.5 else -1) - cost for x in q]
                 if len(nets) < 10:
                     continue
-                sc = score_method(nets, r.get("bss"), k, min_n, n_trials)
+                ys = [int(x["price1"] > x["price0"]) for x in q]
+                bss_lean = skill_vs_lean([x["p_up"] for x in q], ys)
+                sc = score_method(nets, bss_lean, k, min_n, n_trials)
+                recent = nets[-RECENT * k:]
+                if len(recent) >= 30 * k and len(recent) < len(nets):   # the recent record can only lower it
+                    rc = score_method(recent, skill_vs_lean([x["p_up"] for x in q[-RECENT * k:]], ys[-RECENT * k:]),
+                                      k, RECENT, n_trials)
+                    rc["parts"]["sübut həcmi"] = 100                    # the recent window is short by design
+                    rscore = min(rc["parts"].values())
+                    if rscore < sc["score"]:
+                        sc = {**sc, "score": round(rscore), "weakest": "son " + str(RECENT) + " hal: " +
+                              min(rc["parts"], key=rc["parts"].get)}
                 fin = json.loads(db.get(f"final:m:{s}:{h}:{m}") or "{}")
+                reg = rigor.registry_status(db, "method", m, s, h)
                 st = stage(sc["score"], fin.get("status") == "keçdi")
+                if reg in ("rədd edilib", "kölgəyə qaytarıldı") or fin.get("status") == "keçmədi" or fin.get("too_good"):
+                    st = OFF                    # vetoes: the owner's rejection, a demotion, a failed or suspect final
                 desk[m] = {**sc, "stage": st, "size": size_factor(st, sc["score"], sc["kelly"]),
                            "cap": exposure_cap(sc["kelly"]), "final": fin.get("status")}
             if desk:

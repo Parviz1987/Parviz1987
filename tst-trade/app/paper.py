@@ -59,6 +59,8 @@ def set_settings(db: DB, values: dict) -> dict:
 
 def emergency(db: DB, on: bool) -> dict:
     db.put("paper:stop", "1" if on else "0")
+    if not on:                       # released by the owner: the 10 % fall is measured afresh from here
+        db.put("paper:peak_reset_ts", str(time.time()))
     return settings(db)
 
 
@@ -73,11 +75,18 @@ def _day_pnl(db: DB, now: float) -> float:
                       (day0,)).fetchone()["p"]
 
 
-def _peak_drawdown(db: DB, s: dict) -> float:
-    eq = peak = s["start_usd"]
-    for r in db.execute("SELECT pnl FROM paper_orders WHERE status='bağlandı' ORDER BY exit_ts").fetchall():
+def _peak_drawdown(db: DB, s: dict, open_loss: float = 0.0) -> float:
+    """The fall from the equity peak, counted since the owner last released the stop (closed results; open losses
+    added at the end)."""
+    since = float(db.get("paper:peak_reset_ts") or 0)
+    eq0 = s["start_usd"] + db.execute("SELECT COALESCE(SUM(pnl), 0) p FROM paper_orders WHERE status='bağlandı' AND "
+                                      "exit_ts <= ?", (since,)).fetchone()["p"]
+    eq = peak = eq0
+    for r in db.execute("SELECT pnl FROM paper_orders WHERE status='bağlandı' AND exit_ts > ? ORDER BY exit_ts",
+                        (since,)).fetchall():
         eq += r["pnl"] or 0
         peak = max(peak, eq)
+    eq -= max(0.0, open_loss)
     return (peak - eq) / peak if peak > 0 else 0.0
 
 

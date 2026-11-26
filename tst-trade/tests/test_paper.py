@@ -124,3 +124,15 @@ def test_owner_policy_limits_one_method_and_the_fall_from_the_peak():
                (now, "XAG", "1h", "x", 1, 1, 30, 29, 31, now, "bağlandı", "", -1200.0, now - 86400 * 3))
     r2 = paper.propose(db, "XPT", "1h", "tsmom", 0.6, 1000.0, 5, 990.0, 1010.0, now + 3600, now)
     assert r2["status"] == "rədd" and "zirvədən" in r2["reason"] and paper.settings(db)["stopped"]
+
+
+def test_released_stop_measures_the_fall_afresh():
+    from app import paper
+    db = DB(":memory:")
+    now = 1_800_000_000.0
+    db.execute("INSERT INTO paper_orders(ts, symbol, horizon, method, dir, oz, entry, stop, target, expires, status, "
+               "reason, pnl, exit_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+               (now, "XAG", "1h", "x", 1, 1, 30, 29, 31, now, "bağlandı", "", -1200.0, now - 86400 * 3))
+    assert paper._peak_drawdown(db, paper.settings(db)) > 0.1
+    paper.emergency(db, False)                                     # the owner releases the stop
+    assert paper._peak_drawdown(db, paper.settings(db)) == 0.0
