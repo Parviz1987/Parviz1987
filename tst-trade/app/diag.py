@@ -143,7 +143,10 @@ def _conductor(db: DB) -> dict | None:
     """The conductor's evidence: does each voice do better in some market states (stored once a day)."""
     try:
         from . import conductor
-        return conductor.audit_view(db)
+        sh = conductor.shadow_view(db) or {}
+        return {"audit": conductor.audit_view(db),
+                "shadow": {"computed": sh.get("computed"), "seconds": sh.get("seconds"), "params": sh.get("params"),
+                           "desks": sh.get("desks")}}
     except Exception as e:          # the diagnostics never fail on one section
         return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
 

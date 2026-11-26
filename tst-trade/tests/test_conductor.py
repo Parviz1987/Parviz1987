@@ -90,3 +90,51 @@ def test_a_voice_right_only_in_trends_is_seen():
 def test_chi2_tail():
     assert abs(conductor._chi2_sf(3.841, 1) - 0.05) < 0.002
     assert abs(conductor._chi2_sf(7.815, 3) - 0.05) < 0.002
+
+
+def _seq(n, seed=3):
+    """Two voices: A is right in «trend», B in «yan»; each is a coin elsewhere. One moment a day."""
+    random.seed(seed)
+    seq, sts = [], []
+    for i in range(n):
+        s = "trend" if (i // 40) % 2 == 0 else "yan"
+        y = random.random() < 0.5
+        def view(good):
+            right = random.random() < (0.72 if good else 0.5)
+            return 0.62 if (y == right) else 0.38
+        t = T0 + i * DAY
+        seq.append({"t": t, "target": t + DAY - 60, "p0": 1.0, "p1": 1.01 if y else 0.99,
+                    "v": {"A": view(s == "trend"), "B": view(s == "yan")}})
+        sts.append(s)
+    return seq, sts
+
+
+def test_shadow_conductor_beats_the_plain_average_when_voices_have_their_states():
+    seq, sts = _seq(1500)
+    r = conductor.simulate(seq, sts, cost=0.0)
+    a = r["arms"]
+    assert a["dirijor"]["bss"] > a["orta"]["bss"] + 0.03 and a["dirijor"]["bss"] > a["ümumi"]["bss"]
+    assert a["dirijor"]["viewed"] > a["orta"]["viewed"]          # the average says «bilmirəm» when A and B disagree
+    assert r["vs_orta"]["dirijor"]["hi"] < 0                   # lower Brier than the average, 95 % interval below 0
+    w = r["weights_now"]
+    assert w["trend"]["A"] > w["trend"]["B"] and w["yan"]["B"] > w["yan"]["A"]
+
+
+def test_shadow_conductor_does_not_invent_an_edge_from_noise():
+    random.seed(9)
+    seq, sts = [], []
+    for i in range(1200):
+        y = random.random() < 0.5
+        t = T0 + i * DAY
+        seq.append({"t": t, "target": t + DAY - 60, "p0": 1.0, "p1": 1.01 if y else 0.99,
+                    "v": {k: random.choice((0.4, 0.6)) for k in "ABCD"}})
+        sts.append(random.choice(conductor.STATES))
+    r = conductor.simulate(seq, sts, cost=0.0)
+    ci = r["vs_orta"]["dirijor"]
+    assert ci["lo"] < 0.01 and not (ci["hi"] < 0)              # no «proof» of beating the average from coins
+    assert abs(r["arms"]["dirijor"]["hit_rate"] - 0.5) < 0.06
+
+
+def test_woke_up_voice():
+    hist = [(i, {"A": 0.8, "B": 0.2}) for i in range(20)] + [(20 + i, {"A": 0.2, "B": 0.8}) for i in range(10)]
+    assert conductor._woke(hist) == ["B"]

@@ -78,8 +78,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                     hour = time.gmtime().tm_hour
                     if conductor.audit_due(db) and hour not in (4, 5):   # never during the night's backup / vacuum
                         try:
-                            res = await asyncio.to_thread(conductor.audit, db)
-                            log.info("conductor audit: %s s", res.get("seconds"))
+                            log.info("conductor: %s", await asyncio.to_thread(conductor.run, db))
                         except Exception:
                             log.exception("conductor audit failed")
                     await asyncio.sleep(3600)

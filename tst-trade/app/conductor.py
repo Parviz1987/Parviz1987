@@ -31,7 +31,7 @@ AUDIT_HORIZONS = ("1h", "4h", "1d", "1w")
 SKIP = ("rw", "up", "consensus", "terazi", "vahid", "dirijor")
 VOL_N, YEAR_N = 20, 250
 SHOCK_PCT, TREND_Z = 0.80, 1.0
-MAX_ROWS = 400000                    # newest rows per desk: bounded memory on the 1 GB server
+MAX_ROWS = 250000                    # newest rows per desk: bounded memory on the 1 GB server
 MIN_DAYS = 20                        # a voice/state cell needs at least this many separate trading days to be read
 EVENT_RE = ("cpi", "consumer price", "non farm", "nonfarm", "non-farm", "payroll", "fomc", "fed interest rate",
             "interest rate decision", "pce", "gdp")
@@ -278,3 +278,204 @@ def audit_view(db: DB) -> dict | None:
                     "tested": sum(1 for v in d["voices"].values() if v["p_same"] is not None)}
     return {"computed": a.get("computed"), "seconds": a.get("seconds"), "events_from": a.get("events_from"),
             "desks": desks}
+
+
+# ---------- part 2: the conductor itself, in the shadow ----------
+# How it combines (from the research, 2026-11-26): only the voices that have a view at a moment take part and only they
+# learn from it («specialists» / sleeping experts, Freund et al. 1997); weights fall with each voice's Brier loss
+# (exponential weights) and a small share returns to everyone each round (Fixed Share, Herbster & Warmuth 1998), so a
+# voice that is weak now can come back; each market state keeps its own weights, pulled towards the overall weights
+# until the state has its own record (shrinkage: few states, little data per state — the combination puzzle says
+# estimated weights lose to equal weights when data is short). It is compared, walk-forward and out of sample, with the
+# plain average of the same voices (the benchmark) and with the same weights without states. Nothing here reaches a
+# live forecast: the owner decides, on this evidence, whether it ever does.
+ETA_C = 2.0                  # learning rate on the Brier loss (0..1)
+ALPHA = 0.005                # Fixed Share: the share of weight returned to all voices each round
+SHRINK_N = 50                # a state's own weights count fully only after ~this many resolved moments in it
+ABSTAIN = 0.02               # |p - 0.5| below this: «bilmirəm» (no direction), fixed in advance
+SIM_MOMENTS = 6000
+SIM_KEY = "conductor:shadow"
+ARMS = ("orta", "ümumi", "dirijor")     # plain average, weights without states, weights per state
+
+
+class _Weights:
+    def __init__(self):
+        self.logw: dict[str, float] = {}
+
+    def p(self, views: dict[str, float]) -> float | None:
+        if not views:
+            return None
+        lw = {m: self.logw.get(m, 0.0) for m in views}
+        top = max(lw.values())
+        w = {m: math.exp(v - top) for m, v in lw.items()}
+        s = sum(w.values())
+        return sum(w[m] * views[m] for m in views) / s
+
+    def rel(self, views) -> dict[str, float]:
+        lw = {m: self.logw.get(m, 0.0) for m in views}
+        if not lw:
+            return {}
+        top = max(lw.values())
+        w = {m: math.exp(v - top) for m, v in lw.items()}
+        s = sum(w.values())
+        return {m: v / s for m, v in w.items()}
+
+    def learn(self, views: dict[str, float], y: float) -> None:
+        for m, p in views.items():                      # only the awake voices learn
+            self.logw[m] = self.logw.get(m, 0.0) - ETA_C * (p - y) ** 2
+        if self.logw:                                    # Fixed Share: a little weight goes back to everyone
+            top = max(self.logw.values())
+            w = {m: math.exp(v - top) for m, v in self.logw.items()}
+            mean = sum(w.values()) / len(w)
+            self.logw = {m: math.log((1 - ALPHA) * v + ALPHA * mean) for m, v in w.items()}
+
+
+def _moments(db: DB, symbol: str, horizon: str) -> list[dict]:
+    live0 = db.execute("SELECT MIN(issued_t) t FROM forecasts WHERE symbol=? AND horizon=? AND mode='live'",
+                       (symbol, horizon)).fetchone()["t"]
+    cut = live0 if live0 is not None else 1e18
+    t0 = db.execute("SELECT MIN(issued_t) t FROM (SELECT DISTINCT issued_t FROM forecasts WHERE symbol=? AND horizon=? "
+                    "AND price1 IS NOT NULL AND ((mode='history' AND issued_t < ?) OR mode='live') "
+                    "ORDER BY issued_t DESC LIMIT ?)", (symbol, horizon, cut, SIM_MOMENTS)).fetchone()["t"]
+    if t0 is None:
+        return []
+    rows = db.execute("SELECT issued_t, target_t, method, p_up, price0, price1 FROM forecasts WHERE symbol=? AND "
+                      "horizon=? AND issued_t >= ? AND price1 IS NOT NULL AND ((mode='history' AND issued_t < ?) OR "
+                      "mode='live')", (symbol, horizon, t0, cut)).fetchall()
+    mom: dict[int, dict] = {}
+    for r in rows:
+        m = mom.setdefault(r["issued_t"], {"t": r["issued_t"], "target": r["target_t"], "p0": r["price0"],
+                                           "p1": r["price1"], "v": {}})
+        if r["method"] not in SKIP and r["p_up"] is not None and r["p_up"] != 0.5:
+            m["v"][r["method"]] = min(0.95, max(0.05, float(r["p_up"])))
+    return sorted((m for m in mom.values() if m["v"] and m["p1"] != m["p0"]), key=lambda m: m["t"])
+
+
+def _ci(xs: list[float]) -> tuple[float, float, float] | None:
+    if len(xs) < 10:
+        return None
+    n = len(xs)
+    mu = sum(xs) / n
+    sd = math.sqrt(sum((x - mu) ** 2 for x in xs) / (n - 1))
+    half = 1.96 * sd / math.sqrt(n)
+    return round(mu, 5), round(mu - half, 5), round(mu + half, 5)
+
+
+def simulate(seq: list[dict], states: list[str | None], cost: float) -> dict:
+    """Walk-forward: at each moment the three arms predict first (only outcomes already known are learned), then the
+    moment waits for its outcome. Scores per arm, and per trading day the Brier difference against the plain average."""
+    g = _Weights()
+    per: dict[str, _Weights] = {s: _Weights() for s in STATES}
+    seen = {s: 0 for s in STATES}
+    pending: list[tuple[dict, str | None]] = []
+    sc = {a: {"n": 0, "viewed": 0, "hits": 0, "brier": 0.0, "net": 0.0, "ups": 0} for a in ARMS}
+    by_day: dict[str, dict[str, list]] = {}
+    hist: list[tuple[float, dict]] = []                  # (t, relative state weights) for the «woke up» check
+    for m, s in zip(seq, states):
+        still = []
+        for q, qs in pending:
+            if q["target"] <= m["t"]:
+                y = 1.0 if q["p1"] > q["p0"] else 0.0
+                g.learn(q["v"], y)
+                if qs is not None:
+                    per[qs].learn(q["v"], y)
+                    seen[qs] += 1
+            else:
+                still.append((q, qs))
+        pending = still
+        y = 1.0 if m["p1"] > m["p0"] else 0.0
+        p_avg = sum(m["v"].values()) / len(m["v"])
+        p_g = g.p(m["v"])
+        if s is None:
+            p_c = p_g
+        else:
+            lam = SHRINK_N / (SHRINK_N + seen[s])        # little record in this state -> mostly the overall weights
+            p_c = (1 - lam) * per[s].p(m["v"]) + lam * p_g
+            if len(hist) == 0 or m["t"] - hist[-1][0] > 86400:
+                hist.append((m["t"], {k: round(v, 4) for k, v in per[s].rel(m["v"]).items()}))
+        day = _ny_day(m["t"])
+        dd = by_day.setdefault(day, {a: [] for a in ARMS})
+        ret = m["p1"] / m["p0"] - 1
+        for a, p in (("orta", p_avg), ("ümumi", p_g), ("dirijor", p_c)):
+            r = sc[a]
+            r["n"] += 1
+            r["ups"] += int(y)
+            r["brier"] += (p - y) ** 2
+            dd[a].append((p - y) ** 2)
+            if abs(p - 0.5) >= ABSTAIN:
+                r["viewed"] += 1
+                r["hits"] += int((p > 0.5) == (y == 1.0))
+                r["net"] += (ret if p > 0.5 else -ret) - cost
+        m["_s"] = s
+        pending.append((m, s))
+    out = {}
+    for a, r in sc.items():
+        bar = max(0.5, r["ups"] / r["n"], 1 - r["ups"] / r["n"]) if r["n"] else 0.5
+        out[a] = {"n": r["n"], "viewed": r["viewed"], "hit_rate": round(r["hits"] / r["viewed"], 4) if r["viewed"] else None,
+                  "bar": round(bar, 4), "bss": round(1 - (r["brier"] / r["n"]) / 0.25, 5) if r["n"] else None,
+                  "net_avg": round(r["net"] / r["viewed"], 6) if r["viewed"] else None}
+    diffs = {a: [sum(d[a]) / len(d[a]) - sum(d["orta"]) / len(d["orta"]) for d in by_day.values()]
+             for a in ("ümumi", "dirijor")}
+    vs = {a: _ci(x) for a, x in diffs.items()}           # negative = lower Brier than the plain average (better)
+    return {"arms": out, "vs_orta": {a: (None if c is None else {"mean": c[0], "lo": c[1], "hi": c[2]})
+                                     for a, c in vs.items()}, "days": len(by_day), "seen": seen,
+            "weights_now": {s: per[s].rel({k: 0 for k in per[s].logw}) for s in STATES}, "hist": hist}
+
+
+def _woke(hist: list[tuple[float, dict]], back: int = 20) -> list[str]:
+    """Voices whose share in their state's weights rose from under 2/3 of an equal share to over 1.5 x within the last
+    ~20 days: a muted voice that has come back."""
+    if len(hist) <= back:
+        return []
+    old, new = hist[-back - 1][1], hist[-1][1]
+    out = []
+    for m, w in new.items():
+        eq = 1 / max(1, len(new))
+        if w > 1.5 * eq and old.get(m, eq) < eq * 2 / 3:
+            out.append(m)
+    return sorted(out)
+
+
+def shadow(db: DB, symbols: tuple[str, ...] = ("XAU", "XAG", "XPT", "XPD")) -> dict:
+    from . import candles
+    from .judge import full_cost
+    t0 = time.time()
+    events = Events(db)
+    out: dict = {"computed": None, "desks": {}, "params": {"eta": ETA_C, "alpha": ALPHA, "shrink_n": SHRINK_N,
+                                                         "abstain": ABSTAIN}}
+    for s in symbols:
+        daily = Daily(candles.get(db, s, "1d", limit=4000))
+        for h in AUDIT_HORIZONS:
+            try:
+                seq = _moments(db, s, h)
+                if not seq:
+                    continue
+                sts = [state(daily, events, m["t"], m["target"]) for m in seq]
+                r = simulate(seq, sts, full_cost(s, h))
+                now_state = state(daily, events, time.time(), time.time() + (seq[-1]["target"] - seq[-1]["t"]))
+                wn = r["weights_now"].get(now_state) or {}
+                lead = max(wn.items(), key=lambda kv: kv[1])[0] if wn else None
+                out["desks"][f"{s}:{h}"] = {k: r[k] for k in ("arms", "vs_orta", "days", "seen")} | {
+                    "state_now": now_state, "leader_now": lead, "woke": _woke(r["hist"]),
+                    "top_now": sorted(wn.items(), key=lambda kv: -kv[1])[:3]}
+            except Exception as e:          # one desk failing never stops the others
+                out["desks"][f"{s}:{h}"] = {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+    out["computed"] = time.time()
+    out["seconds"] = round(time.time() - t0, 1)
+    db.put(SIM_KEY, json.dumps(out, ensure_ascii=False))
+    return out
+
+
+def shadow_view(db: DB) -> dict | None:
+    raw = db.get(SIM_KEY)
+    try:
+        return json.loads(raw) if raw else None
+    except ValueError:
+        return None
+
+
+def run(db: DB) -> dict:
+    """The daily job: first the evidence, then the shadow conductor."""
+    a = audit(db)
+    s = shadow(db)
+    return {"audit_s": a.get("seconds"), "shadow_s": s.get("seconds")}
