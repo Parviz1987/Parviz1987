@@ -8,3 +8,6 @@ tst-trade/app/paper.py
 tst-trade/app/risk.py
 tst-trade/deploy/protected.txt
 tst-trade/deploy/update.sh
+tst-trade/tests/fingerprint.json
+tst-trade/scripts/guard_tests.py
+.github/workflows/tests.yml

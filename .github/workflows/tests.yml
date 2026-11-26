@@ -1,0 +1,29 @@
+# Testlər və qoruyucu (owner 2026-11-26, plan step 3): on every push all tests run, and the guard turns the run RED
+# when tests are weakened, guarded numbers change or the results fingerprint changes without a «Sahib-təsdiqi:» line.
+# A red run e-mails the owner. No secrets are used.
+name: Tests and guard
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tst-trade
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -q -r requirements.txt pytest
+      - name: All tests
+        run: python -m pytest -q
+      - name: Guard (weakened tests, guarded numbers, results fingerprint)
+        working-directory: .
+        run: python tst-trade/scripts/guard_tests.py "${{ github.event.before }}" "${{ github.sha }}"
