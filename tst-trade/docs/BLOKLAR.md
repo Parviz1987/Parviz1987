@@ -70,9 +70,9 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 - **Vəziyyət (26.11):** bütün qaydalar hesablanır və keçmişdə yenidən oynadılıb (RULES_VER 2026-11-26.1); Hakimdə
   heç bir qayda sübut deyil (62 zəif, 50 yox, 36 az). Qızıl 1h-də `qaydalar` çəkisi 1,24; palladium uzun horizontda
   güclü (1mo 2,6).
-- **Nə qalıb:** (a) «tanış olmayan gün» darvazası (FreqAI Dissimilarity Index kimi: keçmişə bənzəməyən günü
-  zəiflətmək); (b) dirijorun vəziyyət sübutu gələnə qədər gözləmək; (c) həcm məlumatı zəifdir (yalnız tik + COMEX
-  gündəlik).
+- **Nə qalıb:** (a) «tanış olmayan gün» darvazası — 26.11 kölgə sınağı quruldu (`shadow:experiments.unfamiliar`:
+  ən yad 20 % gündə səsin düz çıxma payı aşağıdırmı, z > 2 olarsa darvaza sınağa dəyər); nəticəyə görə qərar;
+  (b) dirijorun vəziyyət sübutu gələnə qədər gözləmək; (c) həcm məlumatı zəifdir (yalnız tik + COMEX gündəlik).
 - **Necə:** yeni qayda yalnız hipotez agenti (HY-) → Hakim → sahib registri yolu ilə; sabit parametrlər əvvəlcədən.
   Əsas: Moskowitz-Ooi-Pedersen (uzun trend), Hurst-Ooi-Pedersen; «sadə orta çox vaxt üstündür» (Timmermann).
 
@@ -85,8 +85,9 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 - **Vəziyyət:** bütün FA qaydaları «zəif» (~49–50 %). Araşdırma: 2022-dən sonra qızıl–real faiz əlaqəsi qırılıb
   (0,84 → ~0,03–0,07; mərkəzi bankların ~1000 t/il alışı). **Sahibin qərarı (5.1-3):** son 3 ilin pəncərəsi —
   kölgədə ölçülür (`app/shadowtests.py` → `shadow:experiments.fa_window`).
-- **Nə qalıb:** kölgə nəticəsi Hakimdən keçsə canlıya qoşmaq (👤 sahib qərarı, nəticə izi dəyişir); mərkəzi bank
-  aylıq məlumatı yoxdur (WGC avtomatik yükləməni qadağan edir; IMF gecikmə ilə var).
+- **Kölgə nəticəsi (26.11):** «son 3 il» bütün keçmişdən **yaxşı deyil** (XAU Brier fərqi +0,00026, interval 0-ı
+  əhatə edir; XAG eyni) → canlı çəkilər dəyişmir (bütün keçmiş qalır). Kölgə hər gün davam edir.
+- **Nə qalıb:** mərkəzi bank aylıq məlumatı yoxdur (WGC avtomatik yükləməni qadağan edir; IMF gecikmə ilə var).
 
 ### 3. Xəbər + məlumat agentləri — `news` 🔧 (ən zəif)
 - **Nə edir:** RSS / Benzinga başlıqları, Kəşfiyyatçı (Grok, X), hadisə birləşdiricisi (eyni xəbər bir dəfə),
@@ -94,11 +95,12 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   (`app/reporter.py`): ibja_rate, india_premium, india_imports, rbi_gold, china_premium, pboc_gold, wgc_etf,
   comex_stocks, fomc_next — iki fərqli şirkətin beyni internetdə tapır, **ikisi razılaşanda** istifadə olunur
   (mənbə linki ilə); biri texniki xəta verəndə ehtiyat beyin (Anthropic Haiku) əvəz edir.
-- **Vəziyyət:** səs son günlərdə az fikir bildirir; agentlərin **hələ bir uğurlu nəticəsi yoxdur**. Səbəblər: Gemini
-  ödənişsizdir (429); 26.11-də «dövr» müqayisəsi səhvi düzəldildi (ay və gün eyni dövr sayılır), qeydlər indi səbəbi
-  dəqiq deyir.
-- **Nə qalıb:** 👤 Gemini ödənişli açarı; sonra agentlərin ilk uğurlarını yoxlamaq; NW qaydalarının şərtlərinin
-  yoxlanması (niyə az işə düşür).
+- **Vəziyyət (26.11):** 7 gündə səsin fikri **yoxdur**, NW qaydaları heç işə düşməyib: qaydalar **bir həftəlik**
+  başlıq qiymətləndirməsi tələb edir (`detect`: ilk etiketdən 7 gün). Blok yoxlaması indi etiketlərin sayını və
+  həftənin nə vaxt dolduğunu göstərir (verdict «gözləyir»). Agentlərin **hələ bir uğurlu nəticəsi yoxdur**: Gemini
+  ödənişsizdir (429); «dövr» müqayisəsi səhvi düzəldildi (ay və gün eyni dövr), qeydlər səbəbi dəqiq deyir.
+- **Nə qalıb:** 👤 Gemini ödənişli açarı; həftə dolandan sonra NW qaydalarının ilk işə düşmələrini yoxlamaq; agentlərin
+  ilk uğurlarını yoxlamaq.
 - **Necə:** Smales 2014/2015 (xəbər əhvalı), Lopez-Lira & Tang 2023; agent rəqəmi yalnız iki şirkət razılaşanda;
   WGC/BlackRock saytlarını avtomatik oxumaq qadağandır (şərtlər); IBJA yalnız rəsmi API.
 
@@ -107,7 +109,9 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 - **İç quruluşu:** `app/crossmarket.py` (CM_VER 2026-11-26.1, 11 qayda: CM-USD-1/2, JPY-1, CNH-1, YLD-1, OIL-1,
   RISK-1/2, CORR-1, CU-1, LEAD-1), `app/markets.py` (RELATED), səhifə `/bazarlar`.
 - **Vəziyyət:** bir neçə metalda 1–3 günlük horizontda müsbət çəki (1,1–1,4); bayram günü VIX gəlmir (normal).
-- **Nə qalıb:** «hansı bazar qızıldan əvvəl hərəkət edir» (lead-lag) testi; rejim asılılığı dirijorda ölçülür.
+- **Nə qalıb:** «hansı bazar qızıldan əvvəl hərəkət edir» — 26.11 kölgə sınağı quruldu (`shadow:experiments.lead_lag`:
+  hər bazarın 1 saatlıq hərəkəti qızılın NÖVBƏTİ saatı ilə korrelyasiya, |t| > 3); nəticəyə görə yeni CM qaydası
+  hipotez agenti → Hakim yolu ilə. Rejim asılılığı dirijorda ölçülür.
 
 ### 5. Vaxt və təqvim — `time` 🟡
 - **Nə edir:** sessiyalar (Asiya qalxır, ABŞ enir), London fiksinqi, həftə günü, ay dönüşü, ABŞ bayramları, ABŞ rəqəm
@@ -118,7 +122,9 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 - **Sahibin qərarı (5.1-1):** mövsüm və zərgərlik istiqamət yox, **dalğalılıq işarəsi** — kölgədə ölçülür
   (`shadow:experiments.festival_vol`). Araşdırma: Baur «payız effekti» ETF dövründə itib; bayramlar dalğalılığı
   artırır, istiqaməti yox.
-- **Nə qalıb:** kölgə nəticəsinə görə: sübut olarsa bayram öncəsi aralığı genişləndirmək (👤 nəticə izi).
+- **Kölgə nəticəsi (26.11):** bayram öncəsi dalğalılıq fərqi **sübut olunmayıb** (XAU 1,09x, t=0,88, 8 ilin 3-ündə
+  yüksək; XAG 1,02x) → aralıq dəyişmir. Hadisə tarixləri: FOMC gəlir; FRED tarixləri səhvi 26.11 düzəldildi.
+- **Nə qalıb:** heç nə (kölgə ölçməyə davam edir).
 
 ### 6. AI beyinlər — `brain` 🟡
 - **Nə edir:** strateq (Claude), ikinci analitik (OpenAI), müzakirə (debate), qrafik analitiki — bütün blokların
@@ -128,8 +134,10 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   `app/learning.py` (kalibrləmə).
 - **Vəziyyət:** beyinlər həddən artıq əmindir (məs. brain2 1d «0,6+» deyəndə qalxma ~0 %) — kalibrləmə düzəldir.
   **Gecə dərsləri dayandırılıb** (sahibin qərarı 5.1-2: 526 halda fayda yoxdur).
-- **Nə qalıb:** beyin modellərinin sınaq dəsti (20–30 bilinən sual) — qabaqcadan icazə qaydasının (s7) «keyfiyyət
-  aşağı deyil» şərti üçün; o qurulana qədər yeni model yalnız sahibin Admin təsdiqi ilə.
+- **Quruldu (26.11):** `app/braintrial.py` — təklif olunan yeni model 20 sabit tapşırıqla sınanır; sahibin qabaqcadan
+  icazə qaydası (eyni şirkət + sınaq aşağı deyil + qiymət ≤ +20 %) saatda bir tətbiq olunur, qalanı Admin-də kart.
+  Aylıq beyin hesabatı diag `agents.router.month`.
+- **Nə qalıb:** 1 həftəlik kölgə (10 %) rejimi yeni model üçün — sınaq sürüşündən sonra əlavə addım (sonraya).
 
 ### 7. Birləşdirmə: vahid proqnoz, tərəzi, konsensus ✅
 - `app/unified.py` (onlayn logistik reqressiya, walk-forward öz-özünü sınaq, blok dəyəri testi — `unified:ablation`),
@@ -146,14 +154,19 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 ### 9. Aralıq və ACI — `app/forecast.py`, `app/aci.py` 🟡
 - 80 % aralıq keçmiş hərəkətlərdən öyrənilir (✅ sübut olunmuş uğur). ACI (Gibbs & Candès 2021): qaçırış çoxdursa
   genişlənir, azdırsa daralır (γ 0,02 qısa, 0,01 uzun). **Kölgədə keçmişdə sınaq** (`aci:shadow`); sahibin qərarı
-  (s9): «əvvəl keçmişdə sınaq, sonra canlı» — kölgə nəticəsi yaxşıdırsa canlıya qoşulacaq (sahibə rəqəmlərlə xəbər).
+  (s9): «əvvəl keçmişdə sınaq, sonra canlı». **Kölgə nəticəsi (26.11):** ACI 16 masanın 14-ündə 77–83 %, indiki
+  üsul 15-ində → **üstün deyil, canlıya qoşulmur**; kölgə hər gün davam edir.
 
 ### 10. Hakim — `app/judge.py`, `app/rigor.py`, `app/judgeplus.py`, `app/hypotheses.py` ✅ (qorunur)
 - Tam xərc (spread + sürüşmə + gecəlik faiz), Holm, Šidák, yalnız artan sınaq sayğacı (fikirlər, kölgə təcrübələri
   da), bir dəfəlik son sınaq + müstəqil yenidən hesablama, registr və sahib təsdiqi. **Gücləndirilmiş (s12):**
   t ≥ 3, DSR ≥ 0,95 (dispersiya döşəməsi), PBO ≤ 0,10, Diebold–Mariano (bazarın öz meylinə qarşı), e-dəyər ≥ 20,
   «inanılmaz yaxşı» → insan yoxlaması; həftəlik öz yoxlaması (20 təsadüfi + 30 % və 100 % gələcəyə baxan qayda);
-  canlıda zəifləyən təsdiqli üsul/qayda avtomatik kölgəyə; sadə dildə hökm kartı.
+  canlıda zəifləyən təsdiqli üsul/qayda avtomatik kölgəyə; sadə dildə hökm kartı. Pilləkən: kölgə → son sınaq →
+  sahib registri → kağız ticarət; «kiçik/tam real pul» heç vaxt avtomatik deyil (sahib).
+- **Öz yoxlaması (26.11):** 20 təsadüfi qaydadan 0 keçdi ✅, tam gələcəyə baxan tutuldu ✅, 30 % baxan (64 % düz)
+  tutulmadı ⚠️ → «inanılmaz yaxşı» həddini bardan +12 → +10 bəndə endirmək təklifi **👤 sahibin «okey»ini gözləyir**
+  (Hakim faylı qorunur).
 - **Qorunan fayllar** (`deploy/protected.txt`): dəyişiklik yalnız `Sahib-təsdiqi:` sətri ilə serverə düşür.
 
 ### 11. Risk və qərar, kağız ticarət ✅
@@ -163,7 +176,8 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 ### 12. Öyrənmə ✅ / 13. Səhv yarılması 🟡 / 14. Hipotez agenti ✅
 - 12: Hedge çəkiləri döşəmə ilə, kalibrləmə gecə (dərslər dayandırılıb).
 - 13: `app/autopsy.py` (s11, aylıq): Murphy bölgüsü, dilimlər (Bonferroni), «kim yanlış apardı», qərar/nəticə 4 qutu,
-  ayın 5 ən böyük səhvi, aralıq sürüşməsi, 8 sabit səbəb → hipotez agentinə ipucu. İlk nəticə: canlı qeydə görə.
+  ayın 5 ən böyük səhvi, aralıq sürüşməsi, 8 sabit səbəb → hipotez agentinə ipucu. **26.11:** canlı vahid proqnozun
+  fikirli halları hələ azdır (masa başına ≤ 18) → hər gün yenidən işləyir, kifayət qədər hal yığılanda aylığa keçir.
 - 14: `app/ideas.py`: bazar günü 14:00 UTC, həftədə ən çox 2 fikir, HY- qaydaları yalnız registr təsdiqindən sonra səs
   verir; ilk iş 29.11.
 
