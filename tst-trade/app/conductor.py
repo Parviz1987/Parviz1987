@@ -29,6 +29,12 @@ NY = ZoneInfo("America/New_York")
 STATES = ("hadisə", "şok", "trend", "yan")
 AUDIT_HORIZONS = ("1h", "4h", "1d", "1w")
 SKIP = ("rw", "up", "consensus", "terazi", "vahid", "dirijor")
+
+
+def _voice(m: str) -> bool:
+    """A voice of today: a method in use (the retired ones' old live rows stay in the table but are not voices)."""
+    from .forecast import METHODS
+    return m in METHODS and m not in SKIP
 VOL_N, YEAR_N = 20, 250
 SHOCK_PCT, TREND_Z = 0.80, 1.0
 MAX_ROWS = 250000                    # newest rows per desk: bounded memory on the 1 GB server
@@ -36,7 +42,7 @@ MIN_DAYS = 20                        # a voice/state cell needs at least this ma
 EVENT_RE = ("cpi", "consumer price", "non farm", "nonfarm", "non-farm", "payroll", "fomc", "fed interest rate",
             "interest rate decision", "pce", "gdp")
 AUDIT_KEY = "conductor:audit"
-VER = "2026-11-26.2"            # a new version recomputes at once instead of waiting a day
+VER = "2026-11-26.3"            # a new version recomputes at once instead of waiting a day
 
 
 # ---------- market state ----------
@@ -76,9 +82,17 @@ class Events:
             rows = db.execute("SELECT ts, event, impact FROM releases ORDER BY ts").fetchall()
         except Exception:               # no calendar table yet: the payroll Friday only
             rows = []
-        self.ts = sorted(r["ts"] for r in rows if str(r["impact"] or "").lower() == "high"
-                         or any(k in str(r["event"] or "").lower() for k in EVENT_RE))
+        ts = {r["ts"] for r in rows if str(r["impact"] or "").lower() == "high"
+              or any(k in str(r["event"] or "").lower() for k in EVENT_RE)}
+        try:                            # the past release dates from FRED (CPI, payrolls, GDP, PCE)
+            hist = json.loads(db.get("calendar:history") or "{}")
+        except ValueError:
+            hist = {}
+        for v in hist.values():
+            ts.update(v)
+        self.ts = sorted(ts)
         self.covered_from = self.ts[0] if self.ts else None
+        self.sources = sorted(hist)
 
     def inside(self, t0: float, t1: float) -> bool:
         if self.covered_from is not None and t1 >= self.covered_from:
@@ -185,7 +199,7 @@ def audit_desk(db: DB, symbol: str, horizon: str, daily: Daily, events: Events) 
     day_acc: dict[tuple, list] = {}
     for r in rows:
         m = r["method"]
-        if m in SKIP:
+        if not _voice(m):
             continue
         key = (r["issued_t"], r["target_t"])
         if key not in st_of:
@@ -235,7 +249,8 @@ def audit(db: DB, symbols: tuple[str, ...] = ("XAU", "XAG", "XPT", "XPD")) -> di
     from . import candles
     t0 = time.time()
     events = Events(db)
-    out: dict = {"computed": None, "ver": VER, "states": list(STATES), "events_from": events.covered_from, "desks": {}}
+    out: dict = {"computed": None, "ver": VER, "states": list(STATES), "events_from": events.covered_from,
+                 "event_sources": getattr(events, "sources", []), "desks": {}}
     for s in symbols:
         daily = Daily(candles.get(db, s, "1d", limit=4000))
         for h in AUDIT_HORIZONS:
@@ -281,6 +296,7 @@ def audit_view(db: DB) -> dict | None:
                     "differ": [{"voice": m, "p": p} for p, m in differ],
                     "tested": sum(1 for v in d["voices"].values() if v["p_same"] is not None)}
     return {"computed": a.get("computed"), "seconds": a.get("seconds"), "events_from": a.get("events_from"),
+            "event_sources": a.get("event_sources"),
             "desks": desks}
 
 
@@ -351,7 +367,7 @@ def _moments(db: DB, symbol: str, horizon: str) -> list[dict]:
     for r in rows:
         m = mom.setdefault(r["issued_t"], {"t": r["issued_t"], "target": r["target_t"], "p0": r["price0"],
                                            "p1": r["price1"], "v": {}})
-        if r["method"] not in SKIP and r["p_up"] is not None and r["p_up"] != 0.5:
+        if _voice(r["method"]) and r["p_up"] is not None and r["p_up"] != 0.5:
             m["v"][r["method"]] = min(0.95, max(0.05, float(r["p_up"])))
     return sorted((m for m in mom.values() if m["v"] and m["p1"] != m["p0"]), key=lambda m: m["t"])
 

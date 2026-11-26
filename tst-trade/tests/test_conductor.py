@@ -138,3 +138,14 @@ def test_shadow_conductor_does_not_invent_an_edge_from_noise():
 def test_woke_up_voice():
     hist = [(i, {"A": 0.8, "B": 0.2}) for i in range(20)] + [(20 + i, {"A": 0.2, "B": 0.8}) for i in range(10)]
     assert conductor._woke(hist) == ["B"]
+
+
+def test_past_release_dates_make_event_moments_and_retired_methods_are_not_voices():
+    import json as _j
+    db = DB(":memory:")
+    t = 1_700_000_000.0
+    db.put("calendar:history", _j.dumps({"CPI": [t]}))
+    ev = conductor.Events(db)
+    assert ev.inside(t - 3600, t + 60) and not ev.inside(t + 60, t + 3600)
+    assert ev.sources == ["CPI"]
+    assert conductor._voice("tsmom") and not conductor._voice("rsi") and not conductor._voice("vahid")

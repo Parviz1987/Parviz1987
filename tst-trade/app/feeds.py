@@ -495,6 +495,39 @@ class Feeds:
                 errors.append(f"{sid}: {str(e).replace(key, '***')}")
         self._health("fred", n > 0, f"{n} müşahidə" + (f"; xəta: {'; '.join(errors)}" if errors else ""), n)
         await self.first_releases(client, key)
+        await self.release_dates(client, key)
+
+    # FRED release ids of the US figures that move gold most (CPI, payrolls, GDP, PCE), all at 08:30 New York
+    RELEASES = {10: "CPI", 50: "Employment Situation", 53: "GDP", 54: "Personal Income and Outlays"}
+
+    async def release_dates(self, client, key: str) -> None:
+        """The past dates of the big US releases (the conductor's «event» state needs them for the history, the
+        calendar table only reaches a few days back). Once a day; stored as timestamps in kv «calendar:history»."""
+        if time.time() - float(self.db.get("calendar:history_ts") or 0) < 86400:
+            return
+        from zoneinfo import ZoneInfo
+        ny = ZoneInfo("America/New_York")
+        out: dict[str, list[float]] = {}
+        errors = []
+        for rid, name in self.RELEASES.items():
+            try:
+                data = await self._get(client, "https://api.stlouisfed.org/fred/release/dates",
+                                       params={"release_id": rid, "api_key": key, "file_type": "json",
+                                               "include_release_dates_with_no_data": "false",
+                                               "sort_order": "asc", "limit": 10000})
+                ts = []
+                for r in (data or {}).get("release_dates", []):
+                    d = datetime.strptime(r["date"], "%Y-%m-%d")
+                    if d.year >= 2010:
+                        ts.append(datetime(d.year, d.month, d.day, 8, 30, tzinfo=ny).timestamp())
+                out[name] = ts
+            except Exception as e:
+                errors.append(f"{name}: {str(e).replace(key, '***')}"[:120])
+        if out:
+            self.db.put("calendar:history", json.dumps(out))
+        self.db.put("calendar:history_ts", str(time.time()))
+        if errors:
+            log.warning("release dates: %s", "; ".join(errors))
 
     FIRST_SERIES = ("DTWEXBGS",)            # the revisable series the history replay reads (DFII10 is not revised)
 
