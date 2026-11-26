@@ -70,6 +70,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     from .security import Guard
     sec = Guard(db)
+    diag._SEALER[:] = [s.session_secret]
 
     def _ip(request: Request) -> str:
         # uvicorn trusts Caddy's X-Forwarded-For from 127.0.0.1: this is the visitor's real address
@@ -140,6 +141,15 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         if auth.password_ok(given, db_hash=db.get("auth:password_hash"), env_hash=s.app_password_hash,
                             env_plain=s.app_password):
             who = "owner"
+            from . import totp
+            got = totp.check(db, s.session_secret, str(form.get("code", "")))
+            if got is None:            # right password, wrong or missing 2FA code: a failed try like any other
+                sec.failed(ip, "login")
+                sec.log("login_code_fail", ip)
+                await asyncio.sleep(1.0)
+                return RedirectResponse("/login?e=code", status_code=303)
+            if got == "recovery":
+                sec.log("recovery_used", ip, "ehtiyat kod istifadə olundu")
         elif auth.guest_ok(given, db.get("auth:guest_hash")):
             who = "guest"
         else:
@@ -884,6 +894,32 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             raise HTTPException(400, f"qonaq parolu ən azı {auth.MIN_LEN} simvol olmalıdır")
         db.put("auth:guest_hash", auth.hash_password(pw))
         return {"guest": True}
+
+    @app.get("/api/admin/2fa")
+    async def tfa_status():
+        from . import totp
+        return totp.status(db, s.session_secret)
+
+    @app.post("/api/admin/2fa/{action}")
+    async def tfa_action(action: str, request: Request):
+        """2FA for the owner's login: start (a new secret to add to the app), confirm (first code -> on, recovery codes
+        shown once), off (needs a current code or a recovery code)."""
+        from . import totp
+        body = await request.json() if action != "start" else {}
+        try:
+            if action == "start":
+                return totp.start(db, s.session_secret)
+            if action == "confirm":
+                codes = totp.confirm(db, s.session_secret, str(body.get("code", "")))
+                sec.log("2fa_on", _ip(request))
+                return {"on": True, "recovery": codes}
+            if action == "off":
+                totp.turn_off(db, s.session_secret, str(body.get("code", "")))
+                sec.log("2fa_off", _ip(request))
+                return {"on": False}
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        raise HTTPException(404, "naməlum əməliyyat")
 
     @app.get("/api/me")
     async def me(request: Request):

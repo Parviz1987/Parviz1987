@@ -138,6 +138,9 @@ def _update_log(db_path: str) -> list[str]:
         return []
 
 
+_SEALER: list = []          # the session secret, set by main (only to tell whether 2FA is on; never reported)
+
+
 def _security(db: DB) -> dict:
     """The counts and alerts; for the failed logins of the last day only the PLACE (city, country), never the address:
     the outside reviewer must not see anyone's IP."""
@@ -150,6 +153,8 @@ def _security(db: DB) -> dict:
         k = geo.label(geo.place(r["ip"], db.path)) if r["ip"] else "—"
         places[k] = places.get(k, 0) + 1
     out["fail_places"] = places
+    from . import totp
+    out["two_factor"] = totp.enabled(db, _SEALER[0]) if _SEALER else None
     for a in out.get("alerts", []):
         a["place"] = geo.label(geo.place(a.get("ip"), db.path))
         a.pop("ip", None)

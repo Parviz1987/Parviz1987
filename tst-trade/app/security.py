@@ -22,8 +22,11 @@ KEEP = 90 * 86400
 KIND_AZ = {"login_fail": "səhv parol", "login_blocked": "bloklanıb (çox səhv cəhd)", "login_new_ip": "yeni ünvandan giriş",
            "login_ok": "giriş", "diag_bad_token": "səhv diaqnostika açarı", "key_saved": "açar saxlanıb",
            "key_deleted": "açar silinib", "password_changed": "parol dəyişib", "guest_changed": "qonaq parolu dəyişib",
-           "provider_changed": "qiymət mənbəyi dəyişib", "diag_token_changed": "diaqnostika açarı dəyişib"}
-ALERT = ("login_blocked", "login_new_ip", "key_deleted", "password_changed", "diag_token_changed", "key_saved")
+           "provider_changed": "qiymət mənbəyi dəyişib", "diag_token_changed": "diaqnostika açarı dəyişib",
+           "login_code_fail": "parol düz, 2FA kodu səhv", "recovery_used": "2FA ehtiyat kodu istifadə olundu",
+           "2fa_on": "2FA açıldı", "2fa_off": "2FA söndürüldü"}
+ALERT = ("login_blocked", "login_new_ip", "key_deleted", "password_changed", "diag_token_changed", "key_saved",
+         "login_code_fail", "recovery_used", "2fa_off")
 
 
 class Guard:

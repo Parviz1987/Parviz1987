@@ -43,6 +43,13 @@
       <label class="note" for="g-pw">Qonaq parolu (ən azı 8 simvol)</label><input id="g-pw" type="text" autocomplete="off" class="inp">
       <div class="btns"><button class="btn pri" id="g-save">Qonaq parolunu saxla</button><button class="btn dan" id="g-off">Qonaq girişini bağla</button></div>
       <div class="msg" id="g-msg"></div></div></section>
+  <section class="adm"><h2>İkiqat yoxlama (2FA)</h2>
+    <div class="box" style="max-width:520px;display:flex;flex-direction:column;gap:6px">
+      <p class="note">Açıq olanda sizin girişiniz parol + telefon/iPad proqramının 6 rəqəmli kodu ilə olur (Google Authenticator,
+        Microsoft Authenticator və ya iPhone/iPad «Passwords»). Qonaq girişinə təsir etmir.</p>
+      <p id="tfa-state" class="note"></p>
+      <div id="tfa-box"></div>
+      <div class="msg" id="tfa-msg"></div></div></section>
   <section class="adm"><h2>Tarixçə</h2>
     <div class="box"><p class="note">Tarixçə 1 gün və 1 həftəlik proqnozları keçmiş üzərində yoxlamaq üçündür. Twelve Data açarı ilə yüklənir (6 saatda bir özü də yenilənir).</p>
       <div class="btns"><button class="btn" id="hist">İndi yüklə və yoxla</button></div><div class="tbl" id="histres"></div></div></section>
@@ -60,5 +67,6 @@
 <script src="/static/admin.js"></script>
 <script src="/static/admin_registry.js"></script>
 <script src="/static/admin_paper.js"></script>
+<script src="/static/admin_2fa.js"></script>
 <script src="/static/nav.js"></script>
 </body></html>
