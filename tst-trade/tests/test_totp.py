@@ -71,11 +71,11 @@ def test_gemini_search_reads_json_from_a_grounded_answer(monkeypatch):
     assert data["value"] == 128450 and calls == 2 and tin == 100
 
 
-def test_gemini_retired_model_is_swapped_for_the_one_google_names(monkeypatch):
+def test_gemini_retired_model_is_not_swapped_but_proposed(monkeypatch):
+    """Owner 2026-11-26 (plan step 7): no automatic model change; the model Google names is attached as a proposal."""
     import asyncio
     import httpx
     from app import llm
-    llm._GEMINI_SWAP.clear()
 
     class R:
         def __init__(self, code, body):
@@ -88,15 +88,15 @@ def test_gemini_retired_model_is_swapped_for_the_one_google_names(monkeypatch):
 
     async def post(self, url, headers=None, json=None):
         used.append(url.split("/models/")[1].split(":")[0])
-        if "gemini-2.5-flash:" in url:
-            return R(404, {"error": {"message": "This model models/gemini-2.5-flash is no longer available to new users. "
-                                                "Please update your code to use models/gemini-3-flash."}})
-        return R(200, {"candidates": [{"content": {"parts": [{"text": '{"found": false}'}]}}], "usageMetadata": {}})
+        return R(404, {"error": {"message": "This model models/gemini-2.5-flash is no longer available to new users. "
+                                            "Please update your code to use models/gemini-3-flash."}})
     monkeypatch.setattr(httpx.AsyncClient, "post", post)
-    data, *_ = asyncio.run(llm.search("gemini", "k", "gemini-2.5-flash", "s", "u"))
-    assert data == {"found": False} and used == ["gemini-2.5-flash", "gemini-3-flash"]
-    asyncio.run(llm.search("gemini", "k", "gemini-2.5-flash", "s", "u"))
-    assert used[-1] == "gemini-3-flash"                       # remembered: the retired model is not asked again
+    try:
+        asyncio.run(llm.search("gemini", "k", "gemini-2.5-flash", "s", "u"))
+        raise AssertionError("expected an error")
+    except llm.LLMError as e:
+        assert e.status == 404 and e.suggested == "gemini-3-flash"
+    assert used == ["gemini-2.5-flash"]                       # the new model was NOT called
 
 
 def test_spare_brain_stands_in_when_one_company_fails(monkeypatch):

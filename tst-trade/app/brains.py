@@ -117,43 +117,74 @@ def last_call(db: DB, slot: str) -> dict | None:
     return dict(r) if r else None
 
 
+_RESERVED: dict[str, float] = {}      # money held back for calls in flight, per slot (parallel calls never pass the cap)
+
+
+def _worst(model: str, system: str, user: str, max_tokens: int, search: bool) -> float:
+    """The most a call can cost: its input (about 3 characters per token) and every output token, plus searches."""
+    return llm.cost(model, (len(system) + len(user)) // 3 + 200, max_tokens) + (5 * llm.SEARCH_CALL_USD if search else 0)
+
+
+def _reserve(db: DB, slot: str, usd: float) -> bool:
+    cap = float(config(db, slot)["month_usd"])
+    if spent(db, slot) + _RESERVED.get(slot, 0.0) + usd > cap:
+        return False
+    _RESERVED[slot] = _RESERVED.get(slot, 0.0) + usd
+    return True
+
+
+def _release(slot: str, usd: float) -> None:
+    _RESERVED[slot] = max(0.0, _RESERVED.get(slot, 0.0) - usd)
+
+
+def _caller(db: DB, slot: str, system: str, user: str, schema: dict | None, max_tokens: int, search: bool):
+    """One brain call as the router sees it: reserve the worst cost, call, write the real cost (or the error)."""
+    async def fn(provider: str, model: str, key: str):
+        worst = _worst(model, system, user, max_tokens, search)
+        if not _reserve(db, slot, worst):
+            from .llm import LLMError
+            raise LLMError(f"aylıq limit bu sorğuya çatmır ({config(db, slot)['month_usd']} $)", hint="config")
+        try:
+            if search:
+                data, tin, tout, calls = await llm.search(provider, key, model, system, user, max_tokens)
+            else:
+                (data, tin, tout), calls = await llm.ask(provider, key, model, system, user, schema, max_tokens), 0
+            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,1,?,?,?,NULL)",
+                       (_time.time(), slot, provider, model, tin, tout,
+                        llm.cost(model, tin, tout) + calls * llm.SEARCH_CALL_USD))
+            return data
+        except Exception as e:
+            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)",
+                       (_time.time(), slot, provider, model, str(e).replace(key, "***")[:200]))
+            raise
+        finally:
+            _release(slot, worst)
+    return fn
+
+
 async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema: dict,
               max_tokens: int = 2000, search: bool = False) -> tuple[dict | None, str]:
-    """Ask the slot's brain, then its fallback. Returns (answer or None, a line for the panel). Never raises."""
+    """Ask the slot's brain, then its fallback, through the router (one retry layer, error-aware). Returns (answer or
+    None, a line for the panel). Never raises."""
+    from . import llmrouter
     db.script(CALLS_SCHEMA)
     cfg = config(db, slot)
     if spent(db, slot) >= float(cfg["month_usd"]):
         return None, f"aylıq limit doldu ({cfg['month_usd']} $)"
-    errors = []
     from .registry import MISSION
     system = MISSION + system           # every brain serves the same goal, in the same words
-    for provider, model in ((cfg["provider"], cfg["model"]), (cfg.get("fallback"), cfg.get("fallback_model"))):
-        if not provider or not model:
-            continue
-        key = keys.first(provider)
-        if not key:
-            errors.append(f"{provider}: açar yoxdur")
-            continue
-        try:
-            calls = 0
-            if search:
-                data, tin, tout, calls = await llm.search(provider, key, model, system, user, max_tokens)
-            else:
-                data, tin, tout = await llm.ask(provider, key, model, system, user, schema, max_tokens)
-            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,1,?,?,?,NULL)",
-                       (_time.time(), slot, provider, model, tin, tout,
-                        llm.cost(model, tin, tout) + calls * llm.SEARCH_CALL_USD))
-            if not search:      # Block 17: count numbers the brain wrote that it was not given
-                from . import checker
-                checker.record(db, slot, data, user + "\n" + system)
-            from . import heartbeat
-            heartbeat.beat("ai-brains", "ok", f"{slot}: {provider}")
-            return data, f"{provider} · {model}"
-        except Exception as e:   # a broken brain must never stop the system
-            msg = str(e).replace(key, "***")[:200]
-            errors.append(f"{provider}: {msg}")
-            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)", (_time.time(), slot, provider, model, msg))
-    return None, "; ".join(errors) or "beyin seçilməyib"
+    chain = [(p, m, keys.first(p) if p else None) for p, m in ((cfg["provider"], cfg["model"]),
+                                                              (cfg.get("fallback"), cfg.get("fallback_model")))]
+    data, provider, model, fb, errors = await llmrouter.call(db, slot, chain,
+                                                             _caller(db, slot, system, user, schema, max_tokens, search))
+    if data is None:
+        return None, "; ".join(errors) or "beyin seçilməyib"
+    if not search:      # Block 17: count numbers the brain wrote that it was not given
+        from . import checker
+        checker.record(db, slot, data, user + "\n" + system)
+    from . import heartbeat
+    heartbeat.beat("ai-brains", "ok", f"{slot}: {provider}")
+    return data, f"{provider} · {model}" + (" (ehtiyat)" if fb else "")
 
 
 SPARE = ("anthropic", "claude-haiku-5-5")      # a third company, used only when one of the two fails technically
@@ -163,42 +194,25 @@ async def run_both(db: DB, keys: KeyStore, slot: str, system: str, user: str,
                    max_tokens: int = 2000) -> list[tuple[dict | None, str]]:
     """Ask the slot's main brain AND its second brain independently, both with live web search: for jobs where two
     independent answers must agree before anything is used (a figure found on the web). Never raises."""
+    from . import llmrouter
     db.script(CALLS_SCHEMA)
     cfg = config(db, slot)
     if spent(db, slot) >= float(cfg["month_usd"]):
         return [(None, f"aylıq limit doldu ({cfg['month_usd']} $)")]
+    fn = _caller(db, slot, system, user, None, max_tokens, True)
     out = []
     for provider, model in ((cfg["provider"], cfg["model"]), (cfg.get("fallback"), cfg.get("fallback_model"))):
         if not provider or not model:
             out.append((None, "ikinci beyin seçilməyib"))
             continue
-        key = keys.first(provider)
-        if not key:
-            out.append((None, f"{provider}: açar yoxdur"))
-            continue
-        try:
-            data, tin, tout, calls = await llm.search(provider, key, model, system, user, max_tokens)
-            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,1,?,?,?,NULL)",
-                       (_time.time(), slot, provider, model, tin, tout,
-                        llm.cost(model, tin, tout) + calls * llm.SEARCH_CALL_USD))
-            out.append((data, f"{provider} · {model}"))
-        except Exception as e:   # a broken brain must never stop the system
-            msg = str(e).replace(key, "***")[:200]
-            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)", (_time.time(), slot, provider, model, msg))
-            out.append((None, f"{provider}: {msg}"))
+        data, p, m, _, errors = await llmrouter.call(db, slot, [(provider, model, keys.first(provider))], fn)
+        out.append((data, f"{p} · {m}") if data is not None else (None, "; ".join(errors)))
     # 2026-11-26: Gemini answered «quota exceeded» — one company's technical failure must not silence the agent.
     # The spare brain (a third company, not one already asked) stands in, so two DIFFERENT companies still agree.
     asked = {cfg.get("provider"), cfg.get("fallback")}
     if any(d is None for d, _ in out) and SPARE[0] not in asked and keys.first(SPARE[0]):
-        key = keys.first(SPARE[0])
-        try:
-            data, tin, tout, calls = await llm.search(SPARE[0], key, SPARE[1], system, user, max_tokens)
-            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,1,?,?,?,NULL)",
-                       (_time.time(), slot, SPARE[0], SPARE[1], tin, tout,
-                        llm.cost(SPARE[1], tin, tout) + calls * llm.SEARCH_CALL_USD))
+        data, p, m, _, errors = await llmrouter.call(db, slot, [(SPARE[0], SPARE[1], keys.first(SPARE[0]))], fn)
+        if data is not None:
             k = next(n for n, (d, _) in enumerate(out) if d is None)
-            out[k] = (data, f"{SPARE[0]} · {SPARE[1]} (əvəzedici)")
-        except Exception as e:
-            msg = str(e).replace(key, "***")[:200]
-            db.execute("INSERT INTO brain_calls VALUES(?,?,?,?,0,0,0,0,?)", (_time.time(), slot, SPARE[0], SPARE[1], msg))
+            out[k] = (data, f"{p} · {m} (əvəzedici)")
     return out

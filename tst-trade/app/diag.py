@@ -145,6 +145,15 @@ def _ops(db: DB) -> dict:
     return ops.state(db)
 
 
+def _router(db: DB) -> dict:
+    """The brain router: models switched off and why, cooling down, proposals waiting for the owner, fallback rate."""
+    try:
+        from . import llmrouter
+        return llmrouter.view(db)
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _heartbeat(db: DB) -> dict | None:
     """The outside watcher: is it set up, and each check's last signal (never the ping addresses)."""
     try:
@@ -178,7 +187,7 @@ def _agents(db: DB) -> dict:
         calls = []
     from . import llm
     return {"agents": [{k: a[k] for k in ("id", "value", "period", "last_ok", "last_note", "last_ts")}
-                       for a in reporter.agents_view(db)], "calls": calls, "gemini_swap": dict(llm._GEMINI_SWAP)}
+                       for a in reporter.agents_view(db)], "calls": calls, "router": _router(db)}
 
 
 def _update_log(db_path: str) -> list[str]:
