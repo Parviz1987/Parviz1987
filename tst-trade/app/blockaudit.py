@@ -85,9 +85,24 @@ def build(db: DB, now: float | None = None) -> dict:
         sheet["value_bss_drop"] = val
         diff = [v["voice"] for k, d in cond.items() for v in d.get("differ", []) if v["voice"] in sheet["voices"]]
         sheet["state_dependent"] = sorted(set(diff))
+        wait_until = None
+        if bid == "news":                # the news rules need a week of the Reader's labels before they may fire
+            try:
+                r = db.execute("SELECT MIN(ts) f, SUM(ts > ?) w, COUNT(*) n FROM news_ai", (now - 7 * 86400,)).fetchone()
+                sheet["labels"] = {"first": r["f"], "last_7d": r["w"] or 0, "all": r["n"]}
+                if r["f"] and now - r["f"] < 7 * 86400:
+                    wait_until = r["f"] + 7 * 86400
+            except Exception:
+                sheet["labels"] = None
         silent_src = [k for k, v in src.items() if v["ok"] is False]
         any_view = sum(v["with_view"] for v in views.values())
-        if silent_src or (views and any_view == 0):
+        if wait_until and not silent_src:
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+            verdict = "gözləyir"
+            why = ("qaydalar bir həftəlik başlıq qiymətləndirməsi tələb edir: "
+                   + datetime.fromtimestamp(wait_until, ZoneInfo("America/New_York")).strftime("%d.%m %H:%M") + " NY")
+        elif silent_src or (views and any_view == 0):
             verdict = "qırıq"
             why = ("mənbə işləmir: " + ", ".join(silent_src)) if silent_src else "son 7 gündə səsin heç fikri olmayıb"
         elif best == "sübut":

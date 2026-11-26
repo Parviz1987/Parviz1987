@@ -16,3 +16,12 @@ def test_sheets_and_verdicts():
     assert by["news"]["verdict"] == "qırıq" and "rss" in by["news"]["why"]
     assert by["ta"]["verdict"] == "qırıq" and "fikri" in by["ta"]["why"]      # no forecasts at all in this test db
     assert blockaudit.view(db)["blocks"]
+
+
+def test_news_waits_for_a_week_of_labels():
+    db = DB(":memory:")
+    db.execute("CREATE TABLE IF NOT EXISTS news_ai (uid TEXT PRIMARY KEY, ts REAL, event TEXT, metals TEXT, direction TEXT, "
+               "strength INTEGER, brain TEXT)")
+    db.execute("INSERT INTO news_ai VALUES('a', ?, 'fed', 'XAU', 'up', 2, 'x')", (time.time() - 2 * 86400,))
+    by = {b["id"]: b for b in blockaudit.build(db)["blocks"]}
+    assert by["news"]["verdict"] == "gözləyir" and by["news"]["labels"]["all"] == 1

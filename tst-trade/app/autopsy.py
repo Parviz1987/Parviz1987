@@ -222,11 +222,14 @@ def run(db: DB, symbols=("XAU", "XAG", "XPT", "XPD")) -> dict:
 
 
 def due(db: DB, now: float | None = None) -> bool:
+    """Monthly — but daily while too few live headline forecasts exist yet (the first months)."""
     try:
-        last = json.loads(db.get(KEY) or "{}").get("computed") or 0
+        prev = json.loads(db.get(KEY) or "{}")
     except ValueError:
-        last = 0
-    return (time.time() if now is None else now) - last > 30 * 86400
+        prev = {}
+    last = prev.get("computed") or 0
+    enough = sum(1 for d in (prev.get("desks") or {}).values() if (d.get("n") or 0) >= 30) >= 4
+    return (time.time() if now is None else now) - last > (30 if enough else 1) * 86400
 
 
 def view(db: DB) -> dict | None:

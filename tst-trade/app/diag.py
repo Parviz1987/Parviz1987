@@ -146,7 +146,7 @@ def _blockaudit(db: DB) -> dict | None:
         v = blockaudit.view(db)
         return v and {"computed": v.get("computed"), "blocks": [{k: b.get(k) for k in (
             "id", "verdict", "why", "sources", "rules", "views_7d", "judge_best", "value_bss_drop", "state_dependent",
-            "feeds")} for b in v.get("blocks", [])]}
+            "feeds", "labels")} for b in v.get("blocks", [])]}
     except Exception as e:
         return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
 
