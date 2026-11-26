@@ -205,7 +205,8 @@ def run(db: DB, symbols=("XAU", "XAG", "XPT", "XPD")) -> dict:
     out["totals"] = totals
     tot = sum(totals.values())
     # a cause far above its share in the previous month: a hint for the weekly hypothesis agent (never a rule)
-    prev = json.loads(db.get(KEY) or "{}").get("totals") or {}
+    # compared with the last MONTHLY run (while it reruns daily, «yesterday» would be no baseline)
+    prev = json.loads(db.get("autopsy:month_totals") or "{}")
     ptot = sum(prev.values())
     hints = []
     if tot >= 40 and ptot >= 40:
@@ -218,6 +219,9 @@ def run(db: DB, symbols=("XAU", "XAG", "XPT", "XPD")) -> dict:
     out["computed"] = time.time()
     out["seconds"] = round(time.time() - t0, 1)
     db.put(KEY, json.dumps(out, ensure_ascii=False))
+    if tot >= 40 and time.time() - float(db.get("autopsy:month_ts") or 0) > 30 * 86400:
+        db.put("autopsy:month_totals", json.dumps(totals))
+        db.put("autopsy:month_ts", str(time.time()))
     return out
 
 

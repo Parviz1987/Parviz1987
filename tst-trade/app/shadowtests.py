@@ -145,12 +145,13 @@ def unfamiliar(db: DB, symbol: str = "XAU", method: str = "qaydalar", horizon: s
         sample = past[::10]
         avg = sum(math.dist(a, b) for a in sample for b in sample) / max(1, len(sample) ** 2 - len(sample))
         di[ts[k]] = near / avg if avg else 0.0
-    rows = db.execute("SELECT issued_t, hit FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND hit IS NOT NULL "
-                      "AND p_up != 0.5", (symbol, horizon, method)).fetchall()
-    pairs = []
-    for r in rows:
+    rows = db.execute("SELECT issued_t, hit, mode FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND hit IS NOT "
+                      "NULL AND p_up != 0.5 ORDER BY issued_t", (symbol, horizon, method)).fetchall()
+    pairs, seen = [], set()
+    for r in rows:                     # one case per day (history and live never both)
         k = conductor.Daily.at(d, r["issued_t"])
-        if k is not None and cs[k]["t"] in di:
+        if k is not None and cs[k]["t"] in di and cs[k]["t"] not in seen:
+            seen.add(cs[k]["t"])
             pairs.append((di[cs[k]["t"]], int(r["hit"])))
     if len(pairs) < 200:
         return {"note": f"az proqnoz ({len(pairs)})"}
@@ -172,12 +173,14 @@ def lead_lag(db: DB, symbol: str = "XAU") -> dict:
     (together)? Correlation with a t-statistic over the common closed hours."""
     from . import candles
     from .markets import RELATED
-    g = {c["t"]: c["c"] for c in candles.get(db, symbol, "1h", limit=6000)}
+    import time as _t
+    now = _t.time()                    # closed hours only (the unfinished hour is one noisy sample)
+    g = {c["t"]: c["c"] for c in candles.closed(db, symbol, "1h", now, limit=6000) if c["c"] > 0}
     gt = sorted(g)
     gr = {gt[i]: math.log(g[gt[i]] / g[gt[i - 1]]) for i in range(1, len(gt)) if gt[i] - gt[i - 1] == 3600}
     out = {}
     for sym in RELATED:
-        m = {c["t"]: c["c"] for c in candles.get(db, sym, "1h", limit=6000)}
+        m = {c["t"]: c["c"] for c in candles.closed(db, sym, "1h", now, limit=6000) if c["c"] > 0}
         mt = sorted(m)
         mr = {mt[i]: math.log(m[mt[i]] / m[mt[i - 1]]) for i in range(1, len(mt)) if mt[i] - mt[i - 1] == 3600
               and m[mt[i - 1]] > 0 and m[mt[i]] > 0}

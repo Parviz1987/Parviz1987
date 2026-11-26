@@ -110,7 +110,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                 while True:
                     await asyncio.sleep(60)
                     k += 1
-                    if k % 60 == 0:             # hourly: a retired model's proposed replacement gets its trial
+                    if time.time() - float(db.get("braintrial:last") or 0) > 3600:   # hourly, across restarts
+                        db.put("braintrial:last", str(time.time()))
                         try:
                             for x in await braintrial.handle_proposals(db, store):
                                 log.info("model pre-approved: %s", x)

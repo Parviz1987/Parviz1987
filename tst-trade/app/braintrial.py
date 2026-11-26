@@ -81,7 +81,9 @@ async def trial(db: DB, provider: str, model: str, key: str) -> dict:
         data, tin, tout = await asyncio.wait_for(llm.ask(provider, key, model, SYSTEM, prompt(), SCHEMA, 1500), 90)
         res = {"score": round(score(data), 3), "usd": round(llm.cost(model, tin, tout), 5), "ok": True}
     except Exception as e:
-        res = {"score": 0.0, "usd": 0.0, "ok": False, "error": (str(e) or type(e).__name__)[:160].replace(key, "***")}
+        res = {"score": 0.0, "usd": 0.0, "ok": False,                     # mask the key BEFORE cutting the text
+               "error": (str(e) or type(e).__name__).replace(key, "***")[:160],
+               "note": "sınaq alınmadı: təkrar edilmir, qərar sahibindədir"}
     res.update({"provider": provider, "model": model, "seconds": round(time.time() - t0, 1), "ts": time.time()})
     scores = json.loads(db.get("braintrial:scores") or "{}")
     scores[f"{provider}:{model}"] = res
@@ -100,7 +102,9 @@ def preapproved(db: DB, provider: str, old: str, new: str, new_res: dict) -> tup
     po, pn = llm.PRICES.get(old), llm.PRICES.get(new)
     if not pn:
         return False, "yeni modelin qiyməti cədvəldə yoxdur"
-    if po and (pn[0] > po[0] * 1.2 or pn[1] > po[1] * 1.2):
+    if not po:
+        return False, "köhnə modelin qiyməti məlum deyil: müqayisə edilə bilmir"
+    if pn[0] > po[0] * 1.2 or pn[1] > po[1] * 1.2:
         return False, f"qiymət 20 %-dən çox artır ({po} → {pn} $/mln token)"
     return True, f"sınaq {new_res['score']} ≥ {bar}, qiymət ≤ +20 %"
 
@@ -117,10 +121,14 @@ async def handle_proposals(db: DB, keys) -> list[str]:
         if not key:
             continue
         res = await trial(db, p["provider"], p["new"], key)
-        p["trial"] = res
         ok, why = preapproved(db, p["provider"], p["old"], p["new"], res)
-        p["rule"] = why
-        db.put("llm:proposals", json.dumps(props, ensure_ascii=False))
+        # the owner may have decided while the trial ran (up to 90 s): re-read and touch only this proposal
+        fresh = json.loads(db.get("llm:proposals") or "{}")
+        cur = fresh.get(k)
+        if not cur or not str(cur.get("status", "")).startswith("sahibin") or cur.get("trial"):
+            continue
+        cur["trial"], cur["rule"] = res, why
+        db.put("llm:proposals", json.dumps(fresh, ensure_ascii=False))
         if ok:
             out = llmrouter.decide(db, keys, "approve", p["provider"], p["old"])
             props = json.loads(db.get("llm:proposals") or "{}")
