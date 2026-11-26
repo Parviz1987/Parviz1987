@@ -169,6 +169,14 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   (Hakim faylı qorunur).
 - **Qorunan fayllar** (`deploy/protected.txt`): dəyişiklik yalnız `Sahib-təsdiqi:` sətri ilə serverə düşür.
 
+- **Avtomatik Hakim siyasəti (sahib 26.11 bir dəfə təsdiqlədi, `app/autojudge.py`, qorunur):** hər üsula 0–100 bal
+  (ən zəif hissə: xərcdən sonrakı nəticə, bazarın meylinə qarşı bacarıq, sabitlik, müstəqil hal sayı, DSR; son 100
+  hal balı yalnız endirə bilər). Pilləkən: < 50 söndürülüb · 50–70 kölgə · 70–85 kiçik kağız payı (risk ¼) · ≥ 85 +
+  son sınaq → tam kağız payı. Bir üsula ≤ min(25 %, yarım Kelly), gündə 2 %, zirvədən 10 % düşəndə hər şey dayanır
+  (sahib buraxanda yenidən sayılır). Sahibin rəddi, avtomatik kölgəyə qaytarma və uğursuz son sınaq həmişə veto.
+  «İnanılmaz yaxşı» həddi Hakimin həftəlik öz yoxlamasından (10–15 bənd, hamarlanmış); şübhədə bir şam gecikmə
+  testi avtomatik qərar verir. **Sahibdən yalnız: real pul və bu siyasətin özünü dəyişmək.**
+
 ### 11. Risk və qərar, kağız ticarət ✅
 - `app/risk.py`, `app/nerve.py`, `app/liquidity.py`, `app/paper.py` (virtual hesab), `app/signals.py`. AL/SAT yalnız
   Hakimin son sınağı + sahib registri ilə; **real ticarət yoxdur** (👤 heç vaxt Claude qərar vermir).
