@@ -39,6 +39,10 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     from .activity import Hub
     hub = Hub(db)                       # the one place every agent reports to; the agents panel reads only this
     engine.activity = feeds.activity = jobs.activity = hub
+    from . import heartbeat
+    heart = heartbeat.Heart(db, store)
+    if start_engine:
+        heartbeat.HEART = heart          # the outside watcher (plan step 1); tests build apps without it
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -82,6 +86,22 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                         except Exception:
                             log.exception("conductor audit failed")
                     await asyncio.sleep(3600)
+            async def _alive():                # every 5 minutes: the panel and the price, for the outside watcher
+                import os
+                heartbeat.deploy_signal(heart, os.path.join(os.path.dirname(os.path.abspath(s.db_path)), "update.log"))
+                n = 0
+                while True:
+                    n += 1
+                    if n % 288 == 0:            # once a day: the deploy check hears «still fine» (period 30 days)
+                        heartbeat.deploy_signal(heart, os.path.join(os.path.dirname(os.path.abspath(s.db_path)),
+                                                                    "update.log"))
+                    try:
+                        heartbeat.alive_signals(heart, engine)
+                    except Exception:
+                        log.exception("alive signal failed")
+                    await asyncio.sleep(300)
+            asyncio.get_running_loop().create_task(heart.run())
+            asyncio.get_running_loop().create_task(_alive())
             asyncio.get_running_loop().create_task(_cleanup())
             asyncio.get_running_loop().create_task(_conductor())
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
@@ -254,6 +274,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             if given:
                 sec.failed(ip, "diag")
             return JSONResponse({"error": "diaqnostika açarı lazımdır"}, status_code=401)
+        heartbeat.beat("duty-check", "ok", "diaqnostika oxundu")
         # off the event loop: the report includes the shadow-trading summary (seconds of work when not cached)
         return await asyncio.to_thread(diag.report, db, store, engine, feeds, jobs, _commit())
 

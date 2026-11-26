@@ -220,14 +220,29 @@ def due(db: DB, now: float) -> bool:
     return now - last >= WEEK and active < MAX_ACTIVE
 
 
+def _weekly_skip(db: DB, now: float) -> None:
+    """Sunday's run is due but 30 ideas are already in trial: the watcher hears «skipped», not silence (once a day)."""
+    d = datetime.fromtimestamp(now, ZoneInfo("UTC"))
+    if d.weekday() != 6 or d.hour < 14 or now - float(db.get("ideas:last") or 0) < WEEK:
+        return
+    day = d.strftime("%Y-%m-%d")
+    if db.get("hc:ideas_skip") != day:
+        db.put("hc:ideas_skip", day)
+        from . import heartbeat
+        heartbeat.skip("hypothesis-weekly", f"{MAX_ACTIVE} fikir artıq sınaqdadır")
+
+
 async def tick(db: DB, keys, now: float | None = None, activity=None) -> int:
     """Sunday, once a week: ask the brain, validate, register at most two ideas. Never raises."""
     import asyncio
     from . import brains, rules
     now = time.time() if now is None else now
     if not due(db, now):
+        _weekly_skip(db, now)
         return 0
     db.put("ideas:last", str(now))
+    from . import heartbeat
+    heartbeat.beat("hypothesis-weekly", "ok", "həftəlik fikir axtarışı başladı")
     rep = activity.report if activity else (lambda *a, **k: None)
     rep("ideas", "working", "W1 Yaddaş", 0.2)
     rec = (await asyncio.to_thread(rules.records, db))["rules"]

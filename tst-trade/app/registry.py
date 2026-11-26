@@ -13,6 +13,7 @@ CATEGORIES = [
     ("calendar", "İqtisadi təqvim"),
     ("macro", "Makro: faiz, dollar"),
     ("brain", "Beyinlər (süni intellekt)"),
+    ("ops", "Nəzarət: kənar izləmə"),
 ]
 
 # Key places. fields: what the provider gives you (most give one key; Alpaca gives an ID and a secret).
@@ -58,6 +59,12 @@ KEY_SLOTS: list[dict] = [
      "url": "https://dash.cloudflare.com/?to=/:account/r2/overview",
      "fields": ["account_id", "access_key_id", "secret_access_key", "bucket"],
      "used_by": "Gecəlik ehtiyat nüsxə (Blok 14)", "stage": LIVE},
+    {"id": "healthchecks", "category": "ops", "name": "Healthchecks.io (kənar nəzarətçi)",
+     "purpose": "Server və vacib işləri hər neçə dəqiqədən bir «sağam» deyir; siqnal gəlməsə Healthchecks.io özü "
+                "Telegram-a yazır (server ölsə belə). Açar layihənin API açarıdır (Settings → API Access → "
+                "«Create API key», yazma icazəli); 12 yoxlama özü yaradılır.",
+     "cost": "Pulsuz (20 yoxlamaya qədər).", "url": "https://healthchecks.io/accounts/signup/",
+     "fields": ["key"], "used_by": "Kənar nəzarətçi (plan addımı 1)", "stage": LIVE},
     {"id": "fred", "category": "macro", "name": "FRED (St. Louis Fed)",
      "purpose": "Real faizlər, dollar indeksi, inflyasiya gözləntisi: uzun üfüqlərin fonu.",
      "cost": "Pulsuz, qeydiyyatla.", "url": "https://fred.stlouisfed.org/docs/api/api_key.html",

@@ -146,6 +146,8 @@ async def run(db: DB, keys: KeyStore, slot: str, system: str, user: str, schema:
             if not search:      # Block 17: count numbers the brain wrote that it was not given
                 from . import checker
                 checker.record(db, slot, data, user + "\n" + system)
+            from . import heartbeat
+            heartbeat.beat("ai-brains", "ok", f"{slot}: {provider}")
             return data, f"{provider} · {model}"
         except Exception as e:   # a broken brain must never stop the system
             msg = str(e).replace(key, "***")[:200]

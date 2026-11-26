@@ -139,6 +139,16 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _heartbeat(db: DB) -> dict | None:
+    """The outside watcher: is it set up, and each check's last signal (never the ping addresses)."""
+    try:
+        from . import heartbeat
+        h = heartbeat.HEART
+        return h.view() if h is not None else {"note": "işləmir (test rejimi)"}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _conductor(db: DB) -> dict | None:
     """The conductor's evidence: does each voice do better in some market states (stored once a day)."""
     try:
@@ -291,6 +301,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "vacuum": json.loads(db.get("cleanup:vacuum_v1") or "null"),
         "agents": _agents(db),
         "conductor": _conductor(db),
+        "heartbeat": _heartbeat(db),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

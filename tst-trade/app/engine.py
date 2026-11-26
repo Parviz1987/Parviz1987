@@ -7,7 +7,9 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
+from . import heartbeat
 from . import brainviews, candles, registry, forecast, judge, markets, rules, slowviews, surprise, unified
 from .db import DB
 from .keys import KeyStore
@@ -27,17 +29,20 @@ TICK_KEEP = 3 * 86400
 MINUTE_KEEP = 30 * 86400
 
 
+_NY = ZoneInfo("America/New_York")
+
+
 def market_open(ts: float) -> bool:
-    """Spot metals trade almost 24/5. Approximate weekly close: Friday 21:00 to Sunday 22:00 UTC."""
-    d = datetime.fromtimestamp(ts, timezone.utc)
+    """Spot metals trade almost 24/5, on New York time (owner 2026-11-26; the old UTC hours were right in summer only):
+    Sunday 18:00 to Friday 17:00 New York, with a daily break 17:00-18:00 New York. In winter that is Sunday 23:00 -
+    Friday 22:00 UTC with the break 22:00-23:00 UTC; in summer one hour earlier. Exchange holidays are not modelled."""
+    d = datetime.fromtimestamp(ts, _NY)
     wd, h = d.weekday(), d.hour
     if wd == 5:
         return False
-    if wd == 4 and h >= 21:
-        return False
-    if wd == 6 and h < 22:
-        return False
-    return True
+    if wd == 6:
+        return h >= 18
+    return h != 17 and not (wd == 4 and h >= 17)
 
 
 target_time = forecast.target_time   # kept here for older imports
@@ -701,10 +706,12 @@ class Engine:
         self._rep("ta", "working", note="qaydalar yoxlanır")
         try:
             res = await asyncio.to_thread(rules.run, self.db)
+            heartbeat.beat("rule-blocks", "ok", f"{res['added']} yeni siqnal")
             self._rep("ta", "done", note=f"qaydalar: {res['added']} yeni siqnal"
                                             + (" (tarixçə sınağı)" if res["replay"] else ""))
         except Exception as e:
             log.warning("rules: %s", e)
+            heartbeat.beat("rule-blocks", "fail", type(e).__name__)
         finally:
             self._rules_busy = False
 
@@ -726,10 +733,12 @@ class Engine:
             self._rep("forecast", "error", note=f"{type(e).__name__}: {str(e)[:100]}")
         try:
             scored = judge.score_due(self.db, now)
+            heartbeat.beat("judge-scoring", "ok", f"{scored} proqnoz yoxlandı")
             if scored:
                 self._rep("judge", "done", note=f"{scored} proqnoz yoxlandı")
         except Exception as e:
             log.exception("score_due failed")
+            heartbeat.beat("judge-scoring", "fail", type(e).__name__)
             self._rep("judge", "error", note=f"{type(e).__name__}: {str(e)[:100]}")
 
     def refresh_decisions(self) -> None:
@@ -774,6 +783,7 @@ class Engine:
         except Exception as e:
             msg = {"ts": time.time(), "ok": False, "msg": f"{type(e).__name__}: {str(e)[:200]}"}
         self.db.put("backup:last", json.dumps(msg))
+        heartbeat.beat("backup-nightly", "ok" if msg["ok"] else "fail", msg["msg"])
         self._rep("history", "done" if msg["ok"] else "error", note="ehtiyat nüsxə: " + msg["msg"])
 
     async def _jobs_loop(self) -> None:
@@ -834,6 +844,7 @@ class Engine:
                     self.db.put("unified:ts", str(time.time()))
                     self._rep("judge", "working", note="vahid proqnoz: öz-özünü sınaq")
                     await asyncio.to_thread(unified.refresh, self.db)
+                    heartbeat.beat("unified-forecast", "ok", "vahid proqnoz yeniləndi")
                     self._rep("judge", "done", note="vahid proqnoz yeniləndi")
                 self._rep("orch", "done", note=f"dövr {time.time() - t_start:.1f} san")
             except Exception as e:   # the loop must survive one bad poll

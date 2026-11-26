@@ -153,6 +153,19 @@ def test_market_open_weekend():
     assert not market_open(sat) and market_open(tue)
 
 
+def test_market_hours_follow_new_york_time_winter_and_summer():
+    import datetime as dt
+    u = lambda *a: dt.datetime(*a, tzinfo=dt.timezone.utc).timestamp()
+    # winter (EST, UTC-5): Friday close 22:00 UTC, Sunday open 23:00 UTC, daily break 22:00-23:00 UTC
+    assert market_open(u(2026, 11, 27, 21, 59)) and not market_open(u(2026, 11, 27, 22, 1))
+    assert not market_open(u(2026, 11, 29, 22, 30)) and market_open(u(2026, 11, 29, 23, 1))
+    assert not market_open(u(2026, 11, 24, 22, 30)) and market_open(u(2026, 11, 24, 23, 1))
+    # summer (EDT, UTC-4): everything one hour earlier
+    assert market_open(u(2026, 7, 10, 20, 59)) and not market_open(u(2026, 7, 10, 21, 1))
+    assert not market_open(u(2026, 7, 12, 21, 30)) and market_open(u(2026, 7, 12, 22, 1))
+    assert not market_open(u(2026, 7, 14, 21, 30)) and market_open(u(2026, 7, 14, 22, 1))
+
+
 def test_brain_slots_save_and_validate():
     db = mem()
     cfg = brains.save(db, "reader", {"provider": "gemini", "model": "gemini-2.5-flash-lite", "month_usd": 5})
@@ -204,8 +217,8 @@ def test_api_requires_login_and_admin_never_leaks_key(tmp_path):
 def test_demo_poll_builds_candles(tmp_path):
     db = mem()
     eng = Engine(db, KeyStore(db, SECRET), "demo", 15)
-    asyncio.run(eng.poll_once(1_700_000_000.0))
-    assert eng.status("XAU", 1_700_000_001.0) == "DEMO"
+    asyncio.run(eng.poll_once(1_700_004_000.0))          # a Tuesday 18:20 New York (1_700_000_000 is in the daily break)
+    assert eng.status("XAU", 1_700_004_001.0) == "DEMO"
     assert candles.get(db, "XAG", "1m")
 
 

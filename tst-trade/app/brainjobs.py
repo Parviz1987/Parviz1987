@@ -12,7 +12,7 @@ import logging
 import re
 import time
 
-from . import brains, brainviews, candles, cards, forecast, judge, markets, newsevents, signals
+from . import brains, brainviews, candles, cards, forecast, heartbeat, judge, markets, newsevents, signals
 from .db import DB
 from .keys import KeyStore
 
@@ -613,8 +613,10 @@ class BrainJobs:
             self.db.put("sleep:day", day)
             try:
                 await self.sleep(now)
-            except Exception:
+                heartbeat.beat("learning-nightly", "ok", "gecə icmalı")
+            except Exception as e:
                 log.exception("sleep review failed")
+                heartbeat.beat("learning-nightly", "fail", type(e).__name__)
         # the nerves: a strong headline, a confirmed US figure or a sharp move wakes the analysis at once
         try:
             syms = ["XAU", "XAG", "XPT", "XPD"] + list(markets.saved(self.db).get("epics", {}))

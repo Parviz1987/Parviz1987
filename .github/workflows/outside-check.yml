@@ -1,0 +1,22 @@
+# Ehtiyat göz (owner 2026-11-26, plan step 1): once an hour, from GitHub's own servers (not ours), the site must answer.
+# If it does not answer in 3 tries over ~3 minutes, this run fails and GitHub e-mails the owner. It is independent of
+# Healthchecks.io, so either one can fail without leaving the owner blind. No secrets are used.
+name: Outside check (site answers)
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+permissions: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: The site answers /healthz
+        run: |
+          for i in 1 2 3; do
+            if curl -fsS -m 30 https://tsttrade.duckdns.org/healthz; then echo; echo "ok"; exit 0; fi
+            echo "try $i failed"; sleep 60
+          done
+          echo "::error::tsttrade.duckdns.org did not answer /healthz in 3 tries"
+          exit 1

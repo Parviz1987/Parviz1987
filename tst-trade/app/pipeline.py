@@ -149,8 +149,7 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     from .engine import market_open
     overdue = sum(1 for r in db.execute("SELECT target_t FROM forecasts WHERE scored_ts IS NULL AND horizon IN "
                                         "('15m','30m','1h','4h') AND target_t < ?", (now - 3 * 3600,)).fetchall()
-                  if market_open(r["target_t"] - 60)
-                  and time.gmtime(r["target_t"] - 60).tm_hour not in (21, 22))   # the metals' daily break (UTC)
+                  if market_open(r["target_t"] - 60))     # closed hours incl. the daily break, on New York time
     out.append(_row("Hakim (proqnozları yoxlayır)", "kartlar, dəqiqlik qrafikləri",
                     "ok" if overdue < 50 else "warn", f"vaxtı keçib yoxlanmayan {overdue}", overdue))
 

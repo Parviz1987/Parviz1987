@@ -457,6 +457,13 @@ class Feeds:
         self.db.execute("DELETE FROM news WHERE ts < ?", (now - NEWS_KEEP,))
         ok = len(errors) < len(NEWS_FEEDS)
         self._health("rss", ok, f"{total} başlıq" + (f"; xəta: {'; '.join(errors)}" if errors else ""), total)
+        from . import heartbeat              # the outside watcher: news is «down» after 3 failed rounds in a row
+        bad = 0 if ok else int(self.db.get("hc:news_bad") or 0) + 1
+        self.db.put("hc:news_bad", str(bad))
+        if bad == 0:
+            heartbeat.beat("news-agents", "ok", f"{total} başlıq")
+        elif bad >= 3:
+            heartbeat.beat("news-agents", "fail", f"{bad} dövr ardıcıl xəta")
 
     async def calendar(self, client) -> None:
         rows, errors = [], []

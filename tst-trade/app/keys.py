@@ -144,6 +144,8 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
         elif slot == "fmp":
             ok, msg = await _http_check("https://financialmodelingprep.com/stable/search-symbol",
                                         params={"query": "AAPL", "apikey": key})
+        elif slot == "healthchecks":
+            ok, msg = await _http_check("https://healthchecks.io/api/v3/checks/", headers={"X-Api-Key": key})
         elif slot == "fred":
             ok, msg = await _http_check("https://api.stlouisfed.org/fred/series",
                                         params={"series_id": "DFII10", "api_key": key, "file_type": "json"})
