@@ -203,3 +203,12 @@ def test_rolled_back_deploy_is_reported_once(tmp_path):
     p.write_text(p.read_text() + "2026-11-27T02:00:00Z updated b -> d, answered after 5 s\n")
     heartbeat.deploy_signal(h, str(p))
     assert [q[1] for q in h.queue if q[0] == "deploy"][-1] == "ok"
+
+
+def test_a_held_deploy_is_urgent(tmp_path):
+    db = DB(":memory:")
+    h = heartbeat.Heart(db, Keys(None))
+    p = tmp_path / "update.log"
+    p.write_text("2026-11-26T20:49:38Z held 68a8dcb: protected files changed without owner approval: tst-trade/app/judge.py\n")
+    heartbeat.deploy_signal(h, str(p))
+    assert [q[1] for q in h.queue if q[0] == "deploy"] == ["fail"]

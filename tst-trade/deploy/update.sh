@@ -32,6 +32,27 @@ apply_site() {
   fi
 }
 
+# Qorunan fayllar (owner 2026-11-26): a change to a file in deploy/protected.txt (read from the version that runs NOW,
+# so a commit cannot loosen its own guard) goes live only if one of the new commits has a line «Sahib-təsdiqi: ...».
+# Otherwise nothing is installed, the server keeps the running version, and data/update.log says why (once).
+guard_protected() {
+  local OLD=$1 NEW=$2 LOG=$3 list changed hit line msgs
+  list=$(sudo -u $APP_USER git -C $REPO show "$OLD:tst-trade/deploy/protected.txt" 2>/dev/null) || return 0
+  changed=$(sudo -u $APP_USER git -C $REPO diff --name-only "$OLD" "$NEW")
+  hit=$(grep -Fxf <(printf '%s\n' "$list" | sed '/^#/d;/^[[:space:]]*$/d') <<<"$changed" || true)
+  [[ -z "$hit" ]] && return 0
+  msgs=$(sudo -u $APP_USER git -C $REPO log --format=%B "$OLD..$NEW")
+  if grep -q '^Sahib-təsdiqi:' <<<"$msgs"; then
+    return 0
+  fi
+  line="held ${NEW:0:7}: protected files changed without owner approval: $(printf '%s ' $hit)"
+  if [[ "$(tail -n 1 "$LOG" 2>/dev/null | cut -d' ' -f2-)" != "$line" ]]; then
+    echo "$(date -u +%FT%TZ) $line" >> "$LOG"; chmod 644 "$LOG"
+  fi
+  echo "$line"
+  return 1
+}
+
 main() {
   APP_USER=tst
   REPO=/opt/tst/repo
@@ -42,6 +63,7 @@ main() {
   NEW=$(sudo -u $APP_USER git -C $REPO rev-parse "origin/$B")
   apply_site || true
   [[ "$OLD" == "$NEW" ]] && return 0
+  guard_protected "$OLD" "$NEW" "$APP_DIR/data/update.log" || return 0
   echo "updating ${OLD:0:7} -> ${NEW:0:7}"
   sudo -u $APP_USER git -C $REPO reset -q --hard "$NEW"
   sudo -u $APP_USER $APP_DIR/.venv/bin/pip install -q -r $APP_DIR/requirements.txt

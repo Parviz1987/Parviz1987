@@ -1,0 +1,10 @@
+# Qorunan fayllar (owner 2026-11-26, plan steps 2-3): a deploy that changes any of these goes live only when one of its
+# commits carries a line «Sahib-təsdiqi: ...», written after the owner said «okey» in the chat for that change.
+# The list is read from the version that is running now, so a commit cannot loosen its own guard.
+tst-trade/app/judge.py
+tst-trade/app/rigor.py
+tst-trade/app/hypotheses.py
+tst-trade/app/paper.py
+tst-trade/app/risk.py
+tst-trade/deploy/protected.txt
+tst-trade/deploy/update.sh

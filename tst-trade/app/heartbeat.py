@@ -290,7 +290,7 @@ def deploy_signal(heart: Heart, log_path: str) -> None:
     if not lines:
         return
     last = lines[-1]
-    if "rolled back" in last:
+    if "rolled back" in last or last.split(" ", 2)[1:2] == ["held"]:   # rolled back, or held for owner approval
         if heart.db.get("hc:deploy_line") == last:    # the same rollback is reported once, not at every restart
             return
         heart.db.put("hc:deploy_line", last)
