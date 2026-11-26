@@ -130,7 +130,8 @@ def test_released_stop_measures_the_fall_afresh():
     from app import paper
     db = DB(":memory:")
     paper.ensure(db)
-    now = 1_800_000_000.0
+    import time as _t
+    now = _t.time()
     db.execute("INSERT INTO paper_orders(ts, symbol, horizon, method, dir, oz, entry, stop, target, expires, status, "
                "reason, pnl, exit_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                (now, "XAG", "1h", "x", 1, 1, 30, 29, 31, now, "bağlandı", "", -1200.0, now - 86400 * 3))
