@@ -47,7 +47,8 @@ def test_canary_catches_the_peek_and_random_rules_fail():
         rows.append(("XAU", "1d", 1_600_000_000 + i * 86400, c, c, c, c))
     db.executemany("INSERT INTO candles(symbol, tf, t, o, h, l, c, origin) VALUES(?,?,?,?,?,?,?,'history')", rows)
     out = jp.canary(db, seed=1)
-    assert out["peek_caught"] and out["random_passed"] <= 1 and out["ok"]
+    assert out["peek_caught"] and out["peek30_caught"] and out["random_passed"] <= 1 and out["ok"]
+    assert 0.6 < out["peek30_hit"] < 0.72
 
 
 def test_gates_need_every_check_and_the_card_says_why():
@@ -57,3 +58,25 @@ def test_gates_need_every_check_and_the_card_says_why():
     assert not g["ok"]
     card = jp.card({"status": "keçmədi", "gates": g, "net": -0.001}, 1500)
     assert card.startswith("Sübut kifayət deyil") and "xərc" in card
+
+
+def test_a_real_edge_can_still_pass_the_dsr_with_many_attempts():
+    random.seed(6)
+    strong = [random.gauss(0.003, 0.01) for _ in range(800)]          # per-case Sharpe 0.3: a very real edge
+    assert jp.dsr(strong, 2000) > 0.95
+    weak = [random.gauss(0.0002, 0.01) for _ in range(800)]
+    assert jp.dsr(weak, 2000) < 0.95
+    assert jp.dsr(strong, 2000, k=10) < jp.dsr(strong, 2000, k=1)      # overlap counts fewer independent cases
+
+
+def test_demotion_needs_a_real_decay_not_a_bad_week():
+    random.seed(7)
+    fine = [random.gauss(0.001, 0.01) for _ in range(600)]
+    assert not jp._decayed(fine, 1)[0]
+    decayed = [random.gauss(0.002, 0.01) for _ in range(300)] + [random.gauss(-0.004, 0.01) for _ in range(300)]
+    assert jp._decayed(decayed, 1)[0]
+
+
+def test_too_good_is_relative_to_the_markets_own_lean():
+    assert not jp.too_good(0.66, "1d", 0.62)       # an honest trend method in a strongly rising year
+    assert jp.too_good(0.66, "1d", 0.50)

@@ -523,13 +523,17 @@ def run(db: DB) -> dict:
     from . import autopsy              # plan step 11: once a month, why the forecasts missed
     if autopsy.due(db):
         autopsy.run(db)
-    from . import judgeplus            # plan step 12: the Judge checks itself weekly; decayed approvals go back
-    try:
-        last = json.loads(db.get("judge:canary") or "{}").get("ts") or 0
-        if time.time() - last > 7 * 86400:
+    import logging
+    from . import judgeplus            # plan step 12: weekly, the Judge checks itself and decayed approvals go back
+    if time.time() - float(db.get("judge:weekly_ts") or 0) > 7 * 86400:
+        db.put("judge:weekly_ts", str(time.time()))
+        try:
             judgeplus.canary(db)
-        judgeplus.demote_check(db)
-    except Exception:                  # the daily job never stops on the Judge's self-check
-        pass
+        except Exception:
+            logging.getLogger("tst.judge").exception("judge canary failed")
+        try:
+            judgeplus.demote_check(db)
+        except Exception:
+            logging.getLogger("tst.judge").exception("demote check failed")
     return {"audit_s": a.get("seconds"), "shadow_s": s.get("seconds"), "experiments_s": x.get("seconds"),
             "aci_s": c.get("seconds")}

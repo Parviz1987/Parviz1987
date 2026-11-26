@@ -23,7 +23,9 @@ import time
 from .db import DB
 
 DSR_MIN, PBO_MAX, T_MIN, E_MIN = 0.95, 0.10, 3.0, 20.0
-SR_VAR_FLOOR = 0.5           # the variance of the attempts' (per-case) Sharpe ratios is never counted below this x SR²
+# the spread of the attempts' per-case Sharpe ratios is never counted below the sampling noise of one Sharpe ratio
+# (1 / n independent cases): near-duplicate attempts cannot shrink the bar — and the floor never depends on the
+# candidate itself (review 2026-11-26: a floor proportional to its own Sharpe made any proof impossible)
 EULER = 0.5772156649
 
 
@@ -51,22 +53,24 @@ def t_stat(rets: list[float], k: int = 1) -> float | None:
     return mu / math.sqrt(max(var, 1e-18) / max(1.0, n / k))
 
 
-def dsr(rets: list[float], n_trials: int, trial_srs: list[float] | None = None) -> float | None:
+def dsr(rets: list[float], n_trials: int, trial_srs: list[float] | None = None, k: int = 1) -> float | None:
     """Deflated Sharpe Ratio: the probability that the true Sharpe is above what the best of n_trials would show by
-    luck. Per-case Sharpe, skew and kurtosis of the returns; the trials' Sharpe variance floored (SR_VAR_FLOOR)."""
-    n = len(rets)
+    luck. Per-case Sharpe, skew and kurtosis; n counted as n / k independent cases (overlapping horizons); the
+    trials' Sharpe variance floored at 1 / n_eff."""
+    n_raw = len(rets)
+    n = n_raw / max(1, k)
     if n < 30:
         return None
-    mu = sum(rets) / n
-    sd = math.sqrt(sum((x - mu) ** 2 for x in rets) / (n - 1)) or 1e-12
+    mu = sum(rets) / n_raw
+    sd = math.sqrt(sum((x - mu) ** 2 for x in rets) / (n_raw - 1)) or 1e-12
     sr = mu / sd
-    g3 = sum(((x - mu) / sd) ** 3 for x in rets) / n
-    g4 = sum(((x - mu) / sd) ** 4 for x in rets) / n
+    g3 = sum(((x - mu) / sd) ** 3 for x in rets) / n_raw
+    g4 = sum(((x - mu) / sd) ** 4 for x in rets) / n_raw
     v = 0.0
     if trial_srs and len(trial_srs) > 1:
         m = sum(trial_srs) / len(trial_srs)
         v = sum((x - m) ** 2 for x in trial_srs) / (len(trial_srs) - 1)
-    v = max(v, SR_VAR_FLOOR * sr * sr, 1.0 / n)          # near-duplicate trials cannot shrink the bar
+    v = max(v, 1.0 / n)                                  # the floor: the noise of one Sharpe ratio, never the candidate
     nt = max(2, n_trials)
     sr0 = math.sqrt(v) * ((1 - EULER) * _phi_inv(1 - 1 / nt) + EULER * _phi_inv(1 - 1 / (nt * math.e)))
     den = math.sqrt(max(1e-12, 1 - g3 * sr + (g4 - 1) / 4 * sr * sr))
@@ -96,10 +100,10 @@ def pbo(matrix: dict[str, list[float]], blocks: int = 8, purge: int = 1) -> floa
     below = total = 0
     for ins in combinations(range(blocks), blocks // 2):
         oos = [i for i in range(blocks) if i not in ins]
-        best = max(names, key=lambda k: perf(k, [cuts[i] for i in ins]))
-        o = sorted(names, key=lambda k: perf(k, [cuts[i] for i in oos]))
+        best = max(sorted(names), key=lambda k: perf(k, [cuts[i] for i in ins]))
+        o = sorted(sorted(names), key=lambda k: perf(k, [cuts[i] for i in oos]))
         rank = (o.index(best) + 1) / (len(names) + 1)
-        below += int(rank < 0.5)
+        below += int(rank <= 0.5)                       # at or below the median out of sample: overfit
         total += 1
     return below / total if total else None
 
@@ -121,32 +125,51 @@ def diebold_mariano(loss_a: list[float], loss_b: list[float], lag: int) -> tuple
     return mu, _phi(mu / se)
 
 
-def evalue_hits(hits: list[int], bar: float, lam: float = 0.2, k: int = 1) -> float:
-    """Anytime-valid betting e-value for «hit rate > bar»: wealth multiplies by 1 + lam*(hit - bar) case by case
-    (every k-th case only, so overlapping horizons are not counted twice). Valid whenever it is looked at."""
-    w = 1.0
-    for i, h in enumerate(hits):
-        if i % max(1, k) == 0:
-            w *= 1 + lam * (h - bar)
-    return w
+LAMS = (0.05, 0.1, 0.2, 0.3)
+
+
+def evalue_hits(hits: list[int], bar: float, k: int = 1) -> float:
+    """Anytime-valid betting e-value for «hit rate > bar» (bar fixed BEFORE these cases): the average wealth of four
+    fixed bets (a mixture of test martingales is one too), each multiplying by 1 + lam*(hit - bar). `hits` must be
+    the time-thinned, independent cases (the caller thins by time); k is kept for old callers."""
+    ws = [1.0] * len(LAMS)
+    for h in hits:
+        ws = [w * (1 + lam * (h - bar)) for w, lam in zip(ws, LAMS)]
+    return sum(ws) / len(ws)
 
 
 def fingerprint(rows) -> str:
     return hashlib.sha256(json.dumps(rows, default=str).encode()).hexdigest()[:16]
 
 
+def thin(times: list[float], span: float) -> list[int]:
+    """Indexes of cases at least `span` seconds apart (in time order): independent outcomes for overlapping horizons."""
+    out, last = [], -1e18
+    for i, t in enumerate(times):
+        if t - last >= span:
+            out.append(i)
+            last = t
+    return out
+
+
 def gates(rets: list[float], hits: list[int], ps: list[float], ys: list[int], bar: float, k: int, n_trials: int,
-          trial_srs: list[float], matrix: dict[str, list[float]] | None) -> dict:
-    """All the strengthened checks on one finalist's after-finalist cases. ok only when every one holds."""
+          trial_srs: list[float], matrix: dict[str, list[float]] | None, base_up: float = 0.5,
+          times: list[float] | None = None, span: float = 0.0) -> dict:
+    """All the strengthened checks on one finalist's after-finalist cases (in time order). ok only when every one
+    holds. bar and base_up come from the cases BEFORE the finalist moment (fixed in advance)."""
     t = t_stat(rets, k)
-    d = dsr(rets, n_trials, trial_srs)
+    d = dsr(rets, n_trials, trial_srs, k)
     p_bo = pbo(matrix, purge=max(1, k)) if matrix else None
-    dm_mu, dm_p = diebold_mariano([(p - y) ** 2 for p, y in zip(ps, ys)], [0.25] * len(ys), k)
-    e = evalue_hits(hits, bar, k=k)
+    # against the market's own base rate (climatology), not 0.5: «always up» in an up year is no skill
+    dm_mu, dm_p = diebold_mariano([(p - y) ** 2 for p, y in zip(ps, ys)], [(base_up - y) ** 2 for y in ys], k)
+    idx = thin(times, span) if times else list(range(0, len(hits), max(1, k)))
+    e = evalue_hits([hits[i] for i in idx], bar)
     checks = {"t>=3": t is not None and t >= T_MIN, "DSR>=0.95": d is not None and d >= DSR_MIN,
-              "PBO<=0.10": p_bo is None or p_bo <= PBO_MAX,          # unknown without enough variants: not a block
+              "PBO<=0.10": p_bo is None or p_bo <= PBO_MAX,
               "DM p<0.05": dm_p is not None and dm_p < 0.05, "e>=20": e >= E_MIN}
-    return {"ok": all(checks.values()), "checks": checks, "t": t, "dsr": d, "pbo": p_bo, "dm_p": dm_p, "e": round(e, 3)}
+    return {"ok": all(checks.values()), "checks": checks, "t": t, "dsr": d, "pbo": p_bo,
+            "pbo_note": None if p_bo is not None else "PBO ölçülə bilmədi (az variant və ya az ortaq məlumat)",
+            "dm_p": dm_p, "e": round(e, 3), "independent": len(idx)}
 
 
 def card(st: dict, n_trials: int) -> str:
@@ -154,10 +177,15 @@ def card(st: dict, n_trials: int) -> str:
     g = st.get("gates") or {}
     if st.get("status") == "keçdi":
         return f"Sübut var: {n_trials} cəhd içində, xərcdən sonra müsbət, bütün yoxlamalar keçdi."
+    if st.get("too_good"):
+        return "İnsan yoxlaması lazımdır: nəticə inanılmaz dərəcədə yaxşıdır (gələcəyə baxma ehtimalı)."
     miss = [k for k, v in (g.get("checks") or {}).items() if not v]
+    if st.get("verify") and not st["verify"].get("ok"):
+        miss.append("verify")
     why = {"t>=3": "nəticə kifayət qədər güclü deyil (t < 3)", "DSR>=0.95": f"{n_trials} cəhd nəzərə alınanda şans "
            f"ola bilər (DSR {round(g.get('dsr') or 0, 2)})", "PBO<=0.10": "keçmişə həddən artıq uyğunlaşıb (PBO)",
-           "DM p<0.05": "«fikri yoxdur»dan yaxşı deyil (Diebold–Mariano)", "e>=20": "gündəlik etibarlı test keçmir"}
+           "DM p<0.05": "bazarın öz meylindən yaxşı deyil (Diebold–Mariano)", "e>=20": "gündəlik etibarlı test keçmir",
+           "verify": "müstəqil yenidən hesablama razılaşmadı"}
     if st.get("net") is not None and st["net"] <= 0:
         miss.insert(0, "net")
         why["net"] = "xərc çıxılandan sonra mənfidir"
@@ -166,75 +194,132 @@ def card(st: dict, n_trials: int) -> str:
 
 
 # ---------- the Judge's own check ----------
+def _rule_gates(cs: list[dict], dirs: list[int], cost: float, n_trials: int) -> tuple[dict, float, bool]:
+    ys = [int(cs[i + 1]["c"] > cs[i]["c"]) for i in range(len(dirs))]
+    rets = [(cs[i + 1]["c"] / cs[i]["c"] - 1) * d - cost for i, d in enumerate(dirs)]
+    hits = [int((d > 0) == bool(y)) for d, y in zip(dirs, ys)]
+    half = len(ys) // 2
+    up = sum(ys[:half]) / half if half else 0.5          # the bar and base rate from the first half only
+    bar = max(0.5, up, 1 - up)
+    g = gates(rets[half:], hits[half:], [0.55 if d > 0 else 0.45 for d in dirs[half:]], ys[half:], bar, 1,
+              n_trials, [], None, base_up=up)
+    hr = sum(hits[half:]) / max(1, len(hits) - half)
+    return g, hr, too_good(hr, "1d", bar)
+
+
 def canary(db: DB, symbol: str = "XAU", seed: int | None = None) -> dict:
-    """20 rules that flip a coin and 1 rule that peeks at the next close, on the real daily candles. Expected: the
-    coins almost never pass the money test at t >= 3, and the peeker is caught as too good to be true."""
+    """The Judge's own check on the real daily candles, through the SAME gates the finals use: 20 coin-flip rules
+    must (almost) never pass; a rule that peeks at the next close on 30 % of the days, and one that always peeks,
+    must both be caught as too good to be true."""
     from . import candles
     from .judge import full_cost
+    from .rigor import trials
     cs = candles.get(db, symbol, "1d", limit=2000)
     if len(cs) < 300:
         return {"note": "az şam"}
     rnd = random.Random(seed if seed is not None else int(time.time() // 604800))
     cost = full_cost(symbol, "1d")
+    try:
+        n_trials = trials(db)
+    except Exception:
+        n_trials = 1000
+    m = len(cs) - 1
     passed = 0
     for _ in range(20):
-        rets = [(cs[i + 1]["c"] / cs[i]["c"] - 1) * rnd.choice((1, -1)) - cost for i in range(len(cs) - 1)]
-        t = t_stat(rets)
-        passed += int(t is not None and t >= T_MIN)
-    peek = [(cs[i + 1]["c"] / cs[i]["c"] - 1) * (1 if cs[i + 1]["c"] > cs[i]["c"] else -1) - cost
-            for i in range(len(cs) - 1)]
-    hit = sum(1 for x in peek if x > -cost) / len(peek)
-    caught = too_good(hit, "1d")
-    out = {"ts": time.time(), "random_passed": passed, "random_n": 20, "peek_caught": caught,
-           "ok": passed <= 1 and caught}
+        g, _, _ = _rule_gates(cs, [rnd.choice((1, -1)) for _ in range(m)], cost, n_trials)
+        passed += int(g["ok"])
+    truth = [1 if cs[i + 1]["c"] > cs[i]["c"] else -1 for i in range(m)]
+    partial = [t if rnd.random() < 0.3 else rnd.choice((1, -1)) for t in truth]
+    _, hr_p, caught_p = _rule_gates(cs, partial, cost, n_trials)
+    _, hr_f, caught_f = _rule_gates(cs, truth, cost, n_trials)
+    out = {"ts": time.time(), "random_passed": passed, "random_n": 20, "peek30_hit": round(hr_p, 3),
+           "peek30_caught": caught_p, "peek_caught": caught_f, "ok": passed <= 1 and caught_p and caught_f}
     db.put("judge:canary", json.dumps(out))
     return out
 
 
-def too_good(hit_rate: float | None, horizon: str) -> bool:
-    """A daily-or-longer metal forecast right more than 65 % of the time is far beyond anything published: it is
-    treated as a sign of look-ahead (a leak from the future), not as a discovery, until a person has checked it."""
-    return hit_rate is not None and hit_rate > (0.65 if horizon in ("1d", "3d", "1w", "10d", "1mo") else 0.70)
+def too_good(hit_rate: float | None, horizon: str, bar: float = 0.5) -> bool:
+    """Right far more often than the market's own lean allows (12 points above the bar for a day or longer, 15 for
+    shorter): beyond anything published for metals, so it is treated as a possible look-ahead leak and sent to a
+    person, not counted as a discovery."""
+    return hit_rate is not None and hit_rate > bar + (0.12 if horizon in ("1d", "3d", "1w", "10d", "1mo") else 0.15)
 
 
 # ---------- demotion ----------
+def _decayed(nets: list[float], k: int) -> tuple[bool, float, float | None]:
+    """A one-sided lower CUSUM on the net result per independent case, against the approved level minus a drift of
+    half of it, alarm at h = 5 (its CURRENT value, not its lowest ever); AND the last 100 independent cases are
+    significantly negative (t < -2). Both together: a real edge on a bad day is not thrown out."""
+    xs = nets[::max(1, k)]
+    if len(xs) < 120:
+        return False, 0.0, None
+    ref = max(0.0, sum(xs[:len(xs) // 2]) / (len(xs) // 2))
+    mu = sum(xs) / len(xs)
+    sd = math.sqrt(sum((x - mu) ** 2 for x in xs) / (len(xs) - 1)) or 1e-12
+    s = 0.0
+    for x in xs:
+        s = min(0.0, s + (x - (ref - 0.5 * ref)) / sd)
+    t = t_stat(xs[-100:])
+    return s < -5 and t is not None and t < -2, s, t
+
+
 def demote_check(db: DB, now: float | None = None) -> list[str]:
-    """Approved methods whose live record decays: a CUSUM alarm on the net result per case (drift 0, threshold 4
-    standard deviations) AND a negative net over the last 100 cases -> back to the shadow («kölgəyə qaytarıldı»)."""
+    """Approved methods and rules whose live record decayed go back to the shadow («kölgəyə qaytarıldı»); going back
+    to live is the owner's decision. Run weekly."""
     from .forecast import steps_of
     from .judge import full_cost
     from .rigor import REG_SCHEMA, log_experiment
     now = time.time() if now is None else now
     db.script(REG_SCHEMA)
     out = []
-    for r in db.execute("SELECT kind, name, symbol, horizon, decided_ts FROM strategy_registry WHERE status='təsdiqlənib' "
-                        "AND kind='method'").fetchall():
-        rows = db.execute("SELECT p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND "
-                          "mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5 ORDER BY issued_t",
-                          (r["symbol"], r["horizon"], r["name"], r["decided_ts"] or 0)).fetchall()
-        cost = full_cost(r["symbol"], r["horizon"])
-        nets = [(x["price1"] / x["price0"] - 1) * (1 if x["p_up"] > 0.5 else -1) - cost for x in rows if x["price0"]]
-        if len(nets) < 100:
+    for r in db.execute("SELECT kind, name, symbol, horizon, decided_ts FROM strategy_registry WHERE status='təsdiqlənib'"
+                        ).fetchall():
+        if r["kind"] == "method":
+            rows = db.execute("SELECT p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND "
+                              "mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5 ORDER BY issued_t",
+                              (r["symbol"], r["horizon"], r["name"], r["decided_ts"] or 0)).fetchall()
+            cost = full_cost(r["symbol"], r["horizon"])
+            nets = [(x["price1"] / x["price0"] - 1) * (1 if x["p_up"] > 0.5 else -1) - cost for x in rows if x["price0"]]
+            k = steps_of(r["horizon"])
+        elif r["kind"] == "rule":
+            rows = db.execute("SELECT t, metal, dir, price0, price1 FROM rule_signals WHERE rule=? AND tf=? AND t > ? AND "
+                              "price1 IS NOT NULL AND price0 > 0 AND mode != 'futures' ORDER BY t",
+                              (r["name"], r["horizon"], r["decided_ts"] or 0)).fetchall()
+            by_t: dict = {}
+            for x in rows:                     # one case per moment (metals firing together are not independent)
+                by_t.setdefault(x["t"], []).append((x["price1"] / x["price0"] - 1) * x["dir"] - full_cost(x["metal"],
+                                                                                                         r["horizon"]))
+            nets = [sum(v) / len(v) for _, v in sorted(by_t.items())]
+            k = 1
+        else:
             continue
-        mu = sum(nets) / len(nets)
-        sd = math.sqrt(sum((x - mu) ** 2 for x in nets) / (len(nets) - 1)) or 1e-12
-        s = alarm = 0.0
-        for x in nets:
-            s = min(0.0, s + x / sd)
-            alarm = min(alarm, s)
-        if alarm < -4 * math.sqrt(max(1, steps_of(r["horizon"]))) and sum(nets[-100:]) < 0:
+        bad, s, t = _decayed(nets, k)
+        if bad:
             db.execute("UPDATE strategy_registry SET status='kölgəyə qaytarıldı', decided_ts=?, note=? WHERE kind=? AND "
-                       "name=? AND symbol=? AND horizon=?", (now, f"canlıda zəiflədi (CUSUM {alarm:.1f}, son 100 hal "
-                                                                f"net {sum(nets[-100:]):.4f})", r["kind"], r["name"],
-                                                            r["symbol"], r["horizon"]))
-            log_experiment(db, "demote", f"{r['name']}:{r['symbol']}:{r['horizon']}", {"cusum": alarm})
+                       "name=? AND symbol=? AND horizon=?", (now, f"canlıda zəiflədi (CUSUM {s:.1f}, son 100 hal "
+                                                                f"t={t:.2f})", r["kind"], r["name"], r["symbol"],
+                                                            r["horizon"]))
+            log_experiment(db, "demote", f"{r['kind']}:{r['name']}:{r['symbol']}:{r['horizon']}", {"cusum": s, "t": t})
             out.append(f"{r['name']} {r['symbol']} {r['horizon']}")
     return out
 
 
+_EVID: dict = {}
+
+
 def desk_evidence(db: DB, sym: str, horizon: str, limit: int = 3000) -> tuple[list[float], dict[str, list[float]]]:
     """Every attempt on one desk over its replayed history: each method's per-case Sharpe (for the DSR spread) and its
-    net result per common forecast moment (the PBO matrix)."""
+    net result per common forecast moment (the PBO matrix). Cached per desk for a day (it reads tens of thousands of
+    rows)."""
+    hit = _EVID.get((sym, horizon))
+    if hit and time.time() - hit[0] < 86400:
+        return hit[1]
+    res = _desk_evidence(db, sym, horizon, limit)
+    _EVID[(sym, horizon)] = (time.time(), res)
+    return res
+
+
+def _desk_evidence(db: DB, sym: str, horizon: str, limit: int) -> tuple[list[float], dict[str, list[float]]]:
     from .judge import full_cost
     cost = full_cost(sym, horizon)
     rows = db.execute("SELECT method, issued_t, p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND "

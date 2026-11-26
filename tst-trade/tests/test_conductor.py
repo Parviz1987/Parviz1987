@@ -149,3 +149,20 @@ def test_past_release_dates_make_event_moments_and_retired_methods_are_not_voice
     assert ev.inside(t - 3600, t + 60) and not ev.inside(t + 60, t + 3600)
     assert ev.sources == ["CPI"]
     assert conductor._voice("tsmom") and not conductor._voice("rsi") and not conductor._voice("vahid")
+
+
+def test_fomc_calendar_page_is_parsed_and_a_strange_page_stores_nothing():
+    from app.feeds import parse_fomc
+    rows = "".join(f'<div class="row fomc-meeting"><div class="fomc-meeting__month col-xs-5"><strong>{m}</strong></div>'
+                   f'<div class="fomc-meeting__date col-xs-4">{d}</div></div>'
+                   for m, d in (("January", "28-29"), ("March", "18-19*"), ("May", "6-7"), ("June", "17-18*"),
+                                ("July", "29-30"), ("September", "16-17*"), ("October/November", "28-29"),
+                                ("December", "9-10*")))
+    html = f"<h4>2025 FOMC Meetings</h4>{rows}"
+    ts = parse_fomc(html)
+    assert len(ts) == 8
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    d = datetime.fromtimestamp(ts[0], ZoneInfo("America/New_York"))
+    assert (d.month, d.day, d.hour) == (1, 29, 14)
+    assert parse_fomc("<h4>2025 FOMC Meetings</h4><p>redesigned</p>") == []

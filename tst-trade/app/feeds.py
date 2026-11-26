@@ -276,6 +276,42 @@ def parse_amfi_gold(raw: bytes) -> float | None:
     return None
 
 
+FOMC_MONTHS = {m: i for i, m in enumerate(("january", "february", "march", "april", "may", "june", "july", "august",
+                                           "september", "october", "november", "december"), 1)}
+
+
+def parse_fomc(html: str) -> list[float]:
+    """federalreserve.gov/monetarypolicy/fomccalendars.htm: per year a heading «2025 FOMC Meetings», then rows with
+    the month (fomc-meeting__month) and the days (fomc-meeting__date, e.g. «28-29» or «29-30*»). The decision is
+    announced at 14:00 New York on the last day. Returns those timestamps; [] if any year has fewer than 6."""
+    import re
+    from zoneinfo import ZoneInfo
+    ny = ZoneInfo("America/New_York")
+    out, ok = [], True
+    parts = re.split(r"(\d{4})\s+FOMC Meetings", html)
+    for i in range(1, len(parts) - 1, 2):
+        year, body = int(parts[i]), parts[i + 1]
+        months = re.findall(r'fomc-meeting__month[^>]*>\s*(?:<[^>]+>\s*)*([A-Za-z/]+)', body)
+        dates = re.findall(r'fomc-meeting__date[^>]*>\s*(?:<[^>]+>\s*)*([0-9][0-9\-–]*)', body)
+        n = 0
+        for mo, dd in zip(months, dates):
+            mname = mo.split("/")[-1].lower()
+            if mname not in FOMC_MONTHS:
+                continue
+            last = int(re.split(r"[-–]", dd)[-1])
+            m = FOMC_MONTHS[mname]
+            if "/" in mo and int(re.split(r"[-–]", dd)[0]) > last:
+                pass                     # «Apr/May 30-1»: the decision day is in the second month
+            try:
+                out.append(datetime(year, m, last, 14, 0, tzinfo=ny).timestamp())
+                n += 1
+            except ValueError:
+                continue
+        if 2015 <= year <= 2100 and n < 6:
+            ok = False
+    return sorted(set(out)) if ok and out else []
+
+
 def amfi_gold_from_rows(rows: list[list]) -> float | None:
     """The column whose header says «Net Inflow», on the row whose scheme name is «Gold ETF»."""
     col = None
@@ -503,6 +539,26 @@ class Feeds:
         self._health("fred", n > 0, f"{n} müşahidə" + (f"; xəta: {'; '.join(errors)}" if errors else ""), n)
         await self.first_releases(client, key)
         await self.release_dates(client, key)
+        await self.fomc_dates(client)
+
+    async def fomc_dates(self, client) -> None:
+        """The Fed's own meeting calendar (federalreserve.gov, US government, public): the decision days of the last
+        years and the coming ones, for the conductor's «event» state. Once a day. If the page does not look as
+        expected (fewer than 6 meetings a year), nothing is stored."""
+        if time.time() - float(self.db.get("calendar:fomc_ts") or 0) < 86400:
+            return
+        self.db.put("calendar:fomc_ts", str(time.time()))
+        try:
+            r = await client.get("https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", timeout=30)
+            days = parse_fomc(r.text) if r.status_code == 200 else []
+            if days:
+                hist = json.loads(self.db.get("calendar:history") or "{}")
+                hist["FOMC"] = days
+                self.db.put("calendar:history", json.dumps(hist))
+            else:
+                log.warning("fomc calendar: page not as expected (HTTP %s)", r.status_code)
+        except Exception as e:
+            log.warning("fomc calendar: %s", type(e).__name__)
 
     # FRED release ids of the US figures that move gold most (CPI, payrolls, GDP, PCE), all at 08:30 New York
     RELEASES = {10: "CPI", 50: "Employment Situation", 53: "GDP", 54: "Personal Income and Outlays"}

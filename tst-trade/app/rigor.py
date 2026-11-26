@@ -90,11 +90,11 @@ def method_final(db: DB, sym: str, horizon: str, method: str, now: float | None 
     if st is None:
         st = {"since": now, "status": "namizəd"}
         db.put(key, json.dumps(st))
-    if st["status"] in ("keçdi", "keçmədi"):
-        return st                                  # looked at once: never again
-    rows = db.execute("SELECT p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND "
-                      "mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5", (sym, horizon, method,
-                                                                                            st["since"])).fetchall()
+    if st["status"] in ("keçdi", "keçmədi", "insan yoxlaması"):
+        return st                                  # looked at once: never again (a possible leak waits for a person)
+    rows = db.execute("SELECT issued_t, p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND method=? "
+                      "AND mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5 ORDER BY issued_t",
+                      (sym, horizon, method, st["since"])).fetchall()
     need = MIN_N.get(horizon, 100)
     st["n"], st["need"] = len(rows), need
     if len(rows) < need:
@@ -104,19 +104,36 @@ def method_final(db: DB, sym: str, horizon: str, method: str, now: float | None 
     rets = [(r["price1"] / r["price0"] - 1) * (1 if r["p_up"] > 0.5 else -1) for r in rows]
     net, p = _money_test(rets, full_cost(sym, horizon), steps_of(horizon))
     passed = p is not None and p < ALPHA and net > 0
-    # plan step 12 (owner 2026-11-26): the strengthened gates, all on the same after-finalist cases
+    # plan step 12 (owner 2026-11-26): the strengthened gates, all on the same after-finalist cases, in time order;
+    # the bar and the market's base rate come from the cases BEFORE the finalist moment (fixed in advance)
     from . import judgeplus
-    cost = full_cost(sym, horizon)
-    ys = [int(r["price1"] > r["price0"]) for r in rows]
-    hits = [int((r["p_up"] > 0.5) == bool(y)) for r, y in zip(rows, ys)]
-    up = sum(ys) / len(ys) if ys else 0.5
-    srs, matrix = judgeplus.desk_evidence(db, sym, horizon)
-    n_trials = trials(db)
-    st["gates"] = judgeplus.gates([x - cost for x in rets], hits, [r["p_up"] for r in rows], ys, max(0.5, up, 1 - up),
-                                  steps_of(horizon), n_trials, srs, matrix)
-    st["too_good"] = judgeplus.too_good(sum(hits) / len(hits) if hits else None, horizon)
-    st["trials"], st["data_fp"] = n_trials, judgeplus.fingerprint([tuple(r) for r in rows])
-    passed = passed and st["gates"]["ok"] and not st["too_good"]
+    from .candles import TF
+    from .forecast import HORIZONS
+    try:
+        cost = full_cost(sym, horizon)
+        ys = [int(r["price1"] > r["price0"]) for r in rows]
+        hits = [int((r["p_up"] > 0.5) == bool(y)) for r, y in zip(rows, ys)]
+        pre = db.execute("SELECT AVG(price1 > price0) u FROM forecasts WHERE symbol=? AND horizon=? AND method='rw' AND "
+                         "issued_t <= ? AND price1 IS NOT NULL", (sym, horizon, st["since"])).fetchone()["u"]
+        up = pre if pre is not None else 0.5
+        srs, matrix = judgeplus.desk_evidence(db, sym, horizon)
+        n_trials = trials(db)
+        k = steps_of(horizon)
+        st["gates"] = judgeplus.gates([x - cost for x in rets], hits, [r["p_up"] for r in rows], ys,
+                                      max(0.5, up, 1 - up), k, n_trials, srs, matrix, base_up=up,
+                                      times=[r["issued_t"] for r in rows], span=k * TF[HORIZONS[horizon]])
+        st["too_good"] = judgeplus.too_good(sum(hits) / len(hits) if hits else None, horizon, max(0.5, up, 1 - up))
+        st["trials"], st["data_fp"] = n_trials, judgeplus.fingerprint([tuple(r) for r in rows])
+    except Exception as e:             # the gates failing to compute is never a pass; the final waits for the next run
+        st["gates_error"] = f"{type(e).__name__}: {str(e)[:120]}"
+        db.put(key, json.dumps(st))
+        return st
+    if st["too_good"]:                 # a possible leak goes to a person, it is not a one-look verdict
+        st["status"] = "insan yoxlaması"
+        st["card"] = judgeplus.card(st, n_trials)
+        db.put(key, json.dumps(st))
+        return st
+    passed = passed and st["gates"]["ok"]
     if passed:                                      # the independent re-check must agree (R5)
         st["verify"] = verify_method(db, sym, horizon, method, st["since"])
         passed = st["verify"]["ok"]
@@ -140,20 +157,26 @@ def rule_final(db: DB, rule: str, tf: str, now: float | None = None) -> dict:
         db.put(key, json.dumps(st))
     if st["status"] in ("keçdi", "keçmədi"):
         return st
-    rows = db.execute("SELECT metal, dir, price0, price1 FROM rule_signals WHERE rule=? AND tf=? AND t > ? AND "
-                      "price1 IS NOT NULL AND price0 > 0 AND mode != 'futures'", (rule, tf, st["since"])).fetchall()
+    rows = db.execute("SELECT t, metal, dir, price0, price1 FROM rule_signals WHERE rule=? AND tf=? AND t > ? AND "
+                      "price1 IS NOT NULL AND price0 > 0 AND mode != 'futures' ORDER BY t",
+                      (rule, tf, st["since"])).fetchall()
     st["n"], st["need"] = len(rows), RULE_MIN
     if len(rows) < RULE_MIN:
         db.put(key, json.dumps(st))
         return st
     nets = [(r["price1"] / r["price0"] - 1) * r["dir"] - full_cost(r["metal"], tf) for r in rows]
     net, p = _money_test(nets, 0.0, 1)
-    # plan step 12: t >= 3, the Deflated Sharpe over every attempt ever made, the anytime e-value, not too good
+    # plan step 12: t >= 3, the Deflated Sharpe over every attempt ever made, the anytime e-value, not too good —
+    # metals firing at the same moment count as ONE case (they are not independent)
     from . import judgeplus
-    hits = [int((r["price1"] - r["price0"]) * r["dir"] > 0) for r in rows]
+    by_t: dict = {}
+    for r, x in zip(rows, nets):
+        by_t.setdefault(r["t"], []).append((x, int((r["price1"] - r["price0"]) * r["dir"] > 0)))
+    one = [(sum(a for a, _ in v) / len(v), int(sum(h for _, h in v) * 2 > len(v))) for _, v in sorted(by_t.items())]
+    hits = [h for _, h in one]
     n_trials = trials(db)
-    t = judgeplus.t_stat(nets)
-    d = judgeplus.dsr(nets, n_trials)
+    t = judgeplus.t_stat([a for a, _ in one])
+    d = judgeplus.dsr([a for a, _ in one], n_trials)
     e = judgeplus.evalue_hits(hits, 0.5)
     tg = judgeplus.too_good(sum(hits) / len(hits) if hits else None, tf)
     st["gates"] = {"checks": {"t>=3": t is not None and t >= judgeplus.T_MIN,
