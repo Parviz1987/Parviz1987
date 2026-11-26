@@ -129,6 +129,7 @@ def test_owner_policy_limits_one_method_and_the_fall_from_the_peak():
 def test_released_stop_measures_the_fall_afresh():
     from app import paper
     db = DB(":memory:")
+    paper.ensure(db)
     now = 1_800_000_000.0
     db.execute("INSERT INTO paper_orders(ts, symbol, horizon, method, dir, oz, entry, stop, target, expires, status, "
                "reason, pnl, exit_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
