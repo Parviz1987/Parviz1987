@@ -9,60 +9,86 @@
   <div class="brand">TST <b>Trade</b> · Admin</div><span class="sp"></span>
 <nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
 </header>
+<nav class="atabs" id="atabs" aria-label="Admin bölmələri">
+  <button data-tab="menbeler">Mənbələr və açarlar</button><button data-tab="beyinler">Beyinlər</button>
+  <button data-tab="tehlukesizlik">Təhlükəsizlik</button><button data-tab="sistem">Sistem</button>
+  <button data-tab="ticaret">Strategiya və ticarət</button></nav>
 <main class="wrap">
   <p class="note" id="secretwarn" hidden>Diqqət: serverdə SESSION_SECRET təyin olunmayıb. Saxlanan açarlar server yenidən başlayanda oxunmayacaq.</p>
+  <div class="atab" data-tab="menbeler">
   <section class="adm"><h2>Canlı qiymət mənbəyi</h2>
     <div class="box"><div class="btns" id="provider"></div><p class="note" id="provnote"></p></div></section>
   <section class="adm"><h2>Məlumat mənbələri və açar yerləri</h2>
     <p class="note">Hər açar öz yerinə qoyulur. Açar serverdə şifrələnmiş saxlanılır və bir daha göstərilmir, ancaq son 4 simvolu görünür.
       «Yoxla» provayderə pulsuz bir sorğu göndərir (model və ya hesab yoxlaması, token xərclənmir).</p>
     <div id="cats"></div></section>
+  </div>
+  <div class="atab" data-tab="beyinler">
   <section class="adm"><h2>Beyin yuvaları</h2>
     <p class="note">Əvvəl iş, sonra beyin: yuvanın işi və tələbləri dəyişmir, beyni dəyişmək bir seçimdir.
       Proqnozları kod verir; beyinlər xəbəri axtarır (Kəşfiyyatçı), qiymətləndirir (Oxuyucu) və izah yazır (Strateq).
       Oxuyucunun «yuxarı / aşağı» deməsini Hakim 1 saat sonrakı hərəkətlə yoxlayır. Heç bir beyin qiymət vermir və alış-satış etmir.</p>
-    <div class="grid" id="brains"></div></section>
+    <div class="klist" id="brains"></div></section>
+  <section class="adm"><h2>Beyinlərin vəziyyəti və model təklifləri</h2>
+    <div class="box" style="display:flex;flex-direction:column;gap:6px">
+      <p class="note">Bir beyin işləməyəndə sistem səbəbini yazır və işi ehtiyat beyinə verir. Model şirkət tərəfindən
+        bağlananda yenisi heç vaxt özü qoşulmur: burada siz təsdiqləyirsiniz.</p>
+      <div id="rt-box" class="tbl"></div><div class="msg" id="rt-msg"></div></div></section>
+  </div>
+  <div class="atab" data-tab="tehlukesizlik">
+  <div class="agrid">
+  <section class="adm"><h2>İkiqat yoxlama (2FA)</h2>
+    <div class="box" style="display:flex;flex-direction:column;gap:6px">
+      <p class="note">Açıq olanda sizin girişiniz parol + telefon/iPad proqramının 6 rəqəmli kodu ilə olur (Google Authenticator,
+        Microsoft Authenticator və ya iPhone/iPad «Passwords»). Qonaq girişinə təsir etmir.</p>
+      <p id="tfa-state" class="note"></p>
+      <div id="tfa-box"></div>
+      <div class="msg" id="tfa-msg"></div></div></section>
   <section class="adm"><h2>Parol</h2>
-    <div class="box" style="max-width:420px;display:flex;flex-direction:column;gap:6px">
+    <div class="box" style="display:flex;flex-direction:column;gap:6px">
       <label class="note" for="pw-old">Köhnə parol</label><input id="pw-old" type="password" autocomplete="current-password" class="inp">
       <label class="note" for="pw-new">Yeni parol (ən azı 8 simvol)</label><input id="pw-new" type="password" autocomplete="new-password" class="inp">
       <label class="note" for="pw-again">Yeni parol bir daha</label><input id="pw-again" type="password" autocomplete="new-password" class="inp">
       <div class="btns"><button class="btn pri" id="pw-save">Parolu dəyiş</button></div><div class="msg" id="pw-msg"></div></div></section>
+  <section class="adm"><h2>Qonaq girişi</h2>
+    <div class="box" style="display:flex;flex-direction:column;gap:6px">
+      <p class="note">Qonaq panelə baxa bilər, amma admin səhifəsinə, açarlara və ayarlara girə bilməz. Ünvan eynidir, ancaq parol başqadır.</p>
+      <p class="note" id="g-state"></p>
+      <label class="note" for="g-pw">Qonaq parolu (ən azı 8 simvol)</label><input id="g-pw" type="text" autocomplete="off" class="inp">
+      <div class="btns"><button class="btn pri" id="g-save">Qonaq parolunu saxla</button><button class="btn dan" id="g-off">Qonaq girişini bağla</button></div>
+      <div class="msg" id="g-msg"></div></div></section>
   <section class="adm"><h2>Diaqnostika açarı (Claude nəzarəti üçün)</h2>
-    <div class="box" style="max-width:640px;display:flex;flex-direction:column;gap:6px">
+    <div class="box" style="display:flex;flex-direction:column;gap:6px">
       <p class="note">Bu açar ancaq sistemin vəziyyətini oxuya bilir: xətalar, mənbələr, beyinlər, Hakimin rəqəmləri. Açarları, parolu
         göstərmir və heç nəyi dəyişə bilmir. Açar bir dəfə göstərilir: kopyalayıb Claude-un açdığı təhlükəsiz formaya yapışdırın.</p>
       <p class="note" id="d-state"></p>
       <div class="btns"><button class="btn pri" id="d-new">Diaqnostika açarı yarat</button><button class="btn dan" id="d-off">Açarı ləğv et</button></div>
       <input id="d-tok" class="inp" readonly hidden>
       <div class="msg" id="d-msg"></div></div></section>
-  <section class="adm"><h2>Qonaq girişi</h2>
-    <div class="box" style="max-width:420px;display:flex;flex-direction:column;gap:6px">
-      <p class="note">Qonaq panelə baxa bilər, amma admin səhifəsinə, açarlara və ayarlara girə bilməz. Ünvan eynidir, ancaq parol başqadır.</p>
-      <p class="note" id="g-state"></p>
-      <label class="note" for="g-pw">Qonaq parolu (ən azı 8 simvol)</label><input id="g-pw" type="text" autocomplete="off" class="inp">
-      <div class="btns"><button class="btn pri" id="g-save">Qonaq parolunu saxla</button><button class="btn dan" id="g-off">Qonaq girişini bağla</button></div>
-      <div class="msg" id="g-msg"></div></div></section>
-  <section class="adm"><h2>İkiqat yoxlama (2FA)</h2>
-    <div class="box" style="max-width:520px;display:flex;flex-direction:column;gap:6px">
-      <p class="note">Açıq olanda sizin girişiniz parol + telefon/iPad proqramının 6 rəqəmli kodu ilə olur (Google Authenticator,
-        Microsoft Authenticator və ya iPhone/iPad «Passwords»). Qonaq girişinə təsir etmir.</p>
-      <p id="tfa-state" class="note"></p>
-      <div id="tfa-box"></div>
-      <div class="msg" id="tfa-msg"></div></div></section>
+  </div>
+  <div class="box"><h2>Təhlükəsizlik jurnalı <span class="sp"></span><span class="note">son 24 saat; parol və açar heç vaxt yazılmır</span></h2>
+    <div id="s-sec"></div></div>
+  </div>
+  <div class="atab" data-tab="sistem">
+  <div class="evbanner" id="sumbar" hidden></div>
+  <div class="box"><h2>Axın xəritəsi: xəbərdən Hakimin hökmünə qədər <span class="sp"></span><span class="note" id="upd"></span></h2>
+    <div class="tbl" id="s-pipe"></div></div>
+  <div class="sgrid">
+    <div class="box"><h2>Qiymətlər</h2><div class="tbl" id="s-metals"></div></div>
+    <div class="box"><h2>Pulsuz mənbələr</h2><div class="tbl" id="s-src"></div></div>
+    <div class="box"><h2>Server</h2><div class="tbl" id="s-srv"></div></div>
+  </div>
+  <div class="box"><h2>Xəta jurnalı <span class="sp"></span><span class="note">eyni xəta bir sətirdə sayılır; açarlar gizlədilir</span></h2>
+    <div class="tbl" id="s-err"></div></div>
+  <div class="agrid">
   <section class="adm"><h2>Avtomatik təmir və kənar nəzarətçi</h2>
-    <div class="box" style="max-width:620px;display:flex;flex-direction:column;gap:6px">
+    <div class="box" style="display:flex;flex-direction:column;gap:6px">
       <p class="note">«Dayandır» basılı olanda sistem özü heç nəyi dəyişmir: avtomatik təmir addım atmır, növbətçi Claude yalnız
         oxuyur və sizə yazır. Kənar nəzarətçi izləməyə davam edir.</p>
       <p id="ops-state" class="note"></p>
       <div class="btns"><button class="btn dan" id="ops-btn"></button></div>
       <div id="ops-watch" class="tbl"></div>
       <div class="msg" id="ops-msg"></div></div></section>
-  <section class="adm"><h2>Beyinlərin vəziyyəti və model təklifləri</h2>
-    <div class="box" style="max-width:720px;display:flex;flex-direction:column;gap:6px">
-      <p class="note">Bir beyin işləməyəndə sistem səbəbini yazır və işi ehtiyat beyinə verir. Model şirkət tərəfindən
-        bağlananda yenisi heç vaxt özü qoşulmur: burada siz təsdiqləyirsiniz.</p>
-      <div id="rt-box" class="tbl"></div><div class="msg" id="rt-msg"></div></div></section>
   <section class="adm"><h2>Tarixçə</h2>
     <div class="box"><p class="note">Tarixçə 1 gün və 1 həftəlik proqnozları keçmiş üzərində yoxlamaq üçündür. Twelve Data açarı ilə yüklənir (6 saatda bir özü də yenilənir).</p>
       <div class="btns"><button class="btn" id="hist">İndi yüklə və yoxla</button></div><div class="tbl" id="histres"></div></div></section>
@@ -72,10 +98,14 @@
       <div class="btns"><button class="btn" id="f-quote">Qiyməti göstər</button>
         <button class="btn pri" id="f-buy" disabled>Təsdiq edirəm, al</button></div>
       <div class="msg" id="f-msg"></div></div></section>
+  </div>
+  </div>
+  <div class="atab" data-tab="ticaret">
   <section class="box"><h2>Strategiya reyestri və təsdiq <span class="sp"></span><span class="note">son sınaqdan və müstəqil yoxlamadan keçənlər</span></h2>
     <div id="reg"></div></section>
   <section class="box"><h2>Kağız ticarət <span class="sp"></span><span class="note">real pul yoxdur: virtual hesab, risk mühərriki, jurnal</span></h2>
     <div id="paper"></div></section>
+  </div>
 </main>
 <script src="/static/admin.js"></script>
 <script src="/static/admin_registry.js"></script>
@@ -83,5 +113,7 @@
 <script src="/static/admin_2fa.js"></script>
 <script src="/static/admin_ops.js"></script>
 <script src="/static/admin_router.js"></script>
+<script src="/static/status.js"></script>
+<script src="/static/admin_tabs.js"></script>
 <script src="/static/nav.js"></script>
 </body></html>

@@ -7,7 +7,7 @@
   const el = document.getElementById("mainnav");
   if (!el) return;
   const MAIN = [["/", "Panel"], ["/results", "Nəticələr"], ["/bloklar", "Bloklar"], ["/agents", "Agentlər"]];
-  const RIGHT = [["/ehtiyat", "Ehtiyat"], ["/status", "Sistem"], ["/admin", "⚙ Admin"]];
+  const RIGHT = [["/ehtiyat", "Ehtiyat"], ["/admin", "⚙ Admin"]];      // «Sistem» is the admin's «Sistem» tab now
   const BLOCKS = [["/bloklar", "Ümumi"], ["/ta", "Texniki analiz"], ["/fundamental", "Fundamental"], ["/xeber", "Xəbər"],
     ["/bazarlar", "Bazarlar arası"], ["/vaxt", "Vaxt və təqvim"], ["/bilik", "Bilik kitabı"]];
   const OWNER_ONLY = ["/agents", "/status", "/admin", "/ehtiyat"];

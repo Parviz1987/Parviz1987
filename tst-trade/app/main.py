@@ -281,7 +281,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
 
     @app.get("/status")
     async def status_page():
-        return FileResponse(STATIC / "status.html")
+        # the system report is the admin page's «Sistem» tab now (owner 2026-11-26: one panel, not two)
+        return RedirectResponse("/admin#sistem", status_code=303)
 
     @app.get("/api/admin/status")
     async def status_data():

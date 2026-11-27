@@ -1,5 +1,11 @@
 /* System status: the same report the read-only diagnostics API gives, for the owner, in words. */
+// Wrapped (2026-11-26): the same report is the «Sistem» tab of the admin page, next to admin.js.
+(function () {
+"use strict";
 const $ = (id) => document.getElementById(id);
+// a part this page does not show (on the admin page keys, brains and history have their own tabs): still computed, so
+// its problems reach the summary line, but drawn nowhere
+const sink = (id) => $(id) || document.createElement("div");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const when = (ts) => ts ? new Date(ts * 1000).toLocaleString("az") : "—";
 const ago = (ts) => {
@@ -31,22 +37,22 @@ async function load() {
       if (h.ok === false) problems.push(`${SRC[k] || k}: ${h.message}`);
       const word = h.off ? "istifadə olunmur" : h.ok ? "işləyir" : h.ok === false ? "xəta" : "gözlənilir";
       return `<tr><td>${SRC[k] || k}</td><td>${h.off ? `<span class="pill next">${word}</span>` : pill(h.ok, word)}</td>
-      <td>${ago(h.checked)}</td><td>${esc(h.message || "")}</td></tr>`;
+      <td>${ago(h.checked)}</td><td title="${esc(h.message || "")}">${esc((h.message || "").length > 110 ? h.message.slice(0, 110) + "…" : h.message || "")}</td></tr>`;
     }).join("") + "</table>";
-  $("s-keys").innerHTML = `<table><tr><th>Yer</th><th>Saxlanıb</th><th>Son yoxlama</th></tr>` +
+  sink("s-keys").innerHTML = `<table><tr><th>Yer</th><th>Saxlanıb</th><th>Son yoxlama</th></tr>` +
     Object.entries(d.keys).map(([k, v]) => {
       const c = v.check || {};
       if (v.saved && c.ok === false) problems.push(`Açar ${k}: ${c.message}`);
       return `<tr><td>${esc(k)}</td><td>${v.saved ? (v.unreadable ? pill(false, "oxunmur") : pill(true, "bəli")) : pill(null, "yox")}</td>
       <td>${v.saved ? pill(c.ok, c.message || "yoxlanmayıb") + " " + ago(c.ts) : "—"}</td></tr>`;
     }).join("") + "</table>";
-  $("s-brains").innerHTML = `<table><tr><th>Beyin</th><th>Model</th><th>Bu ay</th><th>Son çağırış</th></tr>` +
+  sink("s-brains").innerHTML = `<table><tr><th>Beyin</th><th>Model</th><th>Bu ay</th><th>Son çağırış</th></tr>` +
     d.brains.map((b) => `<tr><td>${esc(b.name)}${b.in_use ? "" : " <span class='note'>(işə qoşulmayıb)</span>"}</td>
       <td>${esc(b.config.provider)} · ${esc(b.config.model)}</td><td class="n">$${(b.spent || 0).toFixed(2)} / $${b.config.month_usd}</td>
       <td>${b.last_call ? ago(b.last_call.ts) + (b.last_call.ok === false ? " " + pill(false, "xəta") : "") : "—"}</td></tr>`).join("") + "</table>" +
     Object.entries(d.brain_jobs || {}).map(([k, v]) => `<p class="note">${esc(k)}: ${esc((v && v.message) || "—")} (${ago(v && v.ts)})</p>`).join("");
   const h = d.history || {};
-  $("s-hist").innerHTML = h.result ? `<table><tr><th>Metal</th><th>Nəticə</th></tr>` + Object.entries(h.result).map(([s, r]) =>
+  sink("s-hist").innerHTML = h.result ? `<table><tr><th>Metal</th><th>Nəticə</th></tr>` + Object.entries(h.result).map(([s, r]) =>
     `<tr><td>${NAMES[s] || s}</td><td>${Object.entries(r).map(([tf, t]) => `<b>${esc(tf)}</b> ${esc(t)}`).join("<br>")}</td></tr>`).join("") +
     `</table><p class="note">Son yükləmə ${when(h.ts)} · ${esc(h.source || "")}</p>` : `<p class="note">${esc(h.note || "Hələ yüklənməyib")}</p>`;
   $("s-srv").innerHTML = `<table>
@@ -76,8 +82,11 @@ async function load() {
     `<p class="note">Server firewall-u: internetdən yalnız sayt (80/443) açıqdır, SSH bağlıdır. 15 dəqiqədə 5 səhv parol → həmin ünvan 15 dəqiqə bloklanır.</p>`;
   $("sumbar").hidden = false;
   $("sumbar").className = "evbanner" + (problems.length ? "" : " okbar");
-  $("sumbar").textContent = problems.length ? "Diqqət: " + problems.join(" · ") : "Hər şey qaydasındadır.";
-  $("upd").textContent = "yeniləndi " + new Date().toLocaleTimeString("az");
+  $("sumbar").innerHTML = !problems.length ? "Hər şey qaydasındadır." : problems.length <= 2 ? "Diqqət: " + esc(problems.join(" · "))
+    : `<details><summary>Diqqət: ${problems.length} məsələ — ${esc(problems.slice(0, 2).join(" · ")).slice(0, 160)}…</summary>
+       <ul>${problems.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>`;
+  if ($("upd")) $("upd").textContent = "yeniləndi " + new Date().toLocaleTimeString("az");
 }
 load();
 setInterval(load, 30000);
+})();

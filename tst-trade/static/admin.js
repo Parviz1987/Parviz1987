@@ -26,25 +26,30 @@ function keyState(st) {
   return `<span class="pill warn">saxlanıb, yoxlanmayıb</span>`;
 }
 
+// One row per key, source and brain (owner 2026-11-26: compact, not tiring): name, state and the one fact that matters
+// are always visible; the explanation, the fields and the buttons open with a click. Which rows are open survives the
+// re-draw after «Saxla».
+const OPEN = new Set();
+const row = (id, summary, body) => `<details class="krow" data-open="${id}" ${OPEN.has(id) ? "open" : ""}><summary>${summary}</summary>
+  <div class="kbody">${body}</div></details>`;
 function keySlot(k) {
   const st = k.state, stage = STAGE[k.stage];
   const inputs = k.fields.map((f) => `<label class="note" for="f-${k.id}-${f}">${FIELD_AZ[f] || f}</label>
     <input id="f-${k.id}-${f}" type="password" autocomplete="off" placeholder="${st.saved ? "yenisini yapışdırın" : "yapışdırın"}">`).join("");
-  return `<div class="slot"><div class="hd"><b>${esc(k.name)}</b>${keyState(st)}</div>
-    <div class="meta"><span>Nə üçün</span><span>${esc(k.purpose)}</span>
+  const sum = `<b>${esc(k.name)}</b>${keyState(st)}<span class="kfact">${st.hint ? `<span class="num">…${esc(st.hint)}</span> · ` : ""}${esc(k.used_by)}</span>`;
+  return row("k-" + k.id, sum, `<div class="meta"><span>Nə üçün</span><span>${esc(k.purpose)}</span>
       <span>Qiymət</span><span>${esc(k.cost)}</span>
-      <span>İstifadə edən</span><span>${esc(k.used_by)}</span>
       <span>Mərhələ</span><span><span class="pill ${stage[0]}">${stage[1]}</span></span>
       <span>Haradan alınır</span><span><a href="${esc(k.url)}" target="_blank" rel="noopener">${esc(k.url.replace("https://", ""))}</a></span>
       ${st.hint ? `<span>Saxlanan</span><span class="num">${esc(st.hint)} · ${when(st.saved_ts)}</span>` : ""}
       ${st.check ? `<span>Açar yoxlaması</span><span>${esc(st.check.message)} · ${when(st.check.ts)}</span>` : ""}
       ${k.id === "fred" ? healthLine(k.health) : ""}</div>
-    ${inputs}
+    <div class="kin">${inputs}</div>
     ${k.id === "fred" ? `<div class="btns"><button class="btn" data-feed="macro">Makronu indi yüklə</button></div>` : ""}
     <div class="btns"><button class="btn pri" data-act="save" data-k="${k.id}">Saxla</button>
       <button class="btn" data-act="check" data-k="${k.id}" ${st.saved ? "" : "disabled"}>Yoxla</button>
       <button class="btn dan" data-act="del" data-k="${k.id}" ${st.saved ? "" : "disabled"}>Sil</button></div>
-    <div class="msg" id="m-${k.id}"></div></div>`;
+    <div class="msg" id="m-${k.id}"></div>`);
 }
 
 function healthLine(h) {
@@ -53,13 +58,14 @@ function healthLine(h) {
 }
 
 function freeSlot(f) {
-  const stage = STAGE[f.stage];
-  return `<div class="slot"><div class="hd"><b>${esc(f.name)}</b><span class="pill info">açar lazım deyil</span></div>
-    <div class="meta"><span>Nə üçün</span><span>${esc(f.purpose)}</span><span>Qiymət</span><span>${esc(f.cost)}</span>
+  const stage = STAGE[f.stage], h = f.health || {};
+  const st = !h.checked ? `<span class="pill info">açar lazım deyil</span>` : h.ok ? `<span class="pill ok">işləyir</span>` : `<span class="pill bad">alınmadı</span>`;
+  return row("f-" + f.id, `<b>${esc(f.name)}</b>${st}<span class="kfact">${esc(f.cost)}</span>`,
+    `<div class="meta"><span>Nə üçün</span><span>${esc(f.purpose)}</span>
     <span>Mərhələ</span><span><span class="pill ${stage[0]}">${stage[1]}</span></span>${healthLine(f.health)}</div>
     ${f.id === "rss" ? `<div class="btns"><button class="btn" data-feed="news">İndi yenilə</button></div>` : ""}
     ${f.id === "forexfactory" ? `<div class="btns"><button class="btn" data-feed="calendar">İndi yenilə</button></div>` : ""}
-    ${f.id === "cot" ? `<div class="btns"><button class="btn" data-feed="cot">İndi yüklə</button></div>` : ""}</div>`;
+    ${f.id === "cot" ? `<div class="btns"><button class="btn" data-feed="cot">İndi yüklə</button></div>` : ""}`);
 }
 
 function brainSlot(b) {
@@ -69,21 +75,24 @@ function brainSlot(b) {
   const req = b.requirements.map((r) => `<div><span>${esc(r.name)}</span><span class="num">${r.weight} %</span>
     <div class="bar" style="grid-column:1/3"><i style="width:${r.weight}%"></i></div></div>`).join("");
   const stCls = { "hazırdır": "ok", "açar yoxdur": "next", "yoxlanmayıb": "warn" }[b.state] || "bad";
-  return `<div class="slot"><div class="hd"><b>${esc(b.name)}</b><span class="pill ${stCls}">${esc(b.state)}</span></div>
-    <div class="meta"><span>İşi</span><span>${esc(b.job)}</span><span>Edə bilməz</span><span>${esc(b.may_not)}</span>
+  const share = c.month_usd ? Math.min(100, b.spent / c.month_usd * 100) : 0;
+  const last = b.last_call ? (b.last_call.ok ? "<span class='up'>●</span>" : "<span class='down'>●</span>") : "<span class='mut'>●</span>";
+  const sum = `<b>${esc(b.name)}</b><span class="pill ${stCls}">${esc(b.state)}</span>
+    <span class="kfact">${last} ${esc(BRAIN_PROV[c.provider] || c.provider)} · ${esc(c.model)}</span>
+    <span class="kspend" title="Bu ay xərc"><span class="bar"><i style="width:${share.toFixed(0)}%"></i></span><span class="num">${b.spent.toFixed(2)} / ${c.month_usd} $</span></span>`;
+  return row("b-" + b.id, sum, `<div class="meta"><span>İşi</span><span>${esc(b.job)}</span><span>Edə bilməz</span><span>${esc(b.may_not)}</span>
       <span>Niyə bu beyin</span><span>${esc(b.why)}</span>
       <span>İşdə</span><span>${b.in_use ? "<span class='up'>işləyir</span>" : "hələ qoşulmayıb (növbəti addım)"}</span>
-      <span>Bu ay xərc</span><span class="num">${b.spent.toFixed(2)} $ / ${b.config.month_usd} $</span>
       ${b.last_call ? `<span>Son çağırış</span><span>${b.last_call.ok ? "<span class='up'>uğurlu</span>" : "<span class='down'>alınmadı</span>"} · ${esc(b.last_call.provider)} · ${when(b.last_call.ts)}${b.last_call.error ? " · " + esc(b.last_call.error) : ""}</span>` : ""}</div>
     <div class="note">Tələblər və çəkisi</div><div class="req">${req}</div>
-    <label class="note" for="bp-${b.id}">Beyin (provayder)</label><select id="bp-${b.id}">${opts(c.provider)}</select>
+    <div class="kin kin2"><label class="note" for="bp-${b.id}">Beyin (provayder)</label><select id="bp-${b.id}">${opts(c.provider)}</select>
     <label class="note" for="bm-${b.id}">Model</label><input id="bm-${b.id}" value="${esc(c.model)}">
     <label class="note" for="bf-${b.id}">Ehtiyat beyin</label><select id="bf-${b.id}">${opts(c.fallback, true)}</select>
     <label class="note" for="bfm-${b.id}">Ehtiyat model</label><input id="bfm-${b.id}" value="${esc(c.fallback_model || "")}">
-    <label class="note" for="bu-${b.id}">Aylıq xərc limiti, $</label><input id="bu-${b.id}" type="number" min="0" max="1000" step="1" value="${c.month_usd}">
+    <label class="note" for="bu-${b.id}">Aylıq xərc limiti, $</label><input id="bu-${b.id}" type="number" min="0" max="1000" step="1" value="${c.month_usd}"></div>
     <div class="btns"><button class="btn pri" data-bsave="${b.id}">Saxla</button><button class="btn" data-bcheck="${b.id}">Beyni yoxla</button>
       <button class="btn" data-breset="${b.id}">Tövsiyəyə qaytar</button></div>
-    <div class="msg" id="bm-msg-${b.id}"></div></div>`;
+    <div class="msg" id="bm-msg-${b.id}"></div>`);
 }
 
 function render() {
@@ -97,9 +106,10 @@ function render() {
   $("cats").innerHTML = data.categories.map(([id, name]) => {
     const ks = data.keys.filter((k) => k.category === id).map(keySlot).join("");
     const fs = data.free.filter((f) => f.category === id).map(freeSlot).join("");
-    return `<h3>${esc(name)}</h3><div class="grid">${ks}${fs}</div>`;
+    return `<h3 class="sub">${esc(name)}</h3><div class="klist">${ks}${fs}</div>`;
   }).join("");
   $("brains").innerHTML = data.brains.map(brainSlot).join("");
+  document.querySelectorAll("details.krow").forEach((d) => d.ontoggle = () => { d.open ? OPEN.add(d.dataset.open) : OPEN.delete(d.dataset.open); });
   const h = data.history || {};
   $("histres").innerHTML = h.note ? `<p class="note">${esc(h.note)}</p>` : h.result ?
     `<table><tr><th>Metal</th><th>1 dəq</th><th>1 saat</th><th>4 saat</th><th>1 gün</th><th>1 həftə</th></tr>` +
