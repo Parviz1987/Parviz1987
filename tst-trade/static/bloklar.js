@@ -21,7 +21,9 @@
     return `<b class="${p > 0.5 ? "up" : p < 0.5 ? "down" : ""}">${d} ${pct(p)}</b>`;
   }
   function render(d) {
-    $("comb").innerHTML = Object.values(d.combiners || {}).length ? `<p>${Object.values(d.combiners).map((c) => `${esc(c.name)}: ${lean(c.p)}`).join(" · ")}</p>` : "";
+    // one combiner in front (plan 3.1, 27.11): the system's final word; the consensus and the scale stay in the back
+    const fw = Object.entries(d.combiners || {}).filter(([k]) => k === "vahid").map(([, c]) => c);
+    $("comb").innerHTML = fw.length ? `<p>${fw.map((c) => `<b>Sistemin son sözü</b> (${esc(c.name)}): ${lean(c.p)}`).join(" · ")}</p>` : "";
     $("blocks").innerHTML = d.blocks.map((b) => `<section class="box"><h2>${esc(b.name)} <span class="sp"></span>
         <span>blokun səsi: ${b.on_desk ? lean(b.voice) : '<span class="note">bu üfüqdə üsulu yoxdur</span>'}</span>
         ${b.page ? `<a class="tabtn" href="${b.page}">aç →</a>` : ""}</h2>
@@ -35,7 +37,7 @@
       <p class="note"><b>Nəyə əsaslanır:</b> ${esc(b.evidence)}</p>
       <p class="note"><b>Çatmayan:</b> ${esc(b.missing)}</p></details></section>`).join("");
     const fin = d.finals || [];
-    $("comb").innerHTML += `<p class="note"><b>Sübutun dürüstlüyü:</b> sistem indiyə qədər <b>${d.trials}</b> fikri sınayıb (hər üsul hər masada, hər qayda hər çərçivədə, hər hipotez). Hər sübut bu sayla birlikdə göstərilir. «Sübut» olan hər şey əvvəlcə <b>namizəd</b> olur və yalnız bundan SONRA gələn məlumatda bir dəfə yoxlanır (son sınaq); keçməsə, sübut sayılmır.` +
+    $("honest").innerHTML = `<p class="note"><b>Sübutun dürüstlüyü:</b> sistem indiyə qədər <b>${d.trials}</b> fikri sınayıb (hər üsul hər masada, hər qayda hər çərçivədə, hər hipotez). Hər sübut bu sayla birlikdə göstərilir. «Sübut» olan hər şey əvvəlcə <b>namizəd</b> olur və yalnız bundan SONRA gələn məlumatda bir dəfə yoxlanır (son sınaq); keçməsə, sübut sayılmır.` +
       (d.ablation_full ? ` Bu üfüqdə vahid proqnozun öz-özünü sınağı: düz ${pct(d.ablation_full.hit_rate)}, Brier bacarığı ${d.ablation_full.bss == null ? "—" : d.ablation_full.bss.toFixed(4)}.` : "") + "</p>" +
       (fin.length ? `<div class="tbl"><table class="sc"><tr><th>Namizəd</th><th>Masa</th><th>Son sınaq</th></tr>` + fin.map((f) =>
         `<tr><td>${esc(f.kind)}: ${esc(f.name)}</td><td>${esc(f.symbol)} ${esc(f.horizon)}</td><td>${esc(f.status)}${f.n != null ? ` · ${f.n}/${f.need} hal` : ""}</td></tr>`).join("") + "</table></div>" : "<p class='note'>Hələ namizəd yoxdur.</p>");

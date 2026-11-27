@@ -423,7 +423,7 @@ details.more summary{cursor:pointer;margin:6px 0}
 .trustbar .trust-head{flex:1;min-width:220px;font-weight:600;font-size:.9rem}
 .trustbar details{font-size:.8rem}.trustbar details summary{cursor:pointer;color:var(--acc)}
 .trustbar details[open]{flex-basis:100%}
-.fgrid{display:grid;grid-template-columns:120px repeat(6,minmax(0,1fr));gap:4px}
+.fgrid{display:grid;grid-template-columns:120px repeat(3,minmax(0,1fr));gap:4px}
 .fg-h{font-size:.66rem;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.06em;padding-bottom:2px}
 .fg-m{display:flex;align-items:center;gap:7px;font-weight:700;font-size:.84rem;background:none;border:1px solid transparent;border-radius:8px;
   padding:0 8px;text-align:left;color:var(--fg)}
@@ -442,7 +442,7 @@ details.olbox{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
 details.olbox>summary{cursor:pointer;color:var(--acc);font-size:.84rem;font-weight:600}
 details.olbox[open]>summary{margin-bottom:10px}
 #sec-chart .tatool{margin:10px 0 0}
-@media (max-width:800px){.fgrid{grid-template-columns:74px repeat(6,minmax(0,1fr));gap:3px}.fc span{font-size:.62rem}
+@media (max-width:800px){.fgrid{grid-template-columns:74px repeat(3,minmax(0,1fr));gap:3px}.fc span{font-size:.62rem}
   .fc{padding:5px 2px}.fg-m{font-size:.74rem;padding:0 4px}.top .hwhy{display:none}}
 @media (max-width:480px){.fgrid{grid-template-columns:repeat(3,minmax(0,1fr))}.fg-h{display:none}
   .fg-m{grid-column:1/-1;padding:6px 4px 0}.fc::before{content:attr(data-n);font-size:.6rem;color:var(--muted)}}
@@ -507,3 +507,7 @@ table.jr td.bs{max-width:420px;white-space:normal;font-size:.8rem}
 details.techgroup{margin:14px 0}
 details.techgroup>summary{cursor:pointer;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
 details.techgroup[open]>summary{margin-bottom:12px}
+
+/* the panel's range table (27.11): the range first, AL / SAT only with proof, one decision line above */
+.fcdec{margin:0 0 10px}
+.fc b{font-family:var(--mono)} .fc span.AL{color:var(--up);font-weight:700} .fc span.SAT{color:var(--down);font-weight:700}

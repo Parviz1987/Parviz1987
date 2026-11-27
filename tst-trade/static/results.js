@@ -171,7 +171,7 @@ function renderAnalysts() {
     ck.map((c) => `<tr><td>${esc(BRAIN_NAMES[c.slot] || c.slot)}</td><td class="c mut">${c.answers}</td>
       <td class="c ${c.bad_share > 0.1 ? "down" : ""}">${pc(c.bad_share)}</td><td class="c mut">${c.invented || 0}</td></tr>`).join("") + "</table>";
 }
-async function loadAnalysts() { adata = await api(`/api/analysts?symbol=${sym}`); renderAnalysts(); loadBoard().catch(() => {}); }
+async function loadAnalysts() { if (!$("analysts")) return; adata = await api(`/api/analysts?symbol=${sym}`); renderAnalysts(); loadBoard().catch(() => {}); }
 
 // Gün-gün: who was right in a period (today, yesterday, 7 or 30 days), every horizon side by side
 let sbp = "7d", sbm = "ALL";
@@ -201,9 +201,11 @@ async function loadBoard() {
 
 async function loadHyp() {
   const d = await api("/api/hypotheses");
-  $("hreg").textContent = "qeyd: " + dt(d.registered) + " NY";
   const ST = { "sübut": "✅ sübut", yox: "❌ yox", az: "⏳ az məlumat", "bağlandı": "⛔ bağlandı" };
-  $("hyp").innerHTML = `<table class="sc"><tr><th></th><th>Fərziyyə</th><th>Düz</th><th>Hədd</th><th>Spreddən sonra (qeyd olunduğu kimi)</th><th>Say</th><th>Hökm</th></tr>` +
+  // 27.11 (owner: «artıqları çıxar»): the earlier registrations H1–H8 and H9–H13 left the page — V and Q replaced
+  // them; the server still computes them (API /api/hypotheses), nothing is deleted
+  if ($("hyp")) $("hreg").textContent = "qeyd: " + dt(d.registered) + " NY";
+  if ($("hyp")) $("hyp").innerHTML = `<table class="sc"><tr><th></th><th>Fərziyyə</th><th>Düz</th><th>Hədd</th><th>Spreddən sonra (qeyd olunduğu kimi)</th><th>Say</th><th>Hökm</th></tr>` +
     d.items.map((h) => `<tr><td class="mut">${h.id}</td><td><b>${esc(h.name)}</b><br><span class="note">${esc(h.idea)} · Mənbə: ${esc(h.source)}</span></td>
       <td class="c">${pc(h.hit_rate)}</td><td class="c mut">${pc(h.bar)}</td>
       <td class="c">${h.net_avg == null ? "—" : usd(h.net_avg)}</td><td class="c mut">${h.n}</td><td class="c">${ST[h.status] || h.status}</td></tr>`).join("") +
@@ -217,7 +219,7 @@ async function loadHyp() {
         <td class="c">${pc(h.hit_rate)}</td><td class="c">${h.net_avg == null ? "—" : usd(h.net_avg)}</td><td class="c mut">${h.n}</td>
         <td class="c mut">${h.p == null ? "—" : h.p.toFixed(3)}</td><td class="c">${ST[h.status] || h.status}</td></tr>`).join("") + "</table>";
   }
-  if (d.focus) {
+  if (d.focus && $("focus")) {
     $("freg").textContent = "qeyd: " + dt(d.focus_registered) + " NY · hədd p < " + d.focus_p_bar.toFixed(4);
     $("focus").innerHTML = `<table class="sc"><tr><th></th><th>Hədəf</th><th>Düz</th><th>Hədd</th><th>Tam xərcdən sonra</th><th>Say</th><th>Hökm</th></tr>` +
       d.focus.map((h) => `<tr><td class="mut">${h.id}</td><td><b>${esc(h.name)}</b><br><span class="note">${esc(h.idea)}</span></td>
@@ -228,6 +230,7 @@ async function loadHyp() {
 
 // Block 21: the futures tests
 async function loadFut() {
+  if (!$("fut")) return;                 // left the page 27.11: the 15-year study replaces the 2-year one
   const d = await api("/api/futstudy");
   const st = d.study;
   if (!st) {

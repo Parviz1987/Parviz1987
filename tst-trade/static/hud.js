@@ -7,7 +7,8 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const NAMES = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
-  const DESKS = [["15m", "15 dəq"], ["1h", "1 saat"], ["4h", "4 saat"], ["1d", "1 gün"], ["1w", "1 həftə"], ["1mo", "1 ay"]];
+  // 27.11 (owner: «artıqları çıxar»): three horizons, the range first (the proven part); AL / SAT only with proof
+  const DESKS = [["1h", "1 saat"], ["1d", "1 gün"], ["1w", "1 həftə"]];
   const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
   const grid = $("fgrid");
   if (!grid) return;
@@ -84,10 +85,14 @@
           const dir = e && e.direction ? (e.direction.up ? "▲" : "▼") : "";
           return `<div class="fc ${c.call}${s === cur ? " cur" : ""}" data-m="${s}" data-h="${h}" data-n="${DESKS.find((k) => k[0] === h)[1]}" role="button" tabindex="0"
             title="${esc(NAMES[s] + " · " + (c.name || h) + ": " + (c.why || "") + " · toxunun: ətraflı")}">
-            <b>${c.call === "GÖZLƏ" ? (dir || "GÖZLƏ") : dir + " " + c.call}</b><span>${e && e.lo80 != null ? rf(e.lo80) + " – " + rf(e.hi80) : "—"}</span></div>`;
+            <b>${e && e.lo80 != null ? rf(e.lo80) + " – " + rf(e.hi80) : "—"}</b>${c.call !== "GÖZLƏ" ? `<span class="${c.call}">${dir} ${c.call}</span>` : ""}</div>`;
         }).join("");
         return `<button type="button" class="fg-m${s === cur ? " cur" : ""}" data-sel="${s}" title="${esc(gt)} · toxunun: qrafik bu metala keçir"><i class="${x.gate.open ? "ok" : "shut"}"></i>${NAMES[s]}</button>${row}`;
       }).join("");
+    const live = [];
+    Object.entries(ms).forEach(([s, x]) => x.desks.forEach((c) => { if (c.call !== "GÖZLƏ") live.push(`${NAMES[s]} ${c.name || c.horizon}: ${c.call}`); }));
+    $("fcdec").innerHTML = live.length ? `<b>AL / SAT:</b> ${live.map(esc).join(" · ")}` :
+      `<b>AL / SAT yoxdur</b> <span class="note">— hələ heç bir metalda və müddətdə Hakimin sübutu yoxdur (sübut olanda burada yazılacaq)</span>`;
     $("fcupd").textContent = "yeniləndi " + new Date().toLocaleTimeString("az", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" }) + " NY";
   }
 
@@ -161,23 +166,15 @@
   grid.addEventListener("keydown", (ev) => { const c = ev.target.closest(".fc[data-m]"); if (c && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); openCard(c.dataset.m, c.dataset.h); } });
   document.addEventListener("click", (ev) => { if (ev.target.closest(".tile")) setTimeout(draw, 50); });
 
-  // ---------- simple mode and sound buttons ----------
-  function setSimple(on) {
-    document.body.classList.toggle("simple", on);
-    $("bsimple").textContent = on ? "Tam görünüş" : "Sadə rejim";
-    $("bsimple").setAttribute("aria-pressed", String(on));
-    pref("tst_simple", on ? "1" : "0");
-    if (!on) window.dispatchEvent(new Event("resize"));
-  }
+  // ---------- the sound button (the simple mode left 27.11: the panel itself is simple now) ----------
+  document.body.classList.remove("simple");
   function setSound(on) {
     $("bsound").textContent = on ? "🔔 Səs açıq" : "🔕 Səs";
     $("bsound").setAttribute("aria-pressed", String(on));
     pref("tst_sound", on ? "1" : "0");
     if (on) chime(false);                               // the tap unlocks sound and lets you hear it once
   }
-  $("bsimple").onclick = () => setSimple(!document.body.classList.contains("simple"));
   $("bsound").onclick = () => setSound(pref("tst_sound") !== "1");
-  setSimple(pref("tst_simple") === "1");
   $("bsound").textContent = pref("tst_sound") === "1" ? "🔔 Səs açıq" : "🔕 Səs";
   loadRanges().then(load);
   setInterval(load, 20000);

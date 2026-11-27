@@ -103,6 +103,7 @@
     $("oldgrid").innerHTML = table(order(all.filter((m) => old.has(m))));
     $("oldbox").hidden = !old.size;
     best();
+    strat();                                           // the strategist's words on the metal chosen
     document.querySelectorAll(".srt").forEach((b) => b.onclick = () => { sortBy = b.dataset.s; keep(); render(); });
     document.querySelectorAll("td.ac[data-m]").forEach((td) => {
       const go = () => journal(td.dataset.m, td.dataset.s);
@@ -143,6 +144,22 @@
     }
   }
   $("jclose").onclick = () => { $("sec-j").hidden = true; open = null; };
+  // the strategist's note (moved here from the panel 27.11): the summary and its words on the metal chosen above
+  async function strat() {
+    let d;
+    try { d = await api("/api/brains"); } catch (e) { return; }
+    const x = d.strategist;
+    if (!x) {
+      $("strat").innerHTML = `<p class="note">${esc((d.strategist_state && d.strategist_state.message) || "Strateq hələ izah yazmayıb (saatda bir yazır).")}</p>`;
+      $("stmeta").textContent = ""; return;
+    }
+    $("stmeta").textContent = `${x.brain} · ${dt(x.ts)} NY`;
+    const m = (x.metals || []).find((v) => v.symbol === sortBy);
+    $("strat").innerHTML = `<p>${esc(x.summary)}</p>${m && m.text ? `<p><b>${MNAME[sortBy]}:</b> ${esc(m.text)}</p>` : ""}` +
+      ((x.watch || []).length ? `<p class="note">Diqqət: ${x.watch.map(esc).join(" · ")}</p>` : "") +
+      `<p class="note">Bu, süni intellektin izahıdır, alış-satış məsləhəti deyil; strateqin fikirlərinin düz/səhv sayı yuxarıdakı cədvəldədir.</p>`;
+  }
+  setInterval(strat, 300000);
   setInterval(() => { $("clock").textContent = "Nyu-York " + new Date().toLocaleTimeString("az", { ...NY, hour: "2-digit", minute: "2-digit" }); }, 1000);
   load(); setInterval(load, 300000);
 })();

@@ -42,8 +42,7 @@
   <p class="note more">Kim harada düz deyir və hər fikrin jurnalı: <a href="/analitikler">Analitiklər</a>.</p>
   <!-- owner 2026-11-27 04:57 NY: «texniki şeylər arxa planda olsun — silmək yox, arxada işləsin»: the Judge's working
        tables, earlier registrations, the futures study and the shadow trading, one click away -->
-  <details class="techgroup" id="sec-tech"><summary><b>Ətraflı (texniki)</b>: Hakimin bütün cədvəlləri, əvvəlki qeydlər,
-    fyuçers sınağı, kölgə ticarəti, analitiklər və tərəzi, süzgəc, son yoxlanmış proqnozlar</summary>
+  <details class="techgroup" id="sec-tech"><summary><b>Ətraflı (texniki)</b>: Hakimin cədvəli, kölgə ticarəti, son yoxlanmış proqnozlar</summary>
   <section class="box" id="sec-judge" data-fold="rjudge" data-fold-default="closed"><h2>Hakim: hər üsul nə qədər düz çıxır <span class="sp"></span>
       <span class="seg" id="modes"><button data-m="live" class="on">Canlı</button><button data-m="history">Tarixçə üzrə</button></span></h2>
     <p class="note">Hər üsul iki bazis qaydası ilə yarışır: «Dəyişməz» (istiqamət yoxdur) və «Həmişə yuxarı». «Sübut» üçün üsul daha çox düz
@@ -61,34 +60,6 @@
     <details class="pass"><summary><b>Üsulların pasportu</b>: niyə var, nə gözləyirik, nəticə verməsə nə edirik</summary>
       <div class="tbl" id="passports"></div></details>
   </section>
-  <section class="box" data-fold="res5" data-fold-default="closed">
-    <h2>Analitiklər və tərəzi <span class="sp"></span><span class="seg" id="ahz"></span></h2>
-    <p class="note">Hər analitik (hesab üsulu və ya beyin) ayrıca yoxlanır. «Düz» — istiqaməti neçə faiz düz deyib; «hədd» — keçməli
-      olduğu səviyyə (həmişə «yuxarı» deməklə alınan nəticə). Həddən yaxşı olan analitik <b>çəki</b> alır və «Tərəzi» onun sözünü
-      ağırlaşdırır; həddən yaxşı olmayanın çəkisi 0-dır. Canlı nəticə kifayət qədər yığılana qədər tarixçə istifadə olunur.</p>
-    <div class="tbl" id="analysts"></div>
-    <h3 class="sub" id="sb-h">Gün-gün: kim düz deyir <span class="seg" id="sbp"></span><span class="seg" id="sbm"></span></h3>
-    <p class="note">Seçilmiş dövrdə yoxlanan canlı proqnozlar: hər üfüqdə neçə dəfə tərəf seçib (yuxarı / aşağı) və neçə faizi düz çıxıb.
-      Mötərizədə <b>şans</b>: eyni yuxarı / aşağı qarışığı ilə, analitikin danışdığı eyni anlarda təsadüfən düz çıxma faizi (Hakimin ölçüsü). Yaşıl = şansdan 3 bənd və daha çox yaxşı
-      (ən azı 20 fikir), qırmızı = 3 bənd pis; boz = hələ az fikir. Bu, sübut deyil: sübutu Hakim verir (xərc, çox sınaq).</p>
-    <div class="tbl" id="sb"></div>
-    <h3 class="sub">Beyinlərin öz hesabı (son 30 gün)</h3>
-    <p class="note">Hər beyin fikri sonrakı real qiymətlə yoxlanır: həyəcandan (güclü xəbər, rəqəm, sıçrayış) sonra verilən və saatlıq fikirlər ayrıca.</p>
-    <div class="tbl" id="brainscore"></div>
-  </section>
-  <section class="box" id="sec-sieve" data-fold="ressieve" data-fold-default="closed">
-    <h2>Süzgəc: kim düz deyir, kim səhv <span class="sp"></span><span class="note" id="svnote"></span></h2>
-    <p class="note">Hazırda laboratoriyadır: çox analitik var, hər birinin hər fikri yazılır. Süzgəc onları əvvəlcədən sabit qaydalarla
-      ayırır (Hakimin rəqəmləri, canlı və keçmiş üzrə, 4 metal, bütün üfüqlər):
-      <b>🟢 saxla</b> — Hakim harasa sübut və ya xərcdən kiçik real üstünlük tapıb;
-      <b>🔵 ümidli</b> — harasa şansdan aydın yaxşı (2 standart xəta, ən azı 100 müstəqil fikir), heç yerdə pis deyil — hələ sübut deyil;
-      <b>🟡 qarışıq</b> — bir üfüqdə yaxşı, başqasında pis: yalnız yaxşı yerində saxlamağa namizəd;
-      <b>🔴 ardıcıl səhv</b> — harasa şansdan aydın pis, heç yerdə yaxşı deyil;
-      <b>⚪ fərqsiz</b> — ən azı 100 fikir, şansdan fərqi yoxdur: məlumat yox, səs-küy verir;
-      <b>⏳ az</b> — hələ az fikir. 🔴 və ⚪ çıxarılmağa namizəddir; çıxarmaq sizin qərarınızdır.
-      «Jurnal» düyməsi: analitikin son fikirləri — nə dedi, nəyə əsasən, nə vaxt, nə oldu.</p>
-    <div class="tbl" id="sieve"></div>
-  </section>
   <section class="box" data-fold="res4" data-fold-default="closed">
     <h2>Uğur xəritəsi: kölgə ticarəti <span class="sp"></span><span class="seg" id="smode"></span></h2>
     <p class="note">Hər proqnoz kağız üzərində real sövdələşmə kimi oynanılır: giriş proqnoz anındakı qiymət, stop 80 % koridorun
@@ -96,27 +67,6 @@
       Yaşıl ✓ = pul qazandırdığı sübut olunub (100+ sövdələşmə, təsadüf deyil). Ticarət yalnız yaşıl xanalarda düşünülə bilər.</p>
     <div class="tbl" id="simmap"></div>
     <div id="simbest"></div>
-  </section>
-  <section class="box focus" id="sec-focus" data-fold="resfocus" data-fold-default="closed">
-    <h2>Əvvəlki qeyd: əsas hədəflər (H9–H13) <span class="sp"></span><span class="note" id="freg"></span></h2>
-    <p class="note">Sahibin fokusu (2026-11-24): qızıl 1 gün və 1 həftə, platin və palladiumda impuls. Əvvəlcədən qeydə alınıb,
-      yalnız qeyddən sonrakı canlı nəticə ilə və <b>tam xərcdən</b> sonra (spred + sürüşmə + gecəlik haqq) ölçülür.</p>
-    <div class="tbl" id="focus"></div>
-  </section>
-  <section class="box" data-fold="res6" data-fold-default="closed">
-    <h2>İlk qeydlər: fərziyyələr H1–H8 <span class="sp"></span><span class="note" id="hreg"></span></h2>
-    <p class="note">Araşdırmadan seçilib və <b>əvvəlcədən</b> qeydə alınıb. Yalnız qeyd vaxtından sonrakı yeni canlı proqnozlarla ölçülür
-      (məlumata baxıb seçmə yoxdur). Sübut üçün: «keçməli hədd»i keçmək, təsadüf olmamaq (8 fərziyyəyə görə sərtləşdirilmiş) və
-      spreddən sonra qazanc.</p>
-    <div class="tbl" id="hyp"></div>
-  </section>
-  <section class="box" data-fold="resfut" data-fold-default="closed" id="sec-fut">
-    <h2>Fyuçers sınaqları (Databento, 2 il) <span class="sp"></span><span class="note" id="futwhen"></span></h2>
-    <p class="note">Sahibin fikri birjanın öz məlumatı ilə: böyük oyunçu qiyməti tərpədəndən 1 dəqiqə sonra girsək, hərəkət davam edirmi?
-      «Böyük həcm» = həmin dəqiqənin həcmi adi həcmdən 3 dəfə çox. «Xəbər dəqiqəsi» = 08:30, 10:00, 14:00 NY (ABŞ rəqəmləri).
-      Nəticə 1000 $-lıq sövdələşmə üçün xərcdən sonra: fyuçersdə (1 tik spred + sürüşmə) və eyni sövdələşmə Capital-da.
-      Sübut yalnız: p &lt; hədd, xərcdən sonra müsbət və <b>hər iki ildə</b> müsbət.</p>
-    <div class="tbl" id="fut"></div>
   </section>
   <section class="box" data-fold="rjournal" data-fold-default="closed"><h2>Son yoxlanmış proqnozlar <span class="sp"></span><span class="note">vaxtlar NY</span></h2><div class="tbl" id="journal"></div></section>
   </details>

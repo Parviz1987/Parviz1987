@@ -69,6 +69,25 @@
 - [x] 5.1 `BLOKLAR.md`, `SOHBET-TARIXCESI.md`, `IS-PLANI.md` (5.3), `monitor/sehvlerim.md` yeniləndi.
 - [x] 5.2 Sahibə yekun: nə edildi, necə yoxlandı, nə qaldı.
 
+## İkinci hissə (sahib 27.11 18:35 NY: «Başla … ardıcıl, yarımçıq nəsə buraxıb başqa şeyə keçmə, dəqiq plan üzrə et, bitir»)
+Seçilən yol: **pulsuz agentlər** (vaxtı məlum rəsmi mənbələr, qiymət sıçrayışı) + **pullu** (FinancialJuice — qəfil xəbər,
+Databento — böyük oyunçular, həqiqi həcm, 15 il tarixçə). Hamısı bir axın: giriş → həyəcan → Oxuyucu/beyinlər → Hakim.
+Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), sonra növbəti.
+- [x] 6.1 Paneldən çıxır: «Etibar işığı», 24 xanalı «GÖZLƏ» cədvəli (yerinə hər metal bir sətir: aralıq + AL/SAT yalnız
+      sübutla), «Sabah üçün», «Strateqin izahı» (→ Analitiklər səhifəsi), «Sadə rejim» düyməsi.
+- [x] 6.2 Nəticələrdən çıxır: H1–H8, H9–H13, «Analitiklər və tərəzi», «Süzgəc», 2 illik «Fyuçers sınaqları».
+- [x] 6.3 Bloklar: uzun izah mətnləri bir-iki sətrə.
+- [ ] 7.1 Benzinga (Alpaca) xəbəri söndürülür; Google News 10 dəqiqədən bir; Kəşfiyyatçı yalnız həyəcanda; cavabı bəlli
+      kölgə sınaqları (ACI, dirijor, FA pəncərəsi, bayram) həftədə bir.
+- [ ] 8.1 Sıçrayış 1 dəqiqədə tutulur (canlı axından), dərhal səbəb axtarılır.
+- [ ] 9.1 Rəsmi mənbə agenti: təqvimdəki ABŞ rəqəmi (BLS, BEA) və Fed qərarı dəqiqəsində rəsmi sayt yoxlanır, rəqəm
+      gözləntiylə müqayisə olunur, saniyələr içində həyəcan.
+- [ ] 9.2 Hər xəbərin gəliş vaxtı yazılır: mənbə-mənbə real gecikmə (pul ödəməzdən əvvəlki «əvvəl» rəqəmi).
+- [ ] 10.1 Şənbə 28.11: server 1 GB → 2 GB (ayda $6 → $12; sahib «başla» ilə təsdiqlədi), bazar bağlıdır.
+- [ ] 11.1 Açarlar gələndə: FinancialJuice + Databento qoşulur, 15 il tarixçə, 1 aylıq sınaq qabaqcadan qeyd olunur.
+      (Açarsız sınamaq mümkün deyil — bu addım açarı gözləyir, yarımçıq deyil.)
+- [ ] 12.1 Sənədlər və sahibə yekun.
+
 ## Sahibsiz qalanlar (sistem onsuz işləyir)
 | | Əvəzi | Nə itirilir |
 |---|---|---|
@@ -94,3 +113,6 @@
   addımını gözləyir (Healthchecks, R2, 2FA); blokların yoxlaması 0,4 saatlıq, Xəbər bloku artıq «qırıq» deyil; Google
   News 429 yoxdur; son 1 saatda xəta yoxdur; boş yaddaş 521 MB. Benzinga ümumi axından da 48 saatda yalnız 1 metal başlığı
   verir — mənbə zəifdir, əsas xəbər RSS-dən (316). Plan bitdi.
+- 27.11 18:38 — ikinci hissə başladı (6.1 → 12.1 ardıcıl).
+- 27.11 18:52 — 6 bitdi: Panel (masaüstü 1831→1566 px, telefon 2973→2449), «Bloklar» 1157→987; strateqin izahı «Analitiklər»də;
+  13 səhifə × 2 ölçü, brauzer xətası 0; 10 səhifədə hər düymə basıldı, xəta 0. Kod silinmədi (köhnə fayllar yüklənmir).

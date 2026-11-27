@@ -13,7 +13,6 @@
   <span class="sp"></span>
   <span class="clock" id="clock"></span>
   <button class="btn sm" id="bsound" type="button" aria-pressed="false">🔕 Səs</button>
-  <button class="btn sm" id="bsimple" type="button" aria-pressed="false">Sadə rejim</button>
   <button class="btn pri sm" id="install" hidden>Telefona yüklə</button>
 <nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
 </header>
@@ -28,21 +27,14 @@
   <div class="tiles" id="tiles"></div>
   <div class="ticker" id="ticker" aria-label="Analizdə istifadə olunan bazarlar"></div>
 
-  <!-- 2. Trust light: one line -->
-  <section class="trustbar" id="sec-trust" aria-label="Etibar işığı">
-    <span class="tb-l">Etibar işığı</span><span class="trust-head" id="trustHead">…</span>
-    <details><summary>Hər analitik</summary><div id="trustList"></div>
-      <p class="note">🟢 etibarlı · 🟡 ümidverici · ⚪ fərqi yoxdur · 🔴 etibar yoxdur · ⏳ az</p></details>
-  </section>
 
   <!-- 3. Forecasts: ONE table for every metal and horizon (the decision and the 80 % range in each cell) -->
   <section class="box" id="sec-fc">
-    <h2>Proqnozlar <span class="sp"></span><span class="note" id="fcupd"></span></h2>
+    <h2>Qiymət hara gedə bilər <span class="sp"></span><span class="note" id="fcupd"></span></h2>
+    <p class="fcdec" id="fcdec"></p>
     <div class="fgrid" id="fgrid"></div>
-    <p class="note fchint">Xanada: qərar (AL / SAT yalnız Hakimin sübutu və açıq risk qapısı ilə, yoxsa GÖZLƏ) və qiymətin 80 % ehtimalla
-      olacağı aralıq. Xanaya toxunun: ətraflı kart. Metalın adına toxunun: qrafik o metala keçir.</p>
-    <details class="olbox" id="sec-outlook"><summary>Sabah üçün (1 gün): vahid proqnoz, səslər, ssenarilər <span class="note" id="olnote"></span></summary>
-      <div class="olgrid" id="outlook"></div></details>
+    <p class="note fchint" id="fcnote">Xanada: qiymətin 80 % ehtimalla olacağı aralıq (sistemin sübut olunmuş hissəsi: real tutma
+      ~78–87 %). AL / SAT yalnız Hakimin sübutu olanda yazılır. Xanaya toxunun: ətraflı kart. Metalın adına toxunun: qrafik o metala keçir.</p>
   </section>
 
   <!-- 4. What each analyst says now about the chosen metal, with its record in that metal (owner 2026-11-27 04:57 NY:
@@ -68,8 +60,7 @@
   </section>
 
   <!-- 6. The rest -->
-  <section class="box" id="sec-strat" data-fold="strat"><h2>Strateqin izahı <span class="sp"></span><span class="note" id="stmeta"></span></h2><div id="strat"></div></section>
-  <p class="note more">Ətraflı: <a href="/results">Nəticələr</a> (nə dedik, nə oldu, Hakim) ·
+  <p class="note more">Ətraflı: <a href="/results">Nəticələr</a> (nə dedik, nə oldu, Hakim) · <a href="/analitikler">Analitiklər</a> (kim düz deyir, strateqin izahı) ·
     <a href="/bloklar">Bloklar</a> (xəbər, fundamental, bazarlar, təqvim) · <a href="/agents">Agentlər</a> (sistemin canlı axını)</p>
 </main>
 <script src="/static/chart.js"></script>
@@ -80,6 +71,4 @@
 <script src="/static/nav.js"></script>
 <script src="/static/flow.js"></script>
 <script src="/static/hud.js"></script>
-<script src="/static/outlook.js"></script>
-<script src="/static/trust.js"></script>
 </body></html>

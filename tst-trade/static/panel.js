@@ -127,6 +127,7 @@ function renderTaSummary(all) {
 }
 
 async function loadBrains() {
+  if (!$("strat")) return;                // the strategist's note lives on the Analysts page now (27.11)
   const d = await api("/api/brains");
   const x = d.strategist;
   if (!x) {
