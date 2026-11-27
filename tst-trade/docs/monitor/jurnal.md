@@ -186,3 +186,12 @@
   yoxlaması: 20 təsadüfi qaydanın heç biri keçmədi, tam gələcəyə baxan tutuldu, 30 % baxan (64 % düz) tutulmadı.
 - **Xəbər bloku «qırıq» görünür:** 7 gündə səsin fikri yoxdur. 295 başlıq gəlir, amma Oxuyucu sutkada az işləyir və NW
   qaydalarının qeydi görünmür — Faza E-də araşdırılacaq.
+
+## 2026-11-26 19:50 NY (növbətçi)
+- Təhlükəsizlik: 24 saatda yad giriş yoxdur; CSP, HSTS, X-Frame-Options yerindədir; 2FA hələ söndürülüb (sahib evdə
+  açacaq). Tokensiz diag 401 bu mühitdən yoxlanmadı (proxy tokeni özü qoyur).
+- Qiymət 4/4 canlı, 10/10 əlaqəli bazar; son 3 saatda yeni xəta yoxdur (siyahıdakılar 21–62 saat əvvəlkidir).
+- Xəbər qaydaları işə düşüb (qızıl 284 siqnal). Hadisələr kitabxanası serverdə: 687 hadisə (2010-dan), Fed qərarları
+  düzəlişdən sonra 46; kölgə sınağı heç bir metalda keçməyib → beyinlərə hələ verilmir.
+- WAL iki dəfə 440 MB-a çatıb, təmirçi kiçildib; araşdırma kartı açıqdır (Admin → Əməliyyatlar).
+- Qrafik analitikinin ehtiyat modeli (gpt-5.4-nano) bu ay 39 çağırışdan 2-də uğurlu — ehtiyat kimi işləmir.

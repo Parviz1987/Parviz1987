@@ -26,3 +26,10 @@
 1. **/api/diag cavabı 63–64 saniyə çəkir** (bu gün iki ölçü: 63,7 s və 60 s-də kəsildi). Növbətçi yoxlama və gələcək kənar
    izləmə (plan A1) üçün bu çox uzundur. Təklif: ağır hissələri (cədvəl ölçüləri, proqnoz sayları) 10 dəqiqəlik keşdən vermək.
    Sübut: `curl -w %{time_total}` ölçüləri. Həyata keçirilməyib — sahib qərar verir (plan B2 ilə birlikdə etmək olar).
+
+## 2026-11-27
+1. **Qrafik analitikinin ehtiyat modeli işləmir:** bu ay gpt-5.4-nano 39 çağırışdan yalnız 2-də cavab verib (əsas model
+   haiku 154-dən 112). Ehtimal: şəkilli sorğu ilə uyğun deyil. Model seçimi sahibin qərarıdır — dəyişilməyib. Sübut:
+   diag `agents.router.month.chartist`.
+2. **WAL 440 MB-a çatır** (son gündə 2 dəfə): ağır yenidən hesablamalar (tarixçə sınaqları) zamanı. Təklif: belə
+   işlərdən sonra təmirçinin WAL kiçiltməsini adi saymaq və araşdırma kartını yalnız 3-cü dəfədə açmaq. Sübut: `ops.repair`.
