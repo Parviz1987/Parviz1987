@@ -125,6 +125,13 @@ def _calls(db: DB, now: float | None = None, hours: int = 12) -> dict:
     return out
 
 
+def _scoreboard(db: DB) -> dict:
+    """Yesterday and the last 7 days, all four metals: who was right on which horizon (static/results.js shows the
+    same per period on the site). For the duty check's daily note."""
+    from . import scoreboard
+    return {p: scoreboard.board(db, "ALL", p) for p in ("yesterday", "7d")}
+
+
 def _rules(db: DB) -> dict:
     """Bilik kitabı rules: the Judge's record per rule and timeframe (next candle and stop + target), and replay state."""
     from . import rules
@@ -410,6 +417,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "tables": _slow("tables", lambda: _tables(db), 6 * 3600),
         "forecast_rows": _slow("forecast_rows", lambda: _forecast_rows(db), 6 * 3600),
         "calls_12h": _slow("calls_12h", lambda: _calls(db), 300),
+        "scoreboard": _slow("scoreboard", lambda: _scoreboard(db), 900),
         "cleanup": json.loads(db.get("cleanup:retired_v1") or "null"),
         "vacuum": json.loads(db.get("cleanup:vacuum_v1") or "null"),
         "agents": _agents(db),

@@ -171,7 +171,32 @@ function renderAnalysts() {
     ck.map((c) => `<tr><td>${esc(BRAIN_NAMES[c.slot] || c.slot)}</td><td class="c mut">${c.answers}</td>
       <td class="c ${c.bad_share > 0.1 ? "down" : ""}">${pc(c.bad_share)}</td><td class="c mut">${c.invented || 0}</td></tr>`).join("") + "</table>";
 }
-async function loadAnalysts() { adata = await api(`/api/analysts?symbol=${sym}`); renderAnalysts(); }
+async function loadAnalysts() { adata = await api(`/api/analysts?symbol=${sym}`); renderAnalysts(); loadBoard().catch(() => {}); }
+
+// Gün-gün: who was right in a period (today, yesterday, 7 or 30 days), every horizon side by side
+let sbp = "7d", sbm = "ALL";
+try { sbp = localStorage.getItem("tst_sbp") || sbp; sbm = localStorage.getItem("tst_sbm") || sbm; } catch (e) {}
+const SB_P = [["day", "Bu gün"], ["yesterday", "Dünən"], ["7d", "7 gün"], ["30d", "30 gün"]];
+const SB_H = { "15m": "15 dəq", "1h": "1 saat", "4h": "4 saat", "1d": "1 gün", "1w": "1 həftə" };
+async function loadBoard() {
+  const segs = (id, items, cur, set) => { $(id).innerHTML = items.map(([k, n]) => `<button data-k="${k}" class="${k === cur ? "on" : ""}">${n}</button>`).join("");
+    $(id).querySelectorAll("button").forEach((b) => b.onclick = () => { set(b.dataset.k); try { localStorage.setItem("tst_" + id, b.dataset.k); } catch (e) {} loadBoard().catch(() => {}); }); };
+  segs("sbp", SB_P, sbp, (k) => { sbp = k; });
+  segs("sbm", [["ALL", "4 metal"], [sym, NAMES[sym]]], sbm === "ALL" ? "ALL" : sym, (k) => { sbm = k; });
+  const d = await api(`/api/scoreboard?symbol=${sbm === "ALL" ? "ALL" : sym}&period=${sbp}`);
+  const ms = Object.keys(d.methods).filter((m) => m !== "rw");
+  if (!ms.length) { $("sb").innerHTML = "<p class='note'>Bu dövrdə yoxlanmış proqnoz yoxdur.</p>"; return; }
+  const total = (m) => Object.values(d.methods[m]).reduce((a, c) => a + c.n, 0);
+  ms.sort((a, b) => (a === "up") - (b === "up") || total(b) - total(a));
+  const cell = (c) => {
+    if (!c || !c.n) return `<td class="c mut">·</td>`;
+    const hr = c.right / c.n, diff = hr - c.chance, cls = c.n < 20 ? "mut" : diff >= 0.03 ? "up" : diff <= -0.03 ? "down" : "";
+    return `<td class="c ${cls}" title="${c.n} fikir (${c.up} yuxarı, ${c.n - c.up} aşağı), ${c.right} düz; şans ${pc(c.chance)}">${pc(hr)} <span class="note">(${pc(c.chance)}) · ${c.n}</span></td>`;
+  };
+  $("sb").innerHTML = `<table class="sc"><tr><th>Analitik</th>${d.horizons.map((h) => `<th>${SB_H[h]}</th>`).join("")}</tr>` +
+    ms.map((m) => `<tr><td>${esc(d.names[m] || m)}${m === "up" ? ' <span class="note">(etalon)</span>' : ""}</td>${d.horizons.map((h) => cell(d.methods[m][h])).join("")}</tr>`).join("") +
+    `<tr><td class="note">Bazar bu dövrdə qalxıb</td>${d.horizons.map((h) => `<td class="c note">${d.market_up[h] == null ? "·" : pc(d.market_up[h])}</td>`).join("")}</tr></table>`;
+}
 
 async function loadHyp() {
   const d = await api("/api/hypotheses");

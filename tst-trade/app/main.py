@@ -662,6 +662,17 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             out[sym] = d
         return {"metals": out, "state": nerve.state(db), "ts": now}
 
+    @app.get("/api/scoreboard")
+    async def scoreboard_api(symbol: str = "ALL", period: str = "day"):
+        """Who is right, day by day: every method's checked calls per horizon in a period, against luck."""
+        from . import scoreboard
+        if symbol != "ALL" and symbol not in candles.METALS:
+            raise HTTPException(400, "naməlum metal")
+        if period not in scoreboard.PERIODS:
+            raise HTTPException(400, "naməlum dövr")
+        out = await asyncio.to_thread(diag._slow, f"sb:{symbol}:{period}", lambda: scoreboard.board(db, symbol, period), 300)
+        return {**out, "names": forecast.METHOD_NAMES}
+
     @app.get("/api/analysts")
     async def analysts(symbol: str = "XAU"):
         """Block 3, the scale: every analyst (method or brain) on each desk with its record and its weight, and the
