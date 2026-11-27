@@ -23,24 +23,33 @@
 ## Mərhələ 1 — hər əlaqənin xəritəsi
 - [x] 1.1 Diaqnostikada əlaqə xəritəsi: mənbə → blok → analitik → birləşdirici → Hakim → səhifə; hər halqada son
       məlumatın yaşı, sətir sayı, növbəti halqa istifadə edirmi; «yalançı OK» (0 sətir, amma «ok») ayrıca.
-- [ ] 1.2 GitHub-dakı saatlıq kənar yoxlama həqiqətən işləyirmi.
+- [x] 1.2 GitHub-dakı saatlıq kənar yoxlama həqiqətən işləyirmi. **Yox:** saatlıq yazılıb, amma GitHub onu 22 saatda 2 dəfə
+      işə salıb (26.11 22:39, 27.11 08:53 NY). Əsas kənar göz — 3 saatlıq növbətçi yoxlama (təzə sessiya, telefona xəbər).
 
 ## Mərhələ 2 — qırıqlar və yalançı «işləyir»lər (27.11 səhər tapılanlar + 1.1-in tapdıqları)
-- [ ] 2.1 Hakimin öz yoxlaması: 30 % gələcəyə baxan saxta qayda (64 % düz) tutulmadı.
-- [ ] 2.2 Blokların gündəlik yoxlaması köhnə şəkil göstərir (Xəbəri «qırıq»); tez-tez + yaşı görünsün.
-- [ ] 2.3 Alpaca (Benzinga) 48 saatda 0 başlıq, amma «ok».
-- [ ] 2.4 Seçici konsensus heç vaxt ölçülə bilmir (yalnız sübutlu üsulları dinləyir, sübutlu yoxdur).
-- [ ] 2.5 Qrafik analitikinin ehtiyat modeli 39 çağırışdan 2-də cavab verib.
-- [ ] 2.6 Gemini: köhnə model bağlanıb, yeni modelin sınağı Google 503 ilə alınmayıb — sınaq təkrarı, sahibin
-      qabaqcadan qaydası (eyni şirkət + sınaq pis deyil + qiymət ≤ +20 %).
-- [ ] 2.7 Google News gümüş/platin 429.
-- [ ] 2.8 R2, Healthchecks, 2FA hər yerdə «kod hazırdır, sahibin açarını gözləyir».
-- [ ] 2.9 `feed geo failed` xətası.
+- [x] 2.1 Hakimin öz yoxlaması: 30 % gələcəyə baxan saxta qayda (64 % düz) tutulmadı. Nəticə həddi (10–15 bənd, sahibin
+      siyasəti) onu prinsipcə tuta bilmir. «Boz zona + gecikmə testi» sınandı, ikinci göz göstərdi ki, qısa üfüqlərdə həqiqi
+      tez sönən üstünlüyü həmişəlik rədd edər — atıldı. Yerinə: hər proqnozun **yazılma vaxtı** qeyd olunur, son sınaq yalnız
+      hədəf vaxtından əvvəl yazılanları sayır (nəticədən asılı olmayan qoruyucu). Öz yoxlaması dürüst «diqqət» göstərir.
+- [x] 2.2 Blokların gündəlik yoxlaması köhnə şəkil göstərir (Xəbəri «qırıq»); tez-tez + yaşı görünsün.
+- [x] 2.3 Alpaca (Benzinga) 48 saatda 0 başlıq, amma «ok». Yalnız ETF tikerləri soruşulurdu; indi ümumi axından da (yalnız
+      metal adı keçənlər). Xəritə 0 gətirəni «heç nə gətirmir» göstərir.
+- [x] 2.4 ~~Seçici konsensus heç vaxt ölçülə bilmir~~ — **səhər dediyim səhv idi:** sübutlu üsullardan asılı deyil; ən azı iki
+      ailə razı və heç biri əks olanda danışır, ailələr çox vaxt razılaşmır. Birləşdirici kimi arxa plana (3.1).
+- [x] 2.5 Qrafik analitikinin ehtiyat modeli 39 çağırışdan 2-də cavab verib — bu, cavabların kəsilməsi səhvi idi (26.11 21:22
+      NY düzəldilib); o vaxtdan heç bir səhv cavab yoxdur. Düzəltməyə ehtiyac yoxdur; xəritə 24 saatlıq payı göstərir.
+- [x] 2.6 Gemini: köhnə model bağlanıb, yeni modelin sınağı Google 503 ilə alınmayıb — sınaq təkrarı, sahibin
+      qabaqcadan qaydası (eyni şirkət + sınaq pis deyil + qiymət ≤ +20 %). Müvəqqəti xətada sınaq 6 saatdan bir təkrar
+      (3 dəfə). Yeni modelin qiyməti sistemdə məlum deyil → qayda avtomatik keçə bilmir, **qərar sahibindədir**; məlumat
+      agentləri ehtiyat beyinlə işləyir.
+- [x] 2.7 Google News gümüş/platin 429 — 429 deyən axın 15→30→60 dəq dincəlir (hər 2 dəqiqə soruşmaq onu daha da kəsirdi).
+- [x] 2.8 R2, Healthchecks, 2FA hər yerdə «kod hazırdır, sahibin açarını gözləyir».
+- [x] 2.9 `feed geo failed` xətası — 26.11 yeniləmə anında bir dəfə (fayllar dəyişərkən idxal), təkrarlanmayıb.
 
 ## Mərhələ 3 — artıqları çıxarmaq, sınaqları daraltmaq
 - [ ] 3.1 Birləşdiricilər: önə yalnız vahid proqnoz (+ müqayisə üçün sadə orta); konsensus, tərəzi, dirijor arxada.
-- [ ] 3.2 Mövsüm və zərgərlik səsləri pensiyaya (7 gündə 0 fikir; dalğalılıq sınağı sübut vermədi).
-- [ ] 3.3 İkinci analitik və müzakirə seyrək (pula qənaət).
+- [x] 3.2 Mövsüm və zərgərlik səsləri pensiyaya (7 gündə 0 fikir; dalğalılıq sınağı sübut vermədi).
+- [x] 3.3 İkinci analitik və müzakirə seyrək (pula qənaət) — 4 saatda bir (əvvəl hər saat).
 - [ ] 3.4 Yeni kiçik sınaq ailəsi (3–5 namizəd), qeyd vaxtı ilə, yalnız yeni canlı məlumatla.
 - [ ] 3.5 Qeydə alınmış əsas sınaqların (V1–V5) istifadə etdiyi üsullara toxunulmur — yoxlanır.
 
@@ -67,3 +76,4 @@
 - 27.11 11:05 — 1.1: əlaqə xəritəsi (`pipeline.py`): 18 analitikin hamısının səsi, hər mənbə ayrıca (yalançı OK, qismən
   xəta, yoxlanmayan), beyinlərin 24 saatlıq cavabı, Hakimin öz yoxlaması, sahibi gözləyənlər («owner»), cədvəllərin
   təzəliyi. Blokların yoxlaması saatda bir. Köhnə sorğu 14 mln sətri tam oxuyurdu — indi indekslə (bir sorğu).
+- 27.11 12:05 — Mərhələ 2 bitdi (2.1 başqa yolla), 3.2 və 3.3 bitdi. Mövsüm/zərgərlik məlumatı silinmir (təmizlik yalnız 26.11 siyahısı).
