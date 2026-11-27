@@ -89,3 +89,31 @@ def test_fomc_decision_from_the_target_rate():
     hold, cut = _ts("2024-09-12") + 18 * 3600, _ts("2024-09-18") + 18 * 3600
     ev = {e["t"]: e for e in el.fomc_events(db, [hold, cut])}
     assert ev[cut]["cat"] == "aşağı" and ev[cut]["change"] == -50 and ev[hold]["cat"] == "yaxın"
+
+
+def test_gdelt_parse_averages_per_day():
+    data = {"timeline": [{"series": "Volume Intensity", "data": [
+        {"date": "20240101T000000Z", "value": 1.0}, {"date": "20240101T120000Z", "value": 3.0},
+        {"date": "20240102T000000Z", "value": 0.5}, {"date": "bad", "value": "x"}]}]}
+    assert el.parse_gdelt(json.dumps(data)) == {"2024-01-01": 2.0, "2024-01-02": 0.5}
+    try:
+        el.parse_gdelt("{}")
+        raise AssertionError("must fail")
+    except ValueError:
+        pass
+
+
+def test_geo_jump_is_against_the_past_and_known_after_the_day():
+    days = [datetime.fromtimestamp(_ts("2024-01-01") + i * 86400, timezone.utc).strftime("%Y-%m-%d")
+            for i in range(130)]
+    vals = [1.0] * 130
+    vals[100], vals[103], vals[120] = 2.5, 1.8, 1.6       # a big jump, one inside the 7-day gap, a medium one
+    evs = el.geo_events((days, vals), _ts("2025-01-01"))
+    assert [(e["period"], e["cat"]) for e in evs] == [(days[100], "böyük"), (days[120], "orta")]
+    assert evs[0]["t"] == _ts(days[100]) + 86400               # knowable only when the day is over
+    assert el.geo_events((days, vals), _ts(days[100]) + 3600) == []
+    db = DB(":memory:")
+    el.ensure(db)
+    db.executemany("INSERT INTO geo_vol VALUES(?,?)", list(zip(days, vals)))
+    assert el.geo_now(db, _ts(days[120]) + 86400 + 3600)[0] == "orta"
+    assert el.geo_now(db, _ts(days[125]) + 86400 + 3600) is None

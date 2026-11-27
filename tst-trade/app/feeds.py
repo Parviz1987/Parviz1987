@@ -541,6 +541,9 @@ class Feeds:
         await self.first_releases(client, key)
         await self.release_dates(client, key)
         await self.fomc_dates(client)
+        if not getattr(self, "_geo_busy", False):     # in the background: the history takes a minute (5 s per call)
+            self._geo_busy = True
+            asyncio.get_running_loop().create_task(self._geo_bg())
         await self.event_firsts(client, key)
 
     async def fomc_dates(self, client) -> None:
@@ -625,6 +628,55 @@ class Feeds:
         if self.activity is not None:
             self.activity.report("archivist", "done" if got else "error",
                                  note=f"ALFRED ilk dərc: {got} dəyər" + (f"; xəta: {errors[0]}" if errors else ""))
+
+    async def _geo_bg(self) -> None:
+        from . import eventlib
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
+                new = await self.geo_volume(client)
+            if new:                                  # new history years: rebuild the library now
+                await asyncio.to_thread(eventlib.build, self.db)
+        except Exception as e:
+            log.warning("gdelt: %s", type(e).__name__)
+        finally:
+            self._geo_busy = False
+
+    async def geo_volume(self, client, now: float | None = None) -> bool:
+        """Hadisələr kitabxanası, geopolitics: GDELT's daily share of world news about war and military strikes (open
+        data, no key). First the history from 2017 a year per request (GDELT asks for one request per 5 seconds),
+        then the last three weeks each run."""
+        from . import eventlib
+        now = time.time() if now is None else now
+        eventlib.ensure(self.db)
+        have = {r["d"][:4] for r in self.db.execute("SELECT d FROM geo_vol").fetchall()}
+        year = datetime.fromtimestamp(now, timezone.utc).year
+        spans = [(f"{y}0101000000", f"{y}1231235959") for y in range(eventlib.GDELT_FROM, year)
+                 if str(y) not in have]
+        start = datetime.fromtimestamp(now - 21 * 86400, timezone.utc).strftime("%Y%m%d000000")
+        spans.append((start, datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d%H%M%S")))
+        got, errors = 0, []
+        for i, (a, b) in enumerate(spans):
+            if i:
+                await asyncio.sleep(6)
+            try:
+                r = await client.get(eventlib.GDELT_URL, params={"query": eventlib.GDELT_QUERY, "mode": "timelinevol",
+                                                                 "format": "json", "startdatetime": a,
+                                                                 "enddatetime": b, "timelinesmooth": 0},
+                                     headers=UA, timeout=60)
+                if r.status_code != 200:
+                    raise ValueError(f"HTTP {r.status_code}")
+                days = eventlib.parse_gdelt(r.text)
+                today = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%d")
+                rows = [(d, v) for d, v in days.items() if d < today]      # only finished days
+                self.db.executemany("INSERT OR REPLACE INTO geo_vol(d, v) VALUES(?,?)", rows)
+                got += len(rows)
+            except Exception as e:
+                errors.append(f"{a[:8]}: {type(e).__name__} {str(e)[:80]}")
+        self.db.put("eventlib:geo_fetch", json.dumps({"ts": now, "days": got, "errors": errors[:5]},
+                                                     ensure_ascii=False))
+        if errors:
+            log.warning("gdelt: %s", "; ".join(errors[:3]))
+        return len(spans) > 1 and got > 0
 
     async def event_firsts(self, client, key: str) -> None:
         """Hadisələr kitabxanası (app/eventlib.py): ALFRED's first published CPI, payrolls, PCE prices, real GDP and

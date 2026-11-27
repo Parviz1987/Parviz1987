@@ -23,14 +23,15 @@ from datetime import datetime, timezone
 
 from .db import DB
 
-EV_VER = "2026-11-27.2"   # .2: the Fed target from plain observations (never revised)
+EV_VER = "2026-11-27.3"   # .2: the Fed target from plain observations (never revised)
 SERIES = {"CPI": "CPIAUCSL", "Employment Situation": "PAYEMS", "Personal Income and Outlays": "PCEPI",
           "GDP": "GDPC1"}
 FIRST_SERIES = tuple(SERIES.values()) + ("DFEDTARU",)
 NOT_REVISED = ("DFEDTARU",)
 MIN_LAG = {"CPIAUCSL": 32, "PAYEMS": 28, "PCEPI": 45, "GDPC1": 80}   # days from the period's first day to its release
 NAMES = {"CPI": "CPI (inflyasiya)", "Employment Situation": "NFP (iş yerləri)", "GDP": "ÜDM",
-         "Personal Income and Outlays": "PCE (inflyasiya)", "FOMC": "Fed qərarı"}
+         "Personal Income and Outlays": "PCE (inflyasiya)", "FOMC": "Fed qərarı",
+         "GEO": "geosiyasi gərginlik"}
 GOLD_SIGN = {"CPI": -1, "Employment Situation": -1, "GDP": -1, "Personal Income and Outlays": -1, "FOMC": -1}
 CALENDAR_MATCH = {"CPI": ("cpi", "consumer price"), "Employment Situation": ("non-farm", "nonfarm", "non farm"),
                   "GDP": ("gdp",), "Personal Income and Outlays": ("pce",), "FOMC": ("federal funds", "interest rate")}
@@ -40,11 +41,23 @@ HORIZONS = ("1d", "1w")
 METALS = ("XAU", "XAG", "XPT", "XPD")
 KEY_TEST = "eventlib:test"
 
+# Geopolitics (owner 2026-11-27: «geosiyasi hadisələri də əlavə etməyimiz lazımdır»): GDELT's daily share of world
+# news coverage about war and military strikes (open data, free for any use with citation; api.gdeltproject.org,
+# from 2017). A day is an event when that share jumps well above its own past 90 days; it is known only at the day's
+# end, so the event's time is the next 00:00 UTC (the moves are measured after it was knowable).
+GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
+GDELT_QUERY = '(war OR invasion OR airstrike OR "air strike" OR missile OR bombing OR "military strike")'
+GDELT_FROM = 2017
+GEO_BASE_DAYS, GEO_MIN_BASE, GEO_GAP = 90, 60, 7
+GEO_CATS = {"böyük": 2.0, "orta": 1.5}            # jump against the 90-day median
+CATS = ("yuxarı", "yaxın", "aşağı", "böyük", "orta")
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS ev_lib (id TEXT PRIMARY KEY, kind TEXT NOT NULL, t REAL NOT NULL, period TEXT,
   value REAL, change REAL, base REAL, surprise REAL, cat TEXT NOT NULL, basis TEXT NOT NULL, usd_trend INTEGER,
   note TEXT);
 CREATE INDEX IF NOT EXISTS ev_lib_t ON ev_lib(t);
+CREATE TABLE IF NOT EXISTS geo_vol (d TEXT PRIMARY KEY, v REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS ev_move (id TEXT NOT NULL, symbol TEXT NOT NULL, h TEXT NOT NULL, ret REAL NOT NULL,
   done_t REAL NOT NULL, trend INTEGER, PRIMARY KEY (id, symbol, h));
 """
@@ -139,6 +152,74 @@ def fomc_events(db: DB, days: list[float]) -> list[dict]:
     return out
 
 
+def parse_gdelt(data) -> dict[str, float]:
+    """GDELT timeline JSON -> {YYYY-MM-DD: mean coverage share that day} (hourly points are averaged per day)."""
+    if isinstance(data, (bytes, str)):
+        data = json.loads(data)
+    tl = data.get("timeline") if isinstance(data, dict) else None
+    if not isinstance(tl, list) or not tl or not isinstance(tl[0], dict):
+        raise ValueError("GDELT: gözlənilməyən cavab")
+    acc: dict[str, list[float]] = {}
+    for p in tl[0].get("data") or []:
+        try:
+            raw = str(p["date"])
+            d = f"{raw[0:4]}-{raw[4:6]}-{raw[6:8]}"
+            acc.setdefault(d, []).append(float(p["value"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return {d: sum(v) / len(v) for d, v in acc.items() if v}
+
+
+def _geo_series(db: DB) -> tuple[list[str], list[float]]:
+    try:
+        rows = db.execute("SELECT d, v FROM geo_vol ORDER BY d").fetchall()
+    except Exception:
+        return [], []
+    return [r["d"] for r in rows], [r["v"] for r in rows]
+
+
+def geo_jump(vals: list[float], i: int) -> float | None:
+    """The day's coverage share against the median of the 90 days before it (only the past)."""
+    past = [v for v in vals[max(0, i - GEO_BASE_DAYS):i] if v > 0]
+    if len(past) < GEO_MIN_BASE:
+        return None
+    med = sorted(past)[len(past) // 2]
+    return vals[i] / med if med > 0 else None
+
+
+def geo_events(series: tuple[list[str], list[float]], now: float) -> list[dict]:
+    days, vals = series
+    out, last = [], -10 ** 9
+    for i, d in enumerate(days):
+        t = _day(d) + 86400                         # known when the day is over
+        if t > now:
+            break
+        j = geo_jump(vals, i)
+        if j is None or j < GEO_CATS["orta"] or i - last < GEO_GAP:
+            continue
+        last = i
+        cat = "böyük" if j >= GEO_CATS["böyük"] else "orta"
+        out.append({"kind": "GEO", "t": t, "period": d, "value": vals[i], "change": round(j, 3), "base": 1.0,
+                    "surprise": None, "cat": cat, "basis": "GDELT xəbər payı"})
+    return out
+
+
+def geo_now(db: DB, now: float) -> tuple[str, float] | None:
+    """Was yesterday (the last finished day) a geopolitical jump? -> (category, jump)."""
+    days, vals = _geo_series(db)
+    if not days:
+        return None
+    i = len(days) - 1
+    while i >= 0 and _day(days[i]) + 86400 > now:
+        i -= 1
+    if i < 0 or now - (_day(days[i]) + 86400) > 2 * 86400:
+        return None
+    j = geo_jump(vals, i)
+    if j is None or j < GEO_CATS["orta"]:
+        return None
+    return ("böyük" if j >= GEO_CATS["böyük"] else "orta"), j
+
+
 def _calendar_estimates(db: DB) -> dict[tuple[str, int], float]:
     """(kind, day) -> the economists' estimate minus the actual is known for new releases (FMP calendar)."""
     out = {}
@@ -203,6 +284,7 @@ def build(db: DB, now: float | None = None) -> dict:
                 e["basis"] = "ekspert gözləntisi"
         rows += [e for e in evs if e["cat"]]
     rows += fomc_events(db, [t for t in hist.get("FOMC", []) if t < now])
+    rows += geo_events(_geo_series(db), now)
     dt, dc = _daily(db, "DXY")
     daily = {s: _daily(db, s) for s in METALS}
     lib, mv = [], []
@@ -224,6 +306,7 @@ def build(db: DB, now: float | None = None) -> dict:
            "first": min((x[2] for x in lib), default=None)}
     try:
         res["fetch"] = json.loads(db.get("eventlib:fetch") or "null")
+        res["geo_fetch"] = json.loads(db.get("eventlib:geo_fetch") or "null")
     except ValueError:
         res["fetch"] = None
     res["test"] = shadow_test(db, now)
@@ -320,6 +403,8 @@ def for_brains(db: DB, upcoming: list[dict], released: list[dict], now: float | 
     out = []
     items = [(r.get("title") or r.get("event") or "", None) for r in upcoming[:8]]
     items += [(r.get("event") or "", (r.get("actual"), r.get("estimate"))) for r in released[:6]]
+    g = geo_now(db, now)
+    todo = [("GEO", "geosiyasi gərginlik (dünən)", (g[0],))] if g else []
     for title, fact in items:
         kind = _kind_of(str(title))
         if kind is None:
@@ -327,6 +412,8 @@ def for_brains(db: DB, upcoming: list[dict], released: list[dict], now: float | 
         cats = ("yuxarı", "yaxın", "aşağı")
         if fact and fact[0] is not None and fact[1] is not None:
             cats = ("yuxarı" if fact[0] > fact[1] else "aşağı" if fact[0] < fact[1] else "yaxın",)
+        todo.append((kind, title, cats))
+    for kind, title, cats in todo:
         for cell in sorted(passed):
             s, h = cell.split(":")
             mv = _moves_of(db, s, h)
@@ -350,7 +437,7 @@ def view(db: DB, symbol: str = "XAU") -> dict:
     for h in HORIZONS:
         mv = _moves_of(db, symbol, h)
         for kind in NAMES:
-            for cat in ("yuxarı", "yaxın", "aşağı"):
+            for cat in CATS:
                 rets = [mv[e["id"]][0] for e in evs if e["kind"] == kind and e["cat"] == cat and e["id"] in mv]
                 sm = summary(rets)
                 if sm:

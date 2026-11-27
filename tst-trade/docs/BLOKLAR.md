@@ -234,7 +234,11 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 - **Kölgə sınağı:** hər hadisə yalnız ondan əvvəlki hallarla proqnozlaşdırılır; xərcdən sonra bazarın meylini
   keçməyən metal/horizont beyinlərə **verilmir** (t ≥ 2,5, ≥ 60 hal). Keçənlər strateqin faktlarında
   `history_analogs`. Diag `eventlib`.
-- **Qalan:** geosiyasi hadisələr (GDELT arxivi, 2015-dən) — növbəti addım; GPR indeksi lisenziya aydın olanda.
+- **Geosiyasət (27.11):** GDELT-in (açıq məlumat, mənbə göstərilməklə pulsuz) hər gün dünya xəbərlərində müharibə və
+  hərbi zərbə mövzusunun payı, 2017-dən. Pay öz son 90 gününün medianından 1,5 dəfə yuxarı → «orta», 2 dəfə → «böyük»
+  hadisə (7 gün ara ilə); gün bitəndən sonra bilinir, hərəkət ondan sonra ölçülür. Dünən belə gün olubsa, kölgə
+  sınağından keçən metallarda beyinlər oxşar halları görür.
+- **Qalan:** GPR indeksi (lisenziya aydın olanda); hadisə növləri (müharibə / sanksiya / neft) ayrıca — sübut olsa.
 
 ---
 
