@@ -388,3 +388,27 @@ details.krow>summary:has(.kspend){grid-template-columns:minmax(150px,210px) auto
   details.krow>summary,details.krow>summary:has(.kspend){grid-template-columns:minmax(0,1fr) auto;gap:4px 8px}
   details.krow>summary .kfact,.kspend{grid-column:1/-1}details.krow>summary::after{grid-column:2;grid-row:1}
   .atabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.atabs button{flex:0 0 auto}}
+/* Bilik kitabı: one line per rule, details on a click (owner 2026-11-26) */
+details.rule{padding:0;gap:0}
+details.rule>summary.rh{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px}
+details.rule>summary.rh::-webkit-details-marker{display:none}
+details.rule>summary .rn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+details.rule>summary .rsum{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+details.rule[open]{border-color:rgba(56,200,255,.4)}
+details.rule[open]>summary.rh{border-bottom:1px solid var(--line)}
+details.rule>.rr{padding:4px 10px}details.rule>.rr:last-child{padding-bottom:10px}
+.rchip{font-family:var(--mono);font-size:.7rem;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.rchip.sübut{color:var(--up);border-color:rgba(62,224,143,.45)}.rchip.yox{color:var(--down)}.rchip.zəif{color:var(--warn)}
+@media (max-width:560px){details.rule>summary.rh{grid-template-columns:auto minmax(0,1fr)}details.rule>summary .rsum{grid-column:1/-1;justify-content:flex-start}}
+/* one look on every page (owner 2026-11-26: the design should not get lost inside the panels): each panel carries the
+   same thin light line along its top edge as the panel and the agents page, and its title sits on it */
+.box{position:relative}
+.box::before{content:"";position:absolute;left:16px;right:16px;top:-1px;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(56,200,255,.55),rgba(232,185,74,.35),transparent)}
+.box h2{color:#f1f5ff;text-shadow:0 0 18px rgba(56,200,255,.15)}
+.box h3.sub{color:var(--fg)}
+/* block pages: a closed «necə işləyir» stays on the rule's own line; the TA groups and long lists open on a click */
+.tarule>details:not([open]){flex-basis:auto;margin-left:auto}
+details.more summary{cursor:pointer;margin:6px 0}
+/* a long row of buttons scrolls sideways on a phone instead of pushing the page wider */
+@media (max-width:640px){.seg{max-width:100%;overflow-x:auto;scrollbar-width:none}.seg button{flex:0 0 auto}}

@@ -34,6 +34,7 @@
   let sym = load("sym", "XAU"), tf = load("tf", "1h"), cnt = load("cnt", 120);
   let lay = load("lay", { ema: true, bb: false, ich: false, fib: false, piv: false, sr: true, round: false, zig: true, tl: true, marks: true, sub: "rsi" });
   let off = new Set(load("off", []));          // rules switched off on the chart
+  const OPENK = new Set(load("openk", []));     // rule groups the owner opened (closed by default: a short page)
   let data = null;
 
   function seg(el, items, cur, on) {
@@ -118,7 +119,7 @@
     const firingNow = new Set((data.fired || []).filter((f) => f.t === lastT).map((f) => f.rule));
     const count = {};
     (data.fired || []).forEach((f) => { count[f.rule] = (count[f.rule] || 0) + 1; });
-    $("book").innerHTML = KINDS.map(([kind, ids]) => `<details class="takind" open><summary><b>${esc(kind)}</b> <span class="note">${ids.length} qayda</span></summary>` +
+    $("book").innerHTML = KINDS.map(([kind, ids]) => `<details class="takind"${OPENK.has(kind) ? " open" : ""} data-k="${esc(kind)}"><summary><b>${esc(kind)}</b> <span class="note">${ids.length} qayda</span></summary>` +
       ids.filter((id) => by[id]).map((id) => {
         const r = by[id], x = r.record, rr = x && x.rr;
         const adx = x && x.by_adx ? Object.entries(x.by_adx).map(([g, b]) => `${esc(g.split(" (")[0])} ${pct(b.hit_rate)}`).join(" · ") : "";
@@ -133,6 +134,9 @@
       }).join("") + "</details>").join("") +
       `<p class="note"><b>Sistematik ölçmə</b> (12-ci növ) ayrıca qayda deyil: Hakim yuxarıdakı hər qaydanı iki cür ölçür — növbəti şam
        və treyder kimi (stop 1 ATR, hədəf 2 ATR, xərcdən sonra R ilə), üç ADX rejimində ayrıca.</p>`;
+    $("book").querySelectorAll("details.takind").forEach((d) => d.ontoggle = () => {
+      d.open ? OPENK.add(d.dataset.k) : OPENK.delete(d.dataset.k); save("openk", [...OPENK]);
+    });
     $("book").querySelectorAll("input[data-r]").forEach((i) => i.onchange = () => {
       i.checked ? off.delete(i.dataset.r) : off.add(i.dataset.r); save("off", [...off]); draw();
     });
