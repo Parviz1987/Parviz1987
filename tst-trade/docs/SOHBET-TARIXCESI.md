@@ -68,11 +68,35 @@ sübutu ilə**. Sübut olmayan heç nə pula (hətta kağız ticarətə) getmir.
   kəsilmə adı ilə yazılır; `agents.router.failed_recent` ilə yoxla.
 - Diaqnostika açarı 27.11 yeniləndi, mühitin «Сетевые секреты» bölməsindədir, işləyir.
 
+## 5a. İkinci sessiya ilişdi, iş üçüncüyə köçdü (27.11)
+- Sessiyalar: 1) «Pj Trade Gold repository review» (22–26.11) — planlı arxiv; 2) «TST Trade işə davam»
+  (`session_01JYBTS9BuD5bbJu5ECSL2EN`, 26.11 21:29 – 27.11 05:12 NY, budaq `claude/tst-trade-continue-8vwqze`) —
+  **ilişib**; 3) indiki sessiya (`session_01JYBTS8G8SZcAemkDB557Re`, 27.11 09:22 NY-dən, budaq
+  `claude/eager-faraday-l9bqjn`).
+- **Nə oldu:** 27.11 05:12 NY Anthropic-in təhlükəsizlik filtri (`reasoning_extraction`, «modelin düşüncəsini köçürmə»
+  şübhəsi) cavabı dayandırdı; o andan bütün mesajlar (növbətçi yoxlama 07:49, sahibin «salam»ı 09:18) 1 saniyədə rədd
+  olunur — hər mesajda bütün köhnə söhbət yenidən göndərilir (ehtimal). Xəta mətninin özü «yeni sessiya aç» deyir.
+  Sahibin səhvi yoxdur. Belə olsa: o sessiyaya yazmağın faydası yoxdur — yeni sessiya aç, bu faylı oxu.
+- **İtən:** yalnız yarımçıq Panel bölməsi «Analitiklər nə deyir» (commit olunmamışdı). «Analitiklər» səhifəsi
+  (`c4408f1`, 05:09 NY) serverdədir.
+- **Sahib 27.11 09:35 NY:** «bütün sessiyanı bura köçür» → bu sessiya serverə (`claude/amazing-keller-c4hwfl`) push
+  edə bilər. Sahib: köhnələri **silmək lazım deyil** (sessiya arxivə verilmir, tapşırıqlar yalnız söndürülür).
+- **Sahibin 27.11 04:57 NY tapşırığı** (2-ci sessiyada; 1-ci hissə — jurnal — bitib, 2-ci hissə **açıqdır**):
+  1) Jurnal: kim harada nə deyib, düz çıxıbmı; analitik qızılda düz, gümüşdə səhvdirsə — yalnız qızılda götürülür
+     («pul yox, sadəcə qeyd»). ✅ `/analitikler` + `app/sieve.py`.
+  2) **Bütün panelləri bir-bir gəz:** bir neçə yerdə təkrarlanan şeyi süzgəcdən keçir, azalt; texniki şeylər arxa plana
+     (silmək yox — «arxada işləsin»); ön planda analitiklərin konkret rəyi («filan qiymətdə qalxacaq / düşəcək»);
+     qrafik analizi (TA, Fibonaççi) qrafikin üstündə: bir ana qrafik + altında hər analizin öz qrafiki; qalan proqnoz
+     verənlər jurnal üzərində («qalxacaq dedi — qalxdı»); eyni alətlər bir yerə; səhifədə boş/dolu tərəflər (solda boş,
+     aşağıda sıx) düzəlsin; «baxanda başa düşmək olsun».
+
 ## 6. Açıq işlər
-- **Sahibin:** 2FA; Healthchecks.io açarı; Admin → Əməliyyatlar → WAL araşdırma kartını bağlamaq.
-- **Claude-un:** 3 saatlıq növbətçi yoxlama (temirci) — ✅ 26.11 21:44 NY yeni sessiyaya köçürüldü
-  (`trig_01SPvUvaqY42odFwtafEJxpL`), həftəlik hesabat da (`trig_01MFgmGc9vkDfTtw1XEUTzNt`); köhnə ikisi söndürülüb
-  (silinməyib) — yenidən köçürməyə ehtiyac yoxdur; kəsilmə düzəlişi ✅ yoxlandı (21:26 NY uğurlu); GDELT dolması;
+- **Sahibin:** 2FA; Healthchecks.io açarı; Admin → Əməliyyatlar → WAL araşdırma kartını bağlamaq; Gemini model
+  təklifi (`gemini-2.5-flash` bağlanıb, `gemini-3.8-flash` sınağı Google-un 503-ü ilə alınmayıb; Admin → Beyinlər).
+- **Claude-un:** 3 saatlıq növbətçi yoxlama (temirci) — 27.11 09:36 NY **indiki sessiyaya** köçürüldü
+  (`trig_01RQiBbUSTQ1hnfAh6aUtKNm`), həftəlik hesabat da (`trig_01EgJRrrocafqJqht6CrAedz`); 2-ci sessiyanın ikisi
+  (`trig_01SPvUvaqY42odFwtafEJxpL`, `trig_01MFgmGc9vkDfTtw1XEUTzNt`) və 1-cinin ikisi söndürülüb (silinməyib).
+  Sahibin 04:57 tapşırığının 2-ci hissəsi (bölmə 5a); kəsilmə düzəlişi ✅ yoxlandı (21:26 NY uğurlu); GDELT dolması;
   `news_shock_vol` / `geo_shock_vol` ilk nəticələri (t > 2 olsa, dalğalılıq bayrağı təklifi); `BLOKLAR.md`-ni hər işdən sonra yeniləmək.
 - **Təqvim:** 29.11 hipotez agentinin ilk işi; 30.11 həftəlik hesabat; 2.12 qızıl proqnozu yoxlaması; 9.12 Fed.
 
