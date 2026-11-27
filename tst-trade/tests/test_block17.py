@@ -61,4 +61,22 @@ def test_v_family_starts_empty(tmp_path):
     from app import hypotheses
     db = DB(str(tmp_path / "v.db"))
     rows = hypotheses.evaluate_v(db)
-    assert [r["id"] for r in rows] == ["V1", "V2", "V3", "V4", "V5"] and all(r["status"] == "az" for r in rows)
+    assert [r["id"] for r in rows] == ["V1", "V2", "V3", "V4", "V5", "Q1", "Q2", "Q3"]
+    assert all(r["status"] == "az" for r in rows)
+
+
+def test_q_family_counts_only_forecasts_after_its_registration_on_money(tmp_path):
+    # plan 27.11 step 3.4: chosen by looking at the live record, so only NEW forecasts count, against 0.05 / 3
+    from app import hypotheses
+    db = DB(str(tmp_path / "q.db"))
+    t0 = hypotheses.Q_REGISTERED
+    for i in range(80):
+        for before in (True, False):
+            t = (t0 - 400 * 3600 if before else t0) + i * 3600
+            up = i % 5 != 0                                   # right 4 times in 5, in the forecast's direction
+            db.execute("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, price1, p_up, "
+                       "lo50, hi50, lo80, hi80) VALUES('XAU', '1h', 'qaydalar', 'live', ?, ?, 100, ?, 0.6, 1, 1, 1, 1)",
+                       (t, t + 3600, 100.5 if up else 99.7))
+    q1 = next(r for r in hypotheses.evaluate_v(db) if r["id"] == "Q1")
+    assert q1["n"] == 80 and q1["registered"] == t0 and abs(q1["p_bar"] - 0.05 / 3) < 1e-12
+    assert q1["status"] == "sübut" and q1["net_avg"] > 0

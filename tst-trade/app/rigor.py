@@ -52,7 +52,7 @@ def trials(db: DB) -> int:
         pass
     for x in ("conductor:dirijor", "conductor:ümumi", "shadow:fa_window", "shadow:festival_vol", "aci:shadow"):
         seen.add(f"x:{x}")
-    for group in ("HYPOTHESES", "FOCUS", "V_TESTS"):
+    for group in ("HYPOTHESES", "FOCUS", "V_TESTS", "Q_TESTS"):
         for x in getattr(hypotheses, group, []) or []:
             if isinstance(x, dict) and x.get("id"):
                 seen.add(f"h:{x['id']}")

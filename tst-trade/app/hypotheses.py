@@ -233,6 +233,25 @@ V_TESTS = [
 ]
 
 
+# Q family (plan 27.11 step 3.4, owner approved «sınaqları 3–5 namizədə daralt»): the fastest honest route to an
+# answer. The V family is mostly long horizons (a case a week or a month: years to an answer); these three are gold at
+# one hour, where the cost is smallest against the move and a case comes every hour of trading. Chosen by looking at
+# the live record (qaydalar 1 h was the best live voice on the fastest desk), so ONLY forecasts issued after the
+# registration count, against its own bar 0.05 / 3, on money after the full cost, like V.
+Q_REGISTERED = 1795802400          # 2026-11-27 18:00 UTC = 13:00 New York (registered 10:55 NY, before any of its data)
+Q_P_BAR = 0.05 / 3
+Q_TESTS = [
+    {"id": "Q1", "name": "Qızıl, 1 saat: Bilik kitabı qaydaları (pulla)", "method": "qaydalar", "horizon": "1h",
+     "metals": ("XAU",), "idea": "Ən sürətli masada ən yaxşı canlı səs. Saatda bir hal: üstünlük varsa aylarla cavab.",
+     "source": "canlı qeyd (məlumata baxılaraq seçilib — yalnız yeni məlumat sayılır)"},
+    {"id": "Q2", "name": "Qızıl, 1 saat: vahid proqnoz (pulla)", "method": "vahid", "horizon": "1h", "metals": ("XAU",),
+     "idea": "Sahibə göstərilən son söz ən sürətli masada pul qazandırırmı?", "source": "sahibin vahid proqnoz tələbi"},
+    {"id": "Q3", "name": "Qızıl, 1 saat: qrafik analitiki (pulla)", "method": "chartist", "horizon": "1h",
+     "metals": ("XAU",), "idea": "Qrafiki oxuyan beyin (ucuz model) qaydalardan çox şey görürmü?",
+     "source": "canlı qeyd (məlumata baxılaraq seçilib — yalnız yeni məlumat sayılır)"},
+]
+
+
 def _t_p(xs: list[float]) -> tuple[float | None, float | None]:
     n = len(xs)
     if n < 2:
@@ -249,14 +268,15 @@ def evaluate_v(db: DB, now: float | None = None) -> list[dict]:
     from . import impulse
     now = time.time() if now is None else now
     out = []
-    for h in V_TESTS:
+    for h, reg, bar in [(x, V_REGISTERED, V_P_BAR) for x in V_TESTS] + [(x, Q_REGISTERED, Q_P_BAR) for x in Q_TESTS]:
         row = {k: h[k] for k in ("id", "name", "idea", "source")}
+        row.update({"registered": reg, "p_bar": bar})
         if h.get("kind") == "news_impulse":
             ny = ZoneInfo("America/New_York")
             db.script("CREATE TABLE IF NOT EXISTS v_news_impulse (t INTEGER PRIMARY KEY, cont INTEGER, net REAL)")
             db.executemany("INSERT OR IGNORE INTO v_news_impulse VALUES(?,?,?)",
                            [(e["t"], e["cont"], e["net"]) for e in impulse.events(db, now)
-                            if e["t"] >= V_REGISTERED and e["symbol"] == "XAU" and e["K"] == 4.0 and e["H"] == 60
+                            if e["t"] >= reg and e["symbol"] == "XAU" and e["K"] == 4.0 and e["H"] == 60
                             and (datetime.fromtimestamp(e["t"], ny).hour, datetime.fromtimestamp(e["t"], ny).minute)
                             in ((8, 30), (10, 0), (14, 0))])
             evs = [dict(r) for r in db.execute("SELECT cont, net FROM v_news_impulse").fetchall()]
@@ -268,8 +288,8 @@ def evaluate_v(db: DB, now: float | None = None) -> list[dict]:
             ph = ",".join("?" * len(h["metals"]))
             rows = db.execute(f"SELECT symbol, issued_t, price0, price1, p_up FROM forecasts WHERE mode='live' AND "
                               f"method=? AND horizon=? AND symbol IN ({ph}) AND issued_t >= ? AND price1 IS NOT NULL "
-                              f"AND p_up != 0.5 ORDER BY issued_t",
-                              (h["method"], h["horizon"], *h["metals"], V_REGISTERED)).fetchall()
+                              f"AND p_up != 0.5 AND (created_ts IS NULL OR created_ts < target_t) ORDER BY issued_t",
+                              (h["method"], h["horizon"], *h["metals"], reg)).fetchall()
             dates = sorted({r["issued_t"] for r in rows})[::k]      # one case per horizon: no overlap
             keep = set(dates)
             by: dict[int, list] = {}
@@ -285,7 +305,7 @@ def evaluate_v(db: DB, now: float | None = None) -> list[dict]:
             cases = [sum(v) / len(v) for _, v in sorted(by.items())]   # several metals = one portfolio per date
         mu, p = _t_p(cases)
         n = len(cases)
-        status = "az" if n < 30 else ("sübut" if p is not None and p < V_P_BAR and mu > 0 else "yox")
+        status = "az" if n < 30 else ("sübut" if p is not None and p < bar and mu > 0 else "yox")
         row.update({"n": n, "hit_rate": hits / nk if nk else None, "net_avg": mu, "p": p, "status": status,
                     "bar": None})
         out.append(row)

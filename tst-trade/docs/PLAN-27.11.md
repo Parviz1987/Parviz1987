@@ -50,8 +50,11 @@
 - [ ] 3.1 Birləşdiricilər: önə yalnız vahid proqnoz (+ müqayisə üçün sadə orta); konsensus, tərəzi, dirijor arxada.
 - [x] 3.2 Mövsüm və zərgərlik səsləri pensiyaya (7 gündə 0 fikir; dalğalılıq sınağı sübut vermədi).
 - [x] 3.3 İkinci analitik və müzakirə seyrək (pula qənaət) — 4 saatda bir (əvvəl hər saat).
-- [ ] 3.4 Yeni kiçik sınaq ailəsi (3–5 namizəd), qeyd vaxtı ilə, yalnız yeni canlı məlumatla.
-- [ ] 3.5 Qeydə alınmış əsas sınaqların (V1–V5) istifadə etdiyi üsullara toxunulmur — yoxlanır.
+- [x] 3.4 Yeni kiçik sınaq ailəsi (3–5 namizəd), qeyd vaxtı ilə, yalnız yeni canlı məlumatla. **Q1–Q3** (qızıl, 1 saat:
+      qaydalar, vahid proqnoz, qrafik analitiki), qeyd 27.11 13:00 NY, hədd 0,05/3, pulla (tam xərcdən sonra), V ailəsi ilə
+      eyni üsul. Niyə: V əsasən uzun üfüqlərdir (həftədə/ayda bir hal — illər); 1 saatda hər saat bir hal.
+- [x] 3.5 Qeydə alınmış əsas sınaqların (V1–V5) istifadə etdiyi üsullara toxunulmur — yoxlandı (vahid,
+      trendmix, tsmom, up, ABŞ rəqəmi impulsu — heç biri pensiyaya getmədi).
 
 ## Mərhələ 4 — saytın önü (sahibin 27.11 04:57 tapşırığı, `SOHBET-TARIXCESI.md` 5a)
 - [ ] 4.1 Panel: hər metal üçün analitiklərin indiki fikri (▲/▼, aralıq) + həmin metaldakı düz/səhv qeydi.
@@ -73,7 +76,9 @@
 ## Jurnal (NY saatı)
 - 27.11 10:20 — plan təsdiqləndi, iş başladı.
 - 27.11 10:33 — Mərhələ 0 bitdi: plan faylı; növbətçi yoxlama və həftəlik hesabat təzə sessiyada (ilk yoxlama 10:47).
-- 27.11 11:05 — 1.1: əlaqə xəritəsi (`pipeline.py`): 18 analitikin hamısının səsi, hər mənbə ayrıca (yalançı OK, qismən
+- 27.11 10:37 — 1.1: əlaqə xəritəsi (`pipeline.py`): 18 analitikin hamısının səsi, hər mənbə ayrıca (yalançı OK, qismən
   xəta, yoxlanmayan), beyinlərin 24 saatlıq cavabı, Hakimin öz yoxlaması, sahibi gözləyənlər («owner»), cədvəllərin
   təzəliyi. Blokların yoxlaması saatda bir. Köhnə sorğu 14 mln sətri tam oxuyurdu — indi indekslə (bir sorğu).
-- 27.11 12:05 — Mərhələ 2 bitdi (2.1 başqa yolla), 3.2 və 3.3 bitdi. Mövsüm/zərgərlik məlumatı silinmir (təmizlik yalnız 26.11 siyahısı).
+- 27.11 10:48 — Mərhələ 2 bitdi (2.1 başqa yolla), 3.2 və 3.3 bitdi. Mövsüm/zərgərlik məlumatı silinmir (təmizlik yalnız 26.11 siyahısı).
+- 27.11 10:58 — 3.4 və 3.5 bitdi: Q1–Q3 qeydə alındı (13:00 NY-dən sayılır); qeydə alınmış sınaqlar da yalnız vaxtında
+  yazılmış proqnozları sayır. 3.1 (birləşdiricilər arxaya) saytın önü ilə birlikdə (Mərhələ 4).
