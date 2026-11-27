@@ -10,3 +10,4 @@
 | 2026-11-26 | FRED release/dates cavabını hazır obyekt kimi oxudum, tarixlər yazılmadı | `_get` xam mətn qaytarır | Yeni mənbədə əvvəl saxta cavabla test yazıram |
 | 2026-11-26 | Testlər qırmızı ikən «;» ilə commit və push etdim | Test yalnız mənim yeni testim idi, kod düzgün idi | `set -o pipefail` + `&&`: testin xəta kodu `tail`-dən keçəndə itirdi; indi push yalnız yaşıl testdən sonra |
 | 2026-11-27 | Diaqnostika açarını yeniləməyi dedim, amma yeni açarın hara yazılacağını eyni anda tam demədim | Açar Admin-də dəyişəndə köhnəsi dərhal işləmir, yenisi mühitin «Network secrets» bölməsinə yazılmalıdır | Açar/parol addımını həmişə bütöv verirəm: harada yaradılır, hara yazılır, nə vaxt işə düşür |
+| 2026-11-26 | Bloklar xəritəsində «gecəlik R2 nüsxə ✅» yazılmışdı | R2 açarı heç saxlanmayıb, nüsxə getmir (yalnız DigitalOcean nüsxəsi var) | «Hazır» yazmazdan əvvəl serverin öz statusunu (diag `learning.backup`, `keys`) oxuyuram |

@@ -11,7 +11,7 @@
 > `judge_canary`, `heartbeat`, `ops`. Növbətçi təlimatı `.claude/skills/temirci/SKILL.md`, səhvlər
 > `docs/monitor/sehvlerim.md`, jurnal `docs/monitor/jurnal.md`.
 >
-> Son yeniləmə: **2026-11-26** (Claude). Vəziyyət işarələri: ✅ hazır və işləyir · 🟡 qurulub, sübut/məlumat
+> Son yeniləmə: **2026-11-26 22:00 NY** (Claude). Vəziyyət işarələri: ✅ hazır və işləyir · 🟡 qurulub, sübut/məlumat
 > gözləyir · 🔧 qismən, işi var · ⛔ yoxdur / dayandırılıb · 👤 sahibin addımı lazımdır.
 
 ---
@@ -219,9 +219,11 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 ### 19. Təhlükəsizlik ✅ 👤
 - Giriş jurnalı, geo-IP (DB-IP Lite), bloklama, başlıqlar; **2FA qurulub, sahib açmalıdır** (aşağıda 3).
 
-### 20. Ehtiyat nüsxə və baza ✅
-- DigitalOcean gündəlik backup (7 gün), gecəlik R2 nüsxə (`app/backup.py`), təmizlik (`app/cleanup.py`: 1,12 mln sətir
-  silindi), VACUUM 27.11 04:30 UTC.
+### 20. Ehtiyat nüsxə və baza 🔧 👤
+- DigitalOcean gündəlik backup (7 gün) ✅ — 26.11 yoxlandı (DO API): 3 nüsxə, sonuncu 26.11 19:00 NY, 4,3 GB.
+- Gecəlik R2 nüsxə (`app/backup.py`, 02:00 NY, serverdən kənarda ikinci nüsxə): kod hazırdır, **amma açar saxlanmayıb —
+  işləmir** (diag `learning.backup`: «R2 açarı saxlanmayıb»; əvvəl burada səhvən ✅ yazılmışdı). 👤 «Sahibin işləri» 4.
+- Təmizlik (`app/cleanup.py`: 1,12 mln sətir silindi), VACUUM 27.11 04:30 UTC (26.11 23:30 NY).
 
 ### 21. Blokların gündəlik yoxlaması — `app/blockaudit.py` ✅
 - Hər blok: mənbələr, qayda işə düşmələri, səsin fikirləri, Hakim, blokun dəyəri, vəziyyət asılılığı → «sağlam /
@@ -282,3 +284,18 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
    açarı yazın (Ad: TST Trade, növ: Time based).
 3. Proqramdakı 6 rəqəmi Admin-dəki xanaya yazıb təsdiqləyin.
 4. Ekranda çıxan **8 ehtiyat kodu kağıza yazın** (telefon itsə onlarla girəcəksiniz) → **«Yazdım»**.
+
+### 4) Cloudflare R2 (ikinci ehtiyat nüsxə — serverdən kənarda; istəyə bağlı)
+Nə üçün: DigitalOcean nüsxəsi eyni şirkətdədir; R2 nüsxəsi server və ya DigitalOcean hesabı itsə də qalır. Pulsuz
+10 GB-a qədərdir (bizim sıxılmış nüsxə ~0,2–0,4 GB), amma Cloudflare R2-ni açmaq üçün kart istəyə bilər — pul
+məsələsi olduğu üçün qərar sizindir.
+1. **dash.cloudflare.com** → hesab yaradın və ya daxil olun.
+2. Solda **R2 Object Storage** → (istəsə ödəniş üsulu əlavə edin) → **Create bucket** → ad: `tst-trade-backup` →
+   **Create bucket**.
+3. R2 səhifəsində sağda **Account ID**-ni kopyalayın (sonra lazım olacaq).
+4. R2 səhifəsində **Manage API tokens** (və ya **API** → **Manage API tokens**) → **Create API token** → icazə
+   **Object Read & Write**, yalnız `tst-trade-backup` bucket-i → **Create API Token**. Ekranda bir dəfə görünən
+   **Access Key ID** və **Secret Access Key**-i kopyalayın (çata yazmayın).
+5. Bizim saytda **Admin** → **«Makro: faiz, dollar»** bölməsi → **Cloudflare R2 (gecəlik ehtiyat nüsxə)** → 4 xana:
+   Account ID, Access Key ID, Secret Access Key, bucket adı (`tst-trade-backup`) → **«Saxla»** → **«Yoxla»**.
+6. İlk nüsxə həmin gecə 02:00 NY-də gedir; səhəri mənə «R2 qoydum» yazın — nüsxənin çatdığını yoxlayıram.
