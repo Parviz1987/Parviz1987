@@ -336,6 +336,13 @@ def _owner_steps(db: DB, now: float) -> list[tuple[str, str, str, str]]:
     else:
         st, text = "bad", ("son nüsxə 2 gündən köhnədir" if b.get("ok") else f"son cəhd alınmadı: {msg[:80]}")
     out.append(("İkinci ehtiyat nüsxə (Cloudflare R2)", "serverdən kənarda nüsxə", st, text))
+    # the two paid feeds the owner chose on 27.11 (plan step 11.1): waiting for the plan and the key, then connected
+    fj_saved = bool(db.get("key:financialjuice"))          # sealed value, only whether it exists matters here
+    out.append(("FinancialJuice (sürətli başlıqlar)", "Xəbər bloku, həyəcan", "owner",
+                "açar Admin-də var — qoşulma növbəti addımdır (Claude)" if fj_saved else
+                "sahib almağa qərar verib; açarı Admin → Mənbələr və açarlar bölməsinə yazılandan sonra qoşulur"))
+    out.append(("Databento canlı axını (böyük oyunçular, həqiqi həcm)", "Bazar axını bloku, həyəcan", "owner",
+                "Standard plan alınandan sonra canlı axın qoşulur (indiki açar yalnız tarixi məlumat üçündür)"))
     try:
         from . import diag, totp
         tf = totp.enabled(db, diag._SEALER[0]) if diag._SEALER else None

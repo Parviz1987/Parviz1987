@@ -125,3 +125,6 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   dəqiqəsində rəsmi mənbə 3 saniyədən bir, 4 dəqiqə soruşulur; rəqəm tapılan kimi həyəcan (əvvəl dəqiqədə bir + növbəti beyin
   dövrəsi). PCE və ÜDM FRED-dən gəlir (FRED-in öz gecikməsi var — adi dövrə). Hər başlığın gəliş vaxtı yazılır; əlaqə
   xəritəsində «Xəbər gecikməsi» sətri mənbə-mənbə median gecikməni və son ABŞ rəqəminin neçə saniyəyə gəldiyini göstərir.
+- 27.11 18:56 — 10.1 hazırlandı: şənbə 10:07 NY bu sessiyaya xatırlatma (`trig_012AQJgmWKiDemgCQXMAxUG2`) — server böyütməni özüm
+  edib saytın qayıtdığını yoxlayacağam (disk böyüdülmür ki, lazım olsa $6-a qayıtmaq olsun). 11.1: Admin-də FinancialJuice
+  açar xanası; əlaqə xəritəsində FinancialJuice və Databento canlı axını «sizin addımınızı gözləyir» — açar/plan gələndə qoşulur.

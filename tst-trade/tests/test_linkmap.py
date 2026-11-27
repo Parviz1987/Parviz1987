@@ -129,3 +129,13 @@ def test_one_lucky_random_rule_is_not_a_warning_but_an_old_self_check_is():
     db.put("judge:canary", json.dumps({"ts": NOW - 10 * 86400, "random_passed": 0, "random_n": 20,
                                        "peek30_caught": True, "peek_caught": True, "ok": True}))
     assert _rows(db, ks, eng, feeds, jobs)["Hakimin öz yoxlaması (həftəlik)"]["status"] == "warn"
+
+
+def test_the_two_paid_feeds_wait_for_the_owner_until_connected():
+    db, ks, feeds, jobs, eng = _setup()
+    rows = _rows(db, ks, eng, feeds, jobs)
+    assert rows["FinancialJuice (sürətli başlıqlar)"]["status"] == "owner"
+    assert "Admin" in rows["FinancialJuice (sürətli başlıqlar)"]["msg"]
+    assert rows["Databento canlı axını (böyük oyunçular, həqiqi həcm)"]["status"] == "owner"
+    ks.set("financialjuice", {"key": "k"})
+    assert "qoşulma növbəti addımdır" in _rows(db, ks, eng, feeds, jobs)["FinancialJuice (sürətli başlıqlar)"]["msg"]

@@ -28,7 +28,8 @@ KEY_SLOTS: list[dict] = [
      "purpose": "Qızıl, gümüş, platin və palladium fyuçerslərinin (GC, MGC, SI, PL, PA) illərlə dəqiqəlik şamları və hər "
                 "əməliyyatı: real həcm və alanın/satanın tərəfi. Sahibin impuls fikri və «xəbərdən sonra» sınağı "
                 "bununla yoxlanır (Mərhələ 2). Heç nə sahibin təsdiqi olmadan alınmır: əvvəl qiymət göstərilir.",
-     "cost": "Tarixi məlumat istifadəyə görə; yeni hesaba $125 pulsuz kredit. Canlı axın ayrıca abunədir (alınmayıb).",
+     "cost": "Standard plan ~$199/ay (2026; canlı axın + illərlə tarixçə, şəxsi istifadə) — sahib 27.11 almağa qərar verdi; "
+             "plan alınandan sonra canlı axın qoşulacaq (PLAN-27.11 addım 11.1). Hazırda: tarixi məlumat pulsuz kreditdən.",
      "url": "https://databento.com/portal/keys", "fields": ["key"],
      "used_by": "Mərhələ 2 sınaqları (impuls, xəbərdən sonra hərəkət, platin spredi)", "stage": NEXT},
     {"id": "twelvedata", "category": "price", "name": "Twelve Data açarı",
@@ -40,7 +41,15 @@ KEY_SLOTS: list[dict] = [
      "purpose": "Saniyələrlə gələn başlıqlar (Benzinga). Oxuyucu beyin onları hadisəyə çevirəcək.",
      "cost": "Pulsuz plan var; pullu plan ayda 99 $.",
      "url": "https://app.alpaca.markets/signup", "fields": ["key_id", "secret"],
-     "used_by": "Sürətli xəbər: metal fondları və mədən şirkətləri üzrə Benzinga başlıqları, dəqiqədə bir", "stage": LIVE},
+     "used_by": "Söndürülüb 27.11 (48 saatda 1 metal başlığı gətirirdi); sürətli başlıqları FinancialJuice verəcək",
+     "stage": LIVE},
+    {"id": "financialjuice", "category": "news", "name": "FinancialJuice (sürətli başlıqlar)",
+     "purpose": "Saniyələr içində gələn makro, Fed, geosiyasət və xammal başlıqları — vaxtı bilinməyən qəfil xəbər üçün "
+                "(vaxtı məlum ABŞ rəqəmləri və Fed qərarı rəsmi mənbədən «snayper»lə gəlir). Oxuyucu hər başlığı "
+                "qiymətləndirəcək; gecikməsi əlaqə xəritəsində ölçüləcək.",
+     "cost": "Developer API planı ~$99/ay (2026, «beta» səhifə — alışdan əvvəl təsdiqləyin); sahib 27.11 almağa qərar verdi.",
+     "url": "https://beta.financialjuice.com/developers", "fields": ["key"],
+     "used_by": "Xəbər bloku, həyəcanlar (PLAN-27.11 addım 11.1: açar qoyulandan sonra qoşulur)", "stage": NEXT},
     {"id": "fmp", "category": "calendar", "name": "Financial Modeling Prep",
      "purpose": "İqtisadi təqvim: gözlənti və fakt. Rəqəmin gözləntidən fərqi (sürpriz) bununla ölçülür.",
      "cost": "Pullu, ayda təxminən 49–69 $ (hansı planda olduğu alışdan əvvəl yoxlanmalı).",
