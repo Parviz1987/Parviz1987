@@ -672,7 +672,9 @@ class BrainJobs:
             count["n"] += 1
             if all(a["kind"] == "move" for a in alarm):
                 count["move"] = count.get("move", 0) + 1
-            if any(a["kind"] == "news" for a in alarm) and count["scout"] < SCOUT_ALARMS_PER_DAY \
+            # a strong headline or (27.11, plan 8.1) a price spike: the scout looks for the cause on X at once,
+            # at most SCOUT_ALARMS_PER_DAY a day
+            if any(a["kind"] in ("news", "move") for a in alarm) and count["scout"] < SCOUT_ALARMS_PER_DAY \
                     and self.keys.first("xai"):
                 count["scout"] += 1
                 self._rep("scout", "working", note="həyəcan: X-də dərhal axtarır")

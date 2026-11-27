@@ -5,7 +5,9 @@ away with «what happened» in its facts (an alarm). Kinds:
 - news     a headline the Reader rated strength 3 (a market mover: war, Fed, sanctions...)
 - flow     2+ different events (not copies of one story) of strength 2+, same metal and direction, within 15 min
 - release  a US figure whose actual was confirmed (two brains agreed, or the calendar had it)
-- move     a 15-minute move of a metal or a linked market 4x bigger than its usual move of the last 2 days
+- move     a 15-minute move of a metal or a linked market 4x bigger than its usual move of the last 2 days; and
+           (27.11) a ONE-minute spike of a metal 6x its usual 1-minute move (at least 0.15 %): seen in a minute,
+           not at the end of the quarter hour
 - band     the price left our own 1-hour 80 % range: our prediction failed (nerve.py, prediction-error alarm)
 Every signal has a unique id, so the same event never alarms twice. See docs/sinir-sistemi.md."""
 from __future__ import annotations
@@ -22,6 +24,7 @@ CREATE INDEX IF NOT EXISTS signals_ts ON signals(ts);
 """
 FRESH = 1800            # a signal older than this is history, not an alarm
 MOVE_X, MOVE_MIN = 4.0, 0.0025   # x usual move, and at least 0.25 %
+SPIKE_X, SPIKE_MIN = 6.0, 0.0015  # one minute (plan 27.11 step 8.1): x the usual 1-minute move, and at least 0.15 %
 MOVE_ALARMS_PER_DAY = 4          # price moves may use at most this many of the day's alarms: news and figures keep the rest
 NAMES = {"XAU": "Qızıl", "XAG": "Gümüş", "XPT": "Platin", "XPD": "Palladium", "DXY": "Dollar indeksi",
          "EURUSD": "EUR/USD", "USDJPY": "USD/JPY", "OIL": "Neft (WTI)", "BRENT": "Neft (Brent)", "US500": "S&P 500",
@@ -107,9 +110,33 @@ def from_moves(db: DB, now: float, symbols: list[str]) -> int:
     return n
 
 
+def from_spikes(db: DB, now: float, symbols: list[str]) -> int:
+    """Plan 27.11 step 8.1 (owner: «sıçrayışları dərhal tutaq»): the last closed one-minute candle of each metal against
+    its usual one-minute move of the last 5 hours (upper quartile of the non-flat minutes, the same rule as the
+    15-minute check). The 15-minute check waits for the quarter to close; this one sees the jump within a minute."""
+    n = 0
+    for sym in symbols:
+        if sym not in ("XAU", "XAG", "XPT", "XPD"):
+            continue
+        rows = candles.closed(db, sym, "1m", now, limit=301)
+        if len(rows) < 120 or rows[-1]["t"] < now - 180:
+            continue
+        rets = [abs(b["c"] / a["c"] - 1) for a, b in zip(rows, rows[1:]) if a["c"] and b["t"] - a["t"] == 60]
+        moved = sorted(r for r in rets[:-1] if r > 0)
+        if len(moved) < 60:
+            continue
+        usual = moved[int(len(moved) * 0.75)]
+        last = rows[-1]["c"] / rows[-2]["c"] - 1 if rows[-2]["c"] and rows[-1]["t"] - rows[-2]["t"] == 60 else 0
+        if abs(last) >= max(SPIKE_X * usual, SPIKE_MIN):
+            n += emit(db, f"spike:{sym}:{rows[-1]['t']}", "move",
+                      f"{NAMES.get(sym, sym)} 1 dəqiqədə {last * 100:+.2f} % sıçradı (adi 1 dəqiqəlik hərəkət {usual * 100:.3f} %)",
+                      3 if abs(last) >= 2 * SPIKE_X * usual else 2, sym, now)
+    return n
+
+
 def scan(db: DB, now: float, symbols: list[str]) -> int:
     ensure(db)
-    return from_news(db, now) + from_releases(db, now) + from_moves(db, now, symbols)
+    return from_news(db, now) + from_releases(db, now) + from_moves(db, now, symbols) + from_spikes(db, now, symbols)
 
 
 REFRACTORY = 60 * 60     # the same kind on the same metal alarms at most once an hour (habituation)

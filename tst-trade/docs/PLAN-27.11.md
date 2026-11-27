@@ -79,7 +79,7 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
 - [x] 6.3 Bloklar: uzun izah mətnləri bir-iki sətrə.
 - [x] 7.1 Benzinga (Alpaca) xəbəri söndürülür; Google News 10 dəqiqədən bir; Kəşfiyyatçı yalnız həyəcanda; cavabı bəlli
       kölgə sınaqları (ACI, dirijor, FA pəncərəsi, bayram) həftədə bir.
-- [ ] 8.1 Sıçrayış 1 dəqiqədə tutulur (canlı axından), dərhal səbəb axtarılır.
+- [x] 8.1 Sıçrayış 1 dəqiqədə tutulur (canlı axından), dərhal səbəb axtarılır.
 - [ ] 9.1 Rəsmi mənbə agenti: təqvimdəki ABŞ rəqəmi (BLS, BEA) və Fed qərarı dəqiqəsində rəsmi sayt yoxlanır, rəqəm
       gözləntiylə müqayisə olunur, saniyələr içində həyəcan.
 - [ ] 9.2 Hər xəbərin gəliş vaxtı yazılır: mənbə-mənbə real gecikmə (pul ödəməzdən əvvəlki «əvvəl» rəqəmi).
@@ -119,3 +119,5 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
 - 27.11 18:49 — 7 bitdi: Benzinga söndürüldü (boz, «istifadə olunmur»); Google News 10 dəq (Fed lenti 2 dəq qalır); Kəşfiyyatçı
   yalnız böyük ABŞ rəqəmi ətrafında və xəbər həyəcanında; dirijor və ACI kölgəsi, FA pəncərəsi, bayram sınağı həftədə bir
   (cavabı olmayan 4 kölgə sınağı gündəlik qalır). Testlər 346/346.
+- 27.11 18:51 — 8 bitdi: metalın 1 dəqiqəlik şamı adi 1 dəqiqəlik hərəkətin 6 qatı (ən az 0,15 %) olanda dərhal həyəcan;
+  həyəcanda Kəşfiyyatçı səbəbi X-də axtarır (gündə ən çox 3 dəfə, xərc sərhədi). 15 dəqiqəlik yoxlama da qalır.
