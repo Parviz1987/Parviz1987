@@ -195,3 +195,19 @@
   düzəlişdən sonra 46; kölgə sınağı heç bir metalda keçməyib → beyinlərə hələ verilmir.
 - WAL iki dəfə 440 MB-a çatıb, təmirçi kiçildib; araşdırma kartı açıqdır (Admin → Əməliyyatlar).
 - Qrafik analitikinin ehtiyat modeli (gpt-5.4-nano) bu ay 39 çağırışdan 2-də uğurlu — ehtiyat kimi işləmir.
+
+## 2026-11-26 21:43 NY — növbətçi yoxlama (yeni sessiya)
+- **Təhlükəsizlik:** 24 saatda uğursuz giriş yoxdur, bloklanan yoxdur; başlıqlar (CSP, HSTS, X-Frame-Options) yerindədir.
+  Diaqnostika açarı 20:38 və 20:54 NY-də dəyişdirilib (sahib, Admin). 6 «səhv diaqnostika açarı» San-Fransiskodan —
+  ehtimal: bulud sessiyasının açar dəyişəndən sonra köhnə açarla sorğuları (yer və vaxt uyğundur; sübut deyil). 2FA hələ söndürülüb.
+- **Server:** c0c5a0e, xəta yoxdur (sonuncu 25.11 23:01), boş yaddaş 381–441 MB, baza 1157 MB (VACUUM bu gecə 23:30 NY).
+  Qiymət 4/4 canlı, 10/10 əlaqəli bazar. Yeniləmələr geri qaytarılmayıb, `held` yoxdur.
+- **Beyin cavablarının kəsilməsi düzəlişi işləyir:** 21:24 NY-dən sonra qrafik analitiki, ikinci analitik və rəyçi ilk
+  dövrədə uğurlu cavab verdi; yeni «JSON deyil» xətası yoxdur. Qeyd: ikinci analitik ayın 62 %-ni xərcləyib (30,9 / 50 $);
+  limitə yaxınlaşanda sistem özü seyrəkləşdirir, limit aşılmır.
+- **Yalançı xəbərdarlıq düzəldildi:** Hakim sətri «vaxtı keçib yoxlanmayan 111» göstərirdi. Səbəb: Şükran günü qiymət
+  axını 14:46 NY-də dayanıb (ən köhnə yoxlanmamış hədəf məhz 14:46-dır), həmin saatların hədəflərinin şamı yoxdur;
+  zəncir görünüşü bayramları bilmirdi (təmirçi və kənar nəzarətçi bilirdi). İndi eyni təqvimdən istifadə edir; adi
+  günlər əvvəlki kimi sayılır. Yalnız göstərici — proqnoz, bal, çəki dəyişmir. Testlər: 3 yeni, cəmi 314 yaşıl.
+- **Bloklar yoxlaması** xəbər blokunu hələ «qırıq» göstərir — 16:46 NY-də hesablanıb (xəbər düzəlişindən əvvəl);
+  Hakimdə `xeber` artıq fikir verir (15 dəq, 12 hal). Növbəti gündəlik hesabda yenilənməlidir.
