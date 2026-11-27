@@ -170,8 +170,9 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   canlıda zəifləyən təsdiqli üsul/qayda avtomatik kölgəyə; sadə dildə hökm kartı. Pilləkən: kölgə → son sınaq →
   sahib registri → kağız ticarət; «kiçik/tam real pul» heç vaxt avtomatik deyil (sahib).
 - **Öz yoxlaması (26.11):** 20 təsadüfi qaydadan 0 keçdi ✅, tam gələcəyə baxan tutuldu ✅, 30 % baxan (64 % düz)
-  tutulmadı ⚠️ → «inanılmaz yaxşı» həddini bardan +12 → +10 bəndə endirmək təklifi **👤 sahibin «okey»ini gözləyir**
-  (Hakim faylı qorunur).
+  tutulmadı ⚠️. Əvvəlki «+12 → +10 bənd» təklifi artıq sahibin qərarı deyil: 26.11 təsdiqlənən avtomatik siyasətə
+  görə həddi Hakim həftəlik öz yoxlamasında özü qoyur (10–15 bənd, hamarlanmış; `judgeplus.delta`). 26.11 16:46 NY
+  yoxlaması bu koddan əvvəl idi — növbəti həftəlik yoxlamada `judge_canary.margin` görünməlidir.
 - **Qorunan fayllar** (`deploy/protected.txt`): dəyişiklik yalnız `Sahib-təsdiqi:` sətri ilə serverə düşür.
 
 - **Avtomatik Hakim siyasəti (sahib 26.11 bir dəfə təsdiqlədi, `app/autojudge.py`, qorunur):** hər üsula 0–100 bal
