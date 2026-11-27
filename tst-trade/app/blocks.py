@@ -45,7 +45,7 @@ BLOCKS = [
     {"id": "time", "name": "Vaxt və təqvim", "page": "/vaxt",
      "reads": "Saat (UTC, London, New York), həftənin günü, ay dönüşü, ABŞ birja bayramları, ABŞ rəqəmi saatları; "
               "Hindistan/Çin zərgərlik mövsümləri",
-     "methods": ["vaxt", "season", "jewel"], "ai": None,
+     "methods": ["vaxt"], "ai": None,
      "evidence": "Asiya saatlarında qalxma, ABŞ saatlarında enmə (Blose və b. 2018; WGC 2024); London fiksinqi "
                  "(Caminschi-Heaney 2014); bazar ertəsi effekti (Lucey-Tully 2006); ay dönüşü və bayram ərəfəsi "
                  "(səhmlərdə güclü, qızılda zəif); ABŞ rəqəmi saatında davam (bizim H13). 7 qayda Hakimdə ayrıca ölçülür; "

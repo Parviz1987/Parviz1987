@@ -62,7 +62,9 @@ def test_scale_weighs_only_analysts_above_the_bar():
     v = forecast.weighted_view({"momentum": {"p_up": 0.6}, "fib": {"p_up": 0.3}}, w)
     assert v["p_up"] == 0.6 and "Momentum" in v["basis"]
     assert forecast.weighted_view({"momentum": {"p_up": 0.6}}, None)["p_up"] == 0.5
-    assert {"fundamental", "season", "jewel"} <= set(forecast.methods_for("1mo"))
+    assert "fundamental" in forecast.methods_for("1mo")
+    # 27.11 (plan 3.2): the seasonal voices are retired — a volatility flag in the shadow (owner's decision 5.1-1)
+    assert not {"season", "jewel"} & set(forecast.methods_for("1mo")) and {"season", "jewel"} <= set(forecast.RETIRED)
     assert "brain2" in forecast.methods_for("1h") and "fundamental" not in forecast.methods_for("1h")
 
 

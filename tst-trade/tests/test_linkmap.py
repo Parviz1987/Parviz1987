@@ -44,9 +44,9 @@ def test_link_map_names_a_mute_voice_and_a_dead_one():
     from app import forecast
     for m in forecast.METHODS:                          # every voice speaks ...
         _fc(db, m, 0.6, NOW - 3600)
-    db.execute("DELETE FROM forecasts WHERE method IN ('season', 'jewel')")
-    _fc(db, "season", 0.5, NOW - 3600, basis="mövsüm cədvəli yoxdur")   # ... but this one is always 0.5
-    row = _rows(db, ks, eng, feeds, jobs)["Üsulların səsi (hər analitik)"]  # and «jewel» issued nothing at all
+    db.execute("DELETE FROM forecasts WHERE method IN ('trendmix', 'tsmom')")
+    _fc(db, "trendmix", 0.5, NOW - 3600, basis="mövsüm cədvəli yoxdur")   # ... but this one is always 0.5
+    row = _rows(db, ks, eng, feeds, jobs)["Üsulların səsi (hər analitik)"]  # and «tsmom» issued nothing at all
     assert row["status"] == "bad"
     assert "susur" in row["msg"] and "fikri yoxdur" in row["msg"]
     assert "mövsüm cədvəli yoxdur" in row["msg"]

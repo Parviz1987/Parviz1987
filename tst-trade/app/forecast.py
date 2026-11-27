@@ -43,12 +43,14 @@ HORIZON_NAMES = {"15m": "15 dəqiqə", "30m": "30 dəqiqə", "1h": "1 saat", "4h
 # was a copy of «seans». Their past forecasts stay in the database; the long-horizon trend (tsmom, trendmix) stays:
 # it works on weeks and months, which the block's candle rules do not cover.
 METHODS = ("rw", "up", "tsmom", "fundamental", "surprise", "bazarlar", "xeber", "strateq", "brain2", "debate",
-           "season", "jewel", "vaxt", "trendmix", "consensus", "garch", "gvz", "chartist", "qaydalar", "terazi", "vahid")
+           "vaxt", "trendmix", "consensus", "garch", "gvz", "chartist", "qaydalar", "terazi", "vahid")
 RETIRED = ("momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback", "session", "sam", "ichimoku", "pair",
            "macro", "cot",      # macro and COT: now rules of the fundamental block (FA-RY-1, FA-USD-1, FA-COT-1)
            "news",              # the headline sum: now the news block's rules (NW-*), its voice is «xeber»
            "seans",                  # the overnight/day pattern: now the time block's rules TM-SES-1/2, voice «vaxt»
-           "dollar", "oil", "risk")  # the impulses: now rules of the cross-market block (CM-USD-2, CM-OIL-1, CM-RISK-1)
+           "dollar", "oil", "risk",  # the impulses: now rules of the cross-market block (CM-USD-2, CM-OIL-1, CM-RISK-1)
+           "season", "jewel")        # 27.11 (plan 3.2, owner: «artıq olanı çıxar»): no live view in 7 days; the owner's
+                                     # decision 5.1-1 made them a volatility flag, measured in the shadow (festival_vol)
 # Families = the blocks (owner 2026-11-25: «every block one organ, one voice»; app/blocks.py). Methods of one block
 # carry related ideas from the same kind of data: the consensus gives each block one voice and the Judge counts a
 # block once in its multiple-testing bar. The AI analysts that read every block (Strateq, the second brain, the
@@ -110,9 +112,7 @@ def methods_for(h: str) -> tuple[str, ...]:
     if h not in ("15m", "30m", "1h", "4h", "1d"):
         out.remove("vaxt")       # hour-of-day and day-of-week rules speak about the next hour or the next day
     if h not in ("1w", "10d", "1mo"):
-        out.remove("trendmix")   # monthly seasons, festival seasons: weeks-to-months effects
-        out.remove("season")
-        out.remove("jewel")
+        out.remove("trendmix")   # weeks-to-months effects
         out.remove("tsmom")      # the 12-month trend is a weeks-to-months effect
     return tuple(out)
 

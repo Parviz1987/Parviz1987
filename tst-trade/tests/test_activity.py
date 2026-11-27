@@ -64,6 +64,7 @@ def test_analysts_api_lists_every_desk_with_weights(tmp_path):
     d = c.get("/api/analysts?symbol=XAG").json()
     assert {x["horizon"] for x in d["desks"]} >= {"1h", "1mo"}
     one = next(x for x in d["desks"] if x["horizon"] == "1mo")
-    assert {"fundamental", "season", "jewel", "terazi"} <= {r["method"] for r in one["rows"]}
+    assert {"fundamental", "terazi"} <= {r["method"] for r in one["rows"]}
+    assert not {"season", "jewel"} & {r["method"] for r in one["rows"]}          # retired 27.11 (plan 3.2)
     assert all("weight" in r for r in one["rows"]) and d["brains"] == []
     assert c.get("/api/analysts?symbol=BTC").status_code == 400

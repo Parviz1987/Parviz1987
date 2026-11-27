@@ -13,6 +13,8 @@ import time
 from .db import DB
 
 MARK = "cleanup:retired_v1"
+RETIRED_V1 = ("momentum", "reversal", "trend", "breakout", "rsi", "fib", "pullback", "session", "sam", "ichimoku",
+              "pair", "macro", "cot", "news", "seans", "dollar", "oil", "risk")
 BATCH = 20000
 
 
@@ -31,8 +33,10 @@ def retired_archive(db: DB, pause: float = 0.2) -> dict:
     """Once: keep the record, then delete the replayed history of the retired methods. Returns what was done."""
     if db.get(MARK):
         return json.loads(db.get(MARK))
-    from .forecast import METHODS, RETIRED
-    gone = tuple(m for m in RETIRED if m not in METHODS)
+    from .forecast import METHODS
+    # only the methods retired on 26.11, whose archive the owner let go; a method retired later (season, jewel on
+    # 27.11) keeps its rows — deleting data is the owner's decision each time
+    gone = tuple(m for m in RETIRED_V1 if m not in METHODS)
     if not gone:
         return {}
     snap = snapshot(db, gone)
