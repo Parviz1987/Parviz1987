@@ -227,3 +227,12 @@
 - Təkrarlar çıxdı: Agentlərdə qiymət siyahısı, metal zolağı, qərar cədvəli, risk qapısı, limit və sinxron (Panel / Admin-də
   var); Nəticələrdə «İndi nə gözləyirik» (Panel); Bilik-də bütün qaydaların ikinci nüsxəsi (blok səhifələrində var).
 - Düymələr: hər səhifədə avtomatik basıldı; şübhəlilər ayrıca yoxlandı — hamısı işləyir, brauzer xətası yoxdur.
+
+## 2026-11-27 01:47 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** yeni hadisə yoxdur (24 saatda yalnız axşamkı açar dəyişməsi və köhnə açarla 6 sorğu). 2FA söndürülüb.
+- **Server:** 01:40 NY-də proqram prosesi yeniləmə olmadan yenidən başladı (5 san; maşın yenidən yüklənməyib — DigitalOcean
+  hərəkətlərində yoxdur; avtomatik təmir addım atmayıb; xəta jurnalında yeni yazı yoxdur). Səbəb sübut olunmadı (yaddaş
+  qrafiki yoxdur). İndi: qiymət 4/4 canlı, zəncir qaydasında, boş yaddaş 452 MB, baza 746 MB (VACUUM: 1157 → 740 MB).
+- **Tapılan və düzəldilən:** hər yenidən başlama saatlıq pullu beyin dövrəsini (strateq, ikinci analitik, müzakirə,
+  qrafik analitiki) dərhal təkrar işə salırdı; bu gecə ~12 yenidən başlama ikinci analitikin xərcini 4 saatda 30,9 → 33,9 $
+  qaldırdı. İndi kəşfiyyatçı kimi: növbəti dövrə sonuncunun vaxtından sayılır. Test əvvəl qırmızı, sonra 319/319 yaşıl.

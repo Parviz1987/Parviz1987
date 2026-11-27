@@ -33,3 +33,9 @@
    diag `agents.router.month.chartist`.
 2. **WAL 440 MB-a çatır** (son gündə 2 dəfə): ağır yenidən hesablamalar (tarixçə sınaqları) zamanı. Təklif: belə
    işlərdən sonra təmirçinin WAL kiçiltməsini adi saymaq və araşdırma kartını yalnız 3-cü dəfədə açmaq. Sübut: `ops.repair`.
+3. **Yenidən başlamanın səbəbini görmək üçün yaddaş izi** (27.11 01:40 NY proses səbəbsiz yenidən başladı; maşın yox,
+   yalnız proqram; jurnalda iz yoxdur). Təklif: server hər dəqiqə öz yaddaşını (RSS, boş yaddaş) bazada bir sətirdə
+   saxlasın, açılışda əvvəlki prosesin son nümunəsini diaqnostikaya yazsın — növbəti dəfə «yaddaş bitdi» ya «başqa səbəb»
+   sübutla görünür. Pulsuzdur, nəticəni dəyişmir. Alternativ: DigitalOcean-ın pulsuz monitorinq agenti (serverə quraşdırma
+   lazımdır — sahibin qərarı). Sübut: diag `boots` (01:40 ed36d1c, `updates`-də yoxdur), DO `actions` (reboot yoxdur).
+

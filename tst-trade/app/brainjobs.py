@@ -284,6 +284,11 @@ class BrainJobs:
         # A restart (every update) must not buy an extra search: the next one follows the last one's time.
         last = json.loads(db.get("scout:last") or "{}")
         self.next_scout = float(last.get("ts", 0)) + SCOUT_EVERY
+        # Nor an extra strategist round (strategist, second analyst, debate, chart reader: all paid): on 2026-11-27 a
+        # night of deploys ran it again after every restart. The hourly one follows the last round's time.
+        ran = json.loads(db.get("brainjob:strategist") or "{}").get("ts")
+        if ran:
+            self.next_strategist = float(ran) + STRATEGIST_EVERY
 
     def _state(self, slot: str, msg: str) -> None:
         self.db.put(f"brainjob:{slot}", json.dumps({"ts": time.time(), "message": msg[:300]}))
