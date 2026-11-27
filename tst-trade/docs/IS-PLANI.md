@@ -267,6 +267,11 @@ Sahib 12 addımı bir-bir müzakirə edib təsdiqlədi («12 keç»). Plan səhi
 
 İcra sırası dəyişmir: A → B → C → D → E → F. Sahibdən gözlənən: Gemini açarı (ödənişli), healthchecks.io hesabı, 2FA-nı açmaq.
 
+### 5.2 Keçmiş məlumat (sahib, 27.11.2026: «Kitabxananı qur, ara yolu da et»)
+- Hadisələr kitabxanası qurulur (keçmiş ABŞ rəqəmləri və Fed qərarları, o an bilinənlə; beyinlərə yalnız kölgə
+  sınağından keçən hissə).
+- Ara yol: keçmişdə güclü (bal ≥ 70) üsul canlıda tez kölgəyə keçir; kağız ticarət üçün canlı sübut şərt qalır.
+
 ### 5.1 Blok qərarları (sahib, 26.11.2026: «3 qərarı sənin təkliflərinlə razıyam»)
 1. **Mövsüm və zərgərlik tələbi** (`season`, `jewel`): istiqamət səsi yox, dalğalılıq işarəsi kimi — əvvəl kölgədə, Hakimin
    nəticəsi ilə qərar.

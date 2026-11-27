@@ -139,6 +139,15 @@ def _forecast_rows(db: DB) -> list[dict]:
                     "used": r["method"] in forecast.METHODS} for r in rows), key=lambda x: -x["n"])
 
 
+def _eventlib(db: DB) -> dict:
+    try:
+        from . import eventlib
+        v = eventlib.view(db, "XAU")
+        return {"state": v.get("state"), "xau_table": v.get("table", [])[:30], "last": v.get("last")}
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
 def _news_debug(db: DB) -> dict:
     try:
         from . import newsblock
@@ -385,6 +394,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "judge_canary": json.loads(db.get("judge:canary") or "null"),
         "autojudge": _autojudge(db),
         "news_debug": _slow("news_debug", lambda: _news_debug(db), 600),
+        "eventlib": _slow("eventlib", lambda: _eventlib(db), 600),
         "provider": engine.provider_name, "provider_errors": engine.errors, "last_price_ok": engine.last_ok,
         "metals": metals,
         "sources": {k: feeds.health(k) for k in feeds_mod.SOURCE_IDS},

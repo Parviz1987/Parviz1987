@@ -18,7 +18,12 @@ irreversible or money actions.
    a method that weakens steps down by itself.
 3. The size: half Kelly of the method's own record (mean / variance of its net result), times score / 100, never more
    than 25 % of the paper account in one method. A likely-right method is used a little before it is proven.
-4. Real money: never — that stays the owner's choice."""
+4. Real money: never — that stays the owner's choice.
+5. Ara yol (owner 2026-11-27: «ara yolu da et»): a method whose HISTORY replay record (mode 'history', the same five
+   parts, the same weakest-part score) is at least 70 reaches the shadow step before its live record is long enough —
+   unless its live record already points the wrong way (live t below -1) or a veto holds. Shadow is forecasts only:
+   the paper steps (small / full share) still need the live score alone. The history score is recomputed once a
+   day."""
 from __future__ import annotations
 
 import json
@@ -32,6 +37,9 @@ CUT_SHADOW, CUT_SMALL, CUT_FULL = 50, 70, 85
 SMALL_FACTOR = 0.25
 MAX_SHARE = 0.25           # of the paper account, per method
 KEY = "autojudge:scores"
+KEY_HIST = "autojudge:history"
+CUT_HIST = 70              # the history score that lets a method into the shadow step early
+HIST_EVERY = 86400
 
 
 def _clip(x: float, lo: float = 0.0, hi: float = 100.0) -> float:
@@ -95,6 +103,56 @@ def exposure_cap(kelly: float) -> float:
     return max(0.0, min(MAX_SHARE, 0.5 * kelly))
 
 
+def _nets(db: DB, s: str, h: str, m: str, mode: str, k: int, cost: float):
+    q = db.execute("SELECT p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND "
+                   "mode=? AND price1 IS NOT NULL AND price0 > 0 AND p_up != 0.5 ORDER BY issued_t "
+                   "DESC LIMIT ?", (s, h, m, mode, 4000 * max(1, k))).fetchall()[::-1]
+    nets = [(x["price1"] / x["price0"] - 1) * (1 if x["p_up"] > 0.5 else -1) - cost for x in q]
+    return q, nets
+
+
+def history_scores(db: DB, now: float | None = None, n_trials: int = 1000) -> dict:
+    """Once a day: every method's score on its history replay record (same parts as the live score)."""
+    from . import forecast, judge
+    from .candles import METALS
+    now = time.time() if now is None else now
+    try:
+        old = json.loads(db.get(KEY_HIST) or "null")
+    except ValueError:
+        old = None
+    if old and now - old.get("computed", 0) < HIST_EVERY:
+        return old
+    out: dict = {"computed": now, "desks": {}}
+    for s in METALS:
+        for h in forecast.HORIZONS:
+            cost, k, min_n = judge.full_cost(s, h), forecast.steps_of(h), judge.MIN_N.get(h, 100)
+            try:
+                ms = [r["method"] for r in db.execute("SELECT DISTINCT method FROM forecasts WHERE symbol=? AND "
+                                                      "horizon=? AND mode='history'", (s, h)).fetchall()]
+            except Exception:
+                continue
+            desk = {}
+            for m in ms:
+                if not judge.is_candidate(m, h):
+                    continue
+                q, nets = _nets(db, s, h, m, "history", k, cost)
+                if len(nets) < 30 * k:
+                    continue
+                ys = [int(x["price1"] > x["price0"]) for x in q]
+                sc = score_method(nets, skill_vs_lean([x["p_up"] for x in q], ys), k, min_n, n_trials)
+                desk[m] = {"score": sc["score"], "weakest": sc["weakest"], "n": sc["n"]}
+            if desk:
+                out["desks"][f"{s}:{h}"] = desk
+    db.put(KEY_HIST, json.dumps(out, ensure_ascii=False))
+    return out
+
+
+def early_shadow(st: str, hist_score: float | None, live_t: float | None, vetoed: bool) -> bool:
+    """The middle way: off by the live score, but strong in history and not wrong-way live -> shadow."""
+    return (st == OFF and not vetoed and hist_score is not None and hist_score >= CUT_HIST
+            and (live_t is None or live_t > -1))
+
+
 def refresh(db: DB, now: float | None = None) -> dict:
     """Every hour: score every method on every desk from its live record; store the ladder."""
     from . import forecast, judge, rigor
@@ -104,6 +162,10 @@ def refresh(db: DB, now: float | None = None) -> dict:
         n_trials = rigor.trials(db)
     except Exception:
         n_trials = 1000
+    try:
+        hist = history_scores(db, now, n_trials).get("desks") or {}
+    except Exception:
+        hist = {}
     out: dict = {"computed": now, "desks": {}}
     for s in METALS:
         for h in forecast.HORIZONS:
@@ -119,15 +181,15 @@ def refresh(db: DB, now: float | None = None) -> dict:
                 m = r["method"]
                 if not judge.is_candidate(m, h):
                     continue
-                q = db.execute("SELECT p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND "
-                               "mode='live' AND price1 IS NOT NULL AND price0 > 0 AND p_up != 0.5 ORDER BY issued_t "
-                               "DESC LIMIT ?", (s, h, m, 4000 * max(1, k))).fetchall()[::-1]
-                nets = [(x["price1"] / x["price0"] - 1) * (1 if x["p_up"] > 0.5 else -1) - cost for x in q]
-                if len(nets) < 10:
+                q, nets = _nets(db, s, h, m, "live", k, cost)
+                hs = (hist.get(f"{s}:{h}") or {}).get(m)
+                if len(nets) < 10 and not (hs and hs["score"] >= CUT_HIST):
                     continue
                 ys = [int(x["price1"] > x["price0"]) for x in q]
                 bss_lean = skill_vs_lean([x["p_up"] for x in q], ys)
-                sc = score_method(nets, bss_lean, k, min_n, n_trials)
+                sc = score_method(nets, bss_lean, k, min_n, n_trials) if nets else {
+                    "score": 0, "parts": {}, "weakest": "canlı nəticə yoxdur", "t": None, "dsr": None, "kelly": 0.0,
+                    "n": 0}
                 recent = nets[-RECENT * k:]
                 if len(recent) >= 30 * k and len(recent) < len(nets):   # the recent record can only lower it
                     rc = score_method(recent, skill_vs_lean([x["p_up"] for x in q[-RECENT * k:]], ys[-RECENT * k:]),
@@ -140,10 +202,16 @@ def refresh(db: DB, now: float | None = None) -> dict:
                 fin = json.loads(db.get(f"final:m:{s}:{h}:{m}") or "{}")
                 reg = rigor.registry_status(db, "method", m, s, h)
                 st = stage(sc["score"], fin.get("status") == "keçdi")
-                if reg in ("rədd edilib", "kölgəyə qaytarıldı") or fin.get("status") == "keçmədi" or fin.get("too_good"):
+                vetoed = reg in ("rədd edilib", "kölgəyə qaytarıldı") or fin.get("status") == "keçmədi" or \
+                    bool(fin.get("too_good"))
+                if vetoed:
                     st = OFF                    # vetoes: the owner's rejection, a demotion, a failed or suspect final
+                early = early_shadow(st, hs["score"] if hs else None, sc["t"], vetoed)
+                if early:
+                    st = SHADOW                 # the middle way: strong history, forecasts only
                 desk[m] = {**sc, "stage": st, "size": size_factor(st, sc["score"], sc["kelly"]),
-                           "cap": exposure_cap(sc["kelly"]), "final": fin.get("status")}
+                           "cap": exposure_cap(sc["kelly"]), "final": fin.get("status"),
+                           "history_score": hs["score"] if hs else None, "early": early}
             if desk:
                 out["desks"][f"{s}:{h}"] = desk
     db.put(KEY, json.dumps(out, ensure_ascii=False))
@@ -174,6 +242,7 @@ def view(db: DB) -> dict | None:
     for d in v.get("desks", {}).values():
         for x in d.values():
             count[x["stage"]] = count.get(x["stage"], 0) + 1
-    return {"computed": v.get("computed"), "ladder": count,
+    early = sum(1 for d in v.get("desks", {}).values() for x in d.values() if x.get("early"))
+    return {"computed": v.get("computed"), "ladder": count, "early_shadow": early,
             "top": sorted(((x["score"], f"{k}:{m}", x["stage"], x["weakest"]) for k, d in v.get("desks", {}).items()
                            for m, x in d.items()), reverse=True)[:10]}

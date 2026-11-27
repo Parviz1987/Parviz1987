@@ -60,7 +60,10 @@ STRATEGIST_SYSTEM = (
     "cümlə, faktlardakı göstəricilərlə); «next_update» — bu fikir nə vaxt yenilənməlidir: vaxt və ya konkret hadisə "
     "(təqvimdən). Bunlar proqnoz kartında dondurulur və sonra nəticə ilə müqayisə olunur. Faktlarla birlikdə «BİLİK "
     "KİTABI» verilir: onun fundamental və bazarlar arası qaydaları ilə işlə, fikrinin əsaslandığı qaydaların id-lərini "
-    "«rules» sahəsinə yaz; Hakimin «zəif» və ya «yox» dediyi qaydaya az çəki ver.")
+    "«rules» sahəsinə yaz; Hakimin «zəif» və ya «yox» dediyi qaydaya az çəki ver. «history_analogs» varsa: bu, hadisələr "
+    "kitabxanasıdır — keçmişdə eyni hadisə eyni nəticə ilə (gözləntidən yuxarı / yaxın / aşağı) çıxanda metalın necə "
+    "hərəkət etdiyi (n hal, up_share qalxma payı, mean_pct orta %); yalnız kölgə sınağından keçən metal və horizontlar "
+    "verilir. Onu bir səbəb kimi işlət, rəqəmlərini olduğu kimi götür.")
 STRATEGIST_SCHEMA = {
     "type": "object", "additionalProperties": False, "required": ["summary", "metals", "watch"],
     "properties": {
@@ -344,7 +347,13 @@ class BrainJobs:
         released = [dict(r) for r in self.db.execute(
             "SELECT event, estimate, actual, ts FROM releases WHERE actual IS NOT NULL AND ts BETWEEN ? AND ? "
             "ORDER BY ts DESC LIMIT 6", (now - 12 * 3600, now)).fetchall()] if _has(self.db, "releases") else []
-        from . import learning, playbook
+        from . import eventlib, learning, playbook
+        upcoming = self.feeds.upcoming(now)[:8] if self.feeds is not None else []
+        try:     # the history library's analogs, only where its shadow test passed (app/eventlib.py)
+            analogs = eventlib.for_brains(self.db, upcoming, released, now)
+        except Exception as e:
+            log.warning("eventlib analogs: %s", e)
+            analogs = []
         return json.dumps({"now_utc": time.strftime("%Y-%m-%d %H:%M", time.gmtime(now)),
                            "rulebook": playbook.text_for(("Fundamental", "Bazarlar arası", "Öyrənilmiş"), None,
                                                          learning.accepted_rules(self.db)),
@@ -354,7 +363,7 @@ class BrainJobs:
                            "cards": cards, "macro": self.feeds.macro_view(),
                            "calendar": [{k: e[k] for k in ("title", "impact", "forecast", "previous", "actual")}
                                         for e in self.feeds.upcoming(now)[:8]],
-                           "news": news}, ensure_ascii=False)
+                           "news": news, "history_analogs": analogs}, ensure_ascii=False)
 
     def _rep(self, task: str, status: str, *a, **k) -> None:
         if self.activity is not None:

@@ -2,7 +2,7 @@
 
 > **Kim üçün:** sahib və hər yeni Claude sessiyası. Sahib «blokları bitir», «filan bloku gücləndir» deyəndə Claude
 > **əvvəl bu faylı oxuyur**, sonra işləyir və işi bitirəndə bu faylı yeniləyir (vəziyyət, tarix, nə qaldı).
-> Blok sayı dəyişə bilər (6, 10, 25 — fərq etməz): yeni blok bu fayla eyni şablonla əlavə olunur.
+> Blok sayı dəyişə bilər (27.11: 22) (6, 10, 25 — fərq etməz): yeni blok bu fayla eyni şablonla əlavə olunur.
 >
 > **Qərarlar harada:** sahibin bütün qərarları `docs/IS-PLANI.md` bölmə 5 (12 addım) və 5.1 (blok qərarları);
 > hər qərarın qısası həm də plan səhifəsində (claude.ai/artifact/TdikyZXX1gG51oqyw38YGt, «decisions»).
@@ -179,6 +179,10 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   (sahib buraxanda yenidən sayılır). Sahibin rəddi, avtomatik kölgəyə qaytarma və uğursuz son sınaq həmişə veto.
   «İnanılmaz yaxşı» həddi Hakimin həftəlik öz yoxlamasından (10–15 bənd, hamarlanmış); şübhədə bir şam gecikmə
   testi avtomatik qərar verir. **Sahibdən yalnız: real pul və bu siyasətin özünü dəyişmək.**
+- **Ara yol (sahib 27.11: «ara yolu da et»):** keçmiş üzrə sınaqda (history) balı ≥ 70 olan üsul canlı nəticəsi
+  hələ azdırsa da **kölgəyə** keçir (yalnız proqnoz, ticarət yox), canlı nəticəsi səhv tərəfə getmirsə (t > −1) və
+  veto yoxdursa. Kağız payı (kiçik/tam) yenə yalnız canlı bal ilə. Keçmiş balı gündə bir dəfə hesablanır; diag
+  `autojudge.early_shadow`.
 
 ### 11. Risk və qərar, kağız ticarət ✅
 - `app/risk.py`, `app/nerve.py`, `app/liquidity.py`, `app/paper.py` (virtual hesab), `app/signals.py`. AL/SAT yalnız
@@ -220,6 +224,17 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 ### 21. Blokların gündəlik yoxlaması — `app/blockaudit.py` ✅
 - Hər blok: mənbələr, qayda işə düşmələri, səsin fikirləri, Hakim, blokun dəyəri, vəziyyət asılılığı → «sağlam /
   zəif / qırıq» (diag `blocks_audit`). **Hər blok işindən əvvəl buna bax.**
+
+### 22. Hadisələr kitabxanası — `app/eventlib.py` 🟡 (27.11)
+- **Nə edir:** keçmiş ABŞ rəqəmləri (CPI, NFP, ÜDM, PCE) və Fed qərarları; hər hadisədə o an bilinən (ALFRED ilk
+  dərc, sonradan düzəliş yox), nəticə gözləntiyə görə «yuxarı / yaxın / aşağı», dolların trendi və metalların 1 gün,
+  1 həftə hərəkəti. Alət: «oxşar hallar» — eyni hadisə eyni nəticə ilə çıxanda neçə dəfə qalxıb, orta %.
+- **Gözlənti:** yeni rəqəmlərdə ekspert gözləntisi (təqvim); köhnələrdə əvəzi — son 3 dəyişikliyin ortası («trend
+  əvəzi», açıq yazılır). Hər gün özü yenilənir (yeni rəqəm → yeni hadisə).
+- **Kölgə sınağı:** hər hadisə yalnız ondan əvvəlki hallarla proqnozlaşdırılır; xərcdən sonra bazarın meylini
+  keçməyən metal/horizont beyinlərə **verilmir** (t ≥ 2,5, ≥ 60 hal). Keçənlər strateqin faktlarında
+  `history_analogs`. Diag `eventlib`.
+- **Qalan:** geosiyasi hadisələr (GDELT arxivi, 2015-dən) — növbəti addım; GPR indeksi lisenziya aydın olanda.
 
 ---
 

@@ -5,6 +5,7 @@ Each source keeps its health in kv "src:<id>" (last success, last error, rows), 
 Nothing here is a price: prices come only from the price provider."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import io
 import json
@@ -540,6 +541,7 @@ class Feeds:
         await self.first_releases(client, key)
         await self.release_dates(client, key)
         await self.fomc_dates(client)
+        await self.event_firsts(client, key)
 
     async def fomc_dates(self, client) -> None:
         """The Fed's own meeting calendar (federalreserve.gov, US government, public): the decision days of the last
@@ -623,6 +625,40 @@ class Feeds:
         if self.activity is not None:
             self.activity.report("archivist", "done" if got else "error",
                                  note=f"ALFRED ilk dərc: {got} dəyər" + (f"; xəta: {errors[0]}" if errors else ""))
+
+    async def event_firsts(self, client, key: str) -> None:
+        """Hadisələr kitabxanası (app/eventlib.py): ALFRED's first published CPI, payrolls, PCE prices, real GDP and
+        the Fed's upper target, then the library is rebuilt. Once a day (its own clock, so a new series does not wait
+        for the archivist's)."""
+        from . import eventlib
+        if time.time() - float(self.db.get("eventlib:ts") or 0) < 86400 and self.db.get("eventlib:ver") == eventlib.EV_VER:
+            return
+        self.db.put("eventlib:ts", str(time.time()))
+        got, errors = 0, []
+        for sid in eventlib.FIRST_SERIES:
+            try:
+                data = await self._get(client, "https://api.stlouisfed.org/fred/series/observations",
+                                       params={"series_id": sid, "api_key": key, "file_type": "json",
+                                               "output_type": 4, "realtime_start": "1776-07-04",
+                                               "realtime_end": "9999-12-31", "observation_start": "2005-01-01"})
+                obs = parse_fred(data)
+                self.db.executemany("INSERT OR REPLACE INTO macro_first(series, d, v) VALUES(?,?,?)",
+                                    [(sid, d, v) for d, v in obs])
+                got += len(obs)
+            except Exception as e:
+                errors.append(f"{sid}: {str(e).replace(key, '***')}"[:120])
+        try:
+            res = await asyncio.to_thread(eventlib.build, self.db)
+            self.db.put("eventlib:ver", eventlib.EV_VER)
+            note = f"kitabxana: {res['events']} hadisə, {res['moves']} hərəkət"
+        except Exception as e:
+            log.warning("eventlib: %s", e)
+            note = f"kitabxana qurulmadı: {type(e).__name__}"
+        if errors:
+            log.warning("event firsts: %s", "; ".join(errors))
+        if self.activity is not None:
+            self.activity.report("archivist", "done" if got else "error",
+                                 note=f"ALFRED (hadisələr): {got} dəyər; {note}" + (f"; xəta: {errors[0]}" if errors else ""))
 
     def _recent_release(self, now: float) -> bool:
         return self.db.execute("SELECT 1 FROM events WHERE country='USD' AND impact IN ('High','Medium') AND ts BETWEEN "
