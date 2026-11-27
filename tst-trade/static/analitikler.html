@@ -1,0 +1,40 @@
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TST Trade · Analitiklər</title><link rel="stylesheet" href="/static/app.css">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0f1317">
+<link rel="icon" href="/static/icons/fav-64.png"><link rel="apple-touch-icon" href="/static/icons/apple-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="TST Trade">
+</head><body>
+<header class="top">
+  <div class="brand">TST <b>Trade</b> · Analitiklər</div><span class="sp"></span>
+  <span class="clock" id="clock"></span>
+<nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
+</header>
+<!-- The record book (owner 2026-11-27): who said what, in which metal, and whether it came true. Plain counts: right,
+     wrong, the latest ten, the current run. One analyst can be right in gold and wrong in silver: each metal is kept
+     apart. Proof (cost, many tests) is the Judge's work on «Nəticələr»; this page is the journal. -->
+<main class="wrap anl">
+  <section class="box">
+    <h2>Kim harada düz deyir <span class="sp"></span>
+      <span class="seg" id="ah" aria-label="Müddət"></span>
+      <span class="seg" id="ad" aria-label="Dövr"></span></h2>
+    <p class="note">Hər xana: o analitikin o metalda dediyi və vaxtı çatıb yoxlanmış fikirlər (yalnız «qalxacaq» və ya «düşəcək»
+      deyənlər). <b>12 / 20</b> = 20 fikirdən 12-si düz çıxıb. Nöqtələr — son 10 nəticə, ən yenisi solda
+      (<span class="up">●</span> düz, <span class="down">●</span> səhv). Xanaya basın — o fikirlərin jurnalı açılır.
+      Sütun başlığına basın — o metala görə sıralanır.</p>
+    <div id="best" class="anl-best"></div>
+    <div class="seg big anl-m" id="am" aria-label="Metal"></div>
+    <div class="tbl" id="grid"></div>
+    <details class="olbox" id="oldbox"><summary>Köhnə üsullar (25.11-də işdən çıxıb, qeydləri qalır)</summary><div class="tbl" id="oldgrid"></div></details>
+  </section>
+
+  <section class="box" id="sec-j" hidden>
+    <h2><span id="jtitle">Jurnal</span> <span class="sp"></span><button class="btn" id="jclose" type="button">Bağla</button></h2>
+    <div id="jsum" class="note"></div>
+    <div class="tbl" id="jlist"></div>
+  </section>
+</main>
+<script src="/static/analitikler.js"></script>
+<script src="/static/pwa.js"></script>
+<script src="/static/nav.js"></script>
+</body></html>

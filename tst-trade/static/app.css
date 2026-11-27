@@ -449,3 +449,46 @@ details.olbox[open]>summary{margin-bottom:10px}
 /* phone header: one short line (the phone shows its own clock; the market state is in the price tiles' pills) */
 @media (max-width:640px){.top{gap:6px 8px}.top #mkt,.top .clock{display:none}.top .btn.sm{padding:2px 8px;font-size:.74rem}
   .fgrid .fc{padding:3px 2px}.fg-m{padding:4px 4px 0}}
+/* Analitiklər: the record book (who is right in which metal) */
+.anl .tbl{margin-top:8px}
+table.anl-t td.an{min-width:150px}
+table.anl-t td.an .note{display:block;font-size:.72rem}
+table.anl-t th button.srt{background:none;border:0;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:2px 4px}
+table.anl-t th button.srt.on{color:var(--acc)}
+td.ac{cursor:pointer;text-align:center;white-space:nowrap;border-radius:8px;line-height:1.25}
+td.ac b{font-family:var(--mono);font-size:.95rem}
+td.ac .cnt{font-family:var(--mono);font-size:.74rem;color:var(--muted);margin-left:8px}
+td.ac .run{display:block;font-size:.7rem;min-height:.9em}
+td.ac.good{background:var(--up-soft)} td.ac.good b{color:var(--up)}
+td.ac.bad{background:var(--down-soft)} td.ac.bad b{color:var(--down)}
+td.ac.few b{color:var(--muted)}
+td.ac[data-m]:hover{outline:1px solid var(--acc)}
+.dots{display:flex;gap:2px;justify-content:center;margin:3px 0 1px}
+.dots i{width:6px;height:6px;border-radius:50%;display:block}
+.dots i.y{background:var(--up)} .dots i.n{background:var(--down)}
+#jsum .dots{display:inline-flex;vertical-align:middle}
+tr.base td{border-top:1px dashed var(--line)} tr.base td.an b{color:var(--muted);font-weight:600}
+.anl-best{display:grid;gap:4px;margin:4px 0 6px}
+.anl-best h3{margin:0 0 2px}
+.anl-best .bl{display:grid;grid-template-columns:90px minmax(0,1fr);gap:2px 10px;align-items:baseline;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);font-size:.84rem}
+.anl-best .bm{color:var(--gold);font-weight:700}
+.anl-best .bw{display:flex;flex-wrap:wrap;gap:2px 16px}
+.anl-m{display:none}
+table.jr td.bs{max-width:420px;white-space:normal;font-size:.8rem}
+@media (max-width:640px){
+  table.anl-t td.an{min-width:96px;max-width:120px;white-space:normal}
+  table.anl-t td.an b{font-size:.8rem}
+  .anl-m{display:flex;margin:8px 0 2px}
+  table.anl-t th.c:not(.sel),table.anl-t td.ac:not(.sel){display:none}
+  table.anl-t td.an{max-width:none;min-width:0}
+  table.anl-t td.ac{min-width:150px}
+  .anl-best .bl{grid-template-columns:1fr}
+  .anl-best .bw{display:grid;gap:2px}
+  /* the journal on a phone: one card per call (when, how long, what it said, the result; then the price; then why) */
+  table.jr tr:first-child{display:none}
+  table.jr tr{display:grid;grid-template-columns:auto auto 1fr auto;gap:2px 10px;padding:8px 2px;border-bottom:1px solid var(--line)}
+  table.jr td{border:0;padding:0}
+  table.jr td.c{text-align:left}
+  table.jr td:nth-child(3){order:3} table.jr td:nth-child(6){order:4;text-align:right}
+  table.jr td:nth-child(5){order:5;grid-column:1/-1} table.jr td.bs{order:6;grid-column:1/-1;max-width:none}
+}

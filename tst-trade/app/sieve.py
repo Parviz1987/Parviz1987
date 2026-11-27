@@ -81,16 +81,69 @@ def sieve(db: DB) -> dict:
     return {"rows": rows, "rules": {"min_n": MIN_N, "z_bad": Z_BAD}, "families": forecast.FAMILY_NAMES}
 
 
-def calls(db: DB, method: str, symbol: str = "ALL", limit: int = 60, mode: str = "live") -> list[dict]:
-    """The analyst's latest calls (newest first): what it said, why, when, and what happened."""
+LAST = 10                       # the latest results kept per cell, newest first («düz ardıcıllığı»)
+
+
+def _run(seq: str) -> int:
+    """The current run, newest first: +3 = the last three came true, -2 = the last two did not."""
+    if not seq:
+        return 0
+    k = len(seq) - len(seq.lstrip(seq[0]))
+    return k if seq[0] == "1" else -k
+
+
+def record(db: DB, days: int | None = None, now: float | None = None) -> dict:
+    """The record book (owner 2026-11-27: «Əhməd qızılda düz deyir, gümüşdə səhv — Əhmədin qızılını gətirmək olar,
+    gümüşünü yox; jurnalda kim harada nə deyib və düz deyib, düz ardıcıllığı»): for every analyst, every metal and every
+    horizon, the live calls that took a side and were checked: how many, how many came true, the latest ten results
+    (newest first, «1» right, «0» wrong) and the current run. Plain counts, no weighting: the Judge does the proof.
+    days: only calls checked in the last N days (None: since the start)."""
+    import time as _t
+    since = 0 if not days else int((now or _t.time()) - days * 86400)
+    out: dict = {}
+    for s in METALS:
+        for h in forecast.HORIZON_SPEC:
+            rows = db.execute("SELECT method, hit, target_t FROM forecasts WHERE symbol=? AND horizon=? AND mode='live' "
+                              "AND hit IS NOT NULL AND outcome IS NOT NULL AND target_t>=? "
+                              "ORDER BY target_t DESC", (s, h, since)).fetchall()
+            for r in rows:
+                m = r["method"]
+                if m in NOT_ANALYSTS:
+                    continue
+                per = out.setdefault(m, {}).setdefault(s, {})
+                for key in (h, "all"):
+                    c = per.setdefault(key, {"n": 0, "right": 0, "seq": []})
+                    c["n"] += 1
+                    c["right"] += r["hit"]
+                    if key == h and len(c["seq"]) < LAST:
+                        c["seq"].append((r["target_t"], r["hit"]))
+                    elif key == "all":
+                        c["seq"].append((r["target_t"], r["hit"]))
+                        c["seq"].sort(key=lambda x: -x[0])
+                        del c["seq"][LAST:]
+    for per in out.values():
+        for cells in per.values():
+            for c in cells.values():
+                last = "".join(str(int(hit)) for _t0, hit in c.pop("seq"))
+                c["last"], c["streak"] = last, _run(last)
+    names = {m: forecast.METHOD_NAMES.get(m, m) for m in out}
+    return {"methods": out, "names": names, "family": {m: forecast.FAMILY.get(m) for m in out},
+            "families": forecast.FAMILY_NAMES, "retired": [m for m in out if m in forecast.RETIRED],
+            "horizons": list(forecast.HORIZON_SPEC), "horizon_names": forecast.HORIZON_NAMES, "days": days}
+
+
+def calls(db: DB, method: str, symbol: str = "ALL", limit: int = 60, mode: str = "live",
+          horizon: str | None = None) -> list[dict]:
+    """The analyst's latest calls (the newest said first): what it said, why, when, and what happened."""
     syms = METALS if symbol == "ALL" else (symbol,)
+    hs = (horizon,) if horizon in forecast.HORIZON_SPEC else tuple(forecast.HORIZON_SPEC)
     rows = []
     for s in syms:
-        for h in forecast.HORIZON_SPEC:
+        for h in hs:
             rows += db.execute("SELECT symbol, horizon, issued_t, target_t, p_up, basis, price0, price1, hit, in80, scored_ts "
                                "FROM forecasts WHERE symbol=? AND horizon=? AND mode=? AND method=? AND p_up != 0.5 "
                                "ORDER BY target_t DESC LIMIT ?", (s, h, mode, method, limit)).fetchall()
-    rows.sort(key=lambda r: r["target_t"], reverse=True)
+    rows.sort(key=lambda r: (r["issued_t"], r["target_t"]), reverse=True)     # newest said first
     out = []
     for r in rows[:limit]:
         up = r["p_up"] > 0.5

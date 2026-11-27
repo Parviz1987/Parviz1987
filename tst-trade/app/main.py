@@ -681,15 +681,29 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         return await asyncio.to_thread(diag._slow, "sieve", lambda: sieve.sieve(db), 600)
 
     @app.get("/api/calls")
-    async def calls_api(method: str, symbol: str = "ALL", limit: int = 60, mode: str = "live"):
-        """The journal of one analyst: what it said, why, when, and what happened."""
+    async def calls_api(method: str, symbol: str = "ALL", limit: int = 60, mode: str = "live", horizon: str | None = None):
+        """The journal of one analyst: what it said, why, when, and what happened (one metal and horizon, or all)."""
         from . import sieve
         if symbol != "ALL" and symbol not in candles.METALS:
             raise HTTPException(400, "naməlum metal")
         if mode not in ("live", "history"):
             raise HTTPException(400, "naməlum rejim")
+        if horizon is not None and horizon not in forecast.HORIZON_SPEC:
+            raise HTTPException(400, "naməlum üfüq")
         return {"method": method, "name": forecast.METHOD_NAMES.get(method, method),
-                "calls": await asyncio.to_thread(sieve.calls, db, method, symbol, max(1, min(200, limit)), mode)}
+                "calls": await asyncio.to_thread(sieve.calls, db, method, symbol, max(1, min(200, limit)), mode, horizon)}
+
+    @app.get("/api/record")
+    async def record_api(days: int | None = None):
+        """The record book: every analyst, every metal, every horizon: right / wrong, the latest ten, the current run."""
+        from . import sieve
+        if days is not None and days not in (1, 7, 30):
+            raise HTTPException(400, "naməlum dövr")
+        return await asyncio.to_thread(diag._slow, f"record:{days}", lambda: sieve.record(db, days), 300)
+
+    @app.get("/analitikler")
+    async def analysts_page():
+        return FileResponse(STATIC / "analitikler.html")
 
     @app.get("/api/analysts")
     async def analysts(symbol: str = "XAU"):
