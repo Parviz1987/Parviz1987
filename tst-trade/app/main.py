@@ -671,7 +671,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         if period not in scoreboard.PERIODS:
             raise HTTPException(400, "naməlum dövr")
         out = await asyncio.to_thread(diag._slow, f"sb:{symbol}:{period}", lambda: scoreboard.board(db, symbol, period), 300)
-        return {**out, "names": forecast.METHOD_NAMES}
+        return {**out, "names": {**forecast.METHOD_NAMES, "news": "Xəbər əhvalı (köhnə üsul)"}, "retired": list(forecast.RETIRED)}
 
     @app.get("/api/analysts")
     async def analysts(symbol: str = "XAU"):

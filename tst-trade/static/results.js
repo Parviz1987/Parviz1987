@@ -187,14 +187,15 @@ async function loadBoard() {
   const ms = Object.keys(d.methods).filter((m) => m !== "rw");
   if (!ms.length) { $("sb").innerHTML = "<p class='note'>Bu dövrdə yoxlanmış proqnoz yoxdur.</p>"; return; }
   const total = (m) => Object.values(d.methods[m]).reduce((a, c) => a + c.n, 0);
-  ms.sort((a, b) => (a === "up") - (b === "up") || total(b) - total(a));
+  const old = new Set(d.retired || []);       // methods retired on 25.11: their earlier calls stay visible, marked and last
+  ms.sort((a, b) => (a === "up") - (b === "up") || old.has(a) - old.has(b) || total(b) - total(a));
   const cell = (c) => {
     if (!c || !c.n) return `<td class="c mut">·</td>`;
     const hr = c.right / c.n, diff = hr - c.chance, cls = c.n < 20 ? "mut" : diff >= 0.03 ? "up" : diff <= -0.03 ? "down" : "";
     return `<td class="c ${cls}" title="${c.n} fikir (${c.up} yuxarı, ${c.n - c.up} aşağı), ${c.right} düz; şans ${pc(c.chance)}">${pc(hr)} <span class="note">(${pc(c.chance)}) · ${c.n}</span></td>`;
   };
   $("sb").innerHTML = `<table class="sc"><tr><th>Analitik</th>${d.horizons.map((h) => `<th>${SB_H[h]}</th>`).join("")}</tr>` +
-    ms.map((m) => `<tr><td>${esc(d.names[m] || m)}${m === "up" ? ' <span class="note">(etalon)</span>' : ""}</td>${d.horizons.map((h) => cell(d.methods[m][h])).join("")}</tr>`).join("") +
+    ms.map((m) => `<tr class="${old.has(m) ? "mut" : ""}"><td>${esc(d.names[m] || m)}${m === "up" ? ' <span class="note">(etalon)</span>' : old.has(m) ? ' <span class="note">(pensiyada)</span>' : ""}</td>${d.horizons.map((h) => cell(d.methods[m][h])).join("")}</tr>`).join("") +
     `<tr><td class="note">Bazar bu dövrdə qalxıb</td>${d.horizons.map((h) => `<td class="c note">${d.market_up[h] == null ? "·" : pc(d.market_up[h])}</td>`).join("")}</tr></table>`;
 }
 
