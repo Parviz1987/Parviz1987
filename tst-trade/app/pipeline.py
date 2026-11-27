@@ -20,6 +20,13 @@ def _row(stage, feeds_into, status, msg, n=None):
     return {"stage": stage, "into": feeds_into, "status": status, "msg": msg, "n": n}
 
 
+def _short_day(ts: float) -> bool:
+    """A day the metals do not trade, or the afternoon of a short day: the same calendar as the repair and the
+    outside watcher (heartbeat.holiday / early_close), so the three never disagree about «closed»."""
+    from .heartbeat import early_close, holiday
+    return holiday(ts) or early_close(ts)
+
+
 def release_counts(db: DB, now: float, since: float) -> tuple[int, int, int]:
     """US releases of the last day (after the 25-minute grace): how many, how many have an actual from EITHER source
     (the agency itself, «Rəsmi rəqəmlər», or the two brains), and how many the brains confirmed."""
@@ -45,6 +52,11 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     live = [s for s in candles.METALS if engine.status(s, now) in ("LIVE", "DEMO")]
     if not open_:
         out.append(_row("Qiymət axını (4 metal)", "şamlar", "closed", "bazar bağlıdır"))
+    elif len(live) < 4 and _short_day(now):
+        # a holiday or a short day's afternoon (the repair and the outside watcher already treat it so): quiet is
+        # expected, not a broken first link
+        out.append(_row("Qiymət axını (4 metal)", "şamlar", "closed", f"bayram / qısa gün: {len(live)}/4 canlı",
+                        len(live)))
     else:
         out.append(_row("Qiymət axını (4 metal)", "şamlar", "ok" if len(live) == 4 else "bad" if not live else "warn",
                         f"{len(live)}/4 canlı", len(live)))
@@ -149,7 +161,8 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     from .engine import market_open
     overdue = sum(1 for r in db.execute("SELECT target_t FROM forecasts WHERE scored_ts IS NULL AND horizon IN "
                                         "('15m','30m','1h','4h') AND target_t < ?", (now - 3 * 3600,)).fetchall()
-                  if market_open(r["target_t"] - 60))     # closed hours incl. the daily break, on New York time
+                  if market_open(r["target_t"] - 60)      # closed hours incl. the daily break, on New York time
+                  and not _short_day(r["target_t"] - 60))  # holidays and short afternoons (seen Thanksgiving 2026)
     out.append(_row("Hakim (proqnozları yoxlayır)", "kartlar, dəqiqlik qrafikləri",
                     "ok" if overdue < 50 else "warn", f"vaxtı keçib yoxlanmayan {overdue}", overdue))
 
