@@ -224,6 +224,23 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     out.append(_row("Beyinlərin aylıq limiti", "bütün beyin işləri", "ok" if not near else "warn",
                     "hamısı limitin 80 %-dən aşağıdır" if not near else "limitə yaxın: " + "; ".join(near), len(near)))
 
+    # 12b. how late each news source is (plan 27.11 step 9.2): from the headline's own time to its arrival here,
+    # median of the last day; and how fast the last US figure came from the agency at its minute (the sniper)
+    try:
+        lat: dict[str, list[float]] = {}
+        for r in db.execute("SELECT source, received_ts - ts d FROM news WHERE received_ts IS NOT NULL AND received_ts > ? "
+                            "AND ts > ?", (now - 86400, now - 2 * 86400)).fetchall():
+            if r["d"] is not None and r["d"] >= 0:
+                lat.setdefault(r["source"], []).append(r["d"])
+        parts = [f"{s}: {sorted(v)[len(v) // 2] / 60:.0f} dəq ({len(v)})" for s, v in sorted(lat.items(), key=lambda x: -len(x[1]))[:6]]
+        od = json.loads(db.get("official:last_delay") or "null")
+        if od:
+            parts.append(f"son ABŞ rəqəmi ({od['event']}): {od['seconds']:.0f} san sonra")
+        out.append(_row("Xəbər gecikməsi (mənbə-mənbə)", "həyəcan, Oxuyucu", "ok",
+                        "; ".join(parts) if parts else "hələ ölçü yoxdur (gəliş vaxtı 27.11-dən yazılır)", None))
+    except Exception:
+        pass
+
     # 13. brains answering: per job, the share of calls that worked in the last day (a fallback that fails, an answer
     # cut off) and models the provider has closed
     try:          # a job = the calls of one slot within 2 minutes (a failed primary + a working fallback = answered)

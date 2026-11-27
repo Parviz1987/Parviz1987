@@ -31,6 +31,9 @@ MAX_BYTES = 2 * 1024 * 1024
 
 NEWS_EVERY, CAL_EVERY, MACRO_EVERY = 120, 3600, 6 * 3600
 GOOGLE_EVERY = 600                     # Google News queries: every 10 minutes (plan 27.11 step 7.1)
+NOW_SQL = "(julianday('now') - 2440587.5) * 86400.0"   # when a row really arrived (plan 27.11 step 9.2: delay per source)
+SNIPE_EVERY, SNIPE_FOR = 3, 240        # at a scheduled US release / Fed decision: ask the source every 3 s for 4 min
+FED_EVENTS = ("federal funds rate", "fomc statement")
 ALPACA_EVERY = 60
 ALPACA_URL = "https://data.alpaca.markets/v1beta1/news"
 # Metal funds and miners whose news Benzinga tags: the symbol says which metal the headline is about.
@@ -456,6 +459,8 @@ class Feeds:
                          "official": 0.0, "kalshi": 0.0, "etf": 0.0, "imf": 0.0, "sge": 0.0, "gld": 0.0, "amfi": 0.0, "geo": 0.0}
         self.activity = None      # app.activity.Hub: where each collector reports its status
         db.script(surprise.SCHEMA)
+        if "received_ts" not in {r[1] for r in db.execute("PRAGMA table_info(news)").fetchall()}:
+            db.execute("ALTER TABLE news ADD COLUMN received_ts REAL")   # plan 27.11 step 9.2
 
     def _health(self, sid: str, ok: bool | None, msg: str, rows: int = 0) -> None:
         """ok True: works; False: an error to fix; None: deliberately not used (shown grey, not as a problem)."""
@@ -502,8 +507,8 @@ class Feeds:
             last[name] = now
             try:
                 items = [i for i in parse_feed(await self._get(client, url), name) if now - i["ts"] < NEWS_MAX_AGE]
-                self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals) "
-                                    "VALUES(:uid, :source, :url, :title, :ts, :metals)", items)
+                self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals, received_ts) "
+                                    "VALUES(:uid, :source, :url, :title, :ts, :metals, " + NOW_SQL + ")", items)
                 total += len(items)
                 backoff.pop(name, None)
             except Exception as e:   # one feed failing must not cost the others
@@ -740,22 +745,27 @@ class Feeds:
         return self.db.execute("SELECT 1 FROM events WHERE country='USD' AND impact IN ('High','Medium') AND ts BETWEEN "
                                "? AND ?", (now - 2400, now + 60)).fetchone() is not None
 
-    async def official(self, client) -> None:
-        """US release actuals straight from BLS / FRED for releases of the last 3 days that have no actual yet."""
-        from . import official as off, surprise
+    async def official(self, client, sniping: bool = False) -> int:
+        """US release actuals straight from BLS / FRED for releases of the last 3 days that have no actual yet.
+        sniping (plan 27.11 step 9.1): called every few seconds at the release minute; the release just past counts
+        at once, and each figure found raises its alarm right here (not at the next brains' round)."""
+        from . import official as off, surprise, signals
         surprise.ensure(self.db)
         now = time.time()
         due = []
         for r in self.db.execute("SELECT title, ts, impact, forecast FROM events WHERE country='USD' AND impact IN "
                                  "('High','Medium') AND ts BETWEEN ? AND ? AND forecast IS NOT NULL",
-                                 (now - 3 * 86400, now - 30)).fetchall():
+                                 (now - 3 * 86400, now - (1 if sniping else 30))).fetchall():
             p = off.plan(r["title"])
             uid = off.uid_of(r["title"], r["ts"])
+            if sniping and (p is None or p[0] != "bls" or r["ts"] < now - SNIPE_FOR):
+                continue               # at the minute: only this minute's agency figures (FRED's own lag: normal round)
             if p and not self.db.execute("SELECT 1 FROM releases WHERE uid=? AND actual IS NOT NULL", (uid,)).fetchone():
                 due.append((dict(r), p, uid))
         if not due:
-            self._health("official", True, "gözlənilən rəsmi rəqəm yoxdur", 0)
-            return
+            if not sniping:
+                self._health("official", True, "gözlənilən rəsmi rəqəm yoxdur", 0)
+            return 0
         series: dict[str, list] = {}
         errors = []
         bls = sorted({p[1] for _, p, _ in due if p[0] == "bls"})
@@ -791,8 +801,77 @@ class Feeds:
                                       "raw_date": datetime.fromtimestamp(ev["ts"], timezone.utc).strftime(
                                           "%Y-%m-%d %H:%M:%S"), "known_ts": now}])
             found += 1
-        self._health("official", not errors, f"{found}/{len(due)} rəsmi rəqəm" +
-                     (f"; xəta: {'; '.join(errors)}" if errors else ""), found)
+            signals.ensure(self.db)
+            signals.emit(self.db, "release:" + uid, "release", f"ABŞ rəqəmi çıxdı: {ev['title']} — fakt {res[1]}, "
+                         f"gözlənti {surprise._num(ev['forecast'])} ({round(now - ev['ts'])} san sonra, rəsmi mənbədən)",
+                         3, None, now)
+            self.db.put("official:last_delay", json.dumps({"event": ev["title"], "ts": ev["ts"],
+                                                          "seconds": round(now - ev["ts"], 1)}))
+        if not sniping or found:
+            self._health("official", not errors, f"{found}/{len(due)} rəsmi rəqəm" +
+                         (f"; xəta: {'; '.join(errors)}" if errors else ""), found)
+        return found
+
+    def next_target(self, now: float) -> tuple[float, str] | None:
+        """The next scheduled moment worth sniping: a US release the agency publishes itself (BLS series we map) or a
+        Fed decision (14:00 New York), within the next 6 hours, or one that started less than SNIPE_FOR ago."""
+        from . import official as off
+        for r in self.db.execute("SELECT title, ts FROM events WHERE country='USD' AND impact IN ('High','Medium') AND "
+                                 "ts BETWEEN ? AND ? ORDER BY ts", (now - SNIPE_FOR, now + 6 * 3600)).fetchall():
+            t = str(r["title"]).lower()
+            p = off.plan(r["title"])
+            if p and p[0] == "bls":
+                return r["ts"], "bls"
+            if any(x in t for x in FED_EVENTS):
+                return r["ts"], "fed"
+        return None
+
+    async def snipe_fed(self, client, since: float) -> int:
+        """The Fed's own press feed at the decision minute: its statement goes in as a headline at once and raises a
+        strong news alarm (the Reader labels it like any other)."""
+        from . import signals
+        data = await self._get(client, "https://www.federalreserve.gov/feeds/press_all.xml")
+        items = [i for i in parse_feed(data, "Federal Reserve") if i["ts"] >= since - 120]
+        if not items:
+            return 0
+        self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals, received_ts) "
+                            "VALUES(:uid, :source, :url, :title, :ts, :metals, " + NOW_SQL + ")", items)
+        signals.ensure(self.db)
+        n = 0
+        for i in items:
+            n += signals.emit(self.db, "fed:" + i["uid"], "news", f"Fed: {i['title']} (rəsmi lentdən)", 3, None)
+        return n
+
+    async def sniper(self) -> None:
+        """Plan 27.11 step 9.1 (owner: «məlumat mərkəzlərində xəbər çıxan kimi avtomatik gətirsin»): sleeps until a
+        scheduled US release or Fed decision, then asks the source itself every SNIPE_EVERY seconds for SNIPE_FOR
+        seconds; the figure (or the statement) raises its alarm the moment it is found. Outside those minutes it
+        costs nothing. Its own loop: the 15-second engine round would add up to a quarter of a minute."""
+        while True:
+            try:
+                now = time.time()
+                nxt = self.next_target(now)
+                if nxt is None or nxt[0] - 10 > now:
+                    await asyncio.sleep(min(300.0, max(1.0, (nxt[0] - 10 - now) if nxt else 300.0)))
+                    continue
+                ts, kind = nxt
+                async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
+                    while time.time() < ts + SNIPE_FOR:
+                        try:
+                            got = await (self.official(client, sniping=True) if kind == "bls" else
+                                         self.snipe_fed(client, ts))
+                        except Exception as e:      # one failed ask never stops the minute
+                            log.warning("sniper %s: %s", kind, e)
+                            got = 0
+                        if got:
+                            break
+                        await asyncio.sleep(SNIPE_EVERY)
+                await asyncio.sleep(max(1.0, ts + SNIPE_FOR - time.time()))     # past this event
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("sniper failed")
+                await asyncio.sleep(60)
 
     async def gld(self, client) -> None:
         """GLD's holdings (tonnes) per day from the issuer's archive, every six hours."""
@@ -1054,8 +1133,8 @@ class Feeds:
                 for i in parse_alpaca(data):
                     if i["metals"] and time.time() - i["ts"] < NEWS_MAX_AGE:
                         items[i["uid"]] = i
-            self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals) "
-                                "VALUES(:uid, :source, :url, :title, :ts, :metals)", list(items.values()))
+            self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals, received_ts) "
+                                "VALUES(:uid, :source, :url, :title, :ts, :metals, " + NOW_SQL + ")", list(items.values()))
             fresh = sum(1 for i in items.values() if time.time() - i["ts"] < 86400)
             self._health("alpaca", True, f"{len(items)} metal başlığı (son 48 saat), {fresh} son 24 saatda", len(items))
         except Exception as e:

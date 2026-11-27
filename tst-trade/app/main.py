@@ -142,6 +142,7 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             asyncio.get_running_loop().create_task(_alive())
             asyncio.get_running_loop().create_task(_cleanup())
             asyncio.get_running_loop().create_task(_conductor())
+            asyncio.get_running_loop().create_task(feeds.sniper())     # plan 27.11 step 9.1: the release minute
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
             asyncio.get_running_loop().create_task(app.state.futures_daily())
             asyncio.get_running_loop().create_task(app.state.rigor_daily())

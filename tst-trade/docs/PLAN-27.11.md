@@ -80,9 +80,9 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
 - [x] 7.1 Benzinga (Alpaca) xəbəri söndürülür; Google News 10 dəqiqədən bir; Kəşfiyyatçı yalnız həyəcanda; cavabı bəlli
       kölgə sınaqları (ACI, dirijor, FA pəncərəsi, bayram) həftədə bir.
 - [x] 8.1 Sıçrayış 1 dəqiqədə tutulur (canlı axından), dərhal səbəb axtarılır.
-- [ ] 9.1 Rəsmi mənbə agenti: təqvimdəki ABŞ rəqəmi (BLS, BEA) və Fed qərarı dəqiqəsində rəsmi sayt yoxlanır, rəqəm
+- [x] 9.1 Rəsmi mənbə agenti: təqvimdəki ABŞ rəqəmi (BLS, BEA) və Fed qərarı dəqiqəsində rəsmi sayt yoxlanır, rəqəm
       gözləntiylə müqayisə olunur, saniyələr içində həyəcan.
-- [ ] 9.2 Hər xəbərin gəliş vaxtı yazılır: mənbə-mənbə real gecikmə (pul ödəməzdən əvvəlki «əvvəl» rəqəmi).
+- [x] 9.2 Hər xəbərin gəliş vaxtı yazılır: mənbə-mənbə real gecikmə (pul ödəməzdən əvvəlki «əvvəl» rəqəmi).
 - [ ] 10.1 Şənbə 28.11: server 1 GB → 2 GB (ayda $6 → $12; sahib «başla» ilə təsdiqlədi), bazar bağlıdır.
 - [ ] 11.1 Açarlar gələndə: FinancialJuice + Databento qoşulur, 15 il tarixçə, 1 aylıq sınaq qabaqcadan qeyd olunur.
       (Açarsız sınamaq mümkün deyil — bu addım açarı gözləyir, yarımçıq deyil.)
@@ -121,3 +121,7 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   (cavabı olmayan 4 kölgə sınağı gündəlik qalır). Testlər 346/346.
 - 27.11 18:51 — 8 bitdi: metalın 1 dəqiqəlik şamı adi 1 dəqiqəlik hərəkətin 6 qatı (ən az 0,15 %) olanda dərhal həyəcan;
   həyəcanda Kəşfiyyatçı səbəbi X-də axtarır (gündə ən çox 3 dəfə, xərc sərhədi). 15 dəqiqəlik yoxlama da qalır.
+- 27.11 18:54 — 9 bitdi: «snayper» — təqvimdəki ABŞ rəqəmi (BLS: inflyasiya, iş yerləri, işsizlik, maaş, PPI) və Fed qərarı
+  dəqiqəsində rəsmi mənbə 3 saniyədən bir, 4 dəqiqə soruşulur; rəqəm tapılan kimi həyəcan (əvvəl dəqiqədə bir + növbəti beyin
+  dövrəsi). PCE və ÜDM FRED-dən gəlir (FRED-in öz gecikməsi var — adi dövrə). Hər başlığın gəliş vaxtı yazılır; əlaqə
+  xəritəsində «Xəbər gecikməsi» sətri mənbə-mənbə median gecikməni və son ABŞ rəqəminin neçə saniyəyə gəldiyini göstərir.
