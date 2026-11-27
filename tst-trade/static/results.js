@@ -260,3 +260,41 @@ metals(); load(); loadSim().catch(() => {}); loadAnalysts().catch(() => {}); loa
 // a real change of width only: a phone fires «resize» while scrolling, and each one used to ask the server again
 let lastW = innerWidth;
 window.addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; load().catch(() => {}); });
+
+// 5. The sieve and each analyst's journal (owner 2026-11-27: record who said what, why, when, and whether it came true;
+// then filter: keep what works, remove the rest, a simple system)
+const SV = { "saxla": "🟢 saxla", "pis": "🔴 ardıcıl səhv", "fərqsiz": "⚪ fərqsiz", "az": "⏳ az" };
+const SV_H = { "15m": "15 dəq", "30m": "30 dəq", "1h": "1 saat", "4h": "4 saat", "1d": "1 gün", "3d": "3 gün", "1w": "1 həftə", "10d": "10 gün", "1mo": "1 ay" };
+const svCell = (c) => !c ? "—" : `${SV_H[c.horizon] || c.horizon} ${c.mode === "live" ? "canlı" : "keçmiş"}: ${pc(c.hit)} / ${pc(c.bar)} · ${c.n_eff}`;
+async function loadSieve() {
+  if (!$("sieve")) return;
+  const d = await api("/api/sieve");
+  const cnt = {}; d.rows.filter((r) => !r.retired && !r.baseline).forEach((r) => { cnt[r.verdict] = (cnt[r.verdict] || 0) + 1; });
+  $("svnote").textContent = Object.entries(SV).map(([k, n]) => `${n.split(" ")[0]} ${cnt[k] || 0}`).join(" · ");
+  const row = (r) => `<tr class="${r.retired ? "mut" : ""}"><td><b>${esc(r.name)}</b>${r.baseline ? ' <span class="note">(etalon)</span>' : ""}
+      <br><span class="note">${esc(d.families[r.family] || (r.retired ? "pensiyada" : ""))}</span></td>
+    <td class="c">${SV[r.verdict]}</td><td class="note">${svCell(r.best)}</td><td class="note">${svCell(r.worst)}</td>
+    <td class="c mut">${r.calls}</td><td><button class="btn sm" data-jm="${esc(r.method)}">Jurnal</button></td></tr>
+    <tr class="jrow" data-for="${esc(r.method)}" hidden><td colspan="6"><div class="tbl jbox"></div></td></tr>`;
+  const live = d.rows.filter((r) => !r.retired), old = d.rows.filter((r) => r.retired);
+  const head = `<tr><th>Analitik və ailəsi</th><th>Hökm</th><th>Ən yaxşı yeri (düz / şans · müstəqil fikir)</th><th>Ən pis yeri</th><th>Fikir</th><th></th></tr>`;
+  $("sieve").innerHTML = `<table class="sc">${head}${live.map(row).join("")}</table>` +
+    (old.length ? `<details class="more"><summary class="note">Pensiyada olanlar (${old.length}): 25.11-də çıxarılıb, köhnə fikirləri qalır</summary>
+      <table class="sc">${head}${old.map(row).join("")}</table></details>` : "");
+  $("sieve").querySelectorAll("[data-jm]").forEach((b) => b.onclick = async () => {
+    const tr = $("sieve").querySelector(`.jrow[data-for="${b.dataset.jm}"]`);
+    tr.hidden = !tr.hidden;
+    if (tr.hidden || tr.dataset.done) return;
+    const j = await api(`/api/calls?method=${encodeURIComponent(b.dataset.jm)}&limit=60`);
+    tr.dataset.done = "1";
+    tr.querySelector(".jbox").innerHTML = !j.calls.length ? "<p class='note'>Canlı fikri yoxdur.</p>" :
+      `<table class="sc"><tr><th>Vaxt (NY)</th><th>Metal</th><th>Üfüq</th><th>Nə dedi</th><th>Nəyə əsasən</th><th>Başlanğıc → son</th><th>Nəticə</th></tr>` +
+      j.calls.map((c) => `<tr><td class="mut">${dt(c.issued_t)}</td><td>${NAMES[c.symbol]}</td><td>${SV_H[c.horizon] || c.horizon}</td>
+        <td class="${c.said === "yuxarı" ? "up" : "down"}">${c.said === "yuxarı" ? "▲" : "▼"} ${c.said} ${pc(c.p)}</td>
+        <td class="note">${esc(c.basis)}</td><td class="c">${f(c.price0)} → ${c.price1 == null ? "…" : f(c.price1)}</td>
+        <td>${!c.checked ? "<span class='mut'>gözlənilir</span>" : c.right == null ? "<span class='mut'>dəyişmədi</span>"
+          : `${c.right ? "<span class='up'>✅ düz</span>" : "<span class='down'>❌ səhv</span>"} <span class="note">${c.move_pct >= 0 ? "+" : ""}${c.move_pct.toFixed(2)} % dediyi tərəfə</span>`}</td></tr>`).join("") + "</table>";
+  });
+}
+loadSieve().catch(() => {});
+setInterval(() => loadSieve().catch(() => {}), 600000);

@@ -673,6 +673,24 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         out = await asyncio.to_thread(diag._slow, f"sb:{symbol}:{period}", lambda: scoreboard.board(db, symbol, period), 300)
         return {**out, "names": {**forecast.METHOD_NAMES, "news": "Xəbər əhvalı (köhnə üsul)"}, "retired": list(forecast.RETIRED)}
 
+    @app.get("/api/sieve")
+    async def sieve_api():
+        """The sieve: every analyst sorted by fixed rules (keep / consistently wrong / no different from chance / too
+        few), on the Judge's own numbers, live and on the replayed history."""
+        from . import sieve
+        return await asyncio.to_thread(diag._slow, "sieve", lambda: sieve.sieve(db), 600)
+
+    @app.get("/api/calls")
+    async def calls_api(method: str, symbol: str = "ALL", limit: int = 60, mode: str = "live"):
+        """The journal of one analyst: what it said, why, when, and what happened."""
+        from . import sieve
+        if symbol != "ALL" and symbol not in candles.METALS:
+            raise HTTPException(400, "naməlum metal")
+        if mode not in ("live", "history"):
+            raise HTTPException(400, "naməlum rejim")
+        return {"method": method, "name": forecast.METHOD_NAMES.get(method, method),
+                "calls": await asyncio.to_thread(sieve.calls, db, method, symbol, max(1, min(200, limit)), mode)}
+
     @app.get("/api/analysts")
     async def analysts(symbol: str = "XAU"):
         """Block 3, the scale: every analyst (method or brain) on each desk with its record and its weight, and the

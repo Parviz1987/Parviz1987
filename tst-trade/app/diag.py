@@ -125,6 +125,12 @@ def _calls(db: DB, now: float | None = None, hours: int = 12) -> dict:
     return out
 
 
+def _sieve(db: DB) -> list[dict]:
+    """The sieve in short (the site shows it in full on Nəticələr): every analyst's verdict and its best and worst place."""
+    from . import sieve
+    return [{k: r[k] for k in ("method", "verdict", "retired", "calls", "best", "worst")} for r in sieve.sieve(db)["rows"]]
+
+
 def _scoreboard(db: DB) -> dict:
     """Yesterday and the last 7 days, all four metals: who was right on which horizon (static/results.js shows the
     same per period on the site). For the duty check's daily note."""
@@ -418,6 +424,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "forecast_rows": _slow("forecast_rows", lambda: _forecast_rows(db), 6 * 3600),
         "calls_12h": _slow("calls_12h", lambda: _calls(db), 300),
         "scoreboard": _slow("scoreboard", lambda: _scoreboard(db), 900),
+        "sieve": _slow("sieve_diag", lambda: _sieve(db), 1800),
         "cleanup": json.loads(db.get("cleanup:retired_v1") or "null"),
         "vacuum": json.loads(db.get("cleanup:vacuum_v1") or "null"),
         "agents": _agents(db),
