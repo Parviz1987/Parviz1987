@@ -72,4 +72,4 @@ def test_each_headline_records_its_arrival_and_the_link_map_shows_the_delay():
     assert r["received_ts"] is not None and 550 < r["received_ts"] - r["ts"] < 700
     jobs = BrainJobs(db, ks, f)
     rows = {x["stage"]: x for x in pipeline.check(db, ks, Engine(db, ks, "demo", 15, f, jobs), f, jobs, now)}
-    assert "10 dəq" in rows["Xəbər gecikməsi (mənbə-mənbə)"]["msg"]
+    assert "Google News: 10 dəq" in rows["Xəbər gecikməsi (mənbə-mənbə)"]["msg"]       # one path, not per publisher

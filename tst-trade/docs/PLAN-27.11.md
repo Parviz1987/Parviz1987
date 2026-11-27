@@ -86,7 +86,7 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
 - [ ] 10.1 Şənbə 28.11: server 1 GB → 2 GB (ayda $6 → $12; sahib «başla» ilə təsdiqlədi), bazar bağlıdır.
 - [ ] 11.1 Açarlar gələndə: FinancialJuice + Databento qoşulur, 15 il tarixçə, 1 aylıq sınaq qabaqcadan qeyd olunur.
       (Açarsız sınamaq mümkün deyil — bu addım açarı gözləyir, yarımçıq deyil.)
-- [ ] 12.1 Sənədlər və sahibə yekun.
+- [x] 12.1 Sənədlər və sahibə yekun.
 
 ## Sahibsiz qalanlar (sistem onsuz işləyir)
 | | Əvəzi | Nə itirilir |
@@ -128,3 +128,4 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
 - 27.11 18:56 — 10.1 hazırlandı: şənbə 10:07 NY bu sessiyaya xatırlatma (`trig_012AQJgmWKiDemgCQXMAxUG2`) — server böyütməni özüm
   edib saytın qayıtdığını yoxlayacağam (disk böyüdülmür ki, lazım olsa $6-a qayıtmaq olsun). 11.1: Admin-də FinancialJuice
   açar xanası; əlaqə xəritəsində FinancialJuice və Databento canlı axını «sizin addımınızı gözləyir» — açar/plan gələndə qoşulur.
+- 27.11 18:57 — 12.1: BLOKLAR, IS-PLANI 5.4, SOHBET-TARIXCESI yeniləndi. Qalan: 10.1 şənbə, 11.1 açarlar gələndə.

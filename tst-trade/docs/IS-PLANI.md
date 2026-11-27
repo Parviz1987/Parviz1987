@@ -289,3 +289,11 @@ Tam yoxlama siyahısı və jurnal: `docs/PLAN-27.11.md`. Qərarlar:
    proqnoz son sınaqda sayılmır.
 5. **Sahibsiz işləmək** — R2, Healthchecks, 2FA, Gemini onsuz da sistem işləyir; hər yerdə «sizin addımınızı gözləyir»
    kimi göstərilir. Növbətçi yoxlama hər dəfə təzə sessiyada; iş planı ilişsə (jurnal 6 saatdan köhnə), növbətçi davam etdirir.
+
+### 5.4 Məlumat yolu və sayt (sahib, 27.11 axşam: «hansı yol hansıdırsa onu seçək … başla, ardıcıl, yarımçıq buraxma»)
+1. **Qarışıq yol:** vaxtı məlum rəsmi mənbələr (BLS, Fed) — pulsuz «snayper»; qəfil xəbər — **FinancialJuice** (~$99/ay);
+   böyük oyunçular, həqiqi həcm, 15 il tarixçə — **Databento Standard** (~$199/ay). Sahib ikisini də almağa qərar verdi;
+   1 aylıq sınaq qabaqcadan qeyd olunacaq, fayda yoxdursa dayandırılır.
+2. **Saytdan həqiqətən çıxarmaq** (kod/məlumat silinmir): Panel — etibar zolağı, 24 xanalı «GÖZLƏ», «Sabah üçün»,
+   strateqin izahı (→ Analitiklər), «Sadə rejim»; Nəticələr — H1–H8, H9–H13, analitiklər/tərəzi, süzgəc, 2 illik fyuçers.
+3. **Server** 1 GB → 2 GB (ayda $12), şənbə 28.11, bazar bağlı.

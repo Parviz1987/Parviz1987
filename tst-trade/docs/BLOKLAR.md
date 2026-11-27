@@ -11,7 +11,7 @@
 > `judge_canary`, `heartbeat`, `ops`. Növbətçi təlimatı `.claude/skills/temirci/SKILL.md`, səhvlər
 > `docs/monitor/sehvlerim.md`, jurnal `docs/monitor/jurnal.md`.
 >
-> Son yeniləmə: **2026-11-27 11:15 NY** (Claude; iş planı `docs/PLAN-27.11.md`). Vəziyyət işarələri: ✅ hazır və işləyir · 🟡 qurulub, sübut/məlumat
+> Son yeniləmə: **2026-11-27 19:10 NY** (Claude; iş planı `docs/PLAN-27.11.md`). Vəziyyət işarələri: ✅ hazır və işləyir · 🟡 qurulub, sübut/məlumat
 > gözləyir · 🔧 qismən, işi var · ⛔ yoxdur / dayandırılıb · 👤 sahibin addımı lazımdır.
 
 ---
@@ -105,6 +105,10 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   qızıl üçün 1 saat–1 gün xəbər proqnozunun kənar sınaqda sübutu tapılmayıb — sübutu bizim Hakim verəcək.
 - **27.11:** Benzinga (Alpaca) yalnız metal ETF tikerləri ilə soruşulurdu — 48 saatda 0 başlıq, amma «ok» deyirdi; indi
   ümumi axından da (yalnız metal adı keçənlər). Google News-un «429 çox sorğu» deyən axını 15→30→60 dəq dincəlir.
+- **27.11 axşam (sahib: «xəbər çıxan kimi gəlsin»):** vaxtı məlum ABŞ rəqəmi (BLS) və Fed qərarı dəqiqəsində **«snayper»**
+  rəsmi mənbəni 3 saniyədən bir soruşur, tapılan kimi həyəcan (`feeds.sniper`). Benzinga söndürüldü; Google News 10 dəqiqədən
+  bir (Fed lenti 2 dəq). Hər başlığın gəliş vaxtı yazılır — əlaqə xəritəsində mənbə-mənbə gecikmə. Qəfil xəbər üçün
+  **FinancialJuice** (pullu, sahib qərar verdi) — açar gələndə qoşulur. Kəşfiyyatçı yalnız böyük rəqəm ətrafında və həyəcanda.
 - **Nə qalıb:** (a) qaydaların öz qeydi yığılmalıdır (çəki yalnız müsbət qeydlə); (b) NW-SHOCK-1-i istiqamət yox,
   dalğalılıq/gözlə işarəsinə çevirmək — **kölgə ölçüsü qurulub (27.11):** `shadowtests.news_shock_vol` (böyük xəbərdən
   sonrakı saat, günün eyni saatı ilə) və `geo_shock_vol` (GDELT gərginlik günündən sonrakı gün); gündə bir, diag
@@ -207,7 +211,10 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   `autojudge.early_shadow`.
 
 ### 11. Risk və qərar, kağız ticarət ✅
-- `app/risk.py`, `app/nerve.py`, `app/liquidity.py`, `app/paper.py` (virtual hesab), `app/signals.py`. AL/SAT yalnız
+- `app/risk.py`, `app/nerve.py`, `app/liquidity.py`, `app/paper.py` (virtual hesab), `app/signals.py`.
+- **27.11:** sıçrayış 1 dəqiqədə tutulur (metalın 1 dəqiqəlik şamı adi hərəkətin 6 qatı, ən az 0,15 %) — 15 dəqiqəlik yoxlama
+  da qalır; həyəcanda Kəşfiyyatçı səbəbi axtarır (gündə ən çox 3). Panel: «GÖZLƏ» cədvəli yerinə hər metal bir sətir
+  (1 saat / 1 gün / 1 həftə 80 % aralığı), AL / SAT yalnız sübutla. AL/SAT yalnız
   Hakimin son sınağı + sahib registri ilə; **real ticarət yoxdur** (👤 heç vaxt Claude qərar vermir).
 
 ### 12. Öyrənmə ✅ / 13. Səhv yarılması 🟡 / 14. Hipotez agenti ✅

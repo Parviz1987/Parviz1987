@@ -228,10 +228,12 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     # median of the last day; and how fast the last US figure came from the agency at its minute (the sniper)
     try:
         lat: dict[str, list[float]] = {}
+        # Google News items carry their publisher's name (Reuters, Kitco...): they are one path, «Google News»
+        direct = {n for n, _ in feeds_mod.NEWS_FEEDS if not n.startswith("Google News")} | {"FinancialJuice"}
         for r in db.execute("SELECT source, received_ts - ts d FROM news WHERE received_ts IS NOT NULL AND received_ts > ? "
                             "AND ts > ?", (now - 86400, now - 2 * 86400)).fetchall():
             if r["d"] is not None and r["d"] >= 0:
-                lat.setdefault(r["source"], []).append(r["d"])
+                lat.setdefault(r["source"] if r["source"] in direct else "Google News", []).append(r["d"])
         parts = [f"{s}: {sorted(v)[len(v) // 2] / 60:.0f} dəq ({len(v)})" for s, v in sorted(lat.items(), key=lambda x: -len(x[1]))[:6]]
         od = json.loads(db.get("official:last_delay") or "null")
         if od:

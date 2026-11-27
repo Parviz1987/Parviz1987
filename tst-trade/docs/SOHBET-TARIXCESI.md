@@ -97,8 +97,12 @@ sübutu ilə**. Sübut olmayan heç nə pula (hətta kağız ticarətə) getmir.
   Sahib sessiyanı layihəyə (Projects) köçürməyi soruşdu — yol: sessiyanın menyusu → **Continue in project**; köçürsə,
   növbətçi yoxlama təzə sessiyada olduğu üçün ona bağlı deyil.
 
+- **27.11 axşam:** sahib xəbərin anında gəlməsini və böyük oyunçuların alıb-satmasını görmək istədi; pullu xidmətlərə hazırdır
+  («pulu verək, özümüzü yormayaq»). Qərar: qarışıq yol (IS-PLANI 5.4). Sahib FinancialJuice və Databento-nu alacaq, açarları
+  Admin-ə yazacaq. «Təzə kompüterdə işləmir» — Wi-Fi qoşulmamışdı (serverə heç bir sorğu gəlməmişdi).
+
 ## 6. Açıq işlər
-- **Sahibin:** 2FA; Healthchecks.io açarı; R2 (istəyə bağlı, pul); Admin → Əməliyyatlar → WAL araşdırma kartını bağlamaq; Gemini model
+- **Sahibin:** FinancialJuice və Databento Standard almaq, açarları Admin-ə yazmaq; 2FA; Healthchecks.io açarı; R2 (istəyə bağlı, pul); Admin → Əməliyyatlar → WAL araşdırma kartını bağlamaq; Gemini model
   təklifi (`gemini-2.5-flash` bağlanıb, `gemini-3.8-flash` sınağı Google-un 503-ü ilə alınmayıb; Admin → Beyinlər).
 - **Claude-un:** 3 saatlıq növbətçi yoxlama (temirci) — 27.11 10:33 NY **hər dəfə təzə sessiyada** başlayır
   (`trig_01VQ4otCpmwHSbgWngdMWzpY`), həftəlik hesabat da (`trig_01ATe3NLPyGeK2h81xVAUUSn`) — ilişmiş sessiyadan asılı
