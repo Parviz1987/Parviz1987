@@ -1,0 +1,66 @@
+# İş planı 27.11 — qırıq əlaqələr, artıqlar, saytın önü (sahib: «BAŞLA, HAMISINI DAYANMADAN BİTİR», 27.11 10:20 NY)
+
+> **Kim üçün:** sahib və hər Claude sessiyası. Bu fayl planın **tək mənbəyidir**: hər addımdan sonra işarə və
+> jurnal sətri yazılır. Sessiya ilişsə, yeni sessiya buradan davam edir (əvvəl `SOHBET-TARIXCESI.md` bölmə 5a).
+> Sahibin təsdiqləri (27.11 çatda «Bəli, bunları eləyə bilərsən» + «Başla»): sınaqları 3–5 namizədə daraltmaq;
+> İkinci analitiki və müzakirəni seyrəltmək; Hakimin «30 % gələcəyə baxan» yoxlamasını düzəltmək (qorunan fayl);
+> artıqları çıxarmaq. **«Çıxarmaq» = ekrandan və birləşmədən çıxır; kod və məlumat silinmir, geri qaytarmaq olar.**
+
+## Qaydalar (köhnə səhvlərə qayıtmamaq üçün — `monitor/sehvlerim.md`)
+1. Hər addım: xətanı göstərən test → düzəliş → bütün testlər (`set -o pipefail`) → commit + push (əvvəl öz budaq,
+   sonra `claude/amazing-keller-c4hwfl`) → serverdə yoxla (`/api/diag`, `curl -I`) → bu faylda işarə.
+2. Sadə olmayan dəyişiklik — ayrıca yoxlayıcı agent («ikinci göz»). Proqnoz rəqəmi gözlənilmədən dəyişsə — dayan, yaz.
+3. Üç söz: **işləyir** (serverin öz məlumatında görünür) · **kod hazırdır, sahibi gözləyir** · **işləmir**.
+4. Sahibsiz edilmir: real pul / ticarət, yeni pullu xidmət və ya açar, məlumat silmək, Avtomatik Hakim siyasəti.
+   Belə ehtiyac çıxsa — bura yazılır, həmin addım dayanır, qalanı davam edir.
+
+## Mərhələ 0 — təhlükəsizlik toru
+- [x] 0.1 Bu plan faylı.
+- [x] 0.2 Növbətçi yoxlama və həftəlik hesabat hər dəfə **təzə sessiyada** başlayır (ilişmiş sessiyadan asılı deyil),
+      vacib xəbər telefona. `trig_01VQ4otCpmwHSbgWngdMWzpY` (3 saat), `trig_01ATe3NLPyGeK2h81xVAUUSn`
+      (bazar ertəsi 12:13); köhnələr söndürülüb (silinməyib). Təzə sessiya jurnal 6 saatdan köhnədirsə planı davam etdirir.
+
+## Mərhələ 1 — hər əlaqənin xəritəsi
+- [ ] 1.1 Diaqnostikada əlaqə xəritəsi: mənbə → blok → analitik → birləşdirici → Hakim → səhifə; hər halqada son
+      məlumatın yaşı, sətir sayı, növbəti halqa istifadə edirmi; «yalançı OK» (0 sətir, amma «ok») ayrıca.
+- [ ] 1.2 GitHub-dakı saatlıq kənar yoxlama həqiqətən işləyirmi.
+
+## Mərhələ 2 — qırıqlar və yalançı «işləyir»lər (27.11 səhər tapılanlar + 1.1-in tapdıqları)
+- [ ] 2.1 Hakimin öz yoxlaması: 30 % gələcəyə baxan saxta qayda (64 % düz) tutulmadı.
+- [ ] 2.2 Blokların gündəlik yoxlaması köhnə şəkil göstərir (Xəbəri «qırıq»); tez-tez + yaşı görünsün.
+- [ ] 2.3 Alpaca (Benzinga) 48 saatda 0 başlıq, amma «ok».
+- [ ] 2.4 Seçici konsensus heç vaxt ölçülə bilmir (yalnız sübutlu üsulları dinləyir, sübutlu yoxdur).
+- [ ] 2.5 Qrafik analitikinin ehtiyat modeli 39 çağırışdan 2-də cavab verib.
+- [ ] 2.6 Gemini: köhnə model bağlanıb, yeni modelin sınağı Google 503 ilə alınmayıb — sınaq təkrarı, sahibin
+      qabaqcadan qaydası (eyni şirkət + sınaq pis deyil + qiymət ≤ +20 %).
+- [ ] 2.7 Google News gümüş/platin 429.
+- [ ] 2.8 R2, Healthchecks, 2FA hər yerdə «kod hazırdır, sahibin açarını gözləyir».
+- [ ] 2.9 `feed geo failed` xətası.
+
+## Mərhələ 3 — artıqları çıxarmaq, sınaqları daraltmaq
+- [ ] 3.1 Birləşdiricilər: önə yalnız vahid proqnoz (+ müqayisə üçün sadə orta); konsensus, tərəzi, dirijor arxada.
+- [ ] 3.2 Mövsüm və zərgərlik səsləri pensiyaya (7 gündə 0 fikir; dalğalılıq sınağı sübut vermədi).
+- [ ] 3.3 İkinci analitik və müzakirə seyrək (pula qənaət).
+- [ ] 3.4 Yeni kiçik sınaq ailəsi (3–5 namizəd), qeyd vaxtı ilə, yalnız yeni canlı məlumatla.
+- [ ] 3.5 Qeydə alınmış əsas sınaqların (V1–V5) istifadə etdiyi üsullara toxunulmur — yoxlanır.
+
+## Mərhələ 4 — saytın önü (sahibin 27.11 04:57 tapşırığı, `SOHBET-TARIXCESI.md` 5a)
+- [ ] 4.1 Panel: hər metal üçün analitiklərin indiki fikri (▲/▼, aralıq) + həmin metaldakı düz/səhv qeydi.
+- [ ] 4.2 Texniki şeylər «Ətraflı»ya; təkrarlar bir yerə; «Nəticələr»də bir sınaq siyahısı.
+- [ ] 4.3 Hər səhifə 1366 və 390 ölçüdə şəkil, brauzer xətası yox, hər düymə basılıb.
+
+## Mərhələ 5 — sənədlər və hesabat
+- [ ] 5.1 `BLOKLAR.md`, `SOHBET-TARIXCESI.md`, `IS-PLANI.md` yenilənir.
+- [ ] 5.2 Sahibə yekun: nə edildi, necə yoxlandı, nə qaldı.
+
+## Sahibsiz qalanlar (sistem onsuz işləyir)
+| | Əvəzi | Nə itirilir |
+|---|---|---|
+| R2 | DigitalOcean gündəlik nüsxəsi (7 gün), həftədə bir API ilə yoxlanır | DigitalOcean hesabı itsə nüsxə də itər |
+| Healthchecks | 3 saatlıq növbətçi yoxlama + GitHub saatlıq kənar yoxlama | dəqiqələr içində Telegram xəbəri |
+| 2FA | parol + giriş qoruyucusu + bloklama | yalnız sahibin telefonu ilə qurulur |
+| Gemini | ehtiyat beyinlər (OpenAI, Anthropic) | — |
+
+## Jurnal (NY saatı)
+- 27.11 10:20 — plan təsdiqləndi, iş başladı.
+- 27.11 10:33 — Mərhələ 0 bitdi: plan faylı; növbətçi yoxlama və həftəlik hesabat təzə sessiyada (ilk yoxlama 10:47).

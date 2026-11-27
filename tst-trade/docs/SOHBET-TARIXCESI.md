@@ -93,8 +93,10 @@ sübutu ilə**. Sübut olmayan heç nə pula (hətta kağız ticarətə) getmir.
 ## 6. Açıq işlər
 - **Sahibin:** 2FA; Healthchecks.io açarı; Admin → Əməliyyatlar → WAL araşdırma kartını bağlamaq; Gemini model
   təklifi (`gemini-2.5-flash` bağlanıb, `gemini-3.8-flash` sınağı Google-un 503-ü ilə alınmayıb; Admin → Beyinlər).
-- **Claude-un:** 3 saatlıq növbətçi yoxlama (temirci) — 27.11 09:36 NY **indiki sessiyaya** köçürüldü
-  (`trig_01RQiBbUSTQ1hnfAh6aUtKNm`), həftəlik hesabat da (`trig_01EgJRrrocafqJqht6CrAedz`); 2-ci sessiyanın ikisi
+- **Claude-un:** 3 saatlıq növbətçi yoxlama (temirci) — 27.11 10:33 NY **hər dəfə təzə sessiyada** başlayır
+  (`trig_01VQ4otCpmwHSbgWngdMWzpY`), həftəlik hesabat da (`trig_01ATe3NLPyGeK2h81xVAUUSn`) — ilişmiş sessiyadan asılı
+  deyil; iş planı `docs/PLAN-27.11.md`. Əvvəlki bağlı nüsxələr (`trig_01RQiBbUSTQ1hnfAh6aUtKNm`,
+  `trig_01EgJRrrocafqJqht6CrAedz`) söndürülüb; 2-ci sessiyanın ikisi
   (`trig_01SPvUvaqY42odFwtafEJxpL`, `trig_01MFgmGc9vkDfTtw1XEUTzNt`) və 1-cinin ikisi söndürülüb (silinməyib).
   Sahibin 04:57 tapşırığının 2-ci hissəsi (bölmə 5a); kəsilmə düzəlişi ✅ yoxlandı (21:26 NY uğurlu); GDELT dolması;
   `news_shock_vol` / `geo_shock_vol` ilk nəticələri (t > 2 olsa, dalğalılıq bayrağı təklifi); `BLOKLAR.md`-ni hər işdən sonra yeniləmək.
