@@ -653,11 +653,11 @@ class Feeds:
         spans = [(f"{y}0101000000", f"{y}1231235959") for y in range(eventlib.GDELT_FROM, year)
                  if str(y) not in have]
         start = datetime.fromtimestamp(now - 21 * 86400, timezone.utc).strftime("%Y%m%d000000")
-        spans.append((start, datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d%H%M%S")))
+        spans.insert(0, (start, datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d%H%M%S")))   # newest first
         got, errors = 0, []
         for i, (a, b) in enumerate(spans):
             if i:
-                await asyncio.sleep(6)
+                await asyncio.sleep(12)
             try:
                 r = await client.get(eventlib.GDELT_URL, params={"query": eventlib.GDELT_QUERY, "mode": "timelinevol",
                                                                  "format": "json", "startdatetime": a,
@@ -672,11 +672,13 @@ class Feeds:
                 got += len(rows)
             except Exception as e:
                 errors.append(f"{a[:8]}: {type(e).__name__} {str(e)[:80]}")
+                if "429" in str(e):              # GDELT asks us to slow down: the missing years wait for the next run
+                    break
         self.db.put("eventlib:geo_fetch", json.dumps({"ts": now, "days": got, "errors": errors[:5]},
                                                      ensure_ascii=False))
         if errors:
             log.warning("gdelt: %s", "; ".join(errors[:3]))
-        return len(spans) > 1 and got > 0
+        return len(spans) > 1 and got > 0     # history years arrived: rebuild
 
     async def event_firsts(self, client, key: str) -> None:
         """Hadisələr kitabxanası (app/eventlib.py): ALFRED's first published CPI, payrolls, PCE prices, real GDP and
