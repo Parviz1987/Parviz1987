@@ -87,6 +87,14 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
                             log.info("conductor: %s", await asyncio.to_thread(conductor.run, db))
                         except Exception:
                             log.exception("conductor audit failed")
+                    elif hour not in (4, 5):
+                        # the block sheets every hour too (27.11: built once a day, they called the news block
+                        # «broken» 17 hours after its fix); one indexed query, seconds
+                        from . import blockaudit
+                        try:
+                            await asyncio.to_thread(blockaudit.build, db)
+                        except Exception:
+                            log.exception("block audit failed")
                     await asyncio.sleep(3600)
             async def _alive():                # every 5 minutes: the panel and the price, for the outside watcher
                 import os

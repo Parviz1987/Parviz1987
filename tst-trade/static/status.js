@@ -65,11 +65,14 @@ async function load() {
       <td>${esc(e.message)}${e.trace ? `<details><summary class="note">ətraflı</summary><pre class="trace">${esc(e.trace)}</pre></details>` : ""}</td></tr>`).join("") + "</table>"
     : "<p class='note'>Xəta yoxdur.</p>";
   if (d.errors.some((e) => Date.now() / 1000 - e.last_ts < 3600)) problems.push("son 1 saatda xəta yazılıb (aşağıya baxın)");
-  const ST = { ok: [true, "işləyir"], warn: [null, "diqqət"], bad: [false, "işləmir"], closed: [undefined, "bazar bağlı"] };
+  // three words only (owner 2026-11-27): works / waits for the owner's own step / does not work; «diqqət» = partly
+  const ST = { ok: [true, "işləyir"], warn: [null, "diqqət"], bad: [false, "işləmir"], closed: [undefined, "bazar bağlı"],
+    owner: [null, "sizin addımınızı gözləyir"] };
   $("s-pipe").innerHTML = `<table><tr><th>Halqa</th><th>Vəziyyət</th><th>Nə göstərir</th><th>Nəyə ötürür</th></tr>` +
     (d.pipeline || []).map((r) => { const [ok, t] = ST[r.status] || [null, r.status];
       if (r.status === "warn" || r.status === "bad") problems.push(r.stage + ": " + r.msg);
-      return `<tr><td>${esc(r.stage)}</td><td>${r.status === "closed" ? "<span class='pill next'>bazar bağlı</span>" : pill(ok, t)}</td>
+      return `<tr><td>${esc(r.stage)}</td><td>${r.status === "closed" ? "<span class='pill next'>bazar bağlı</span>" :
+        r.status === "owner" ? "<span class='pill next'>sizin addımınızı gözləyir</span>" : pill(ok, t)}</td>
         <td>${esc(r.msg)}</td><td class="note">→ ${esc(r.into)}</td></tr>`; }).join("") + "</table>";
   const sec = d.security || {}, cnt = sec.last_24h || {};
   if ((sec.alerts || []).length) problems.push("təhlükəsizlik: " + sec.alerts.length + " xəbərdarlıq (aşağıya baxın)");

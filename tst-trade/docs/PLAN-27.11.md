@@ -21,7 +21,7 @@
       (bazar ertəsi 12:13); köhnələr söndürülüb (silinməyib). Təzə sessiya jurnal 6 saatdan köhnədirsə planı davam etdirir.
 
 ## Mərhələ 1 — hər əlaqənin xəritəsi
-- [ ] 1.1 Diaqnostikada əlaqə xəritəsi: mənbə → blok → analitik → birləşdirici → Hakim → səhifə; hər halqada son
+- [x] 1.1 Diaqnostikada əlaqə xəritəsi: mənbə → blok → analitik → birləşdirici → Hakim → səhifə; hər halqada son
       məlumatın yaşı, sətir sayı, növbəti halqa istifadə edirmi; «yalançı OK» (0 sətir, amma «ok») ayrıca.
 - [ ] 1.2 GitHub-dakı saatlıq kənar yoxlama həqiqətən işləyirmi.
 
@@ -64,3 +64,6 @@
 ## Jurnal (NY saatı)
 - 27.11 10:20 — plan təsdiqləndi, iş başladı.
 - 27.11 10:33 — Mərhələ 0 bitdi: plan faylı; növbətçi yoxlama və həftəlik hesabat təzə sessiyada (ilk yoxlama 10:47).
+- 27.11 11:05 — 1.1: əlaqə xəritəsi (`pipeline.py`): 18 analitikin hamısının səsi, hər mənbə ayrıca (yalançı OK, qismən
+  xəta, yoxlanmayan), beyinlərin 24 saatlıq cavabı, Hakimin öz yoxlaması, sahibi gözləyənlər («owner»), cədvəllərin
+  təzəliyi. Blokların yoxlaması saatda bir. Köhnə sorğu 14 mln sətri tam oxuyurdu — indi indekslə (bir sorğu).

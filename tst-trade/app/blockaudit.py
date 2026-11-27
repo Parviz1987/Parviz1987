@@ -22,6 +22,18 @@ FEEDS = {"ta": ["vahid", "brain", "conductor"], "fund": ["vahid", "brain", "cond
          "news": ["vahid", "brain", "conductor"], "cross": ["vahid", "brain", "conductor"],
          "time": ["vahid", "brain", "conductor"], "brain": ["vahid", "conductor"]}
 ORDER = ("sübut", "namizəd", "xərc", "zəif", "az", "yox", "bazis")
+METALS_SQL = "('XAU','XAG','XPT','XPD')"
+
+
+def voices(db: DB, since: float) -> dict[str, dict]:
+    """Every method's live forecasts issued after `since`: how many, how many with a view (not 0.5), the last one.
+    One grouped query on the fc_recent index (symbol, mode, target_t): a forecast's target is never before its issue,
+    so «target after since» narrows the 14-million-row table to the window first. Shared by this audit and the link
+    map (pipeline), so the two never count differently."""
+    rows = db.execute(f"SELECT method, COUNT(*) n, SUM(p_up != 0.5) v, MAX(issued_t) last FROM forecasts WHERE symbol "
+                      f"IN {METALS_SQL} AND mode='live' AND target_t > ? AND issued_t > ? GROUP BY method",
+                      (since, since)).fetchall()
+    return {r["method"]: {"n": r["n"], "v": r["v"] or 0, "last": r["last"]} for r in rows}
 
 
 def build(db: DB, now: float | None = None) -> dict:
@@ -38,6 +50,7 @@ def build(db: DB, now: float | None = None) -> dict:
         cond = json.loads(db.get("conductor:audit") or "{}").get("desks", {})
     except ValueError:
         cond = {}
+    voice7 = voices(db, now - 7 * 86400)
     for b in BLOCKS:
         bid = b["id"]
         if bid not in PREFIX:
@@ -58,11 +71,8 @@ def build(db: DB, now: float | None = None) -> dict:
             week = db.execute(f"SELECT COUNT(*) n FROM rule_signals WHERE ({like}) AND t > ? AND mode='live'",
                               args + [now - 7 * 86400]).fetchone()["n"]
             sheet["rules"] = {"fired_24h": day, "fired_7d": week}
-        views = {}
-        for m in sheet["voices"]:
-            r = db.execute("SELECT COUNT(*) n, SUM(p_up != 0.5) v FROM forecasts WHERE method=? AND mode='live' AND "
-                           "issued_t > ?", (m, now - 7 * 86400)).fetchone()
-            views[m] = {"moments": r["n"], "with_view": r["v"] or 0}
+        views = {m: {"moments": voice7.get(m, {}).get("n", 0), "with_view": voice7.get(m, {}).get("v", 0)}
+                 for m in sheet["voices"]}
         sheet["views_7d"] = views
         best = None
         try:
