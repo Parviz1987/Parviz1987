@@ -97,6 +97,34 @@ def _slow(key: str, fn, ttl: float = 600):
     return out
 
 
+def _calls(db: DB, now: float | None = None, hours: int = 12) -> dict:
+    """Who said what in the last hours (owner 2026-11-27: «which analysts said gold would rise?»): per metal, horizon
+    (1 h, 4 h, 1 day) and method, the live forecasts ISSUED in the window that took a side (up above 0.505, down
+    below 0.495), the average probability of up, and of those already checked how many came true. A method without a
+    side in the window is left out. Read only; uses the recent-forecasts index."""
+    now = time.time() if now is None else now
+    start = int(now - hours * 3600)
+    out: dict = {"from": start, "hours": hours}
+    for sym in ("XAU", "XAG", "XPT", "XPD"):
+        per: dict = {}
+        for r in db.execute("SELECT horizon, method, p_up, hit, scored_ts FROM forecasts WHERE symbol=? AND mode='live' "
+                            "AND target_t>=? AND issued_t>=? AND horizon IN ('1h','4h','1d')", (sym, start, start)):
+            p = r["p_up"]
+            if p is None or 0.495 <= p <= 0.505:
+                continue
+            c = per.setdefault(r["horizon"], {}).setdefault(r["method"], {"up": 0, "down": 0, "p_sum": 0.0, "scored": 0, "right": 0})
+            c["up" if p > 0.5 else "down"] += 1
+            c["p_sum"] += p
+            if r["scored_ts"] is not None and r["hit"] is not None:
+                c["scored"] += 1
+                c["right"] += int(r["hit"])
+        for h in per.values():
+            for c in h.values():
+                c["p_up_avg"] = round(c.pop("p_sum") / (c["up"] + c["down"]), 3)
+        out[sym] = per
+    return out
+
+
 def _rules(db: DB) -> dict:
     """Bilik kitabı rules: the Judge's record per rule and timeframe (next candle and stop + target), and replay state."""
     from . import rules
@@ -381,6 +409,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "boots": json.loads(db.get("boot:log") or "[]")[-10:], "updates": _update_log(db_path),
         "tables": _slow("tables", lambda: _tables(db), 6 * 3600),
         "forecast_rows": _slow("forecast_rows", lambda: _forecast_rows(db), 6 * 3600),
+        "calls_12h": _slow("calls_12h", lambda: _calls(db), 300),
         "cleanup": json.loads(db.get("cleanup:retired_v1") or "null"),
         "vacuum": json.loads(db.get("cleanup:vacuum_v1") or "null"),
         "agents": _agents(db),
