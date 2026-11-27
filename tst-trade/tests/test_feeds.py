@@ -91,12 +91,10 @@ def test_parse_alpaca_maps_fund_symbols_to_metals():
 
 
 
-def test_alpaca_keeps_metal_headlines_from_the_general_stream_too():
-    # 27.11: asked only for the metal ETFs' tickers, Benzinga brought 0 headlines in 48 hours while saying «ok»
+def test_alpaca_is_off_and_shown_as_deliberately_unused():
+    # plan 27.11 step 7.1: even its general stream gave 1 metal headline in 48 hours; FinancialJuice replaces it.
+    # Off means grey («not used»), never a fault, and nothing is asked
     import asyncio
-    import json as _json
-    import time as _time
-    from datetime import datetime, timezone
     from app.db import DB
     from app.feeds import Feeds
     from app.keys import KeyStore
@@ -104,19 +102,35 @@ def test_alpaca_keeps_metal_headlines_from_the_general_stream_too():
     ks = KeyStore(db, "s" * 64)
     ks.set("alpaca", {"key_id": "a", "secret": "b"})
     f = Feeds(db, ks)
-    iso = datetime.fromtimestamp(_time.time() - 600, timezone.utc).isoformat().replace("+00:00", "Z")
-    general = {"news": [{"id": 1, "headline": "Gold climbs as the dollar slips", "created_at": iso, "symbols": []},
-                        {"id": 2, "headline": "Apple unveils a phone", "created_at": iso, "symbols": ["AAPL"]}]}
     calls = []
 
     async def fake_get(client, url, headers=None, **kw):
-        calls.append(kw.get("params"))
-        return _json.dumps(general if "symbols" not in kw["params"] else {"news": []}).encode()
+        calls.append(url)
+        return b"{}"
     f._get = fake_get
     asyncio.run(f.alpaca(None))
-    titles = [r["title"] for r in db.execute("SELECT title FROM news").fetchall()]
-    assert titles == ["Gold climbs as the dollar slips"]
-    assert len(calls) == 2 and f.health("alpaca")["rows"] == 1
+    assert calls == [] and f.health("alpaca")["ok"] is None and "söndürülüb" in f.health("alpaca")["message"]
+
+
+def test_google_news_is_asked_every_10_minutes_the_fed_feed_every_round():
+    import asyncio
+    from app import feeds as fm
+    from app.db import DB
+    from app.feeds import Feeds
+    from app.keys import KeyStore
+    db = DB(":memory:")
+    f = Feeds(db, KeyStore(db, "s" * 64))
+    asked = []
+
+    async def fake_get(client, url, headers=None, **kw):
+        asked.append(url)
+        return b"<rss><channel></channel></rss>"
+    f._get = fake_get
+    asyncio.run(f.news(None))
+    asyncio.run(f.news(None))                       # «two minutes later» (same clock: within 10 minutes)
+    google = [u for n, u in fm.NEWS_FEEDS if n.startswith("Google News")]
+    fed = [u for n, u in fm.NEWS_FEEDS if n == "Federal Reserve"]
+    assert all(asked.count(u) == 1 for u in google) and all(asked.count(u) == 2 for u in fed)
 
 
 def test_a_news_feed_that_says_429_rests_instead_of_being_asked_every_2_minutes():

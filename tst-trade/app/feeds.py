@@ -30,6 +30,7 @@ TIMEOUT = 15.0
 MAX_BYTES = 2 * 1024 * 1024
 
 NEWS_EVERY, CAL_EVERY, MACRO_EVERY = 120, 3600, 6 * 3600
+GOOGLE_EVERY = 600                     # Google News queries: every 10 minutes (plan 27.11 step 7.1)
 ALPACA_EVERY = 60
 ALPACA_URL = "https://data.alpaca.markets/v1beta1/news"
 # Metal funds and miners whose news Benzinga tags: the symbol says which metal the headline is about.
@@ -486,11 +487,19 @@ class Feeds:
         backoff = getattr(self, "_news_backoff", None)
         if backoff is None:
             backoff = self._news_backoff = {}
+        last = getattr(self, "_news_last", None)
+        if last is None:
+            last = self._news_last = {}
         for name, url in NEWS_FEEDS:
+            # plan 27.11 step 7.1: Google News every 10 minutes (it is minutes late anyway and limits its callers);
+            # the Federal Reserve's own feed and the rest every round (2 minutes)
             until, wait = backoff.get(name, (0.0, 0.0))
             if now < until:            # 27.11: Google News answered «429 too many» to one query every 2 minutes;
                 resting.append(f"{name} {round((until - now) / 60)} dəq")   # asking again at once only kept it angry
                 continue
+            if name.startswith("Google News") and now - last.get(name, 0) < GOOGLE_EVERY:
+                continue
+            last[name] = now
             try:
                 items = [i for i in parse_feed(await self._get(client, url), name) if now - i["ts"] < NEWS_MAX_AGE]
                 self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals) "
@@ -1025,6 +1034,11 @@ class Feeds:
                             self.activity.report(task, "error", note=f"{name}: {type(e).__name__}")
 
     async def alpaca(self, client) -> None:
+        # plan 27.11 step 7.1: off — even its general stream brought 1 metal headline in 48 hours; FinancialJuice
+        # (paid, owner's decision) takes the fast-headline role. Shown grey («deliberately not used»), not as a fault.
+        self._health("alpaca", None, "söndürülüb 27.11: 48 saatda 1 metal başlığı gətirirdi; sürətli başlıqları "
+                     "FinancialJuice verəcək")
+        return
         creds = self.keys.get("alpaca")
         if not creds:
             return

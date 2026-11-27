@@ -282,17 +282,30 @@ def geo_shock_vol(db: DB, symbols=("XAU", "XAG", "XPT", "XPD")) -> dict:
     return out
 
 
+WEEKLY = ("fa_window", "festival_vol")   # plan 27.11 step 7.1: these answered (neither better) — once a week now
+
+
 def run(db: DB) -> dict:
     t0 = time.time()
+    try:
+        prev = json.loads(db.get(KEY) or "{}") or {}
+    except ValueError:
+        prev = {}
     out: dict = {"computed": None}
+    weekly_due = time.time() - float(db.get("shadow:weekly_ts") or 0) > 7 * 86400
     for name, fn in (("fa_window", fa_window), ("festival_vol", festival_vol), ("unfamiliar", unfamiliar),
                      ("lead_lag", lead_lag), ("news_shock_vol", news_shock_vol), ("geo_shock_vol", geo_shock_vol)):
+        if name in WEEKLY and not weekly_due and name in prev:
+            out[name] = prev[name]
+            continue
         try:
             out[name] = fn(db)
         except Exception as e:          # one experiment failing never stops the other
             out[name] = {"error": f"{type(e).__name__}: {str(e)[:150]}"}
     out["computed"] = time.time()
     out["seconds"] = round(time.time() - t0, 1)
+    if weekly_due:
+        db.put("shadow:weekly_ts", str(time.time()))
     db.put(KEY, json.dumps(out, ensure_ascii=False))
     return out
 

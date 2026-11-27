@@ -18,7 +18,7 @@ RANGE_ONLY = ("garch", "gvz")                  # they give the range, never a di
 NEWS_SOURCES = ("rss", "alpaca")               # zero rows from these on a trading day means nothing arrived
 STALE_SOURCE = 26 * 3600                       # the slowest source is checked daily
 FRESH_SHEETS = (("blocks:audit", "blokların yoxlaması", 4 * 3600),   # hourly, paused 04-05 UTC ("conductor:audit", "dirijorun sübutu", 30 * 3600),
-                ("aci:shadow", "aralıq düzəlişi (ACI)", 30 * 3600))
+                ("aci:shadow", "aralıq düzəlişi (ACI)", 8 * 86400))             # weekly since 27.11
 
 
 def _row(stage, feeds_into, status, msg, n=None):
@@ -131,9 +131,10 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     # 5. scout
     sc = jobs.last_scout()
     age = (now - sc["ts"]) / 3600 if sc else None
-    out.append(_row("Kəşfiyyatçı (Grok, X)", "xəbər siyahısı", "closed" if not open_ else
-                    "ok" if age is not None and age < 9 else "warn",
-                    "hələ axtarmayıb" if age is None else f"son axtarış {age:.1f} saat əvvəl", None))
+    # since 27.11 it searches only around a high-impact release and on a news alarm: a long quiet is normal
+    out.append(_row("Kəşfiyyatçı (Grok, X)", "xəbər siyahısı", "ok",
+                    ("yalnız böyük ABŞ rəqəmi ətrafında və xəbər həyəcanında axtarır; " +
+                     ("hələ axtarmayıb" if age is None else f"son axtarış {age:.1f} saat əvvəl")), None))
 
     # 6. calendar -> hunter -> 7. surprise
     since = float(db.get("hunter:since") or now)   # releases before the hunter existed are not its misses

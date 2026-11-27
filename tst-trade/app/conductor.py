@@ -515,11 +515,16 @@ def shadow_view(db: DB) -> dict | None:
 def run(db: DB) -> dict:
     """The daily job: first the evidence, then the shadow conductor."""
     a = audit(db)
-    s = shadow(db)
+    # plan 27.11 step 7.1: the shadow conductor and the range correction (ACI) answered — neither beat the simple
+    # way — so they are replayed once a week, not every day (the daily job stays lighter for the new live feeds)
+    weekly = time.time() - float(db.get("conductor:weekly_ts") or 0) > 7 * 86400
+    s = shadow(db) if weekly else {"seconds": 0}
     from . import shadowtests          # owner's block decisions 1 and 3, measured in the shadow
     x = shadowtests.run(db)
     from . import aci                  # plan step 9: the range correction, tested on the past first
-    c = aci.shadow(db)
+    c = aci.shadow(db) if weekly else {"seconds": 0}
+    if weekly:
+        db.put("conductor:weekly_ts", str(time.time()))
     from . import autopsy              # plan step 11: once a month, why the forecasts missed
     if autopsy.due(db):
         autopsy.run(db)

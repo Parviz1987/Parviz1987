@@ -625,11 +625,13 @@ class BrainJobs:
         except Exception:
             log.exception("ideas failed")
         if now >= self.next_scout and self.feeds is not None:
-            # Every 4 hours while the market is open; every 30 minutes around a high-impact US release.
+            # plan 27.11 step 7.1: no more routine search every 4 hours — every 30 minutes around a high-impact US
+            # release, and at once on a news alarm (below, at most SCOUT_ALARMS_PER_DAY); the routine headlines
+            # come from the feeds
             from .engine import market_open
             hot = self.feeds.event_mode(now) is not None
-            self.next_scout = now + (SCOUT_EVENT_EVERY if hot else SCOUT_EVERY)
-            if market_open(now) and self.keys.first("xai"):
+            self.next_scout = now + (SCOUT_EVENT_EVERY if hot else 15 * 60)
+            if hot and market_open(now) and self.keys.first("xai"):
                 self._rep("scout", "working", note="X-də axtarır")
                 n = await self.scout(now)
                 self._rep("scout", "done" if n else "error", note=self.state("scout").get("message", ""))
