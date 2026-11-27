@@ -2,6 +2,8 @@
 
 - **Bloklar barədə hər şey:** `tst-trade/docs/BLOKLAR.md` — hansı blok var, içində nə var, vəziyyəti, nə qalıb, necə
   bitirilir, sahibin işləri. «Blokları bitir / gücləndir» tapşırığında əvvəl onu oxu, işi bitirəndə onu yenilə.
+- **Köhnə söhbətin xülasəsi** (22–27.11, arxivdə): `tst-trade/docs/SOHBET-TARIXCESI.md` — sahib necə danışır, nə qərar
+  verilib, hansı suallara nə cavab verilib, nə açıq qalıb. Yeni sessiyada əvvəl onu oxu.
 - Ümumi plan və sahibin qərarları: `tst-trade/docs/IS-PLANI.md` (bölmə 5). Səhvlərim: `tst-trade/docs/monitor/sehvlerim.md`.
 - Növbətçi yoxlama: skill `temirci` (`.claude/skills/temirci/SKILL.md`).
 - Sahib: Azərbaycan dilində sadə və hörmətli cavab, vaxtlar New York saatı ilə.
