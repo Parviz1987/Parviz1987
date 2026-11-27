@@ -14,7 +14,7 @@
   <button class="btn pri sm" id="install" hidden>Telefona yüklə</button>
 <nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
 </header>
-<nav class="jump" aria-label="Bölmələr"><a href="#sec-chart">Qrafik</a><a href="#cards">Proqnoz</a><a href="#sec-mkt">Bazarlar</a><a href="#sec-fund">Fundamental</a><a href="#sec-judge">Hakim</a><a href="#news">Xəbər</a></nav>
+<nav class="jump" aria-label="Bölmələr"><a href="#tiles">Qiymət</a><a href="#sec-chart">Qrafik</a><a href="#sec-tools">Alətlər</a><a href="#sec-fc">Proqnozlar</a></nav>
 <main class="wrap">
   <div class="evbanner" id="offline" hidden>İnternet yoxdur: qiymətlər yenilənmir. Əlaqə gələndə panel özü davam edəcək.</div>
   <div class="evbanner" id="evbanner" hidden></div>
@@ -29,74 +29,53 @@
   </section>
   <dialog class="card-dlg" id="cardDlg" aria-label="Proqnoz kartı"><div id="cardBody"></div>
     <form method="dialog"><button class="btn sm">Bağla</button></form></dialog>
+
+  <!-- 1. Prices: the four metals, then every market the analysis reads (a chip opens the cross-market block) -->
   <div class="tiles" id="tiles"></div>
-  <section class="box trust" id="sec-trust">
-    <h2>Etibar işığı <span class="sp"></span><span class="note">🟢 etibarlı · 🟡 ümidverici · ⚪ fərqi yoxdur · 🔴 etibar yoxdur · ⏳ az</span></h2>
-    <p class="trust-head" id="trustHead">…</p>
-    <details><summary>Hər analitik bir cümlə ilə</summary><div id="trustList"></div></details>
-  </section>
-  <section class="box outlook" id="sec-outlook" data-fold="outlook">
-    <h2>Sabah üçün proqnoz (1 gün) <span class="sp"></span><span class="note" id="olnote"></span></h2>
-    <p class="note">Hər metal üçün: gözlənilən aralıq (sübut olunmuş bacarıq), istiqamət üzrə üç səs və hər birinin indiyə qədərki nəticəsi.
-      <b>Meyl sübut deyil:</b> Hakim 1 günlük masada istiqamət sübutu görəndə burada ✅ yazılacaq.</p>
-    <div class="olgrid" id="outlook"></div>
-  </section>
   <div class="ticker" id="ticker" aria-label="Analizdə istifadə olunan bazarlar"></div>
-  <nav class="flow" id="flow" aria-label="Sistemin canlı axını" hidden></nav>
-  <div class="main">
-    <div class="box" id="sec-chart">
-      <h2><span id="ctitle">Qrafik</span><span class="sp"></span>
-        <span class="seg" id="tfs"></span></h2>
-      <div class="tatool" id="ta"></div>
-      <div class="chart" id="chart"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
-      <div class="legend">
-        <span><i style="background:var(--up)"></i>yuxarı şam</span>
-        <span><i style="background:var(--down)"></i>aşağı şam</span>
-        <span><i style="background:var(--gold);opacity:.25"></i>növbəti şam üçün 80 % aralıq</span>
-        <span><i style="background:var(--gold);opacity:.55"></i>50 % aralıq</span>
-        <span id="ovnote"></span>
-      </div>
-      <div class="tasum" id="tasum"></div>
+
+  <!-- 2. The chart -->
+  <section class="box" id="sec-chart">
+    <h2><span id="ctitle">Qrafik</span><span class="sp"></span><span class="seg" id="tfs"></span></h2>
+    <div class="chart" id="chart"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
+    <div class="legend">
+      <span><i style="background:var(--up)"></i>yuxarı şam</span>
+      <span><i style="background:var(--down)"></i>aşağı şam</span>
+      <span><i style="background:var(--gold);opacity:.25"></i>növbəti şam üçün 80 % aralıq</span>
+      <span><i style="background:var(--gold);opacity:.55"></i>50 % aralıq</span>
+      <span id="ovnote"></span>
     </div>
-    <div class="box"><h2>Proqnoz kartları <span class="sp"></span><span class="note" id="fcupd"></span></h2>
+  </section>
+
+  <!-- 3. Chart tools: what is drawn on the chart and the chart in words -->
+  <section class="box" id="sec-tools">
+    <h2>Qrafik alətləri <span class="sp"></span><a class="note" href="/ta">Texniki analiz bloku →</a></h2>
+    <div class="tatool" id="ta"></div>
+    <div class="tasum" id="tasum"></div>
+  </section>
+
+  <!-- 4. Forecasts -->
+  <section class="fcsec" id="sec-fc" aria-label="Proqnozlar">
+    <div class="box"><h2>Proqnozlar <span class="note">15 dəqiqədən 1 həftəyə</span><span class="sp"></span><span class="note" id="fcupd"></span></h2>
+      <p class="note fchint">Qiymət 50 % və 80 % ehtimalla bu aralıqlarda olacaq. İstiqamət (▲ / ▼) yalnız Hakim onu xərcdən sonra sübut edəndə göstərilir.</p>
       <div class="cards" id="cards"></div></div>
-  </div>
-  <div class="split">
-    <div class="box" data-fold="strat"><h2>Strateqin izahı <span class="sp"></span><span class="note" id="stmeta"></span></h2><div id="strat"></div></div>
-    <div class="box" data-fold="scout" data-fold-default="closed"><h2>Kəşfiyyatçı: X və vebdə son 3 saat <span class="sp"></span><span class="note" id="scmeta"></span></h2><div id="scout"></div></div>
-  </div>
-  <div class="feeds">
-    <div class="box" data-fold="macro" data-fold-default="closed"><h2>Makro fon <span class="sp"></span><span class="note">FRED, gündəlik</span></h2><div id="macro"></div></div>
-    <div class="box" data-fold="events" data-fold-default="closed"><h2>İqtisadi təqvim (ABŞ) <span class="sp"></span><span class="note">Forex Factory</span></h2><div class="tbl" id="events"></div>
-      <h3 class="sub">Son açıqlanan rəqəmlər: gözləntiyə qarşı <span class="note">FMP</span></h3><div class="tbl" id="releases"></div></div>
-    <div class="box" data-fold="news" data-fold-default="closed"><h2>Xəbərlər <span class="sp"></span><span class="seg" id="nfilter"><button data-f="metal" class="on">Seçilmiş metal</button><button data-f="all">Hamısı</button></span></h2><div id="news"></div></div>
-  </div>
-  <div class="box" id="sec-mkt" data-fold="mkt" data-fold-default="closed"><h2>Bazarlar və əlaqələr <span class="sp"></span><span class="note" id="mktnote"></span></h2>
-    <div class="mkts" id="mkts"></div>
-    <p class="note">«Birlikdə»: son 30 gündə saatlıq hərəkətlərin seçilmiş metalla əlaqəsi (+1 eyni istiqamət, −1 əks, 0 əlaqə yoxdur).
-      «Qabaqlayır»: bu bazarın 15 dəqiqəlik hərəkəti metalın NÖVBƏTİ 15 dəqiqəsi ilə nə qədər əlaqəlidir (0-a yaxın = qabaqlamır).
-      Əlaqə iddia edilmir, ölçülür; «Dollar impulsu» və «Neft impulsu» üsulları bunu Hakimdə yoxlayır.</p></div>
-  <div class="box" id="sec-fund" data-fold="fund" data-fold-default="closed"><h2>Fundamental: qızıla təsir edən amillər <span class="sp"></span><span class="note">FRED gündəlik · CFTC həftəlik</span></h2>
-    <div class="fund"><div id="fsig"></div><div class="tbl" id="cot"></div></div></div>
-  <div class="box" id="sec-judge" data-fold="judge" data-fold-default="closed"><h2>Hakim: proqnozlar nə qədər düz çıxır <span class="sp"></span>
-      <span class="seg" id="modes"><button data-m="live" class="on">Canlı</button><button data-m="history">Tarixçə üzrə</button></span></h2>
-    <p class="note">Hər üsul iki bazis qaydası ilə yarışır: «Dəyişməz» (istiqamət yoxdur) və «Həmişə yuxarı». «Sübut» statusu
-      üçün üsul daha çox düz çıxmalı (p &lt; 0.05), Brier balı müsbət olmalı və kifayət qədər yoxlama yığılmalıdır.</p>
-    <h3 class="sub">Ümumi mənzərə: hər üfüqdə hər üsul neçə faiz düz çıxır</h3>
-    <div class="tbl" id="jmatrix"></div>
-    <h3 class="sub">Beyin yoxlaması: Oxuyucunun «yuxarı / aşağı» qiymətləndirməsi növbəti 1 saatda düz çıxırmı</h3>
-    <div class="tbl" id="rscore"></div>
-    <h3 class="sub">Ətraflı <span class="seg" id="jh"></span></h3>
-    <div class="jcharts">
-      <div><div class="note">Düz çıxma faizi zamanla (hər üsulun son <span id="jwin">100</span> yoxlaması)</div><div class="lc"><canvas id="jc1"></canvas></div><div class="legend" id="jl1"></div></div>
-      <div><div class="note">Qiymət proqnoz aralığına düşdü (hədəf: 50 % və 80 %)</div><div class="lc"><canvas id="jc2"></canvas></div><div class="legend" id="jl2"></div></div>
+    <div class="box outlook" id="sec-outlook" data-fold="outlook">
+      <h2>Sabah üçün proqnoz (1 gün) <span class="sp"></span><span class="note" id="olnote"></span></h2>
+      <p class="note">Hər metal üçün: gözlənilən aralıq (sübut olunmuş bacarıq), istiqamət üzrə üç səs və hər birinin indiyə qədərki nəticəsi.
+        <b>Meyl sübut deyil:</b> Hakim 1 günlük masada istiqamət sübutu görəndə burada ✅ yazılacaq.</p>
+      <div class="olgrid" id="outlook"></div>
     </div>
-    <div class="tbl" id="judge"></div>
-    <details class="pass"><summary><b>Üsulların pasportu</b>: niyə var, nə gözləyirik, nəticə verməsə nə edirik</summary>
-      <div class="tbl" id="passports"></div></details>
-    <h3 class="sub">Harada düz, harada səhv: seans və bazar əhvalı üzrə (tarixçə)</h3>
-    <div class="tbl" id="jwhere"></div></div>
-  <div class="box" data-fold="journal" data-fold-default="closed"><h2>Son yoxlanmış proqnozlar</h2><div class="tbl" id="journal"></div></div>
+    <div class="split">
+      <div class="box trust" id="sec-trust">
+        <h2>Etibar işığı <span class="sp"></span><span class="note">🟢 etibarlı · 🟡 ümidverici · ⚪ fərqi yoxdur · 🔴 etibar yoxdur · ⏳ az</span></h2>
+        <p class="trust-head" id="trustHead">…</p>
+        <details><summary>Hər analitik bir cümlə ilə</summary><div id="trustList"></div></details>
+      </div>
+      <div class="box" data-fold="strat"><h2>Strateqin izahı <span class="sp"></span><span class="note" id="stmeta"></span></h2><div id="strat"></div></div>
+    </div>
+    <p class="note more">Ətraflı: <a href="/results">Nəticələr</a> (Hakim, yoxlanmış proqnozlar) ·
+      <a href="/bloklar">Bloklar</a> (xəbər, fundamental, bazarlar, təqvim) · <a href="/agents">Agentlər</a> (sistemin canlı axını)</p>
+  </section>
 </main>
 <script src="/static/chart.js"></script>
 <script src="/static/panel.js"></script>

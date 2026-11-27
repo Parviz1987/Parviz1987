@@ -31,7 +31,8 @@ button{cursor:pointer}
 .top a,.top button.link{color:var(--muted);text-decoration:none;background:none;border:0;padding:4px 6px}
 .top a:hover,.top button.link:hover{color:var(--fg)}
 /* the same navigation on every page (static/nav.js): where you are is highlighted */
-.mainnav{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.mainnav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex-basis:100%}
+.mainnav .nsp{flex:1}
 .mainnav a,.mainnav button{color:var(--muted);text-decoration:none;background:none;border:1px solid transparent;
   border-radius:8px;padding:5px 11px;font-size:.84rem;font-weight:600}
 .mainnav a:hover,.mainnav button:hover{color:var(--fg);border-color:var(--line)}
@@ -71,7 +72,7 @@ button{cursor:pointer}
 .tip{position:absolute;top:6px;left:8px;font-family:var(--mono);font-size:.76rem;color:var(--muted);pointer-events:none}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.76rem;color:var(--muted);margin-top:6px}
 .legend i{display:inline-block;width:18px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
-.cards{display:flex;flex-direction:column;gap:10px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;align-items:start}
 .card{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel2);display:flex;flex-direction:column;gap:6px}
 .card .hd{display:flex;align-items:center;gap:8px}
 .card .hd b{flex:1}
@@ -140,7 +141,6 @@ section.adm>h2{font-size:1rem;margin:6px 0 0;color:var(--acc)}
 .tasum div span:first-child{color:var(--muted)}
 .tasum .v{font-family:var(--mono);text-align:right}
 .tasum p{grid-column:1/-1;margin:4px 0 0}
-@media (min-width:1101px){.cards{max-height:760px;overflow:auto;padding-right:4px}}
 h3.sub{font-size:.85rem;margin:12px 0 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .jcharts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-bottom:8px}
 .lc{position:relative;height:190px}.lc canvas{position:absolute;inset:0;width:100%;height:100%}
@@ -165,7 +165,7 @@ pre.trace{white-space:pre-wrap;font-size:.72rem;color:var(--muted);max-height:22
     padding:6px 12px;overflow-x:auto;scrollbar-width:none}
   .jump a{flex:0 0 auto;color:var(--muted);text-decoration:none;font-size:.8rem;padding:4px 10px;border:1px solid var(--line);border-radius:999px}
   .jump a:active{color:var(--acc);border-color:var(--acc)}
-  [id^="sec-"],#cards,#news{scroll-margin-top:52px}
+  [id^="sec-"],#tiles,#cards{scroll-margin-top:52px}
   #tfs button{padding:4px 7px}
 }
 .pill.xərc{background:var(--warn-soft);color:var(--warn)}
@@ -250,8 +250,8 @@ div.res span.sübut{background:var(--up-soft);color:var(--up)}div.res span.yox{c
 .hg.AL{background:var(--up-soft);color:var(--up);font-weight:800;box-shadow:0 0 10px rgba(62,224,143,.25)}
 .hg.SAT{background:var(--down-soft);color:var(--down);font-weight:800;box-shadow:0 0 10px rgba(255,93,108,.25)}
 @media (max-width:800px){.hud{grid-template-columns:minmax(0,1fr)}.hgrid{grid-template-columns:72px repeat(6,minmax(0,1fr))}}
-/* simple mode: price, strip, flow and decisions only */
-body.simple .main,body.simple .split,body.simple .feeds,body.simple .box[data-fold],body.simple .jump{display:none}
+/* simple mode: decisions, prices, the markets strip and the trust light only */
+body.simple #sec-chart,body.simple #sec-tools,body.simple .jump,body.simple #sec-fc>.box,body.simple #sec-fc .box[data-fold],body.simple .more{display:none}
 .pill.QUIET{background:var(--info-soft);color:var(--info)}
 
 /* Block 16: forecast card */
@@ -329,3 +329,26 @@ body.noscroll{overflow:hidden}
 .stform input,.stform select,#csv{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:6px 8px;font-size:.9rem;min-width:120px}
 .stform label.wide{flex:1 1 220px}
 #csv{width:100%;font-family:var(--mono);margin:6px 0}
+
+/* ---- navigation: blocks sub-menu (nav.js), the forecasts section on the panel (owner 2026-11-26) ---- */
+.subnav{display:flex;gap:4px;flex-wrap:wrap;padding:6px max(16px,env(safe-area-inset-left,0px));border-bottom:1px solid var(--line);
+  background:rgba(5,10,22,.6);backdrop-filter:blur(8px)}
+.subnav a{color:var(--muted);text-decoration:none;font-size:.8rem;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid transparent}
+.subnav a:hover{color:var(--fg);border-color:var(--line)}
+.subnav a.on{color:var(--gold);border-color:rgba(232,185,74,.45);background:var(--gold-soft)}
+.fcsec{display:flex;flex-direction:column;gap:14px}
+.fcsec .more{margin:0;text-align:center}
+#sec-tools .tatool{margin:0}
+#sec-tools .tasum{margin-top:12px}
+@media (max-width:640px){.subnav{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.subnav a{flex:0 0 auto}
+  .mainnav{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.mainnav a,.mainnav button{flex:0 0 auto}}
+.card .dir{font-family:var(--mono);font-size:1rem;font-weight:600}
+.card .dir.up{color:var(--up)}.card .dir.down{color:var(--down)}.card .dir.mut{color:var(--muted);font-weight:500}
+.card .hd b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .hd .pill{font-size:.64rem;padding:1px 7px}
+.cards{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.fchint{margin:-4px 0 10px}
+.olc .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+details.olmore{border-top:1px solid var(--line);padding-top:6px;display:grid;gap:5px}
+details.olmore summary{cursor:pointer;color:var(--acc);font-size:12px}
+details.olmore[open]{gap:6px}

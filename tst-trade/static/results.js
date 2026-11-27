@@ -23,7 +23,8 @@ async function api(path) {
 
 function metals() {
   $("metals").innerHTML = Object.entries(NAMES).map(([k, n]) => `<button data-s="${k}" class="${k === sym ? "on" : ""}">${n}</button>`).join("");
-  document.querySelectorAll("#metals button").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); metals(); load(); loadSim().catch(() => {}); loadAnalysts().catch(() => {}); });
+  document.querySelectorAll("#metals button").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); metals(); load(); loadSim().catch(() => {}); loadAnalysts().catch(() => {});
+    if (window.TSTSections) TSTSections.refresh(); });
 }
 function save() { try { localStorage.setItem("tst_sym", sym); localStorage.setItem("tst_res_h", hz); } catch (e) {} }
 

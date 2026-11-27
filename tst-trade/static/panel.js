@@ -1,4 +1,5 @@
-/* TST Trade panel: prices, candles, forecast cards, the Judge's table and the journal. */
+/* TST Trade panel: prices, the chart and its tools, forecast cards and the strategist's note. The Judge's tables and the
+   journal are on the results page, news, fundamentals and the calendar on their block pages (static/sections.js). */
 const $ = (id) => document.getElementById(id);
 const TFS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"];
 const TF_NAMES = { "1m": "1 dəq", "5m": "5 dəq", "15m": "15 dəq", "30m": "30 dəq", "1h": "1 saat", "4h": "4 saat", "1d": "1 gün", "1w": "1 həftə" };
@@ -6,7 +7,7 @@ const STATUS_AZ = { LIVE: "Canlı", DELAYED: "Gecikir", OFFLINE: "Əlaqə yoxdur
 const VERDICT_AZ = { "sübut": "Sübut olunub", "yox": "Sübut yoxdur", "az": "Məlumat azdır", "bazis": "Bazis",
   "xərc": "Spreaddən kiçik" };
 const PROVIDER_AZ = { goldapi: "gold-api.com", capital: "Capital.com (axın)", twelvedata: "Twelve Data", demo: "DEMO" };
-let sym = "XAU", tf = "1m", mode = "live", lastState = null, lastFc = null;
+let sym = "XAU", tf = "1m", lastState = null, lastFc = null;
 // Chart tools (display only; the Judge tests the same ideas as forecast methods).
 let ta = { ema: true, bb: false, fib: false, piv: false, sr: true, round: false, sub: "rsi", show: 120 };
 try { sym = localStorage.getItem("tst_sym") || sym; tf = localStorage.getItem("tst_tf") || tf;
@@ -126,30 +127,30 @@ function renderTaSummary(all) {
       proqnoza bir səs kimi gedir — Qaydalar${judgeSays("qaydalar")}; Qrafik analitiki${judgeSays("chartist")}.</p>`;
 }
 
+// One forecast card, compact (owner 2026-11-26: no long repeated sentences): the horizon, the Judge's status, the
+// direction only when proven, the two ranges and when it is checked. The rule «a direction only with the Judge's
+// proof» is said once above the cards; every method's number stays under «Bütün üsullar».
+const VSHORT = { "sübut": "✓ sübut", "yox": "sübut yox", "az": "az məlumat", "bazis": "bazis", "xərc": "xərcdən kiçik" };
 function cardHtml(c, names) {
   const v = c.verdict;
   const off = c.methods.find((m) => m.method === v.method) || c.methods.find((m) => m.method === "rw");
   let head;
   if (!c.methods.length) {
-    head = `<p class="note">Proqnoz hələ yoxdur: ${c.candles_have} bitmiş şam var, ${c.candles_need} lazımdır.
-      ${c.tf === "1d" || c.tf === "1w" ? "Bu üfüq üçün tarixçə lazımdır (admin: Capital.com və ya Twelve Data açarı)." : ""}</p>`;
+    head = `<div class="dir mut">hələ yoxdur</div><div class="note">${c.candles_have} / ${c.candles_need} şam${c.tf === "1d" || c.tf === "1w" ? " · tarixçə lazımdır" : ""}</div>`;
   } else if (v.status === "sübut") {
-    const p = off.p_up, dir = p > 0.5 ? "yuxarı" : p < 0.5 ? "aşağı" : "indi fikir yoxdur";
-    head = `<div class="big ${p > 0.5 ? "up" : p < 0.5 ? "down" : "mut"}">${dir}${p === 0.5 ? "" : " · " + (Math.max(p, 1 - p) * 100).toFixed(0) + " %"}</div>
+    const p = off.p_up, dir = p > 0.5 ? "▲ yuxarı" : p < 0.5 ? "▼ aşağı" : "fikir yox";
+    head = `<div class="dir ${p > 0.5 ? "up" : p < 0.5 ? "down" : "mut"}">${dir}${p === 0.5 ? "" : " · " + (Math.max(p, 1 - p) * 100).toFixed(0) + " %"}</div>
       <div class="note">${esc(names[v.method])}: ${esc(off.basis)}</div>` +
-      (v.condition ? `<div class="note"><b>Şərtli sübut:</b> bu üsul yalnız «${esc(GROUP_AZ[v.condition] || v.condition)}» şəraitində
-        sübut olunub (${pct(v.cond_hit_rate, 0)}, ${v.cond_n} yoxlama). Şərait dəyişəndə istiqamət göstərilməyəcək.</div>` : "");
+      (v.condition ? `<div class="note"><b>Şərtli:</b> yalnız «${esc(GROUP_AZ[v.condition] || v.condition)}» şəraitində (${pct(v.cond_hit_rate, 0)}, ${v.cond_n} yoxlama).</div>` : "");
   } else {
-    head = `<div class="big mut">İstiqamət göstərilmir</div>
-      <div class="note">Heç bir üsul hələ bazis qaydalarını sübutla üstələməyib. Aşağıda yalnız gözlənilən aralıq var.</div>`;
+    head = `<div class="dir mut">istiqamət yox</div>`;
   }
-  const rng = off ? `<div class="kv"><span>İndiki qiymət</span><span class="num">${fmt(off.price0)}</span>
-      <span>50 % aralıq</span><span class="num">${fmt(off.lo50)} – ${fmt(off.hi50)}</span>
-      <span>80 % aralıq</span><span class="num">${fmt(off.lo80)} – ${fmt(off.hi80)}</span>
-      <span>Yoxlanma vaxtı</span><span class="num">${when(off.target_t, c.tf)}</span></div>` : "";
+  const rng = off ? `<div class="kv"><span>50 %</span><span class="num">${fmt(off.lo50)} – ${fmt(off.hi50)}</span>
+      <span>80 %</span><span class="num">${fmt(off.lo80)} – ${fmt(off.hi80)}</span>
+      <span>yoxlanır</span><span class="num">${when(off.target_t, c.tf)}</span></div>` : "";
   const rows = c.methods.map((m) => `<tr><td>${esc(names[m.method])}</td><td class="n">${(m.p_up * 100).toFixed(1)} %</td><td>${esc(m.basis)}</td></tr>`).join("");
   return `<div class="card"><div class="hd"><b>${c.name}</b>
-      <span class="pill ${v.status}">${VERDICT_AZ[v.status]}${v.by === "history" ? " · tarixçə" : ""}</span></div>
+      <span class="pill ${v.status}" title="${VERDICT_AZ[v.status]}${v.by === "history" ? " (tarixçə üzrə)" : ""}">${VSHORT[v.status] || v.status}</span></div>
     ${head}${rng}
     ${rows ? `<details class="meth"><summary>Bütün üsullar</summary><table><tr><th>Üsul</th><th>Yuxarı ehtimalı</th><th>Əsas</th></tr>${rows}</table></details>` : ""}
   </div>`;
@@ -160,162 +161,13 @@ function renderCards(fc) {
   $("fcupd").textContent = "yeniləndi " + hhmm(Date.now() / 1000);
 }
 
-let jh = "15m";
-try { jh = localStorage.getItem("tst_jh") || jh; if (jh === "1m") jh = "15m"; } catch (e) {}
-const MCOL = { qaydalar: "#3fb27f", chartist: "#c77dff", vahid: "#d4a73c", momentum: "#4ea1ff", reversal: "#c77dff", trend: "#3fb27f", breakout: "#ff9f43", rsi: "#e0605a",
-  fib: "#d4a73c", macro: "#2ec4b6", session: "#f78fb3", surprise: "#ffd166", dollar: "#06d6a0", oil: "#8d6e63",
-  news: "#ef476f", strateq: "#118ab2", pullback: "#b5e48c", consensus: "#9aa5b1" };
-function renderJudge(fc) {
-  const key = mode === "live" ? "stats_live" : "stats_history";
-  const methods = Object.keys(fc.method_names).filter((m) => m !== "rw");
-  // summary matrix: rows = horizons, cells = hit rate coloured by status
-  let mx = `<table><tr><th>Üfüq</th>${methods.map((m) => `<th>${esc(fc.method_names[m])}</th>`).join("")}<th>50 % aralıq</th><th>80 % aralıq</th></tr>`;
-  for (const c of fc.cards) {
-    const by = Object.fromEntries(c[key].map((r) => [r.method, r]));
-    const rw = by.rw || {};
-    mx += `<tr><td>${c.name}</td>` + methods.map((m) => {
-      const r = by[m];
-      if (!r) return `<td class="cell mut">·</td>`;
-      if (m === "up") return `<td class="cell bazis">${r.n ? pct(r.hit_rate, 0) : "—"}</td>`;
-      const cnt = r.nh;
-      return `<td class="cell ${r.status}" title="${cnt} yoxlama, keçməli hədd ${pct(r.bar, 0)}">${cnt ? pct(r.hit_rate, 0) : "—"}</td>`;
-    }).join("") + `<td class="cell">${rw.n ? pct(rw.cover50, 0) : "—"}</td><td class="cell">${rw.n ? pct(rw.cover80, 0) : "—"}</td></tr>`;
-  }
-  $("jmatrix").innerHTML = mx + `</table><p class="note">Xanada: üsul istiqamət göstərəndə neçə faiz düz çıxıb. Yaşıl = sübut olunub,
-    qırmızı = kifayət qədər yoxlama var, amma sübut yoxdur, sarı = hələ az yoxlama, altdan nöqtəli sarı = statistik düzdür, amma hərəkət spreaddən kiçikdir. Bazis «Həmişə yuxarı» sütunu: qiymət neçə faiz hallarda qalxıb.
-    Aralıq sütunları: qiymət 50 % və 80 % aralığa neçə faiz düşüb (düzgün aralıq ≈ 50 % və ≈ 80 %).</p>`;
-
-  $("jh").innerHTML = fc.cards.map((c) => `<button data-h="${c.horizon}" class="${c.horizon === jh ? "on" : ""}">${c.name}</button>`).join("");
-  document.querySelectorAll("#jh button").forEach((b) => b.onclick = () => { jh = b.dataset.h; try { localStorage.setItem("tst_jh", jh); } catch (e) {} renderJudge(fc); });
-  const card = fc.cards.find((c) => c.horizon === jh) || fc.cards[0];
-  let html = `<table><tr><th>Üsul</th><th>Yoxlama</th><th>Düz çıxıb</th><th title="Şansla düz çıxma səviyyəsi: üsulun öz alış payı ilə bazarın qalxma payından">Şans səviyyəsi</th><th title="Pul sınağı: xərcdən sonra orta nəticə sıfırdan böyükdürmü (kiçik p = sübut)">p (pul)</th>
-    <th title="Tam xərc: spred + sürüşmə + gecəlik saxlama haqqı (swap)">Orta qazanc / tam xərc</th><th>Brier bal</th><th>50 % aralıq tutdu</th><th>80 % aralıq tutdu</th><th>Status</th></tr>`;
-  for (const r of card[key]) {
-    const cnt = r.method === "rw" || r.method === "up" ? r.n : r.nh;
-    const st = r.status === "az" ? `az (${cnt}/${r.min_n})` : VERDICT_AZ[r.status];
-    html += `<tr><td>${esc(fc.method_names[r.method])}</td><td class="n">${cnt}</td>
-      <td class="n">${r.method === "rw" ? "—" : pct(r.hit_rate)}</td><td class="n">${r.method === "rw" ? "—" : pct(r.bar)}</td>
-      <td class="n">${r.p == null || r.method === "rw" ? "—" : r.p.toFixed(3)}</td>
-      <td class="n ${r.edge > r.cost ? "up" : ""}" title="${costTip(r.cost_parts)}">${r.edge == null || r.method === "rw" ? "—" : (r.edge * 100).toFixed(3) + " / " + (r.cost * 100).toFixed(3) + " %"}</td>
-      <td class="n">${r.bss == null ? "—" : (r.bss * 100).toFixed(1)}</td>
-      <td class="n">${pct(r.cover50, 0)}</td><td class="n">${pct(r.cover80, 0)}</td>
-      <td><span class="pill ${r.status}">${st}</span></td></tr>`;
-  }
-  $("judge").innerHTML = html + `</table><p class='note'>«Yoxlama»: üsulun istiqamət göstərdiyi proqnozların sayı (RSI, Fibonacci, sıçrayış
-    yalnız siqnal olanda istiqamət göstərir). 3 gün, 10 gün və 1 ay proqnozları hər gün verilir və üst-üstə düşür: p bunu nəzərə alır
-    (say üfüqün gün sayına bölünür). Eyni məlumatda çox üsul yoxlandığı üçün p həddi üsulların sayına bölünür
-    (indi ${card[key][2] ? card[key][2].p_bar.toFixed(4) : "—"}): təsadüfi «sübut» olmasın. «Orta qazanc»: proqnoz istiqamətində orta hərəkət;
-    tam xərcdən (spred + sürüşmə + gecəlik haqq) kiçikdirsə, statistik düz olsa da pul qazandırmaz («xərcdən kiçik»). Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı.</p>`;
-  loadJudgeCharts(card).catch(() => {});
-  loadWhere(card).catch(() => {});
-  loadPassports().catch(() => {});
-}
 // Session hours are fixed in UTC (22-07, 07-13, 13-22); shown in New York time for the owner (DST included).
 const nyHour = (utcH) => { const d = new Date(); d.setUTCHours(utcH, 0, 0, 0);
   return d.toLocaleTimeString("az", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" }); };
 const GROUP_AZ = { asia: `Asiya seansı (${nyHour(22)}–${nyHour(7)} NY)`, london: `London (${nyHour(7)}–${nyHour(13)} NY)`,
   ny: `Nyu-York (${nyHour(13)}–${nyHour(22)} NY)`, calm: "Sakit bazar", wild: "Dalğalı bazar" };
-function spark(vals, up) {
-  if (!vals || vals.length < 2) return "";
-  const lo = Math.min(...vals), hi = Math.max(...vals), w = 200, h = 34;
-  const pts = vals.map((v, i) => `${(i / (vals.length - 1) * w).toFixed(1)},${(h - 2 - (hi === lo ? 0.5 : (v - lo) / (hi - lo)) * (h - 4)).toFixed(1)}`).join(" ");
-  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="${up ? "var(--up)" : "var(--down)"}" stroke-width="1.5" points="${pts}"/></svg>`;
-}
-const corrTxt = (c) => c == null ? "—" : (c >= 0 ? "+" : "") + c.toFixed(2);
-async function loadMarkets() {
-  const d = await api(`/api/markets?metal=${sym}`);
-  $("mktnote").textContent = d.resolved ? "Capital.com axını, canlı" : (d.resolve_error ? "broker siyahısı: " + d.resolve_error : "broker siyahısı yoxlanır…");
-  $("mkts").innerHTML = d.markets.map((m) => {
-    if (m.live) {
-      const ch = m.price != null && m.day_open ? m.price / m.day_open - 1 : null;
-      const lk = m.links ? `<div class="lk"><span title="${m.links.n_1h} saat">Birlikdə ${corrTxt(m.links.corr_1h)}</span><span title="${m.links.n_15m} cüt">Qabaqlayır ${corrTxt(m.links.lead_15m)}</span></div>` : "";
-      return `<div class="mkt"><div class="row"><b>${esc(m.name)}</b><span class="pill ${m.status}">${STATUS_AZ[m.status] || m.status}</span></div>
-        <div class="row"><span class="px">${m.price == null ? "—" : exact(m.price)}</span><span class="${ch == null ? "mut" : ch >= 0 ? "up" : "down"}">${ch == null ? "—" : (ch >= 0 ? "+" : "") + (ch * 100).toFixed(2) + " %"}</span></div>
-        ${spark(m.spark, ch == null || ch >= 0)}${lk}${m.why ? `<div class="why">${esc(m.why)}</div>` : ""}</div>`;
-    }
-    if (m.daily != null) return `<div class="mkt"><div class="row"><b>${esc(m.name)}</b><span class="pill next">gündəlik</span></div>
-        <div class="row"><span class="px">${m.daily.toFixed(2)}</span><span class="note">${esc(m.daily_date)}</span></div>
-        <div class="why">Brokerdə tapılmadı: FRED-in gündəlik rəqəmi. ${esc(m.why)}</div></div>`;
-    return `<div class="mkt"><div class="row"><b>${esc(m.name)}</b><span class="pill next">yoxdur</span></div><div class="why">${esc(m.why)}</div></div>`;
-  }).join("");
-}
-async function loadPassports() {
-  const d = await api(`/api/passports?symbol=${sym}`);
-  const short = { "sübut": "✓", "xərc": "xərc", "yox": "✗", "az": "az" };
-  $("passports").innerHTML = `<table><tr><th>Üsul</th><th>Niyə var</th><th>Nə gözləyirik</th><th>Hakim indi (üfüq: nəticə)</th><th>Nəticə verməsə</th></tr>` +
-    d.methods.map((m) => `<tr><td><b>${esc(m.name)}</b>${m.family ? `<br><span class="note">ailə: ${esc(m.family)}</span>` : ""}</td><td>${esc(m.why)}</td><td>${esc(m.expect)}</td>
-      <td><div class="res">${Object.entries(m.results).map(([h, r]) => { const x = r.live && r.live.nh >= 1 && r.live.status !== "az" ? r.live : r.history || r.live || {};
-        return `<span class="${x.status || "az"}" title="${x.nh ?? x.n ?? 0} yoxlama">${esc(d.horizons[h])}: ${short[x.status] || x.status || "—"}${x.hit_rate != null && m.method !== "rw" ? " " + Math.round(x.hit_rate * 100) + "%" : ""}</span>`; }).join("")}</div></td>
-      <td>${esc(m.else)}</td></tr>`).join("") + `</table><p class="note">✓ sübut · ✗ kifayət qədər yoxlama var, sübut yoxdur · xərc: düzdür, amma tam xərcdən kiçik · az: hələ az yoxlama.</p>`;
-}
-async function loadWhere(card) {
-  const d = await api(`/api/judge/where?symbol=${sym}&horizon=${card.horizon}&mode=history`);
-  const ms = Object.keys(d.methods);
-  if (!ms.length) { $("jwhere").innerHTML = "<p class='note'>Hələ məlumat yoxdur.</p>"; return; }
-  $("jwhere").innerHTML = `<table><tr><th>Üsul</th>${d.groups.map((g) => `<th>${GROUP_AZ[g]}</th>`).join("")}</tr>` +
-    ms.map((m) => `<tr><td>${esc(lastFc.method_names[m] || m)}</td>${d.groups.map((g) => { const c = d.methods[m][g];
-      const cls = c.status === "sübut" ? "sübut" : c.status === "xərc" ? "xərc" : c.hit_rate == null || c.n < 50 ? "mut" : c.hit_rate < d.bar - 0.03 ? "yox" : "";
-      return `<td class="cell ${cls}" title="${c.n} yoxlama, p ${c.p == null ? "—" : c.p.toFixed(4)}">${c.n ? pct(c.hit_rate, 0) : "—"}${c.status === "sübut" ? " ✓" : ""}</td>`; }).join("")}</tr>`).join("") +
-    `</table><p class="note">✓ yaşıl = bu şəraitdə sübut olunub (eyni sərt qaydalar; p həddi bütün xanaların sayına bölünür: ${d.p_bar ? d.p_bar.toFixed(4) : "—"}).
-    Belə üsul kartda yalnız həmin şərait olanda istiqamət göstərir. Qırmızı = həddən (${pct(d.bar, 0)}) 3 bənd aşağı, boz = 50-dən az yoxlama.
-    Sübutsuz xanalar yalnız müşahidədir: üsulun harada səhv etdiyini göstərir.</p>`;
-}
-async function loadJudgeCharts(card) {
-  const d = await api(`/api/judge/series?symbol=${sym}&horizon=${card.horizon}&mode=${mode}`);
-  $("jwin").textContent = d.window;
-  const names = lastFc.method_names, bar = (card[mode === "live" ? "stats_live" : "stats_history"].find((r) => r.method === "qaydalar") || {}).bar || 0.5;
-  const ser = Object.entries(d.methods).map(([m, pts]) => ({ name: names[m], color: MCOL[m] || "#888", pts }));
-  drawLines($("jc1"), ser, [{ v: bar, label: "keçməli hədd " + (bar * 100).toFixed(0) + " %", color: getComputedStyle(document.documentElement).getPropertyValue("--muted") }], 0.3, 0.8);
-  $("jl1").innerHTML = ser.map((s) => `<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join("");
-  const gold = getComputedStyle(document.documentElement).getPropertyValue("--gold"), info = "#4ea1ff";
-  drawLines($("jc2"), [{ name: "50 %", color: info, pts: d.cover["50"] }, { name: "80 %", color: gold, pts: d.cover["80"] }],
-    [{ v: 0.5, color: info }, { v: 0.8, color: gold }], 0.2, 1.0);
-  $("jl2").innerHTML = `<span><i style="background:${info}"></i>50 % aralığa düşən</span><span><i style="background:${gold}"></i>80 % aralığa düşən</span>`;
-}
-
-async function loadJournal() {
-  const d = await api(`/api/journal?symbol=${sym}`);
-  const names = lastFc ? lastFc.method_names : {};
-  const hn = Object.fromEntries((lastFc ? lastFc.cards : []).map((c) => [c.horizon, c.name]));
-  if (!d.rows.length) { $("journal").innerHTML = "<p class='note'>Hələ yoxlanmış proqnoz yoxdur. Ən qısa proqnoz 15 dəqiqəlikdir: bazar açıq olanda hər 15 dəqiqədə yoxlanır.</p>"; return; }
-  $("journal").innerHTML = `<table><tr><th>Vaxt</th><th>Üfüq</th><th>Üsul</th><th>Başlanğıc</th><th>Nəticə</th><th>Yuxarı ehtimalı</th><th>İstiqamət</th><th>80 % aralıq</th></tr>` +
-    d.rows.map((r) => `<tr><td>${hhmm(r.target_t)}</td><td>${hn[r.horizon]}</td><td>${esc(names[r.method] || r.method)}</td>
-      <td class="n">${fmt(r.price0)}</td><td class="n">${fmt(r.price1)}</td><td class="n">${(r.p_up * 100).toFixed(1)} %</td>
-      <td>${r.hit == null ? "<span class='mut'>—</span>" : r.hit ? "<span class='up'>düz</span>" : "<span class='down'>səhv</span>"}</td>
-      <td>${r.in80 ? "<span class='up'>tutdu</span>" : "<span class='down'>tutmadı</span>"}</td></tr>`).join("") + "</table>";
-}
-
-let nfilter = "metal";
-const STR_AZ = ["təsirsiz", "zəif", "orta", "güclü"];
-function aiTag(a) {
-  if (!a) return "";
-  const arrow = a.direction === "up" ? "<span class='up'>↑</span>" : a.direction === "down" ? "<span class='down'>↓</span>" : "→";
-  return ` · <b>Oxuyucu:</b> ${esc(a.ai_metals || "—")} ${arrow} ${STR_AZ[a.strength] || ""}${a.event ? " (" + esc(a.event) + ")" : ""}`;
-}
-function renderReaderScore(rs) {
-  if (!rs || !rs.n) { $("rscore").innerHTML = "<p class='note'>Hələ yoxlanmış qiymətləndirmə yoxdur: Oxuyucu başlığa «yuxarı» və ya «aşağı» deyəndən 1 saat sonra yoxlanır.</p>"; return; }
-  $("rscore").innerHTML = `<table><tr><th>Güc</th><th>Yoxlama</th><th>Düz çıxıb</th><th>p (sikkəyə qarşı)</th></tr>` +
-    rs.rows.map((r) => `<tr><td>${STR_AZ[r.strength] || r.strength}</td><td class="n">${r.n}</td><td class="n">${pct(r.hit_rate)}</td>
-      <td class="n">${r.p == null ? "—" : r.p.toFixed(3)}</td></tr>`).join("") +
-    `<tr><td><b>Cəmi</b></td><td class="n">${rs.n}</td><td class="n"><b>${pct(rs.hit_rate)}</b></td><td></td></tr></table>
-    <p class="note">Eyni hadisə haqqında bir neçə başlıq bir-birindən asılıdır: bu ilk baxışdır, sübut deyil. Müqayisə üçün: bu saatlarda qiymət ${pct(rs.up_rate, 0)} hallarda qalxıb.</p>`;
-}
-function renderScout(d) {
-  const x = d.scout;
-  if (!x) { $("scout").innerHTML = `<p class="note">${esc((d.scout_state && d.scout_state.message) || "Kəşfiyyatçı (Grok, yalnız X) hələ axtarmayıb: bazar açıq olanda 4 saatda bir, mühüm ABŞ rəqəmi ətrafında 30 dəqiqədə bir axtarır. xAI açarı lazımdır.")}</p>`; $("scmeta").textContent = ""; return; }
-  $("scmeta").textContent = `${x.brain} · ${new Date(x.ts * 1000).toLocaleString("az")}`;
-  const items = x.items.filter((i) => nfilter === "all" || !i.metals.length || i.metals.includes(sym));
-  $("scout").innerHTML = (x.mood ? `<p>${esc(x.mood)}</p>` : "") + (items.length ? items.map((i) => `<div class="nitem">
-      ${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">${esc(i.title)}</a>` : `<span>${esc(i.title)}</span>`}
-      <span class="m">${esc(i.source)} · ${esc(i.metals.join(", ") || "ümumi")} ${i.direction === "up" ? "<span class='up'>↑</span>" : i.direction === "down" ? "<span class='down'>↓</span>" : "→"} ${STR_AZ[i.strength] || ""}${i.why ? " · " + esc(i.why) : ""}</span></div>`).join("")
-    : "<p class='note'>Seçilmiş metal üçün tapılan yoxdur.</p>") +
-    `<p class="note">Grok X və vebdə axtarır. Mənbəyə klikləyib yoxlayın: süni intellekt səhv edə bilər. Rəqəm olan cümlələr avtomatik silinir.</p>` +
-    (d.scout_state && d.scout_state.message && d.scout_state.ts > x.ts ? `<p class="note">Son cəhd: ${esc(d.scout_state.message)}</p>` : "");
-}
 async function loadBrains() {
   const d = await api("/api/brains");
-  renderReaderScore(d.reader_score);
-  renderScout(d);
   const x = d.strategist;
   if (!x) {
     $("strat").innerHTML = `<p class="note">${esc((d.strategist_state && d.strategist_state.message) || "Strateq hələ izah yazmayıb (saatda bir yazır).")}</p>`;
@@ -342,103 +194,14 @@ const ago = (ts) => { const m = Math.round((Date.now() / 1000 - ts) / 60);
 const until = (ts) => { const m = Math.round((ts - Date.now() / 1000) / 60);
   if (m < 0) return "çıxıb";
   return m < 60 ? m + " dəq sonra" : m < 1440 ? Math.floor(m / 60) + " saat " + (m % 60) + " dəq sonra" : Math.round(m / 1440) + " gün sonra"; };
-const SER = { DFII10: 2, DGS10: 2, T10YIE: 2, DTWEXBGS: 2, VIXCLS: 1, SP500: 0 };
-const MNAME = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
-// Fundamentals in words: each factor, which way it points for gold, and why. Display only: the macro method in the
-// Judge is the test of whether this view actually forecasts anything.
-function renderFund(d) {
-  const m = Object.fromEntries(d.macro.map((x) => [x.series, x]));
-  const sig = [];
-  const add = (dir, title, text) => sig.push(`<div class="fsig"><span class="ar ${dir > 0 ? "up" : dir < 0 ? "down" : "mut"}">${dir > 0 ? "↑" : dir < 0 ? "↓" : "→"}</span>
-    <span><b>${title}</b><br><span class="note">${text}</span></span></div>`);
-  const r = m.DFII10, usd = m.DTWEXBGS, vix = m.VIXCLS, sp = m.SP500;
-  if (r && r.value != null) add(r.change_week < -0.03 ? 1 : r.change_week > 0.03 ? -1 : 0, `Real faiz ${r.value.toFixed(2)} % (həftədə ${r.change_week >= 0 ? "+" : ""}${r.change_week.toFixed(2)})`,
-    "Real faiz enəndə qızıl saxlamağın «itirilmiş gəliri» azalır: adətən qızıl üçün müsbət. 2022-dən bu əlaqə zəifləyib.");
-  if (usd && usd.value != null) { const p = usd.change_week / (usd.value - usd.change_week) * 100;
-    add(p < -0.3 ? 1 : p > 0.3 ? -1 : 0, `Dollar indeksi ${usd.value.toFixed(1)} (həftədə ${p >= 0 ? "+" : ""}${p.toFixed(2)} %)`,
-      "Dollar zəifləyəndə qızıl başqa valyutalarda ucuzlaşır, tələb artır: qızıl üçün müsbət."); }
-  if (vix && vix.value != null) add(vix.value > 25 ? 1 : 0, `VIX ${vix.value.toFixed(1)}`,
-    vix.value > 25 ? "Bazarda qorxu yüksəkdir: sığınacaq kimi qızıla tələb arta bilər (amma ilk panikada qızıl da satıla bilər)."
-      : vix.value < 15 ? "Bazar sakitdir: sığınacaq tələbi zəifdir." : "Qorxu səviyyəsi normaldır.");
-  if (sp && sp.value != null) { const p = sp.change_week / (sp.value - sp.change_week) * 100;
-    add(p < -3 ? 1 : 0, `S&P 500 həftədə ${p >= 0 ? "+" : ""}${p.toFixed(1)} %`, p < -3 ? "Səhmlərdə kəskin düşüş: risk-off, qızıla axın ola bilər." : "Səhm bazarında risk-off yoxdur."); }
-  const c = (d.cot || []).find((x) => x.symbol === sym);
-  if (c && c.date) add(c.rank > 85 ? -1 : c.rank < 15 ? 1 : 0, `Böyük fondlar (${MNAME[sym]}): xalis ${Math.round(c.net).toLocaleString("az")} müqavilə, 3 ilin ${c.rank == null ? "—" : c.rank.toFixed(0) + " %"}-i`,
-    c.rank > 85 ? "Fondlar 3 ilin ən yüklü mövqeyinə yaxındır: alan az qalıb, geri çəkilmə riski artır."
-      : c.rank < 15 ? "Fondlar 3 ilin ən zəif mövqeyinə yaxındır: satan az qalıb, dönüş potensialı var." : "Fondların mövqeyi ifrat deyil.");
-  $("fsig").innerHTML = sig.length ? sig.join("") + `<p class="note">Bunlar izahdır. Makro (real faiz + dollar) üsulu Hakimdə yoxlanır${judgeSays("macro")
-    .replace(" · ", ": ")}. COT məlumatı çərşənbə axşamının vəziyyətidir, cümə günü dərc olunur.</p>`
-    : `<p class="note">Fundamental məlumat hələ yoxdur (admin: FRED açarı).</p>`;
-  const h = (d.health || {}).cot || {};
-  $("cot").innerHTML = (d.cot || []).some((x) => x.date) ? `<table><tr><th>Metal</th><th>Hesabat</th><th>Fondların xalis mövqeyi</th><th>Açıq mövqelərin %-i</th><th>Həftəlik dəyişmə</th><th>3 illik diapazonda</th></tr>` +
-    d.cot.map((x) => x.date ? `<tr><td>${MNAME[x.symbol]}</td><td>${x.date}</td><td class="n">${Math.round(x.net).toLocaleString("az")}</td>
-      <td class="n">${x.net_pct_oi == null ? "—" : x.net_pct_oi.toFixed(1) + " %"}</td>
-      <td class="n ${x.change > 0 ? "up" : x.change < 0 ? "down" : ""}">${x.change == null ? "—" : (x.change > 0 ? "+" : "") + Math.round(x.change).toLocaleString("az")}</td>
-      <td class="n">${x.rank == null ? "—" : x.rank.toFixed(0) + " %"}</td></tr>` : "").join("") + "</table>" +
-    `<p class="note">CFTC COT: «managed money» (hedc fondları, CTA) fyuçers mövqeyi. 100 % = son 3 ilin ən böyük alış mövqeyi.</p>`
-    : `<p class="note">CFTC COT: ${esc(h.message || "hələ yüklənməyib")}</p>`;
-}
-
-async function loadFeeds() {
-  const d = await api(`/api/feeds${nfilter === "metal" ? "?metal=" + sym : ""}`);
-  const h = d.health || {};
-  try { renderFund(d); } catch (e) {}
-  $("macro").innerHTML = d.macro.map((m) => m.value == null
-    ? `<div class="mrow"><span>${esc(m.name)}</span><span class="mut">—</span><span></span></div>`
-    : `<div class="mrow"><span>${esc(m.name)}<br><span class="note">${esc(m.date)}</span></span>
-       <span class="v">${m.value.toFixed(SER[m.series] || 2)}</span>
-       <span class="v ${m.change_week > 0 ? "up" : m.change_week < 0 ? "down" : "mut"}">${m.change_week >= 0 ? "+" : ""}${m.change_week.toFixed(2)}</span></div>`).join("") +
-    `<p class="note">${h.fred && h.fred.ok ? "Son: həftəlik dəyişmə sağda. Real faiz yüksələndə qızıl adətən sıxılır, amma 2022-dən bu əlaqə zəifləyib."
-      : "FRED: " + esc((h.fred && h.fred.message) || "hələ yüklənməyib")}</p>`;
-  $("events").innerHTML = d.events.length ? `<table><tr><th>Vaxt</th><th>Hadisə</th><th>Gözlənti</th><th>Əvvəlki</th><th>Fakt</th></tr>` +
-    d.events.map((e) => `<tr><td>${new Date(e.ts * 1000).toLocaleString("az", { weekday: "short", hour: "2-digit", minute: "2-digit" })}<br>
-      <span class="note">${until(e.ts)}</span></td><td><span class="${e.impact === "High" ? "hi" : "me"}">●</span> ${esc(e.title)}</td>
-      <td class="n">${esc(e.forecast || "—")}</td><td class="n">${esc(e.previous || "—")}</td><td class="n">${esc(e.actual || "—")}</td></tr>`).join("") + "</table>"
-    : `<p class="note">${h.forexfactory && h.forexfactory.ok === false ? "Təqvim: " + esc(h.forexfactory.message) : "Yaxın 7 gündə mühüm ABŞ hadisəsi yoxdur və ya təqvim hələ yüklənməyib."}</p>`;
-  const fx = (v) => v == null ? "—" : Math.abs(v) >= 1e5 ? (v / 1e3).toFixed(0) + "K" : String(+v.toFixed(3));
-  $("releases").innerHTML = (d.releases || []).length ? `<table><tr><th>Vaxt</th><th>Rəqəm</th><th>Gözlənti</th><th>Fakt</th><th>Qızıl üçün</th></tr>` +
-    d.releases.map((r) => `<tr><td>${new Date(r.ts * 1000).toLocaleString("az", { weekday: "short", hour: "2-digit", minute: "2-digit" })}</td>
-      <td><span class="${r.impact === "High" ? "hi" : "me"}">●</span> ${esc(r.event)}</td><td class="n">${fx(r.estimate)}</td>
-      <td class="n"><b>${fx(r.actual)}</b></td>
-      <td>${r.actual == null ? "<span class='mut'>gözlənilir</span>" : !r.scored ? "<span class='mut'>—</span>" : r.gold > 0 ? "<span class='up'>↑ müsbət</span>" : "<span class='down'>↓ mənfi</span>"}</td></tr>`).join("") +
-    `</table><p class="note">Məsələn, inflyasiya və ya iş yerləri gözləntidən yüksək çıxanda dollar güclənir və bu, adətən qızıl üçün mənfidir. Bu, ehtimaldır: «Hadisə sürprizi» üsulu Hakimdə yoxlanır.</p>`
-    : `<p class="note">${h.fmp && h.fmp.ok === false ? "FMP: " + esc(h.fmp.message) : "Hələ açıqlanan rəqəm yoxdur (admin: FMP açarı)."}</p>`;
-  const hu = d.hunter || [];
-  $("releases").innerHTML += hu.length ? `<p class="note"><b>Rəqəm ovçusu</b> (iki beyin vebdə ayrı-ayrı axtarır): ` +
-    hu.map((x) => `${esc(x.event)} — ${x.accepted ? "<span class='up'>təsdiqləndi</span>" : "<span class='mut'>" + esc(x.note) + "</span>"}` +
-      [x.a, x.b].filter((v) => v && v.url).map((v) => ` <a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">${esc(v.raw)}</a>`).join("")).join(" · ") + "</p>"
-    : `<p class="note"><b>Rəqəm ovçusu:</b> mühüm ABŞ rəqəmi çıxandan 2–20 dəqiqə sonra iki beyin faktı vebdən tapır; üst-üstə düşsə, istifadə olunur.</p>`;
-  $("news").innerHTML = d.news.length ? d.news.slice(0, 20).map((n) => `<div class="nitem">
-      ${n.url ? `<a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(n.title)}</a>` : `<span>${esc(n.title)}</span>`}
-      <span class="m">${esc(n.source)} · ${ago(n.ts)}${n.metals ? " · " + esc(n.metals) : ""}${aiTag(n.ai)}</span></div>`).join("")
-    : `<p class="note">${h.rss && h.rss.ok === false ? "Xəbər: " + esc(h.rss.message) : "Hələ başlıq yoxdur."}</p>`;
-}
-document.querySelectorAll("#nfilter button").forEach((b) => b.onclick = () => {
-  nfilter = b.dataset.f; document.querySelectorAll("#nfilter button").forEach((x) => x.classList.toggle("on", x === b));
-  loadFeeds().catch(() => {});
-});
-
 function save() { try { localStorage.setItem("tst_sym", sym); localStorage.setItem("tst_tf", tf); } catch (e) {} }
 
 async function refreshState() { lastState = await api("/api/state"); renderTiles(lastState); }
-let modeTouched = false;
 async function refreshFc() {
   lastFc = await api(`/api/forecasts?symbol=${sym}`);
-  // Until live forecasts have been scored, open the Judge on the history tab (live would be all zeros).
-  if (!modeTouched) {
-    const liveN = lastFc.cards.reduce((a, c) => a + c.stats_live.reduce((b, r) => b + r.n, 0), 0);
-    mode = liveN ? "live" : "history";
-    document.querySelectorAll("#modes button").forEach((x) => x.classList.toggle("on", x.dataset.m === mode));
-  }
-  renderCards(lastFc); renderJudge(lastFc);
+  renderCards(lastFc);
 }
-async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadJournal(); await loadFeeds(); await loadBrains();
-  loadMarkets().catch(() => {}); }
-
-document.querySelectorAll("#modes button").forEach((b) => b.onclick = () => {
-  mode = b.dataset.m; modeTouched = true; document.querySelectorAll("#modes button").forEach((x) => x.classList.toggle("on", x === b));
-  if (lastFc) renderJudge(lastFc);
-});
+async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadBrains(); }
 setInterval(() => {
   const d = new Date();
   // The owner lives in New York: New York time first (winter/summer time handled by the browser), UTC for the data.
@@ -451,6 +214,6 @@ refreshAll();
 
 setInterval(() => refreshState().catch(() => {}), 5000);
 setInterval(() => loadChart().catch(() => {}), 10000);
-setInterval(() => { refreshFc().catch(() => {}); loadJournal().catch(() => {}); }, 20000);
-setInterval(() => { loadFeeds().catch(() => {}); loadBrains().catch(() => {}); loadMarkets().catch(() => {}); }, 60000);
+setInterval(() => { refreshFc().catch(() => {}); }, 20000);
+setInterval(() => { loadBrains().catch(() => {}); }, 60000);
 checkVersion(); setInterval(checkVersion, 60000);

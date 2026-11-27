@@ -15,7 +15,7 @@
     const chips = d.markets.map((m) => {
       const ch = m.price != null && m.day_open ? (m.price / m.day_open - 1) * 100 : null;
       const cls = ch == null ? "mut" : ch >= 0 ? "up" : "down";
-      return `<a class="tk" href="#sec-mkt" title="${esc(m.name)} · ${esc(m.status)}${m.kind === "ETF" ? " · ETF (yalnız ABŞ saatları)" : ""}">
+      return `<a class="tk" href="/bazarlar" title="${esc(m.name)} · ${esc(m.status)}${m.kind === "ETF" ? " · ETF (yalnız ABŞ saatları)" : ""}">
         <span class="n">${esc(m.name)}</span><span class="v">${fmt(m.price)}</span>
         <span class="${cls}">${ch == null ? "—" : (ch >= 0 ? "+" : "") + ch.toFixed(2) + "%"}</span></a>`;
     });
