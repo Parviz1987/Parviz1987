@@ -17,6 +17,7 @@ from .db import DB
 from .keys import KeyStore
 
 READER_EVERY, STRATEGIST_EVERY = 120, 3600
+SECOND_EVERY = 4 * 3600          # the second analyst and the debate (plan 3.3, 27.11)
 ALARM_GAP, ALARMS_PER_DAY = 15 * 60, 12          # an alarm analysis at most every 15 minutes, 12 a day (cost cap)
 SCOUT_ALARMS_PER_DAY = 3
 SLEEP_HOUR_UTC = 6                               # 01:00 New York: the nightly review (calibration and lessons)                         # a fresh X search before the analysis, for news alarms only
@@ -409,8 +410,12 @@ class BrainJobs:
         if chk is not None:
             self._rep("checker", "done", note="Strateqin son cavabı: " + (
                 f"{chk['invented']} uydurma rəqəm (göstərilmədi)" if chk["invented"] else "uydurma rəqəm yoxdur"))
-        await self.second_brain(now, facts, trigger)
-        await self.debate(now, facts, trigger)
+        # 27.11 (plan 3.3, owner approved): the second analyst and the debate (both on the «analyst2» slot, 36 $ of
+        # the month's 89 $) showed no edge over chance in 383 and 93 views; they run every 4 hours, not every hour
+        if self._round_due("analyst2", now):
+            await self.second_brain(now, facts, trigger)
+        if self._round_due("debate", now):
+            await self.debate(now, facts, trigger)
         await self.chartist(now, trigger)
         self._state("strategist", f"izah yazıldı · {how}")
         return True
@@ -520,6 +525,13 @@ class BrainJobs:
         except Exception as e:
             log.warning("chartist card: %s", e)
         self._rep("chartist", "done", note=f"{len(rows)} ehtimal · {how}")
+        return True
+
+    def _round_due(self, name: str, now: float) -> bool:
+        """Once per SECOND_EVERY for the second analyst and the debate (kept across restarts)."""
+        if now - float(self.db.get(f"round:{name}") or 0) < SECOND_EVERY:
+            return False
+        self.db.put(f"round:{name}", str(now))
         return True
 
     @staticmethod
