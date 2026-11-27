@@ -236,3 +236,12 @@
 - **Tapılan və düzəldilən:** hər yenidən başlama saatlıq pullu beyin dövrəsini (strateq, ikinci analitik, müzakirə,
   qrafik analitiki) dərhal təkrar işə salırdı; bu gecə ~12 yenidən başlama ikinci analitikin xərcini 4 saatda 30,9 → 33,9 $
   qaldırdı. İndi kəşfiyyatçı kimi: növbəti dövrə sonuncunun vaxtından sayılır. Test əvvəl qırmızı, sonra 319/319 yaşıl.
+
+## 2026-11-27 04:48 NY — növbətçi yoxlama
+- **Təhlükəsizlik:** yeni hadisə yoxdur (24 saatda axşamkı açar dəyişməsi və köhnə açarla 6 sorğu). 2FA söndürülüb.
+- **Server:** 5c635b4, xəta yoxdur, zəncir qaydasında, qiymət 4/4 canlı (qızıl 3 678,74), boş yaddaş 441 MB, baza 747 MB.
+  04:16–04:32 arası 4 yeniləmə oldu; düzəlişdən sonra yenidən başlama pullu beyin dövrəsi açmır (ikinci analitik 3 saatda +1 $).
+- **Beyin keçidi:** Gemini `gemini-2.5-flash` modelini bağlayıb (söndürülüb); təklif `gemini-3.8-flash` — sınaq Google-un
+  503 «yüksək tələb» xətası ilə alınmadı, təkrar edilmir, qərar sahibindədir (Admin → Beyinlər → model təklifləri).
+  Məlumat agentləri ehtiyat beyinlə (OpenAI, Anthropic) işləyir.
+- **Ehtiyat nüsxə:** R2 gecəlik nüsxə yenə alınmadı (açar yoxdur); DigitalOcean nüsxəsi var.
