@@ -67,7 +67,7 @@
 
 ## Mərhələ 5 — sənədlər və hesabat
 - [x] 5.1 `BLOKLAR.md`, `SOHBET-TARIXCESI.md`, `IS-PLANI.md` (5.3), `monitor/sehvlerim.md` yeniləndi.
-- [ ] 5.2 Sahibə yekun: nə edildi, necə yoxlandı, nə qaldı.
+- [x] 5.2 Sahibə yekun: nə edildi, necə yoxlandı, nə qaldı.
 
 ## Sahibsiz qalanlar (sistem onsuz işləyir)
 | | Əvəzi | Nə itirilir |
@@ -88,4 +88,9 @@
   yazılmış proqnozları sayır. 3.1 (birləşdiricilər arxaya) saytın önü ilə birlikdə (Mərhələ 4).
 - 27.11 11:07 — Mərhələ 4: 13 səhifə 1366 və 390-da, brauzer xətası 0; 10 səhifədə hər görünən düymə basıldı (Admin xaric — ayar
   dəyişir), xəta 0; yığılmış bölmələr açılanda qrafik ölçüsü sıfır qalmır.
-- 27.11 11:20 — 5.1: sənədlər yeniləndi. Növbətçi yoxlama 10:47-də təzə sessiyada uğurla işlədi (sakit, commit yoxdur).
+- 27.11 11:13 — 5.1: sənədlər yeniləndi. Növbətçi yoxlama 10:47-də təzə sessiyada uğurla işlədi (sakit, commit yoxdur).
+- 27.11 11:16 — **Serverdə yoxlandı** (versiya 76e6e8f, 11:13 NY quruldu, qorunan fayllar «held» olmadı): əlaqə xəritəsində
+  20 halqa — 15 işləyir, 2 diqqət (Gemini modeli bağlıdır, iş ehtiyat beyinlə; Hakimin öz yoxlaması — izahlı), 3 sahibin
+  addımını gözləyir (Healthchecks, R2, 2FA); blokların yoxlaması 0,4 saatlıq, Xəbər bloku artıq «qırıq» deyil; Google
+  News 429 yoxdur; son 1 saatda xəta yoxdur; boş yaddaş 521 MB. Benzinga ümumi axından da 48 saatda yalnız 1 metal başlığı
+  verir — mənbə zəifdir, əsas xəbər RSS-dən (316). Plan bitdi.
