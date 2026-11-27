@@ -101,7 +101,10 @@
     $("wrapc").classList.toggle("full", on); document.body.classList.toggle("noscroll", on); setTimeout(draw, 30); }
   $("big").onclick = () => setBig(true); $("small").onclick = () => setBig(false);
   addEventListener("keydown", (e) => { if (e.key === "Escape") setBig(false); });
-  addEventListener("resize", () => { if (data) factors(); });
+  // only a real change of width redraws: on a phone the address bar hides and shows while scrolling and fires
+  // «resize» each time; rebuilding 16 charts on every scroll could make the phone browser close the page
+  let lastW = innerWidth;
+  addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; if (data) factors(); });
   async function go() {
     seg($("sym"), Object.entries(NAMES), sym, (k) => { sym = k; save("sym", k); go(); });
     seg($("cnt"), [[120, "6 ay"], [250, "1 il"], [500, "2 il"]], cnt, (k) => { cnt = +k; save("cnt", cnt); seg($("cnt"), [[120, "6 ay"], [250, "1 il"], [500, "2 il"]], cnt, () => {}); draw(); go(); });

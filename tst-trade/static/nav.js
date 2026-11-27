@@ -24,6 +24,24 @@
     const head = el.closest("header");
     if (head) head.after(sub); else el.after(sub);
   }
+  // Every page follows the server's version by itself (owner 2026-11-26: «hər dəyişiklik avtomatik brauzerə getsin»):
+  // when /version says a new commit runs, the page reloads and gets the new files (pages and static files are sent
+  // with «no-cache», the service worker asks the server too). Not while the owner is typing: it waits for the field
+  // to be left. One place for all pages; the panel and the admin page used to do this on their own.
+  let seen = null;
+  const typing = () => { const a = document.activeElement; return !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName); };
+  async function followVersion() {
+    try {
+      const v = (await (await fetch("/version", { cache: "no-store" })).json()).commit;
+      if (seen && v && v !== seen) {
+        if (typing()) { document.activeElement.addEventListener("blur", () => location.reload(), { once: true }); return; }
+        location.reload();
+      }
+      seen = seen || v;
+    } catch (e) { /* offline: try again later */ }
+  }
+  followVersion(); setInterval(followVersion, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) followVersion(); });
   fetch("/api/me", { credentials: "same-origin" }).then((r) => r.ok ? r.json() : null).then((m) => {
     if (m && m.role === "guest") el.querySelectorAll("a").forEach((a) => {
       if (OWNER_ONLY.includes(a.getAttribute("href"))) a.hidden = true;

@@ -196,6 +196,11 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             # Every visit pushes the 30 days forward: the owner logs in once and stays in.
             response.set_cookie(auth.COOKIE, auth.make_token(s.session_secret, role=who or "owner"),
                                 max_age=auth.DAYS * 86400, httponly=True, secure=s.cookie_secure, samesite="lax")
+        if request.method == "GET" and not path.startswith("/api/") and "cache-control" not in response.headers:
+            # pages and their scripts/styles: the browser may keep a copy but must ask the server before using it (a
+            # short 304 when nothing changed). Without this a browser reused old files for hours after a deploy and
+            # the owner kept seeing the old site (2026-11-26).
+            response.headers["Cache-Control"] = "no-cache"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"

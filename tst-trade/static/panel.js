@@ -180,15 +180,6 @@ async function loadBrains() {
     (x.watch.length ? `<p class="note">Diqqət: ${x.watch.map(esc).join(" · ")}</p>` : "") +
     `<p class="note">Bu, süni intellektin izahıdır, alış-satış məsləhəti deyil. Faktlarda olmayan rəqəmli cümlələr avtomatik silinir.</p>`;
 }
-// The page reloads itself when the server runs a new version (no manual refresh after an update).
-let seenVersion = null;
-async function checkVersion() {
-  try {
-    const v = (await (await fetch("/version", { cache: "no-store" })).json()).commit;
-    if (seenVersion && v && v !== seenVersion) location.reload();
-    seenVersion = seenVersion || v;
-  } catch (e) {}
-}
 const ago = (ts) => { const m = Math.round((Date.now() / 1000 - ts) / 60);
   return m < 60 ? m + " dəq əvvəl" : m < 1440 ? Math.round(m / 60) + " saat əvvəl" : Math.round(m / 1440) + " gün əvvəl"; };
 const until = (ts) => { const m = Math.round((ts - Date.now() / 1000) / 60);
@@ -216,4 +207,4 @@ setInterval(() => refreshState().catch(() => {}), 5000);
 setInterval(() => loadChart().catch(() => {}), 10000);
 setInterval(() => { refreshFc().catch(() => {}); }, 20000);
 setInterval(() => { loadBrains().catch(() => {}); }, 60000);
-checkVersion(); setInterval(checkVersion, 60000);
+// a new server version reloads the page: static/nav.js (the same for every page)

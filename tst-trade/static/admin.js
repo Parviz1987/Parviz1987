@@ -232,11 +232,4 @@ $("pw-save").onclick = async () => {
 
 async function load() { data = await call("GET", "/api/admin/overview"); render(); }
 load();
-let seenVersion = null;
-setInterval(async () => {
-  try {
-    const v = (await (await fetch("/version", { cache: "no-store" })).json()).commit;
-    if (seenVersion && v && v !== seenVersion) location.reload();
-    seenVersion = seenVersion || v;
-  } catch (e) {}
-}, 60000);
+// a new server version reloads the page: static/nav.js (the same for every page)

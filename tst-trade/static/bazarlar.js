@@ -73,7 +73,8 @@
     $("wrapc").classList.toggle("full", on); document.body.classList.toggle("noscroll", on); setTimeout(draw, 30); }
   $("big").onclick = () => setBig(true); $("small").onclick = () => setBig(false);
   addEventListener("keydown", (e) => { if (e.key === "Escape") setBig(false); });
-  addEventListener("resize", () => { if (data) { draw(); markets(); } });
+  let lastW = innerWidth;      // a real change of width only (a phone fires «resize» while scrolling)
+  addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; if (data) { draw(); markets(); } });
   async function go() {
     seg($("sym"), Object.entries(NAMES), sym, (k) => { sym = k; save("sym", k); go(); });
     seg($("tf"), TFS, tf, (k) => { tf = k; save("tf", k); go(); });

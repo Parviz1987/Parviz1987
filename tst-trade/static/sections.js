@@ -174,7 +174,9 @@
     $("judge").innerHTML = html + `</table><p class='note'>«Yoxlama»: üsulun istiqamət göstərdiyi proqnozların sayı. Eyni məlumatda çox üsul
       yoxlandığı üçün p həddi üsulların sayına bölünür (indi ${card[key][2] ? card[key][2].p_bar.toFixed(4) : "—"}).
       «Orta qazanc» tam xərcdən kiçikdirsə, statistik düz olsa da pul qazandırmaz. Brier bal: 0-dan yuxarı = sikkə atmaqdan yaxşı.</p>`;
-    loadJudgeCharts(card).catch(() => {});
+    const holder = $("jc1") && $("jc1").closest("details");
+    if (holder && !holder.dataset.wired) { holder.dataset.wired = "1"; holder.addEventListener("toggle", () => { if (holder.open && fc) renderJudge(); }); }
+    if (!holder || holder.open) loadJudgeCharts(card).catch(() => {});
     loadWhere(card).catch(() => {});
     loadPassports().catch(() => {});
   }

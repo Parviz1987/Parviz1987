@@ -230,4 +230,6 @@ async function load() {
 }
 setInterval(() => { $("clock").textContent = "Nyu-York " + new Date().toLocaleTimeString("az", { ...NY, hour: "2-digit", minute: "2-digit" }); }, 1000);
 metals(); load(); loadSim().catch(() => {}); loadAnalysts().catch(() => {}); loadHyp().catch(() => {}); loadFut().catch(() => {}); setInterval(() => load().catch(() => {}), 30000);
-window.addEventListener("resize", () => load().catch(() => {}));
+// a real change of width only: a phone fires «resize» while scrolling, and each one used to ask the server again
+let lastW = innerWidth;
+window.addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; load().catch(() => {}); });
