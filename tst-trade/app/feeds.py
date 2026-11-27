@@ -637,16 +637,17 @@ class Feeds:
         got, errors = 0, []
         for sid in eventlib.FIRST_SERIES:
             try:
-                data = await self._get(client, "https://api.stlouisfed.org/fred/series/observations",
-                                       params={"series_id": sid, "api_key": key, "file_type": "json",
-                                               "output_type": 4, "realtime_start": "1776-07-04",
-                                               "realtime_end": "9999-12-31", "observation_start": "2005-01-01"})
+                params = {"series_id": sid, "api_key": key, "file_type": "json", "observation_start": "2005-01-01"}
+                if sid not in eventlib.NOT_REVISED:     # the Fed's target is never revised: plain observations
+                    params.update({"output_type": 4, "realtime_start": "1776-07-04", "realtime_end": "9999-12-31"})
+                data = await self._get(client, "https://api.stlouisfed.org/fred/series/observations", params=params)
                 obs = parse_fred(data)
                 self.db.executemany("INSERT OR REPLACE INTO macro_first(series, d, v) VALUES(?,?,?)",
                                     [(sid, d, v) for d, v in obs])
                 got += len(obs)
             except Exception as e:
                 errors.append(f"{sid}: {str(e).replace(key, '***')}"[:120])
+        self.db.put("eventlib:fetch", json.dumps({"ts": time.time(), "n": got, "errors": errors}, ensure_ascii=False))
         try:
             res = await asyncio.to_thread(eventlib.build, self.db)
             self.db.put("eventlib:ver", eventlib.EV_VER)

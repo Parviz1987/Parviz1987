@@ -23,10 +23,11 @@ from datetime import datetime, timezone
 
 from .db import DB
 
-EV_VER = "2026-11-27.1"
+EV_VER = "2026-11-27.2"   # .2: the Fed target from plain observations (never revised)
 SERIES = {"CPI": "CPIAUCSL", "Employment Situation": "PAYEMS", "Personal Income and Outlays": "PCEPI",
           "GDP": "GDPC1"}
 FIRST_SERIES = tuple(SERIES.values()) + ("DFEDTARU",)
+NOT_REVISED = ("DFEDTARU",)
 MIN_LAG = {"CPIAUCSL": 32, "PAYEMS": 28, "PCEPI": 45, "GDPC1": 80}   # days from the period's first day to its release
 NAMES = {"CPI": "CPI (inflyasiya)", "Employment Situation": "NFP (iş yerləri)", "GDP": "ÜDM",
          "Personal Income and Outlays": "PCE (inflyasiya)", "FOMC": "Fed qərarı"}
@@ -221,6 +222,10 @@ def build(db: DB, now: float | None = None) -> dict:
     res = {"computed": now, "events": len(lib), "moves": len(mv),
            "by_kind": {k: sum(1 for x in lib if x[1] == k) for k in NAMES},
            "first": min((x[2] for x in lib), default=None)}
+    try:
+        res["fetch"] = json.loads(db.get("eventlib:fetch") or "null")
+    except ValueError:
+        res["fetch"] = None
     res["test"] = shadow_test(db, now)
     db.put("eventlib:state", json.dumps(res, ensure_ascii=False))
     return res

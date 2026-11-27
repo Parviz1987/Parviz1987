@@ -77,3 +77,15 @@ def test_middle_way_shadow_only():
     assert not aj.early_shadow(aj.OFF, 90, None, True)         # a veto holds
     assert not aj.early_shadow(aj.SMALL, 90, 3.0, False)       # never moves a stage down or past shadow
     assert aj.size_factor(aj.SHADOW, 90, 1.0) == 0.0           # shadow never trades
+
+
+def test_fomc_decision_from_the_target_rate():
+    db = DB(":memory:")
+    db.script("CREATE TABLE IF NOT EXISTS macro_first (series TEXT NOT NULL, d TEXT NOT NULL, v REAL NOT NULL, "
+              "PRIMARY KEY (series, d));")
+    days = [f"2024-09-{d:02d}" for d in range(10, 25)]
+    db.executemany("INSERT INTO macro_first VALUES('DFEDTARU',?,?)",
+                   [(d, 5.5 if d < "2024-09-19" else 5.0) for d in days])
+    hold, cut = _ts("2024-09-12") + 18 * 3600, _ts("2024-09-18") + 18 * 3600
+    ev = {e["t"]: e for e in el.fomc_events(db, [hold, cut])}
+    assert ev[cut]["cat"] == "aşağı" and ev[cut]["change"] == -50 and ev[hold]["cat"] == "yaxın"
