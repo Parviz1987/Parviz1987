@@ -18,6 +18,7 @@ const LANES = [
   { key: "act", name: "Qərar", ids: ["risk", "decision"] },
 ];
 const LANE_W = [1.25, 0.85, 1.7, 0.85, 0.85];          // relative lane widths on a wide screen
+const BRAIN_K = 0.6;                                     // the brain cloud at 60 % (owner 2026-11-26: the agents around it matter more)
 const BRAIN_IDS = ["strateq", "debate", "reader", "cards", "checker", "ta", "chartist"];   // their work makes the brain's neurons fire
 let NODES = [], live = {}, shown = {}, skew = 0, events = [], mode = "live";
 let nerveState = "SAKİT";
@@ -35,6 +36,7 @@ function ago(t) {
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const curState = () => (mode === "live" ? live : shown);
 const phone = () => matchMedia("(max-width:760px)").matches;
+if ($("hx") && !phone()) $("hx").open = true;     // the header's limits and sync rows: shown at once on a wide screen
 
 // ---------- the agents ("bots") ----------
 let BOTS = [], BY = {}, CORE = null;   // BY: id -> bot; CORE: the orchestrator, drawn as the brain
@@ -105,7 +107,7 @@ function layout(w, h) {
         g.forEach((b, k) => {
           b.x = cx + Math.cos(angs[k]) * R * 1.4;
           b.y = cy + Math.sin(angs[k]) * R * 1.95;
-          b.r = 13; b.maxW = Math.min(lw * 0.48, 118);
+          b.r = 15; b.maxW = Math.min(lw * 0.48, 118);
         });
       } else {
         const avail = h - top - bot, per = Math.max(1, Math.floor(avail / 70));
@@ -113,7 +115,7 @@ function layout(w, h) {
         g.forEach((b, k) => {
           b.x = zig ? cx + (k % 2 ? 1 : -1) * lw * 0.21 : cx;
           b.y = top + (k + 0.5) * avail / g.length - 8;
-          b.r = 13; b.maxW = Math.min(zig ? lw * 0.58 : lw * 0.92, 118);
+          b.r = 15; b.maxW = Math.min(zig ? lw * 0.58 : lw * 0.92, 118);
         });
       }
       x0 += lw;
@@ -161,7 +163,7 @@ function placeHits() {
   for (const b of BOTS) {
     const el = cards[b.id];
     if (!el) continue;
-    const s = b === CORE ? Math.round(R * 1.5) : 44;
+    const s = b === CORE ? Math.round(R * 1.5 * BRAIN_K) + 12 : 46;
     el.style.width = el.style.height = s + "px";
     el.style.left = Math.round(offX + b.x - s / 2) + "px";
     el.style.top = Math.round(offY + b.y - s / 2) + "px";
@@ -268,7 +270,7 @@ function glow(i, x, y, size, a) {
 }
 
 // ---------- couriers: one light per REAL event, from the event's source to its task ----------
-const MAXP = 60, DUR = 800;
+const MAXP = 80, DUR = 1150;             // owner 2026-11-26: the light should be easy to follow
 const P = { on: new Uint8Array(MAXP), a: new Array(MAXP).fill(null), b: new Array(MAXP).fill(null),
   s: new Int8Array(MAXP), t0: new Float64Array(MAXP), c: new Uint8Array(MAXP) };
 const Q = new Float64Array(2);
@@ -317,11 +319,12 @@ function drawPulses(tm) {
     const [ax, ay] = ends(P.a[i], b);
     ctrl(ax, ay, b.cx, b.cy, P.s[i]);
     const qx = Q[0], qy = Q[1];
-    for (let j = 7; j >= 0; j--) {     // a short fading tail behind the head
-      const v = u - j * 0.035;
+    for (let j = 12; j >= 0; j--) {    // a fading tail behind a bright head
+      const v = u - j * 0.028;
       if (v < 0) continue;
       const m = 1 - v, x = m * m * ax + 2 * m * v * qx + v * v * b.cx, y = m * m * ay + 2 * m * v * qy + v * v * b.cy;
-      glow(P.c[i], x, y, j ? 14 - j : 22, j ? 0.55 * (1 - j / 8) : 1);
+      glow(P.c[i], x, y, j ? 18 - j : 34, j ? 0.7 * (1 - j / 13) : 1);
+      if (!j) glow(P.c[i], x, y, 12, 1);
     }
   }
   cx.globalCompositeOperation = "source-over"; cx.globalAlpha = 1;
@@ -376,11 +379,11 @@ function drawBrain(t, dt, tm, st, base) {
   const coreFlash = Math.max(0, 1 - (tm - CORE.flashT) / 900);
   const pulse = Math.max(0, 1 - (tm - lastPulse) / 900);
   const breath = paused ? 1 : 1 + 0.018 * Math.sin(t * 1.1);
-  const S = R / (phone() ? 0.64 : 0.56) * breath * (1 + pulse * 0.03);
+  const S = R * BRAIN_K / (phone() ? 0.64 : 0.56) * breath * (1 + pulse * 0.03);
   // a soft halo in the nervous state's colour
-  const g = cx.createRadialGradient(ox, oy, R * 0.1, ox, oy, R * 1.7);
+  const g = cx.createRadialGradient(ox, oy, R * 0.05, ox, oy, R * 1.15);
   g.addColorStop(0, `rgba(${base},${0.16 + pulse * 0.12 + coreFlash * 0.12 + brainBusy * 0.04})`); g.addColorStop(1, "rgba(0,0,0,0)");
-  cx.fillStyle = g; cx.beginPath(); cx.arc(ox, oy, R * 1.7, 0, 7); cx.fill();
+  cx.fillStyle = g; cx.beginPath(); cx.arc(ox, oy, R * 1.15, 0, 7); cx.fill();
   // random firing only in proportion to the brain agents that really work right now
   if (!paused && brainBusy) {
     let want = brainBusy * 7 * dt;
@@ -417,9 +420,9 @@ function drawBrain(t, dt, tm, st, base) {
   // the orchestrator's name under the brain
   const so = st.orch || { status: "waiting" };
   cx.textAlign = "center"; cx.font = FONT_NAME; cx.fillStyle = "#e8eefc";
-  cx.fillText(CORE.l1[0], ox, oy + R * 1.12);
-  cx.font = FONT_SUB; cx.fillStyle = CORE.l2c; cx.fillText(CORE.l2, ox, oy + R * 1.12 + 13);
-  if (so.status === "error") { cx.fillStyle = COLOR.error; cx.beginPath(); cx.arc(ox + R * 0.9, oy - R * 0.8, 5, 0, 7); cx.fill(); }
+  cx.fillText(CORE.l1[0], ox, oy + R * 0.82);
+  cx.font = FONT_SUB; cx.fillStyle = CORE.l2c; cx.fillText(CORE.l2, ox, oy + R * 0.82 + 13);
+  if (so.status === "error") { cx.fillStyle = COLOR.error; cx.beginPath(); cx.arc(ox + R * 0.6, oy - R * 0.55, 5, 0, 7); cx.fill(); }
 }
 
 // ---------- the bots ----------
@@ -456,11 +459,19 @@ function drawBot(b, s, t, tm) {
   const x = b.cx, y = b.cy, r = b.r, ci = SIDX[s.status] ?? 0, col = COLOR[s.status] || COLOR.waiting;
   const flash = Math.max(0, 1 - (tm - b.flashT) / 850);
   cx.globalCompositeOperation = "lighter";
-  if (s.status === "working") glow(1, x, y, r * 4.2 * (paused ? 1 : 0.92 + 0.12 * Math.sin(t * 4 + b.ph)), 0.32);
+  glow(ci, x, y, r * 3.0, s.status === "waiting" ? 0.07 : 0.14);          // a faint halo: every agent is visible
+  if (s.status === "working") glow(1, x, y, r * 4.4 * (paused ? 1 : 0.92 + 0.12 * Math.sin(t * 4 + b.ph)), 0.36);
   if (s.status === "error") glow(3, x, y, r * 3.6, 0.3);
-  if (flash) glow(b.flashC, x, y, r * (3 + 3 * flash), flash * 0.9);
+  if (flash) glow(b.flashC, x, y, r * (3 + 4 * flash), flash);
   cx.globalCompositeOperation = "source-over"; cx.globalAlpha = 1;
-  cx.fillStyle = "rgba(9,16,32,.94)"; cx.beginPath(); cx.arc(x, y, r, 0, TAU); cx.fill();
+  if (flash > 0.02) {                  // the light has arrived: a ring bursts out of the agent
+    const [fr, fg, fb] = RGB[b.flashC];
+    cx.strokeStyle = `rgba(${fr},${fg},${fb},${flash * 0.85})`; cx.lineWidth = 1 + 2 * flash;
+    cx.beginPath(); cx.arc(x, y, r + 4 + (1 - flash) * 22, 0, TAU); cx.stroke();
+  }
+  const disc = cx.createRadialGradient(x - r * 0.35, y - r * 0.45, r * 0.1, x, y, r);
+  disc.addColorStop(0, "rgba(40,60,100,.96)"); disc.addColorStop(1, "rgba(8,14,28,.96)");
+  cx.fillStyle = disc; cx.beginPath(); cx.arc(x, y, r, 0, TAU); cx.fill();
   cx.lineWidth = 1.4; cx.strokeStyle = col; cx.globalAlpha = s.status === "waiting" ? 0.45 : 0.9;
   cx.beginPath(); cx.arc(x, y, r, 0, TAU); cx.stroke();
   cx.globalAlpha = 1;
@@ -533,9 +544,9 @@ function draw(tms) {
     let a = f.a ? 0.07 : 0.04, ci = 0;
     if (s === "working") { a = 0.2; ci = 1; }
     else if (s === "error") { a = 0.16; ci = 3; }
-    if (g > 0) { a = Math.max(a, 0.12 + 0.5 * g); ci = f.glowC; }
+    if (g > 0) { a = Math.max(a, 0.18 + 0.62 * g); ci = f.glowC; }
     const [r0, g0, b0] = ci ? RGB[ci] : [120, 170, 255];
-    cx.strokeStyle = `rgba(${r0},${g0},${b0},${a})`; cx.lineWidth = g > 0 ? 1 + g * 1.2 : 1;
+    cx.strokeStyle = `rgba(${r0},${g0},${b0},${a})`; cx.lineWidth = g > 0 ? 1 + g * 1.8 : 1;
     cx.beginPath(); cx.moveTo(ax, ay); cx.quadraticCurveTo(Q[0], Q[1], b.cx, b.cy); cx.stroke();
   }
   drawBrain(t, paused ? 0 : dt, tms, st, base);
