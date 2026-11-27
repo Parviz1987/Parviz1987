@@ -9,6 +9,7 @@ the shadow — nothing here reaches a live forecast; the owner decides on the re
    average absolute daily move in those days really larger than on other days, overall and year by year?"""
 from __future__ import annotations
 
+import bisect
 import json
 import math
 import time
@@ -204,11 +205,88 @@ def lead_lag(db: DB, symbol: str = "XAU") -> dict:
     return out
 
 
+# ---------- 5. news block: does a big news moment bring bigger moves? (a volatility flag, not a direction) ----------
+def _vol_compare(a: list[float], b: list[float], label: str) -> dict:
+    if len(a) < 20 or len(b) < 50:
+        return {"cases": len(a), "note": f"az məlumat ({len(a)} {label})"}
+    ma, mb = sum(a) / len(a), sum(b) / len(b)
+    va = sum((x - ma) ** 2 for x in a) / (len(a) - 1)
+    vb = sum((x - mb) ** 2 for x in b) / (len(b) - 1)
+    t = (ma - mb) / math.sqrt(va / len(a) + vb / len(b)) if va + vb > 0 else 0.0
+    return {"cases": len(a), "others": len(b), "ratio": round(ma / mb, 3) if mb else None, "t": round(t, 2),
+            "verdict": ("sonra tərpəniş daha böyükdür (t > 2): dalğalılıq bayrağı üçün namizəd" if t > 2 else
+                        "fərq sübut olunmayıb" if t > -2 else "sonra daha sakitdir (t < -2)")}
+
+
+def news_shock_vol(db: DB, symbols=("XAU", "XAG", "XPT", "XPD")) -> dict:
+    """NW-SHOCK-1 as a flag: the hour after a strength-3 headline about a metal, against the same hour of the day on
+    other days (the hour's own rhythm is taken out). Only the headline's arrival time is used."""
+    from . import candles
+    out = {}
+    for s in symbols:
+        try:
+            ts = [r["ts"] for r in db.execute("SELECT n.ts FROM news n JOIN news_ai a ON a.uid=n.uid WHERE a.strength=3 "
+                                              "AND (',' || a.metals || ',') LIKE ?", (f"%,{s},%",)).fetchall()]
+        except Exception:
+            ts = []
+        cs = candles.get(db, s, "1h", limit=4500)
+        if not cs:
+            out[s] = {"note": "şam yoxdur"}
+            continue
+        starts = [c["t"] for c in cs]
+        flagged = set()
+        for t in ts:
+            k = bisect.bisect_right(starts, t)       # the first hour that starts after the headline
+            if k < len(cs):
+                flagged.add(k)
+        a, b = [], []
+        hour_of = {}
+        for i in range(1, len(cs)):
+            if cs[i - 1]["c"] <= 0 or cs[i]["c"] <= 0:
+                continue
+            m = abs(math.log(cs[i]["c"] / cs[i - 1]["c"]))
+            hour_of.setdefault(int(cs[i]["t"] // 3600 % 24), []).append((i in flagged, m))
+        for rows in hour_of.values():         # each flagged hour against the unflagged same hour of day
+            base = [m for f, m in rows if not f]
+            mb = sum(base) / len(base) if base else 0
+            for f, m in rows:
+                if mb > 0:
+                    (a if f else b).append(m / mb)
+        out[s] = _vol_compare(a, b, "böyük xəbər saatı")
+    return out
+
+
+def geo_shock_vol(db: DB, symbols=("XAU", "XAG", "XPT", "XPD")) -> dict:
+    """The library's geopolitical days (GDELT jump): the next trading day's move against all other days."""
+    from . import candles, eventlib
+    days, vals = eventlib._geo_series(db)
+    shock = set()
+    for i, d in enumerate(days):
+        j = eventlib.geo_jump(vals, i)
+        if j is not None and j >= eventlib.GEO_CATS["orta"]:
+            shock.add(datetime.fromisoformat(d).date())
+    out = {"shock_days": len(shock), "covered_days": len(days)}
+    for s in symbols:
+        cs = candles.get(db, s, "1d", limit=4000)
+        a, b = [], []
+        for i in range(1, len(cs)):
+            if cs[i - 1]["c"] <= 0 or cs[i]["c"] <= 0:
+                continue
+            d = datetime.fromtimestamp(cs[i]["t"] + candles.SESSION_SHIFT, timezone.utc).date()
+            if days and not (days[0] <= d.isoformat() <= days[-1]):
+                continue
+            prev = d - timedelta(days=1 if d.weekday() else 3)       # the shock day before this trading day
+            m = abs(math.log(cs[i]["c"] / cs[i - 1]["c"]))
+            (a if prev in shock else b).append(m)
+        out[s] = _vol_compare(a, b, "gərginlik günündən sonrakı gün")
+    return out
+
+
 def run(db: DB) -> dict:
     t0 = time.time()
     out: dict = {"computed": None}
     for name, fn in (("fa_window", fa_window), ("festival_vol", festival_vol), ("unfamiliar", unfamiliar),
-                     ("lead_lag", lead_lag)):
+                     ("lead_lag", lead_lag), ("news_shock_vol", news_shock_vol), ("geo_shock_vol", geo_shock_vol)):
         try:
             out[name] = fn(db)
         except Exception as e:          # one experiment failing never stops the other

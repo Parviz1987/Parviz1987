@@ -78,3 +78,32 @@ def test_unfamiliar_and_lead_lag_run_and_find_a_planted_lead():
     out = shadowtests.lead_lag(db)
     assert out["DXY"]["lead_t"] > 3 and "əvvəl" in out["DXY"]["verdict"]
     assert "note" in shadowtests.unfamiliar(db)                       # no daily candles here: says so, no crash
+
+
+def test_news_and_geo_shock_volatility_tests():
+    import math as _m
+    import random as _r
+    from app import eventlib, shadowtests
+    from app.db import DB
+    db = DB(":memory:")
+    _r.seed(5)
+    t0 = 1_700_000_000 // 86400 * 86400
+    # 1-hour candles: after each «big news» hour the next hour moves 3x more
+    db.script("CREATE TABLE IF NOT EXISTS news (uid TEXT PRIMARY KEY, source TEXT, url TEXT, title TEXT, ts REAL, "
+              "metals TEXT); CREATE TABLE IF NOT EXISTS news_ai (uid TEXT PRIMARY KEY, ts REAL, event TEXT, metals TEXT, "
+              "direction TEXT, strength INTEGER, how TEXT);")
+    c, rows, news = 100.0, [], []
+    for i in range(3000):
+        t = t0 + i * 3600
+        big = i % 50 == 1
+        c *= _m.exp(_r.gauss(0, 0.006 if big else 0.002))
+        rows.append(("XAU", "1h", t, c, c, c, c))
+        if i % 50 == 0:
+            news.append((f"n{i}", "x", "", "t", t + 600, "XAU"))
+    db.executemany("INSERT INTO candles(symbol, tf, t, o, h, l, c) VALUES(?,?,?,?,?,?,?)", rows)
+    db.executemany("INSERT INTO news VALUES(?,?,?,?,?,?)", news)
+    db.executemany("INSERT INTO news_ai VALUES(?,?,?,?,?,?,?)", [(n[0], n[4], "", "XAU", "up", 3, "") for n in news])
+    r = shadowtests.news_shock_vol(db, ("XAU",))["XAU"]
+    assert r["cases"] >= 50 and r["t"] > 2 and r["ratio"] > 1.5
+    eventlib.ensure(db)
+    assert "shock_days" in shadowtests.geo_shock_vol(db, ("XAU",))

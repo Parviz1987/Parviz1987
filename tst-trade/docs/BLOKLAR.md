@@ -104,7 +104,9 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   əlaqəli xəbər işləyir (Groß-Klußmann & Hautsch) ✓ metalı olmayan etiket sayılmır; LLM lüğətdən xeyli dəqiqdir;
   qızıl üçün 1 saat–1 gün xəbər proqnozunun kənar sınaqda sübutu tapılmayıb — sübutu bizim Hakim verəcək.
 - **Nə qalıb:** (a) qaydaların öz qeydi yığılmalıdır (çəki yalnız müsbət qeydlə); (b) NW-SHOCK-1-i istiqamət yox,
-  dalğalılıq/gözlə işarəsinə çevirmək — kölgədə ölçüldükdən sonra; (c) gündəlik geosiyasi risk indeksi (GPR) —
+  dalğalılıq/gözlə işarəsinə çevirmək — **kölgə ölçüsü qurulub (27.11):** `shadowtests.news_shock_vol` (böyük xəbərdən
+  sonrakı saat, günün eyni saatı ilə) və `geo_shock_vol` (GDELT gərginlik günündən sonrakı gün); gündə bir, diag
+  `experiments`; t > 2 çıxsa bayraq təklif olunur; (c) gündəlik geosiyasi risk indeksi (GPR) —
   lisenziya aydınlaşanda; (d) agentlər: Gemini açarı saxlanıb ✅, ilk uğurlar yoxlanacaq.
 
 ### 4. Bazarlar arası — `cross` 🟡
