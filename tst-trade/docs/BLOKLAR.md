@@ -11,7 +11,7 @@
 > `judge_canary`, `heartbeat`, `ops`. Növbətçi təlimatı `.claude/skills/temirci/SKILL.md`, səhvlər
 > `docs/monitor/sehvlerim.md`, jurnal `docs/monitor/jurnal.md`.
 >
-> Son yeniləmə: **2026-11-26 22:00 NY** (Claude). Vəziyyət işarələri: ✅ hazır və işləyir · 🟡 qurulub, sübut/məlumat
+> Son yeniləmə: **2026-11-27 11:15 NY** (Claude; iş planı `docs/PLAN-27.11.md`). Vəziyyət işarələri: ✅ hazır və işləyir · 🟡 qurulub, sübut/məlumat
 > gözləyir · 🔧 qismən, işi var · ⛔ yoxdur / dayandırılıb · 👤 sahibin addımı lazımdır.
 
 ---
@@ -103,6 +103,8 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 - **Araşdırma (docs/research, 26.11):** mənfi xəbər güclüdür (Smales 2014/2015) ✓ bizdə 1,5x; yalnız yüksək
   əlaqəli xəbər işləyir (Groß-Klußmann & Hautsch) ✓ metalı olmayan etiket sayılmır; LLM lüğətdən xeyli dəqiqdir;
   qızıl üçün 1 saat–1 gün xəbər proqnozunun kənar sınaqda sübutu tapılmayıb — sübutu bizim Hakim verəcək.
+- **27.11:** Benzinga (Alpaca) yalnız metal ETF tikerləri ilə soruşulurdu — 48 saatda 0 başlıq, amma «ok» deyirdi; indi
+  ümumi axından da (yalnız metal adı keçənlər). Google News-un «429 çox sorğu» deyən axını 15→30→60 dəq dincəlir.
 - **Nə qalıb:** (a) qaydaların öz qeydi yığılmalıdır (çəki yalnız müsbət qeydlə); (b) NW-SHOCK-1-i istiqamət yox,
   dalğalılıq/gözlə işarəsinə çevirmək — **kölgə ölçüsü qurulub (27.11):** `shadowtests.news_shock_vol` (böyük xəbərdən
   sonrakı saat, günün eyni saatı ilə) və `geo_shock_vol` (GDELT gərginlik günündən sonrakı gün); gündə bir, diag
@@ -129,6 +131,8 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   artırır, istiqaməti yox.
 - **Kölgə nəticəsi (26.11):** bayram öncəsi dalğalılıq fərqi **sübut olunmayıb** (XAU 1,09x, t=0,88, 8 ilin 3-ündə
   yüksək; XAG 1,02x) → aralıq dəyişmir. Hadisə tarixləri: FOMC gəlir; FRED tarixləri səhvi 26.11 düzəldildi.
+- **27.11 (plan 3.2):** `season` və `jewel` səsləri **pensiyaya** (7 gündə canlı fikir yox; sahibin 5.1-1 qərarı ilə onlar
+  dalğalılıq bayrağıdır, `festival_vol` kölgədə ölçülür). Məlumatları silinmir (təmizlik yalnız 26.11 siyahısını silir).
 - **Nə qalıb:** heç nə (kölgə ölçməyə davam edir).
 
 ### 6. AI beyinlər — `brain` 🟡
@@ -142,9 +146,16 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 - **Quruldu (26.11):** `app/braintrial.py` — təklif olunan yeni model 20 sabit tapşırıqla sınanır; sahibin qabaqcadan
   icazə qaydası (eyni şirkət + sınaq aşağı deyil + qiymət ≤ +20 %) saatda bir tətbiq olunur, qalanı Admin-də kart.
   Aylıq beyin hesabatı diag `agents.router.month`.
+- **27.11 (plan 3.3, sahib təsdiqlədi):** İkinci analitik və müzakirə hər saat yox, **4 saatda bir** (383 və 93 fikirdə
+  şansdan fərq yox, ayın 89 $ beyin xərcinin 36 $-ı). Qrafik analitikinin ehtiyat modeli «39-dan 2» — bu, 26.11 21:22 NY
+  düzəldilən cavab kəsilməsi idi, o vaxtdan səhv yoxdur. Gemini: müvəqqəti xətada sınaq 6 saatdan bir təkrar (3 dəfə);
+  yeni modelin qiyməti məlum deyil → qərar sahibindədir; məlumat agentləri ehtiyat beyinlə işləyir.
 - **Nə qalıb:** 1 həftəlik kölgə (10 %) rejimi yeni model üçün — sınaq sürüşündən sonra əlavə addım (sonraya).
 
 ### 7. Birləşdirmə: vahid proqnoz, tərəzi, konsensus ✅
+- **27.11 (plan 3.1):** önə yalnız **vahid proqnoz** («sistemin son sözü»): Panelin «Analitiklər nə deyir» bölməsi və
+  «Nəticələr»in 7 günlük hesabı onu göstərir; konsensus və tərəzi arxada ölçülür (Hakim, Analitiklər səhifəsi).
+  Seçici konsensus sübutlu üsullardan asılı deyil — ən azı iki ailə razı, heç biri əks olanda danışır.
 - `app/unified.py` (onlayn logistik reqressiya, walk-forward öz-özünü sınaq, blok dəyəri testi — `unified:ablation`),
   `app/learning.py` (Hedge, tərəzi). Vahid proqnoz Hakimdə `vahid` kimi ölçülür.
 
@@ -174,6 +185,14 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   görə həddi Hakim həftəlik öz yoxlamasında özü qoyur (10–15 bənd, hamarlanmış; `judgeplus.delta`). 26.11 16:46 NY
   yoxlaması bu koddan əvvəl idi — növbəti həftəlik yoxlamada `judge_canary.margin` görünməlidir.
 - **Qorunan fayllar** (`deploy/protected.txt`): dəyişiklik yalnız `Sahib-təsdiqi:` sətri ilə serverə düşür.
+- **27.11 (plan 2.1, sahib təsdiqlədi):** öz yoxlamasında 30 % gələcəyə baxan saxta qayda (64 %) nəticə həddinin (10–15
+  bənd) altında qalır — nəticəyə görə tutmaq prinsipcə mümkün deyil. «Boz zona + gecikmə testi» sınandı, ikinci göz
+  göstərdi ki, qısa üfüqlərdə həqiqi tez sönən üstünlüyü həmişəlik rədd edər — atıldı. Yerinə: hər proqnozun **yazılma
+  vaxtı** (`forecasts.created_ts`) qeyd olunur; son sınaq və qeydə alınmış sınaqlar yalnız hədəf vaxtından ƏVVƏL
+  yazılanları sayır (nəticədən asılı olmayan qoruyucu).
+- **27.11 (plan 3.4, sahib təsdiqlədi): Q ailəsi** — qızıl, 1 saat: Q1 qaydalar, Q2 vahid proqnoz, Q3 qrafik analitiki;
+  qeyd 27.11 13:00 NY, hədd 0,05/3, pulla (tam xərcdən sonra), V ailəsi ilə eyni üsul. Niyə: V əsasən həftə/ay
+  üfüqüdür (illər), 1 saatda hər saat bir hal — ən tez dürüst cavab. «Nəticələr»in başında V ilə birlikdə.
 
 - **Avtomatik Hakim siyasəti (sahib 26.11 bir dəfə təsdiqlədi, `app/autojudge.py`, qorunur):** hər üsula 0–100 bal
   (ən zəif hissə: xərcdən sonrakı nəticə, bazarın meylinə qarşı bacarıq, sabitlik, müstəqil hal sayı, DSR; son 100
@@ -203,6 +222,9 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 - 12 yoxlama (təcili: panel, qiymət, backup, deploy; qalanı e-poçt icmalı), bazar saatı New York vaxtı, bayram/qısa
   günlər sakit, 3 pis nümunədən sonra «fail»; GitHub Actions saatlıq ehtiyat yoxlama (`.github/workflows/outside-check.yml`).
 - 👤 **Açar lazımdır** (aşağıda «Sahibin işləri» 2).
+- **27.11:** GitHub-un «saatlıq» ehtiyat yoxlaması faktiki nizamsızdır (GitHub onu 22 saatda 2 dəfə işə salıb). Əsas kənar
+  göz — 3 saatlıq növbətçi yoxlama: hər dəfə **təzə sessiyada** (`trig_01VQ4otCpmwHSbgWngdMWzpY`), telefona xəbər; ilk iş
+  27.11 10:47 NY uğurlu.
 
 ### 16. Avtomatik təmir — `app/repair.py`, `app/ops.py` ✅
 - Kataloq: qiymət ehtiyat mənbəyi 30 dəq, WAL sıxma, mühərriki yenidən başlatmaq; limitlər, jurnal `ops_actions`,
@@ -229,6 +251,10 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 ### 21. Blokların gündəlik yoxlaması — `app/blockaudit.py` ✅
 - Hər blok: mənbələr, qayda işə düşmələri, səsin fikirləri, Hakim, blokun dəyəri, vəziyyət asılılığı → «sağlam /
   zəif / qırıq» (diag `blocks_audit`). **Hər blok işindən əvvəl buna bax.**
+- **27.11:** saatda bir yenilənir (gündə bir idi: Xəbəri düzəlişdən 17 saat sonra da «qırıq» göstərirdi); 14 mln sətri tam
+  oxuyan sorğu indekslə bir sorğuya endi. **Əlaqə xəritəsi** (diag `pipeline`, Admin → Sistem): hər analitikin səsi
+  (susan / fikri olmayan), hər mənbə ayrıca (yalançı «ok», qismən xəta), beyinlərin cavabı, Hakimin öz yoxlaması,
+  sahibi gözləyənlər («sizin addımınızı gözləyir» — heç vaxt «işləyir» yox), cədvəllərin təzəliyi.
 
 ### 22. Hadisələr kitabxanası — `app/eventlib.py` 🟡 (27.11)
 - **Nə edir:** keçmiş ABŞ rəqəmləri (CPI, NFP, ÜDM, PCE) və Fed qərarları; hər hadisədə o an bilinən (ALFRED ilk

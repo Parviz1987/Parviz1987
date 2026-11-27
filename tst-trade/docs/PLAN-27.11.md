@@ -66,7 +66,7 @@
 - [x] 4.3 Hər səhifə 1366 və 390 ölçüdə şəkil, brauzer xətası yox, hər düymə basılıb.
 
 ## Mərhələ 5 — sənədlər və hesabat
-- [ ] 5.1 `BLOKLAR.md`, `SOHBET-TARIXCESI.md`, `IS-PLANI.md` yenilənir.
+- [x] 5.1 `BLOKLAR.md`, `SOHBET-TARIXCESI.md`, `IS-PLANI.md` (5.3), `monitor/sehvlerim.md` yeniləndi.
 - [ ] 5.2 Sahibə yekun: nə edildi, necə yoxlandı, nə qaldı.
 
 ## Sahibsiz qalanlar (sistem onsuz işləyir)
@@ -86,5 +86,6 @@
 - 27.11 10:48 — Mərhələ 2 bitdi (2.1 başqa yolla), 3.2 və 3.3 bitdi. Mövsüm/zərgərlik məlumatı silinmir (təmizlik yalnız 26.11 siyahısı).
 - 27.11 10:58 — 3.4 və 3.5 bitdi: Q1–Q3 qeydə alındı (13:00 NY-dən sayılır); qeydə alınmış sınaqlar da yalnız vaxtında
   yazılmış proqnozları sayır. 3.1 (birləşdiricilər arxaya) saytın önü ilə birlikdə (Mərhələ 4).
-- 27.11 11:35 — Mərhələ 4: 13 səhifə 1366 və 390-da, brauzer xətası 0; 10 səhifədə hər görünən düymə basıldı (Admin xaric — ayar
+- 27.11 11:07 — Mərhələ 4: 13 səhifə 1366 və 390-da, brauzer xətası 0; 10 səhifədə hər görünən düymə basıldı (Admin xaric — ayar
   dəyişir), xəta 0; yığılmış bölmələr açılanda qrafik ölçüsü sıfır qalmır.
+- 27.11 11:20 — 5.1: sənədlər yeniləndi. Növbətçi yoxlama 10:47-də təzə sessiyada uğurla işlədi (sakit, commit yoxdur).

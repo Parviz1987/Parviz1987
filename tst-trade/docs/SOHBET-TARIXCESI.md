@@ -90,8 +90,15 @@ sübutu ilə**. Sübut olmayan heç nə pula (hətta kağız ticarətə) getmir.
      verənlər jurnal üzərində («qalxacaq dedi — qalxdı»); eyni alətlər bir yerə; səhifədə boş/dolu tərəflər (solda boş,
      aşağıda sıx) düzəlsin; «baxanda başa düşmək olsun».
 
+- **27.11 10:20 NY sahib planı təsdiqlədi** («BAŞLA, HAMISINI DAYANMADAN BİTİR»): tam siyahı və jurnal `docs/PLAN-27.11.md`,
+  qərarlar `IS-PLANI.md` 5.3. Sahibin sualları: «hədəfə çatmaq üçün köhnə sessiyanın xətası nə olub» — cavab
+  `monitor/sehvlerim.md`-də (çox qurmaq, az yoxlamaq; sayt mühəndis üçün; yoxlamadan «hazırdır»); «sən saytda işləyə
+  bilirsənmi» — bəli, kod → sınaq serveri → server budağı → diag ilə yoxlama; canlı sayta sahibin parolu ilə girmirəm.
+  Sahib sessiyanı layihəyə (Projects) köçürməyi soruşdu — yol: sessiyanın menyusu → **Continue in project**; köçürsə,
+  növbətçi yoxlama təzə sessiyada olduğu üçün ona bağlı deyil.
+
 ## 6. Açıq işlər
-- **Sahibin:** 2FA; Healthchecks.io açarı; Admin → Əməliyyatlar → WAL araşdırma kartını bağlamaq; Gemini model
+- **Sahibin:** 2FA; Healthchecks.io açarı; R2 (istəyə bağlı, pul); Admin → Əməliyyatlar → WAL araşdırma kartını bağlamaq; Gemini model
   təklifi (`gemini-2.5-flash` bağlanıb, `gemini-3.8-flash` sınağı Google-un 503-ü ilə alınmayıb; Admin → Beyinlər).
 - **Claude-un:** 3 saatlıq növbətçi yoxlama (temirci) — 27.11 10:33 NY **hər dəfə təzə sessiyada** başlayır
   (`trig_01VQ4otCpmwHSbgWngdMWzpY`), həftəlik hesabat da (`trig_01ATe3NLPyGeK2h81xVAUUSn`) — ilişmiş sessiyadan asılı

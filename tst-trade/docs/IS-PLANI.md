@@ -278,3 +278,14 @@ Sahib 12 addımı bir-bir müzakirə edib təsdiqlədi («12 keç»). Plan səhi
 2. **Gecə dərsləri dayandırılır** (526 halda fayda yoxdur: 44,5 % və 44,9 %): beyin pulu xərclənmir; yerinə addım 11-in
    beyinsiz səhv yarılması.
 3. **Fundamental çəkilər** son 2–3 ilin hərəkət edən pəncərəsi ilə yenidən hesablanır (2022 qırılması) — əvvəl kölgədə.
+
+### 5.3 İş planı 27.11 (sahib, 27.11.2026: «Bəli, bunları eləyə bilərsən» + 10:20 NY «BAŞLA, HAMISINI DAYANMADAN BİTİR»)
+Tam yoxlama siyahısı və jurnal: `docs/PLAN-27.11.md`. Qərarlar:
+1. **Artıqları çıxarmaq** — «çıxarmaq» = ekrandan və birləşmədən çıxır; kod və məlumat silinmir (sahib: «silmək lazım
+   deyil, arxada işləsin»). İcra: `season`, `jewel` pensiyaya; konsensus/tərəzi arxada, önə vahid proqnoz.
+2. **Sınaqları daraltmaq** — Q ailəsi (qızıl, 1 saat: qaydalar, vahid, qrafik analitiki), qeyd 27.11 13:00 NY, hədd 0,05/3.
+3. **İkinci analitik və müzakirə seyrək** — 4 saatda bir (pula qənaət).
+4. **Hakimin 30 % yoxlaması** — nəticə həddi dəyişmədi (siyasət); əlavə qoruyucu: yazılma vaxtı hədəfdən sonra olan
+   proqnoz son sınaqda sayılmır.
+5. **Sahibsiz işləmək** — R2, Healthchecks, 2FA, Gemini onsuz da sistem işləyir; hər yerdə «sizin addımınızı gözləyir»
+   kimi göstərilir. Növbətçi yoxlama hər dəfə təzə sessiyada; iş planı ilişsə (jurnal 6 saatdan köhnə), növbətçi davam etdirir.
