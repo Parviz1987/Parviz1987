@@ -205,7 +205,7 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
             broken.append(f"{sid} ({str(h.get('message') or '')[:60]})")
         elif h.get("checked") and now - h["checked"] > STALE_SOURCE:
             stale.append(f"{sid} {(now - h['checked']) / 3600:.0f} saat")
-        elif "xəta" in str(h.get("message") or ""):
+        elif "xəta" in str(h.get("message") or "") or "limitə görə" in str(h.get("message") or ""):
             partial.append(f"{sid} ({str(h['message']).split('xəta:', 1)[-1].strip()[:70]})")
         elif sid in NEWS_SOURCES and not h.get("rows") and open_ and not _short_day(now):
             empty.append(f"{sid} ({str(h.get('message') or '')[:50]})")

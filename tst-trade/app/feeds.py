@@ -482,18 +482,30 @@ class Feeds:
         return r.content
 
     async def news(self, client) -> None:
-        now, total, errors = time.time(), 0, []
+        now, total, errors, resting = time.time(), 0, [], []
+        backoff = getattr(self, "_news_backoff", None)
+        if backoff is None:
+            backoff = self._news_backoff = {}
         for name, url in NEWS_FEEDS:
+            until, wait = backoff.get(name, (0.0, 0.0))
+            if now < until:            # 27.11: Google News answered «429 too many» to one query every 2 minutes;
+                resting.append(f"{name} {round((until - now) / 60)} dəq")   # asking again at once only kept it angry
+                continue
             try:
                 items = [i for i in parse_feed(await self._get(client, url), name) if now - i["ts"] < NEWS_MAX_AGE]
                 self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals) "
                                     "VALUES(:uid, :source, :url, :title, :ts, :metals)", items)
                 total += len(items)
+                backoff.pop(name, None)
             except Exception as e:   # one feed failing must not cost the others
                 errors.append(f"{name}: {e}")
+                if "HTTP 429" in str(e):           # wait 15, 30, then 60 minutes before asking that feed again
+                    wait = min(3600.0, max(900.0, 2 * wait))
+                    backoff[name] = (now + wait, wait)
         self.db.execute("DELETE FROM news WHERE ts < ?", (now - NEWS_KEEP,))
         ok = len(errors) < len(NEWS_FEEDS)
-        self._health("rss", ok, f"{total} başlıq" + (f"; xəta: {'; '.join(errors)}" if errors else ""), total)
+        self._health("rss", ok, f"{total} başlıq" + (f"; xəta: {'; '.join(errors)}" if errors else "") +
+                     (f"; limitə görə gözləyir: {', '.join(resting)}" if resting else ""), total)
         from . import heartbeat              # the outside watcher: news is «down» after 3 failed rounds in a row
         bad = 0 if ok else int(self.db.get("hc:news_bad") or 0) + 1
         self.db.put("hc:news_bad", str(bad))
@@ -1017,14 +1029,21 @@ class Feeds:
         if not creds:
             return
         try:
-            data = await self._get(client, ALPACA_URL, params={"symbols": ",".join(ALPACA_SYMBOLS), "limit": "50",
-                                                               "sort": "desc"},
-                                   headers={**UA, "APCA-API-KEY-ID": creds.get("key_id", ""),
-                                            "APCA-API-SECRET-KEY": creds.get("secret", "")})
-            items = [i for i in parse_alpaca(data) if time.time() - i["ts"] < NEWS_MAX_AGE]
+            hdr = {**UA, "APCA-API-KEY-ID": creds.get("key_id", ""), "APCA-API-SECRET-KEY": creds.get("secret", "")}
+            # 27.11: asked only for the metal ETFs' tickers, Benzinga gave 0-2 headlines in 48 hours (the source said
+            # «ok» while bringing nothing). Now also its latest headlines of any kind, kept only when they name a metal
+            # (ticker or word), each minute — the same filter as every other news source
+            items: dict[str, dict] = {}
+            for params in ({"symbols": ",".join(ALPACA_SYMBOLS), "limit": "50", "sort": "desc"},
+                           {"limit": "50", "sort": "desc"}):
+                data = await self._get(client, ALPACA_URL, params=params, headers=hdr)
+                for i in parse_alpaca(data):
+                    if i["metals"] and time.time() - i["ts"] < NEWS_MAX_AGE:
+                        items[i["uid"]] = i
             self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals) "
-                                "VALUES(:uid, :source, :url, :title, :ts, :metals)", items)
-            self._health("alpaca", True, f"{len(items)} başlıq (son 48 saat)", len(items))
+                                "VALUES(:uid, :source, :url, :title, :ts, :metals)", list(items.values()))
+            fresh = sum(1 for i in items.values() if time.time() - i["ts"] < 86400)
+            self._health("alpaca", True, f"{len(items)} metal başlığı (son 48 saat), {fresh} son 24 saatda", len(items))
         except Exception as e:
             msg = str(e)
             for v in creds.values():

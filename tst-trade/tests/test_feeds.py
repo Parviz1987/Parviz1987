@@ -89,3 +89,54 @@ def test_parse_alpaca_maps_fund_symbols_to_metals():
     assert a["uid"] == "alp:7" and a["metals"] == "XAU" and a["url"].startswith("https://")
     assert b["metals"] == "XAG,XPD" and b["url"] == ""
 
+
+
+def test_alpaca_keeps_metal_headlines_from_the_general_stream_too():
+    # 27.11: asked only for the metal ETFs' tickers, Benzinga brought 0 headlines in 48 hours while saying «ok»
+    import asyncio
+    import json as _json
+    import time as _time
+    from datetime import datetime, timezone
+    from app.db import DB
+    from app.feeds import Feeds
+    from app.keys import KeyStore
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    ks.set("alpaca", {"key_id": "a", "secret": "b"})
+    f = Feeds(db, ks)
+    iso = datetime.fromtimestamp(_time.time() - 600, timezone.utc).isoformat().replace("+00:00", "Z")
+    general = {"news": [{"id": 1, "headline": "Gold climbs as the dollar slips", "created_at": iso, "symbols": []},
+                        {"id": 2, "headline": "Apple unveils a phone", "created_at": iso, "symbols": ["AAPL"]}]}
+    calls = []
+
+    async def fake_get(client, url, headers=None, **kw):
+        calls.append(kw.get("params"))
+        return _json.dumps(general if "symbols" not in kw["params"] else {"news": []}).encode()
+    f._get = fake_get
+    asyncio.run(f.alpaca(None))
+    titles = [r["title"] for r in db.execute("SELECT title FROM news").fetchall()]
+    assert titles == ["Gold climbs as the dollar slips"]
+    assert len(calls) == 2 and f.health("alpaca")["rows"] == 1
+
+
+def test_a_news_feed_that_says_429_rests_instead_of_being_asked_every_2_minutes():
+    import asyncio
+    from app import feeds as fm
+    from app.db import DB
+    from app.feeds import Feeds
+    from app.keys import KeyStore
+    db = DB(":memory:")
+    f = Feeds(db, KeyStore(db, "s" * 64))
+    asked = []
+
+    async def fake_get(client, url, headers=None, **kw):
+        asked.append(url)
+        if url == fm.NEWS_FEEDS[1][1]:
+            raise ValueError("HTTP 429")
+        return b"<rss><channel></channel></rss>"
+    f._get = fake_get
+    asyncio.run(f.news(None))
+    n_first = asked.count(fm.NEWS_FEEDS[1][1])
+    asyncio.run(f.news(None))                       # two minutes later: the angry feed is not asked again
+    assert n_first == 1 and asked.count(fm.NEWS_FEEDS[1][1]) == 1
+    assert "limitə görə gözləyir" in f.health("rss")["message"]

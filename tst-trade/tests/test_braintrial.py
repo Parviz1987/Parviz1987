@@ -71,3 +71,34 @@ def test_owner_rejecting_during_the_trial_wins():
         llm.PRICES.update(prices)
     assert done == [] and brains.config(db, "reader")["model"] == "gemini-2.5-flash"
     assert "rədd" in json.loads(db.get("llm:proposals"))["gemini:gemini-2.5-flash"]["status"]
+
+
+def test_a_trial_the_provider_was_too_busy_for_is_tried_again_later_but_not_for_ever():
+    # 27.11: Google answered the only trial of gemini-3.8-flash with «503 high demand»; the card then waited for ever
+    db = DB(":memory:")
+    brains.save(db, "reader", {"provider": "gemini", "model": "gemini-2.5-flash"})
+    llmrouter.Router(db).failed("gemini", "gemini-2.5-flash", "model", None, "k", "gone", "gemini-3.8-flash")
+    props = json.loads(db.get("llm:proposals"))
+    props["gemini:gemini-2.5-flash"]["trial"] = {"ok": False, "score": 0.0, "ts": 0,
+                                                 "error": "Gemini: HTTP 503: This model is currently experiencing high demand"}
+    db.put("llm:proposals", json.dumps(props))
+
+    class K:
+        def first(self, p):
+            return "k"
+
+    async def ask(provider, key, model, system, user, schema, max_tokens):
+        return perfect(), 1000, 500
+    real, prices = llm.ask, dict(llm.PRICES)
+    llm.ask = ask
+    llm.PRICES.update({"gemini-2.5-flash": (0.3, 2.5), "gemini-3.8-flash": (0.33, 2.7)})
+    try:
+        done = asyncio.run(bt.handle_proposals(db, K()))
+    finally:
+        llm.ask = real
+        llm.PRICES.clear()
+        llm.PRICES.update(prices)
+    assert done and brains.config(db, "reader")["model"] == "gemini-3.8-flash"
+    p = {"trial": {"ok": False, "ts": 0, "error": "HTTP 503"}, "trial_attempts": 3}
+    assert not bt._retry_due(p, 1e10)                                  # three tries are enough
+    assert not bt._retry_due({"trial": {"ok": False, "ts": 0, "error": "HTTP 404 no such model"}}, 1e10)

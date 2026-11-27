@@ -83,7 +83,7 @@ async def trial(db: DB, provider: str, model: str, key: str) -> dict:
     except Exception as e:
         res = {"score": 0.0, "usd": 0.0, "ok": False,                     # mask the key BEFORE cutting the text
                "error": (str(e) or type(e).__name__).replace(key, "***")[:160],
-               "note": "sınaq alınmadı: təkrar edilmir, qərar sahibindədir"}
+               "note": "sınaq alınmadı: müvəqqəti xətadırsa 6 saatdan sonra yenə (ən çox 3 dəfə), yoxsa qərar sahibindədir"}
     res.update({"provider": provider, "model": model, "seconds": round(time.time() - t0, 1), "ts": time.time()})
     scores = json.loads(db.get("braintrial:scores") or "{}")
     scores[f"{provider}:{model}"] = res
@@ -109,14 +109,30 @@ def preapproved(db: DB, provider: str, old: str, new: str, new_res: dict) -> tup
     return True, f"sınaq {new_res['score']} ≥ {bar}, qiymət ≤ +20 %"
 
 
+TRANSIENT = ("HTTP 429", "HTTP 500", "HTTP 502", "HTTP 503", "HTTP 504", "high demand", "Timeout", "timed out",
+             "overloaded")
+RETRY_AFTER, RETRY_MAX = 6 * 3600, 3
+
+
+def _retry_due(p: dict, now: float) -> bool:
+    """A trial the provider could not run for a passing reason (busy, a timeout) is tried again later — 27.11: the new
+    Gemini model's only trial hit Google's «high demand» 503 and the proposal then waited for the owner for ever."""
+    t = p.get("trial") or {}
+    if t.get("ok") or int(p.get("trial_attempts") or 1) >= RETRY_MAX:
+        return False
+    return any(x in str(t.get("error") or "") for x in TRANSIENT) and now - float(t.get("ts") or 0) > RETRY_AFTER
+
+
 async def handle_proposals(db: DB, keys) -> list[str]:
     """For each waiting proposal: one trial; if the owner's rule holds, apply it (and say so); else leave the card."""
     from . import llmrouter
     props = json.loads(db.get("llm:proposals") or "{}")
     done = []
+    now = time.time()
     for k, p in props.items():
-        if not str(p.get("status", "")).startswith("sahibin") or p.get("trial"):
+        if not str(p.get("status", "")).startswith("sahibin") or (p.get("trial") and not _retry_due(p, now)):
             continue
+        attempts = int(p.get("trial_attempts") or (1 if p.get("trial") else 0)) + 1
         key = keys.first(p["provider"]) if keys is not None else None
         if not key:
             continue
@@ -125,9 +141,10 @@ async def handle_proposals(db: DB, keys) -> list[str]:
         # the owner may have decided while the trial ran (up to 90 s): re-read and touch only this proposal
         fresh = json.loads(db.get("llm:proposals") or "{}")
         cur = fresh.get(k)
-        if not cur or not str(cur.get("status", "")).startswith("sahibin") or cur.get("trial"):
+        if not cur or not str(cur.get("status", "")).startswith("sahibin") or \
+                (cur.get("trial") and not _retry_due(cur, now)):
             continue
-        cur["trial"], cur["rule"] = res, why
+        cur["trial"], cur["rule"], cur["trial_attempts"] = res, why, attempts
         db.put("llm:proposals", json.dumps(fresh, ensure_ascii=False))
         if ok:
             out = llmrouter.decide(db, keys, "approve", p["provider"], p["old"])
