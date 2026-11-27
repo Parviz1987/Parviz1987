@@ -17,7 +17,7 @@
   <button class="btn pri sm" id="install" hidden>Telefona yüklə</button>
 <nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
 </header>
-<nav class="jump" aria-label="Bölmələr"><a href="#tiles">Qiymət</a><a href="#sec-fc">Proqnoz</a><a href="#sec-chart">Qrafik</a></nav>
+<nav class="jump" aria-label="Bölmələr"><a href="#tiles">Qiymət</a><a href="#sec-fc">Proqnoz</a><a href="#sec-says">Analitiklər</a><a href="#sec-chart">Qrafik</a></nav>
 <main class="wrap">
   <div class="evbanner" id="offline" hidden>İnternet yoxdur: qiymətlər yenilənmir. Əlaqə gələndə panel özü davam edəcək.</div>
   <div class="evbanner" id="evbanner" hidden></div>
@@ -45,7 +45,14 @@
       <div class="olgrid" id="outlook"></div></details>
   </section>
 
-  <!-- 4. The chart and its tools -->
+  <!-- 4. What each analyst says now about the chosen metal, with its record in that metal (owner 2026-11-27 04:57 NY:
+       «analitiklərin konkret rəyi lazımdır»; static/says.js). The chart's metal decides which one. -->
+  <section class="box" id="sec-says">
+    <h2>Analitiklər nə deyir · <span id="saysm">Qızıl</span> <span class="sp"></span><span class="seg" id="sayh"></span></h2>
+    <div id="says"><p class="note">Yüklənir…</p></div>
+  </section>
+
+  <!-- 5. The chart and its tools -->
   <section class="box" id="sec-chart">
     <h2><span id="ctitle">Qrafik</span><span class="sp"></span><span class="seg" id="tfs"></span></h2>
     <div class="chart" id="chart"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
@@ -60,14 +67,16 @@
     <div class="tasum" id="tasum"></div>
   </section>
 
-  <!-- 5. The rest -->
+  <!-- 6. The rest -->
   <section class="box" id="sec-strat" data-fold="strat"><h2>Strateqin izahı <span class="sp"></span><span class="note" id="stmeta"></span></h2><div id="strat"></div></section>
   <p class="note more">Ətraflı: <a href="/results">Nəticələr</a> (nə dedik, nə oldu, Hakim) ·
     <a href="/bloklar">Bloklar</a> (xəbər, fundamental, bazarlar, təqvim) · <a href="/agents">Agentlər</a> (sistemin canlı axını)</p>
 </main>
 <script src="/static/chart.js"></script>
+<script src="/static/says.js"></script>
 <script src="/static/panel.js"></script>
 <script src="/static/pwa.js"></script>
+<script src="/static/fold.js"></script>
 <script src="/static/nav.js"></script>
 <script src="/static/flow.js"></script>
 <script src="/static/hud.js"></script>

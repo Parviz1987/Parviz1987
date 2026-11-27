@@ -1,6 +1,5 @@
 // Panel additions (owner's request 2026-11-24, Radar Gold look): the strip of every market our analysis reads, the
-// live flow of the whole system (eyes -> nerves -> brains -> judge -> decision), and fold-able sections so the page
-// stays short without losing anything (a folded section keeps its content; its state is remembered on this device).
+// live flow of the whole system (eyes -> nerves -> brains -> judge -> decision). Fold-able sections: static/fold.js.
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
@@ -58,36 +57,7 @@
     }).join("");
   }
 
-  // ---------- 3. fold-able sections ----------
-  const KEY = "tst_fold";
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { saved = {}; }
-  function setFold(box, folded) {
-    box.classList.toggle("folded", folded);
-    const b = box.querySelector(".foldbtn");
-    if (b) { b.textContent = folded ? "Göstər ▾" : "Gizlət ▴"; b.setAttribute("aria-expanded", String(!folded)); }
-    saved[box.dataset.fold] = folded;
-    try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) { /* private window: fine */ }
-    if (!folded) window.dispatchEvent(new Event("resize"));       // charts inside redraw at their real size
-  }
-  document.querySelectorAll(".box[data-fold]").forEach((box) => {
-    const h = box.querySelector("h2");
-    if (!h) return;
-    const b = document.createElement("button");
-    b.type = "button"; b.className = "foldbtn";
-    b.onclick = () => setFold(box, !box.classList.contains("folded"));
-    h.appendChild(b);
-    const def = box.dataset.foldDefault === "closed";
-    setFold(box, saved[box.dataset.fold] ?? def);
-  });
-  // a jump link (phone) or a strip chip opens its folded section
-  document.addEventListener("click", (ev) => {
-    const a = ev.target.closest('a[href^="#"]');
-    if (!a) return;
-    const box = document.querySelector(a.getAttribute("href"));
-    const holder = box && (box.matches(".box[data-fold]") ? box : box.closest(".box[data-fold]"));
-    if (holder && holder.classList.contains("folded")) setFold(holder, false);
-  });
+  // fold-able sections: static/fold.js (the same on every page)
 
   loadTicker(); loadFlow();
   setInterval(loadTicker, 20000);

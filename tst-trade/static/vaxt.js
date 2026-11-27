@@ -81,6 +81,7 @@
   addEventListener("keydown", (e) => { if (e.key === "Escape") setBig(false); });
   let lastW = innerWidth;      // a real change of width only (a phone fires «resize» while scrolling)
   addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; if (data) { draw(); stats(); } });
+  addEventListener("tst:unfold", () => { if (data) { draw(); stats(); } });     // a folded section opened (fold.js)
   async function go() {
     seg($("sym"), Object.entries(NAMES), sym, (k) => { sym = k; save("sym", k); go(); });
     seg($("tf"), TFS, tf, (k) => { tf = k; save("tf", k); go(); });

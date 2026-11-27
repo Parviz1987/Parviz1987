@@ -105,6 +105,7 @@
   // «resize» each time; rebuilding 16 charts on every scroll could make the phone browser close the page
   let lastW = innerWidth;
   addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; if (data) factors(); });
+  addEventListener("tst:unfold", () => { if (data) factors(); });               // a folded section opened (fold.js)
   async function go() {
     seg($("sym"), Object.entries(NAMES), sym, (k) => { sym = k; save("sym", k); go(); });
     seg($("cnt"), [[120, "6 ay"], [250, "1 il"], [500, "2 il"]], cnt, (k) => { cnt = +k; save("cnt", cnt); seg($("cnt"), [[120, "6 ay"], [250, "1 il"], [500, "2 il"]], cnt, () => {}); draw(); go(); });

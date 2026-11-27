@@ -779,8 +779,9 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             r = db.execute("SELECT COUNT(*) n, AVG(in80) c80, AVG(in50) c50 FROM forecasts WHERE symbol=? AND horizon=? "
                            "AND mode='live' AND method='rw' AND price1 IS NOT NULL AND target_t > ?",
                            (symbol, h, now - 7 * 86400)).fetchone()
+            # the system's final word (vahid), not the selective consensus: plan 27.11 step 3.1 — one combiner in front
             d = db.execute("SELECT COUNT(hit) n, AVG(hit) hr FROM forecasts WHERE symbol=? AND horizon=? AND mode='live' "
-                           "AND method='consensus' AND hit IS NOT NULL AND target_t > ?",
+                           "AND method='vahid' AND hit IS NOT NULL AND target_t > ?",
                            (symbol, h, now - 7 * 86400)).fetchone()
             bar = next((x["bar"] for x in judge.stats(db, symbol, h, "live", ttl=60) if x["method"] == "up"), 0.5)
             score.append({"horizon": h, "name": forecast.HORIZON_NAMES[h], "n": r["n"], "cover80": r["c80"],

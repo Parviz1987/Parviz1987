@@ -492,3 +492,18 @@ table.jr td.bs{max-width:420px;white-space:normal;font-size:.8rem}
   table.jr td:nth-child(3){order:3} table.jr td:nth-child(6){order:4;text-align:right}
   table.jr td:nth-child(5){order:5;grid-column:1/-1} table.jr td.bs{order:6;grid-column:1/-1;max-width:none}
 }
+
+/* «Analitiklər nə deyir» on the panel (static/says.js): name · view · why · record in this metal */
+.sy-px{margin:0 0 8px}
+.sy-r{display:grid;grid-template-columns:170px 160px minmax(0,1fr) 250px;gap:4px 12px;align-items:baseline;padding:7px 4px;
+  border-top:1px solid var(--line)}
+.sy-r.lead{background:var(--panel2);border-radius:8px;border-top:0;padding:8px}
+.sy-n{font-weight:600}.sy-b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sy-rec .dots{display:inline-flex;vertical-align:middle;margin:0 0 0 4px}
+@media (max-width:760px){.sy-r{grid-template-columns:minmax(0,1fr) auto}.sy-b{grid-column:1 / -1;white-space:normal}
+  .sy-rec{grid-column:1 / -1}}
+
+/* the Results page's technical group (owner 2026-11-27: technical things in the back, one click away) */
+details.techgroup{margin:14px 0}
+details.techgroup>summary{cursor:pointer;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+details.techgroup[open]>summary{margin-bottom:12px}

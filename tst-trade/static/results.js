@@ -47,7 +47,7 @@ function renderExpect(d) {
 function light(v, good, ok) { return v == null ? "⚪" : v >= good ? "🟢" : v >= ok ? "🟡" : "🔴"; }
 function renderScore(d) {
   $("score").innerHTML = `<table class="sc"><tr><th>Üfüq</th><th>Koridor tutdu<br><span class="note">hədəf 80 %</span></th>
-    <th>İstiqamət düz çıxdı<br><span class="note">seçici konsensus</span></th><th>Keçməli hədd</th><th>Yoxlama</th></tr>` +
+    <th>İstiqamət düz çıxdı<br><span class="note">sistemin son sözü (vahid proqnoz)</span></th><th>Keçməli hədd</th><th>Yoxlama</th></tr>` +
     d.score.map((s) => {
       const c = s.cover80 == null ? "—" : `${s.cover80 >= 0.74 && s.cover80 <= 0.88 ? "🟢" : s.cover80 >= 0.65 ? "🟡" : "🔴"} ${pc(s.cover80)}`;
       const dir = !s.dir_n ? "⚪ fikir bildirməyib" : `${light(s.dir_hit, s.bar + 0.02, s.bar - 0.02)} ${pc(s.dir_hit)}`;
@@ -209,9 +209,11 @@ async function loadHyp() {
       <td class="c">${h.net_avg == null ? "—" : usd(h.net_avg)}</td><td class="c mut">${h.n}</td><td class="c">${ST[h.status] || h.status}</td></tr>`).join("") +
     "</table><p class='note'>«Spreddən sonra»: 1000 $-lıq bir sövdələşmənin orta nəticəsi; H1–H8 qeyd olunduğu kimi yalnız spredlə ölçülür, əsas hədəflər isə tam xərclə. «Az məlumat»: sübut üçün hələ yetərli yeni proqnoz yoxdur.</p>";
   if (d.v) {
-    $("vreg").textContent = "qeyd: " + dt(d.v_registered) + " NY · hədd p < " + d.v_p_bar.toFixed(3) + " · hamısı pulla, tam xərcdən sonra";
+    // V (24.11) and Q (27.11, plan 3.4: gold at one hour, the fastest honest answer): each family its own time and bar
+    $("vreg").textContent = "hamısı pulla, tam xərcdən sonra · hər sınaq yalnız öz qeyd vaxtından sonrakı proqnozlarla";
     $("vtests").innerHTML = `<table class="sc"><tr><th></th><th>Sınaq</th><th>Düz</th><th>Tam xərcdən sonra</th><th>Hal</th><th>p</th><th>Hökm</th></tr>` +
-      d.v.map((h) => `<tr><td class="mut">${h.id}</td><td><b>${esc(h.name)}</b><br><span class="note">${esc(h.idea)}</span></td>
+      d.v.map((h) => `<tr><td class="mut">${h.id}</td><td><b>${esc(h.name)}</b><br><span class="note">${esc(h.idea)}
+        · qeyd ${h.registered ? dt(h.registered) : dt(d.v_registered)} NY, hədd p &lt; ${(h.p_bar || d.v_p_bar).toFixed(3)}</span></td>
         <td class="c">${pc(h.hit_rate)}</td><td class="c">${h.net_avg == null ? "—" : usd(h.net_avg)}</td><td class="c mut">${h.n}</td>
         <td class="c mut">${h.p == null ? "—" : h.p.toFixed(3)}</td><td class="c">${ST[h.status] || h.status}</td></tr>`).join("") + "</table>";
   }
@@ -260,6 +262,7 @@ metals(); load(); loadSim().catch(() => {}); loadAnalysts().catch(() => {}); loa
 // a real change of width only: a phone fires «resize» while scrolling, and each one used to ask the server again
 let lastW = innerWidth;
 window.addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; load().catch(() => {}); });
+window.addEventListener("tst:unfold", () => load().catch(() => {}));            // a folded section opened (fold.js)
 
 // 5. The sieve and each analyst's journal (owner 2026-11-27: record who said what, why, when, and whether it came true;
 // then filter: keep what works, remove the rest, a simple system)

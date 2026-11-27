@@ -152,6 +152,7 @@ async function refreshState() { lastState = await api("/api/state"); renderTiles
 // for every metal is static/hud.js)
 async function refreshFc() {
   lastFc = await api(`/api/forecasts?symbol=${sym}`);
+  if (window.renderSays) window.renderSays(sym, lastFc);     // «Analitiklər nə deyir» (static/says.js)
 }
 async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadBrains(); }
 setInterval(() => {

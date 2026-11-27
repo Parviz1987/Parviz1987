@@ -47,7 +47,8 @@
 - [x] 2.9 `feed geo failed` xətası — 26.11 yeniləmə anında bir dəfə (fayllar dəyişərkən idxal), təkrarlanmayıb.
 
 ## Mərhələ 3 — artıqları çıxarmaq, sınaqları daraltmaq
-- [ ] 3.1 Birləşdiricilər: önə yalnız vahid proqnoz (+ müqayisə üçün sadə orta); konsensus, tərəzi, dirijor arxada.
+- [x] 3.1 Birləşdiricilər: önə yalnız vahid proqnoz (+ müqayisə üçün sadə orta); konsensus, tərəzi, dirijor arxada.
+      Panelin yeni bölməsində konsensus/tərəzi göstərilmir; «Nəticələr»in 7 günlük hesabı konsensus yox, vahid proqnozla.
 - [x] 3.2 Mövsüm və zərgərlik səsləri pensiyaya (7 gündə 0 fikir; dalğalılıq sınağı sübut vermədi).
 - [x] 3.3 İkinci analitik və müzakirə seyrək (pula qənaət) — 4 saatda bir (əvvəl hər saat).
 - [x] 3.4 Yeni kiçik sınaq ailəsi (3–5 namizəd), qeyd vaxtı ilə, yalnız yeni canlı məlumatla. **Q1–Q3** (qızıl, 1 saat:
@@ -57,9 +58,12 @@
       trendmix, tsmom, up, ABŞ rəqəmi impulsu — heç biri pensiyaya getmədi).
 
 ## Mərhələ 4 — saytın önü (sahibin 27.11 04:57 tapşırığı, `SOHBET-TARIXCESI.md` 5a)
-- [ ] 4.1 Panel: hər metal üçün analitiklərin indiki fikri (▲/▼, aralıq) + həmin metaldakı düz/səhv qeydi.
-- [ ] 4.2 Texniki şeylər «Ətraflı»ya; təkrarlar bir yerə; «Nəticələr»də bir sınaq siyahısı.
-- [ ] 4.3 Hər səhifə 1366 və 390 ölçüdə şəkil, brauzer xətası yox, hər düymə basılıb.
+- [x] 4.1 Panel: hər metal üçün analitiklərin indiki fikri (▲/▼, aralıq) + həmin metaldakı düz/səhv qeydi.
+- [x] 4.2 Texniki şeylər «Ətraflı»ya; təkrarlar bir yerə; «Nəticələr»də bir sınaq siyahısı. «Nəticələr»: önə əsas sınaqlar
+      (V+Q), 7 günlük hesab, «nə dedik»; qalan 8 cədvəl bir «Ətraflı (texniki)» düyməsində (masaüstü 2426→1342 px). «Bloklar»:
+      hər blokun təfərrüatı «Ətraflı»da (2009→1157 px). Blok səhifələrində 2 illik qrafiklər və qayda cədvəlləri yığılır.
+      Yığma mexanizmi bir fayl (`static/fold.js`), açılanda qrafiklər düzgün ölçüdə çəkilir.
+- [x] 4.3 Hər səhifə 1366 və 390 ölçüdə şəkil, brauzer xətası yox, hər düymə basılıb.
 
 ## Mərhələ 5 — sənədlər və hesabat
 - [ ] 5.1 `BLOKLAR.md`, `SOHBET-TARIXCESI.md`, `IS-PLANI.md` yenilənir.
@@ -82,3 +86,5 @@
 - 27.11 10:48 — Mərhələ 2 bitdi (2.1 başqa yolla), 3.2 və 3.3 bitdi. Mövsüm/zərgərlik məlumatı silinmir (təmizlik yalnız 26.11 siyahısı).
 - 27.11 10:58 — 3.4 və 3.5 bitdi: Q1–Q3 qeydə alındı (13:00 NY-dən sayılır); qeydə alınmış sınaqlar da yalnız vaxtında
   yazılmış proqnozları sayır. 3.1 (birləşdiricilər arxaya) saytın önü ilə birlikdə (Mərhələ 4).
+- 27.11 11:35 — Mərhələ 4: 13 səhifə 1366 və 390-da, brauzer xətası 0; 10 səhifədə hər görünən düymə basıldı (Admin xaric — ayar
+  dəyişir), xəta 0; yığılmış bölmələr açılanda qrafik ölçüsü sıfır qalmır.
