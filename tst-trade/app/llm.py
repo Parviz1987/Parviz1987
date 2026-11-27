@@ -108,6 +108,8 @@ async def _anthropic(key, model, system, user, schema, max_tokens):
         await client.close()
     if r.stop_reason == "refusal":
         raise LLMError("Anthropic: model cavab verməkdən imtina etdi", 200, hint="refusal")
+    if r.stop_reason == "max_tokens":
+        raise LLMError(f"cavab kəsildi: çıxış həddi ({max_tokens}) bitdi", 200, hint="output")
     text = next((b.text for b in r.content if b.type == "text"), "")
     return _json(text), r.usage.input_tokens, r.usage.output_tokens
 
@@ -122,9 +124,12 @@ async def _openai_like(base, key, model, system, user, schema, max_tokens, token
     if r.status_code != 200:
         raise _http_err("", r)
     j = r.json()
-    msg = (j.get("choices") or [{}])[0].get("message") or {}
+    choice = (j.get("choices") or [{}])[0]
+    msg = choice.get("message") or {}
     if msg.get("refusal"):
         raise LLMError("model cavab verməkdən imtina etdi", 200, hint="refusal")
+    if choice.get("finish_reason") == "length":   # reasoning models spend part of the limit on thinking
+        raise LLMError(f"cavab kəsildi: çıxış həddi ({max_tokens}) bitdi", 200, hint="output")
     u = j.get("usage") or {}
     return _json(msg.get("content") or ""), int(u.get("prompt_tokens") or 0), int(u.get("completion_tokens") or 0)
 

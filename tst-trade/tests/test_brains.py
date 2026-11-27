@@ -127,3 +127,28 @@ def test_scout_search_parses_responses_output_and_strips_numbers(monkeypatch):
     assert db.execute("SELECT COUNT(*) FROM news WHERE source LIKE 'Grok%'").fetchone()[0] == 1
     spent = db.execute("SELECT usd FROM brain_calls").fetchone()[0]
     assert spent > 2 * llm.SEARCH_CALL_USD - 1e-9
+
+
+def test_cut_off_answer_is_named_as_cut_off(monkeypatch):
+    import asyncio
+    from app import llm
+
+    class R:
+        status_code = 200
+        def json(self):
+            return {"choices": [{"finish_reason": "length", "message": {"content": '{"metals": [{"symbol": "XAU", "ca'}}],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 1500}}
+
+    class C:
+        def __init__(self, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): pass
+        async def post(self, url, headers=None, json=None):
+            return R()
+
+    monkeypatch.setattr(llm.httpx, "AsyncClient", C)
+    try:
+        asyncio.run(llm.ask("openai", "k", "gpt-5.4-nano", "s", "u", {"type": "object"}, 1500))
+        raise AssertionError("must raise")
+    except llm.LLMError as e:
+        assert "kəsildi" in str(e) and "1500" in str(e)

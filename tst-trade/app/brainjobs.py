@@ -465,10 +465,10 @@ class BrainJobs:
             return False
         self._rep("debate", "working", "W1 Yuxarı tərəfdarı", 0.2, self._chain(trigger))
         bull, _ = await brains.run(self.db, self.keys, "analyst2", BULL_SYSTEM, "Facts (JSON):\n" + facts,
-                                   CASE_SCHEMA, max_tokens=1500)
+                                   CASE_SCHEMA, max_tokens=4000)
         self._rep("debate", "working", "W2 Aşağı tərəfdarı", 0.5, self._chain(trigger))
         bear, _ = await brains.run(self.db, self.keys, "analyst2", BEAR_SYSTEM, "Facts (JSON):\n" + facts,
-                                   CASE_SCHEMA, max_tokens=1500)
+                                   CASE_SCHEMA, max_tokens=4000)
         if bull is None or bear is None:
             self._rep("debate", "error", note="tərəfdarlardan biri cavab vermədi")
             return False
@@ -476,7 +476,7 @@ class BrainJobs:
         user = ("Facts (JSON):\n" + facts + "\n\nBULL case:\n" + json.dumps(bull, ensure_ascii=False) +
                 "\n\nBEAR case:\n" + json.dumps(bear, ensure_ascii=False))
         data, how = await brains.run(self.db, self.keys, "reviewer", DEBATE_JUDGE_SYSTEM, user, ANALYST2_SCHEMA,
-                                     max_tokens=1500)
+                                     max_tokens=4000)
         if data is None:
             self._rep("debate", "error", note="hakim beyin cavab vermədi: " + how)
             return False
@@ -497,7 +497,7 @@ class BrainJobs:
         charts = await asyncio.to_thread(chart_facts, self.db, now)
         self._rep("chartist", "working", "W2 Beyin", 0.4)
         data, how = await brains.run(self.db, self.keys, "chartist", CHARTIST_SYSTEM, "Charts (JSON):\n" + charts,
-                                     CHARTIST_SCHEMA, max_tokens=2000)
+                                     CHARTIST_SCHEMA, max_tokens=5000)
         if data is None:
             self._rep("chartist", "error", note="cavab gəlmədi: " + how)
             return False
@@ -530,7 +530,7 @@ class BrainJobs:
         extra = ("\n\nLessons from this desk's past errors (consider them, they are not facts):\n- " +
                  "\n- ".join(lessons)) if lessons else ""
         data, how = await brains.run(self.db, self.keys, "analyst2", ANALYST2_SYSTEM, "Facts (JSON):\n" + facts + extra,
-                                     ANALYST2_SCHEMA, max_tokens=1500)
+                                     ANALYST2_SCHEMA, max_tokens=4000)
         if data is None:
             self._state("analyst2", "alınmadı: " + how)
             return False
