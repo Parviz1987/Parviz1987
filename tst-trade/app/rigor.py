@@ -18,6 +18,9 @@ import time
 
 from .db import DB
 
+# 27.11 look-ahead guard: a final counts only forecasts written before their target time (rows from before the
+# column existed have no write time and are taken as written in time; the live process issues at the candle close)
+WRITTEN_IN_TIME = "(created_ts IS NULL OR created_ts < target_t)"
 ALPHA = 0.05
 RULE_MIN = 100            # rule finals: cases after the finalist moment
 
@@ -95,8 +98,11 @@ def method_final(db: DB, sym: str, horizon: str, method: str, now: float | None 
     if st["status"] == "insan yoxlaması":          # an entry from before the policy: the Judge decides it itself now
         st["status"] = "namizəd"
     rows = db.execute("SELECT issued_t, target_t, p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND "
-                      "method=? AND mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5 ORDER BY issued_t",
-                      (sym, horizon, method, st["since"])).fetchall()
+                      "method=? AND mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5 AND "
+                      f"{WRITTEN_IN_TIME} ORDER BY issued_t", (sym, horizon, method, st["since"])).fetchall()
+    st["late_excluded"] = db.execute(
+        "SELECT COUNT(*) n FROM forecasts WHERE symbol=? AND horizon=? AND method=? AND mode='live' AND issued_t > ? "
+        f"AND NOT {WRITTEN_IN_TIME}", (sym, horizon, method, st["since"])).fetchone()["n"]
     need = MIN_N.get(horizon, 100)
     st["n"], st["need"] = len(rows), need
     if len(rows) < need:
@@ -246,7 +252,7 @@ def verify_method(db: DB, sym: str, horizon: str, method: str, since: float) -> 
     from .forecast import HORIZONS
     step = TF[HORIZONS[horizon]]
     rows = db.execute("SELECT issued_t, target_t, p_up, price0, price1 FROM forecasts WHERE symbol=? AND horizon=? AND "
-                      "method=? AND mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5",
+                      f"method=? AND mode='live' AND issued_t > ? AND price1 IS NOT NULL AND p_up != 0.5 AND {WRITTEN_IN_TIME}",
                       (sym, horizon, method, since)).fetchall()
     tf = HORIZONS[horizon]
     closes = {r["t"]: r["c"] for r in db.execute("SELECT t, c FROM candles WHERE symbol=? AND tf=? AND t>=?",

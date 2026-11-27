@@ -61,6 +61,10 @@ def cost_parts(symbol: str, horizon: str | None = None) -> dict:
 MIN_N = {"15m": 300, "30m": 250, "1h": 200, "4h": 200, "1d": 250, "3d": 250, "1w": 100, "10d": 250, "1mo": 250}
 P_MAX = 0.05
 RANGE_ONLY = ("garch", "gvz")
+# 27.11: each row records when it was really written. The final test counts a forecast only if it was written
+# before its target time — a row written later (a catch-up after a stall, a replay labelled live) could have seen
+# the answer. This is the look-ahead guard that does not depend on how good the result looks.
+NOW_SQL = "(julianday('now') - 2440587.5) * 86400.0"
 
 
 def issue_rows(symbol: str, horizon: str, issued_t: int, target_t: int, fc: dict, mode: str = "live") -> list:
@@ -71,14 +75,14 @@ def issue_rows(symbol: str, horizon: str, issued_t: int, target_t: int, fc: dict
 def insert(db: DB, rows: list) -> None:
     db.executemany(
         "INSERT OR IGNORE INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, "
-        "lo50, hi50, lo80, hi80, basis) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+        "lo50, hi50, lo80, hi80, basis, created_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?," + NOW_SQL + ")", rows)
 
 
 def issue(db: DB, symbol: str, horizon: str, issued_t: int, target_t: int, fc: dict, mode: str = "live") -> int:
     rows = issue_rows(symbol, horizon, issued_t, target_t, fc, mode)
     db.executemany(
         "INSERT OR IGNORE INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, "
-        "lo50, hi50, lo80, hi80, basis) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+        "lo50, hi50, lo80, hi80, basis, created_ts) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?," + NOW_SQL + ")", rows)
     return len(rows)
 
 

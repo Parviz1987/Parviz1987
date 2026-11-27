@@ -85,6 +85,9 @@ class DB:
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(candles)").fetchall()}
         if "v" not in cols:          # tick volume (2026-11-25): how many times the price changed inside the candle
             self.conn.execute("ALTER TABLE candles ADD COLUMN v INTEGER")
+        fcols = {r[1] for r in self.conn.execute("PRAGMA table_info(forecasts)").fetchall()}
+        if "created_ts" not in fcols:   # 27.11: when the row was really written (the Judge's look-ahead guard)
+            self.conn.execute("ALTER TABLE forecasts ADD COLUMN created_ts REAL")
 
     def script(self, sql: str) -> None:
         """Schema statements under the same lock as every write. sqlite's executescript COMMITs first: run unlocked

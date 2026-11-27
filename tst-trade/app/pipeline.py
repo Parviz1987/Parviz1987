@@ -251,7 +251,9 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
         out.append(_row("Hakimin öz yoxlaması (həftəlik)", "Hakimə etibar", "warn", "hələ işləməyib", None))
     else:
         bad = ([f"{can.get('random_passed')}/{can.get('random_n')} təsadüfi qayda keçdi"] if can.get("random_passed") else []) + \
-              (["30 % gələcəyə baxan saxta qayda tutulmadı"] if can.get("peek30_caught") is False else []) + \
+              (["30 % gələcəyə baxan saxta qayda nəticəyə görə tutulmadı (o, «inanılmaz yaxşı» həddinin altında qalır; "
+                "son sınaqda ayrıca qoruyucu var: proqnoz hədəf vaxtından sonra yazılıbsa sayılmır)"]
+               if can.get("peek30_caught") is False else []) + \
               (["tam gələcəyə baxan saxta qayda tutulmadı"] if can.get("peek_caught") is False else [])
         out.append(_row("Hakimin öz yoxlaması (həftəlik)", "Hakimə etibar", "warn" if bad else "ok",
                         "; ".join(bad) if bad else "təsadüfi qaydalar keçmədi, gələcəyə baxanlar tutuldu", len(bad)))

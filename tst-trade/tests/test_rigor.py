@@ -142,3 +142,21 @@ def test_three_way_probabilities_sum_to_one_and_robustness_flags_fragile():
     v = [(1_700_000_000 + i * 86400, 0.002, 0.0015 if i < 150 else -0.0005, "XAU") for i in range(300)]
     r = rules.robustness(v, [0.0005] * 300, deep=True)
     assert r["fragile"] and "boot95" in r and r["windows"]
+
+
+def test_a_forecast_written_after_its_target_time_never_counts_in_a_final():
+    # 27.11: the look-ahead guard that does not depend on how good a result looks — a row written after its target
+    # candle closed (a catch-up after a stall, a replay labelled live) could have seen the answer
+    import time as _time
+    from app import judge, rigor
+    from app.db import DB
+    db = DB(":memory:")
+    fc = {"price": 100.0, "methods": {"qaydalar": {"p_up": 0.6, "lo50": 99, "hi50": 101, "lo80": 98, "hi80": 102,
+                                                   "basis": "x"}}}
+    now = int(_time.time())
+    judge.issue(db, "XAU", "1h", now - 7200, now - 3600, fc)          # written now, target an hour ago: late
+    judge.issue(db, "XAU", "1h", now, now + 3600, fc)                 # written before its target: counts
+    rows = db.execute(f"SELECT issued_t FROM forecasts WHERE {rigor.WRITTEN_IN_TIME}").fetchall()
+    assert [r["issued_t"] for r in rows] == [now]
+    r = db.execute("SELECT created_ts FROM forecasts WHERE issued_t=?", (now,)).fetchone()
+    assert abs(r["created_ts"] - _time.time()) < 5
