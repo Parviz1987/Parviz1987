@@ -99,9 +99,33 @@ def test_brains_with_failing_answers_are_named():
                "usd REAL, error TEXT)")
     cols = [r[1] for r in db.execute("PRAGMA table_info(brain_calls)").fetchall()]
     for i in range(10):
-        vals = {"ts": NOW - 600 - i, "slot": "chartist", "provider": "openai", "model": "x", "ok": int(i < 3)}
+        vals = {"ts": NOW - 600 - i * 300, "slot": "chartist", "provider": "openai", "model": "x", "ok": int(i < 3)}
         keys = [k for k in vals if k in cols]
         db.execute(f"INSERT INTO brain_calls({', '.join(keys)}) VALUES({', '.join('?' for _ in keys)})",
                    [vals[k] for k in keys])
     row = _rows(db, ks, eng, feeds, jobs)["Beyinlərin cavabı"]
     assert row["status"] == "warn" and "chartist 3/10" in row["msg"]
+
+
+def test_a_failing_backup_is_never_green_and_a_job_saved_by_its_fallback_is_answered():
+    db, ks, feeds, jobs, eng = _setup()
+    db.put("backup:last", json.dumps({"ts": NOW - 3600, "ok": False, "msg": "ClientError 403"}))
+    assert _rows(db, ks, eng, feeds, jobs)["İkinci ehtiyat nüsxə (Cloudflare R2)"]["status"] == "bad"
+    db.execute("CREATE TABLE IF NOT EXISTS brain_calls (ts REAL, slot TEXT, provider TEXT, model TEXT, ok INTEGER, "
+               "usd REAL, error TEXT)")
+    for i in range(6):                     # each job: the primary fails, the fallback answers a few seconds later
+        db.execute("INSERT INTO brain_calls(ts, slot, provider, model, ok) VALUES(?, 'reader', 'a', 'x', 0)",
+                   (NOW - 1000 - i * 600,))
+        db.execute("INSERT INTO brain_calls(ts, slot, provider, model, ok) VALUES(?, 'reader', 'b', 'y', 1)",
+                   (NOW - 995 - i * 600,))
+    assert _rows(db, ks, eng, feeds, jobs)["Beyinlərin cavabı"]["status"] == "ok"
+
+
+def test_one_lucky_random_rule_is_not_a_warning_but_an_old_self_check_is():
+    db, ks, feeds, jobs, eng = _setup()
+    db.put("judge:canary", json.dumps({"ts": NOW - 3600, "random_passed": 1, "random_n": 20, "peek30_caught": True,
+                                       "peek_caught": True, "ok": True}))
+    assert _rows(db, ks, eng, feeds, jobs)["Hakimin öz yoxlaması (həftəlik)"]["status"] == "ok"
+    db.put("judge:canary", json.dumps({"ts": NOW - 10 * 86400, "random_passed": 0, "random_n": 20,
+                                       "peek30_caught": True, "peek_caught": True, "ok": True}))
+    assert _rows(db, ks, eng, feeds, jobs)["Hakimin öz yoxlaması (həftəlik)"]["status"] == "warn"

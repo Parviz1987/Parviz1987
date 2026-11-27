@@ -17,7 +17,7 @@ RELATED_SILENT = 3600      # a linked market silent for an hour while metals tra
 RANGE_ONLY = ("garch", "gvz")                  # they give the range, never a direction
 NEWS_SOURCES = ("rss", "alpaca")               # zero rows from these on a trading day means nothing arrived
 STALE_SOURCE = 26 * 3600                       # the slowest source is checked daily
-FRESH_SHEETS = (("blocks:audit", "blokların yoxlaması", 3 * 3600), ("conductor:audit", "dirijorun sübutu", 30 * 3600),
+FRESH_SHEETS = (("blocks:audit", "blokların yoxlaması", 4 * 3600),   # hourly, paused 04-05 UTC ("conductor:audit", "dirijorun sübutu", 30 * 3600),
                 ("aci:shadow", "aralıq düzəlişi (ACI)", 30 * 3600))
 
 
@@ -175,7 +175,7 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     # consensus had been silent for days unseen). Dead: nothing issued for 3 days; mute: issues, but never a view
     # (always 0.5) for a week. Ranges-only methods and the benchmarks have no direction by design.
     from .blockaudit import voices, METALS_SQL
-    act3, act7 = voices(db, now - 3 * 86400), voices(db, now - 7 * 86400)
+    act3, act7 = voices(db, now - 4 * 86400), voices(db, now - 7 * 86400)   # 4 days: a holiday Friday + weekend
     dead, mute = [], []
     for m in forecast.METHODS:
         if m in forecast.BASELINES or m in RANGE_ONLY:
@@ -185,9 +185,9 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
             dead.append(name)
         elif not act7.get(m, {}).get("v"):
             why = db.execute(f"SELECT basis FROM forecasts WHERE symbol IN {METALS_SQL} AND mode='live' AND "
-                             "target_t > ? AND method=? ORDER BY issued_t DESC LIMIT 1", (now - 3 * 86400, m)).fetchone()
+                             "target_t > ? AND method=? ORDER BY issued_t DESC LIMIT 1", (now - 4 * 86400, m)).fetchone()
             mute.append(f"{name} («{why['basis'][:60]}»)" if why and why["basis"] else name)
-    parts = (["susur (3 gündə proqnoz yoxdur): " + ", ".join(dead)] if dead else []) + \
+    parts = (["susur (4 gündə proqnoz yoxdur): " + ", ".join(dead)] if dead else []) + \
             (["fikri yoxdur (7 gündə hamısı 0.5): " + "; ".join(mute)] if mute else [])
     out.append(_row("Üsulların səsi (hər analitik)", "vahid proqnoz, Hakim, kartlar",
                     "bad" if dead and open_ else "warn" if dead or mute else "ok",
@@ -225,18 +225,24 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
 
     # 13. brains answering: per job, the share of calls that worked in the last day (a fallback that fails, an answer
     # cut off) and models the provider has closed
-    try:
-        weak = [f"{r['slot']} {r['ok']}/{r['n']}" for r in db.execute(
-            "SELECT slot, SUM(ok) ok, COUNT(*) n FROM brain_calls WHERE ts > ? GROUP BY slot", (now - 86400,)).fetchall()
-            if r["n"] >= 5 and r["ok"] < 0.8 * r["n"]]
+    try:          # a job = the calls of one slot within 2 minutes (a failed primary + a working fallback = answered)
+        weak = [f"{r['slot']} {r['good']}/{r['jobs']}" for r in db.execute(
+            "SELECT slot, COUNT(*) jobs, SUM(okb) good FROM (SELECT slot, CAST(ts / 120 AS INTEGER) b, MAX(ok) okb "
+            "FROM brain_calls WHERE ts > ? GROUP BY slot, b) GROUP BY slot", (now - 86400,)).fetchall()
+            if r["jobs"] >= 5 and r["good"] < 0.8 * r["jobs"]]
     except Exception:
         weak = []
-    try:
+    try:          # a closed model counts only while a brain is still set to use it (replaced ones are history)
+        used = set()
+        for b in brains.view(db, keys):
+            c = b["config"]
+            used |= {(c.get("provider"), c.get("model")), (c.get("fallback"), c.get("fallback_model"))}
         closed = [f"{r['provider']} {r['model']}" for r in db.execute("SELECT provider, model FROM llm_state WHERE off "
-                                                                      "IS NOT NULL AND off != ''").fetchall()]
+                                                                      "IS NOT NULL AND off != ''").fetchall()
+                  if (r["provider"], r["model"]) in used]
     except Exception:
         closed = []
-    parts = (["24 saatda uğurlu cavab 80 %-dən az: " + ", ".join(weak)] if weak else []) + \
+    parts = (["24 saatda cavab alınan iş 80 %-dən az: " + ", ".join(weak)] if weak else []) + \
             (["söndürülmüş model (iş ehtiyat beyinlə gedir): " + ", ".join(closed)] if closed else [])
     out.append(_row("Beyinlərin cavabı", "bütün beyin işləri", "warn" if parts else "ok",
                     "; ".join(parts) if parts else "hər beyin işinin son gündə cavabları 80 %-dən çox uğurlu",
@@ -250,7 +256,10 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     if can is None:
         out.append(_row("Hakimin öz yoxlaması (həftəlik)", "Hakimə etibar", "warn", "hələ işləməyib", None))
     else:
-        bad = ([f"{can.get('random_passed')}/{can.get('random_n')} təsadüfi qayda keçdi"] if can.get("random_passed") else []) + \
+        bad = ([f"{can.get('random_passed')}/{can.get('random_n')} təsadüfi qayda keçdi"]
+               if (can.get("random_passed") or 0) > 1 else []) + \
+              ([f"son dəfə {(now - can['ts']) / 86400:.0f} gün əvvəl işləyib (həftəlik olmalıdır)"]
+               if can.get("ts") and now - can["ts"] > 8 * 86400 else []) + \
               (["30 % gələcəyə baxan saxta qayda nəticəyə görə tutulmadı (o, «inanılmaz yaxşı» həddinin altında qalır; "
                 "son sınaqda ayrıca qoruyucu var: proqnoz hədəf vaxtından sonra yazılıbsa sayılmır)"]
                if can.get("peek30_caught") is False else []) + \
@@ -259,8 +268,8 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
                         "; ".join(bad) if bad else "təsadüfi qaydalar keçmədi, gələcəyə baxanlar tutuldu", len(bad)))
 
     # 15. what waits for the owner's own step (code ready, a key or a phone needed): shown as such, never as «works»
-    for stage, into, waiting, msg in _owner_steps(db, now):
-        out.append(_row(stage, into, "owner" if waiting else "ok", msg))
+    for stage, into, st, msg in _owner_steps(db, now):
+        out.append(_row(stage, into, st, msg))
 
     # 16. the daily and hourly sheets the reports are built from: a sheet that stopped being rebuilt shows an old
     # picture as if it were today's (27.11: the block audit called the news block «broken» 17 hours after its fix)
@@ -277,32 +286,45 @@ def check(db: DB, keys, engine, feeds, jobs, now: float | None = None) -> list[d
     return out
 
 
-def _owner_steps(db: DB, now: float) -> list[tuple[str, str, bool, str]]:
-    """Parts whose code is ready but which need the owner (a key, his phone). Each says what replaces it meanwhile."""
+def _owner_steps(db: DB, now: float) -> list[tuple[str, str, str, str]]:
+    """Parts whose code is ready but which need the owner (a key, his phone): «owner» while waiting, «ok» only when
+    the server's own record shows it working, «bad» when it is set up but failing (a backup error is never green)."""
     out = []
     try:
         from . import heartbeat
-        key = bool(heartbeat.HEART and heartbeat.HEART.view().get("key"))
+        hv = heartbeat.HEART.view() if heartbeat.HEART else {}
     except Exception:
-        key = False
-    out.append(("Kənar nəzarətçi (Healthchecks.io)", "sahibə dəqiqələr içində xəbər", not key,
-                "işləyir" if key else "kod hazırdır, sahibin açarını gözləyir; əvəzi: 3 saatlıq növbətçi yoxlama və "
-                "GitHub-un saatlıq kənar yoxlaması"))
+        hv = {}
+    setup = hv.get("setup") or {}
+    if not hv.get("key"):
+        out.append(("Kənar nəzarətçi (Healthchecks.io)", "sahibə dəqiqələr içində xəbər", "owner",
+                    "kod hazırdır, sahibin açarını gözləyir; əvəzi: 3 saatlıq növbətçi yoxlama (telefona xəbər)"))
+    elif setup.get("ok") is False:
+        out.append(("Kənar nəzarətçi (Healthchecks.io)", "sahibə dəqiqələr içində xəbər", "bad",
+                    f"açar var, amma qurulmadı: {str(setup.get('note') or '')[:80]}"))
+    else:
+        out.append(("Kənar nəzarətçi (Healthchecks.io)", "sahibə dəqiqələr içində xəbər", "ok", "işləyir"))
     try:
         b = json.loads(db.get("backup:last") or "null") or {}
     except ValueError:
         b = {}
-    waiting = not b.get("ok") and "açar" in str(b.get("msg") or "")
-    out.append(("İkinci ehtiyat nüsxə (Cloudflare R2)", "serverdən kənarda nüsxə", waiting,
-                "kod hazırdır, sahibin açarını gözləyir; əvəzi: DigitalOcean-ın gündəlik nüsxəsi (7 gün)" if waiting else
-                "son nüsxə alındı" if b.get("ok") else f"son cəhd: {str(b.get('msg') or 'hələ olmayıb')[:80]}"))
+    msg = str(b.get("msg") or "")
+    if b.get("ok") and now - float(b.get("ts") or 0) < 2 * 86400:
+        st, text = "ok", "son nüsxə alındı"
+    elif not b.get("ok") and "açar" in msg:
+        st, text = "owner", "kod hazırdır, sahibin açarını gözləyir; əvəzi: DigitalOcean-ın gündəlik nüsxəsi (7 gün)"
+    elif not b:
+        st, text = "warn", "hələ heç bir cəhd olmayıb"
+    else:
+        st, text = "bad", ("son nüsxə 2 gündən köhnədir" if b.get("ok") else f"son cəhd alınmadı: {msg[:80]}")
+    out.append(("İkinci ehtiyat nüsxə (Cloudflare R2)", "serverdən kənarda nüsxə", st, text))
     try:
         from . import diag, totp
         tf = totp.enabled(db, diag._SEALER[0]) if diag._SEALER else None
     except Exception:
         tf = None
     if tf is not None:
-        out.append(("İkiqat yoxlama (2FA)", "girişin qorunması", not tf,
+        out.append(("İkiqat yoxlama (2FA)", "girişin qorunması", "ok" if tf else "owner",
                     "açıqdır" if tf else "kod hazırdır, sahibin telefonunu gözləyir; indi: parol + giriş qoruyucusu"))
     return out
 
