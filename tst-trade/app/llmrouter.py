@@ -296,7 +296,15 @@ def view(db: DB) -> dict:
                                                     "calls": r["n"], "usd": r["usd"]})
     except Exception:
         pass
-    return {"models": [x for x in state if x["state"] != "işləyir"], "proposals":
+    recent = []                        # the last failed calls (time, slot, model, the error's first words)
+    try:
+        for r in db.execute("SELECT ts, slot, provider, model, error FROM brain_calls WHERE ok=0 AND ts > ? ORDER BY ts "
+                            "DESC LIMIT 12", (now - 7 * 86400,)).fetchall():
+            recent.append({"ts": r["ts"], "slot": r["slot"], "brain": f"{r['provider']} · {r['model']}",
+                           "error": str(r["error"] or "")[:140]})
+    except Exception:
+        pass
+    return {"failed_recent": recent, "models": [x for x in state if x["state"] != "işləyir"], "proposals":
             json.loads(db.get("llm:proposals") or "{}"), "slots_24h": slots, "month": month}
 
 
