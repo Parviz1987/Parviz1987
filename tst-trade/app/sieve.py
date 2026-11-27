@@ -8,8 +8,11 @@ The sieve: every analyst sorted by FIXED rules (written here once, never tuned t
 numbers (judge.stats: hit rate, the no-skill bar, the number of calls with a side, the Judge's status), live and on
 the replayed history, every horizon, all four metals:
   saxla    the Judge found proof somewhere, or a real but too small edge («sübut» / «xərc»): keep and watch
-  pis      on some horizon, with at least 100 independent calls, worse than the bar by two standard errors: it points
-           the wrong way consistently: a removal candidate
+  ümidli   on some horizon, with at least 100 independent calls, better than the bar by two standard errors, nowhere
+           worse: not proof (many horizons are looked at), the place to watch
+  qarışıq  better there, worse elsewhere: keep only where it is better (a candidate for a narrower job)
+  pis      worse than the bar by two standard errors somewhere, nowhere better: it points the wrong way consistently:
+           a removal candidate
   fərqsiz  at least 100 independent calls somewhere and never better or worse than chance: it adds noise, not
            information: a removal candidate (the owner wants a simple system)
   az       too few calls yet
@@ -54,9 +57,14 @@ def sieve(db: DB) -> dict:
             cells.append({"horizon": h, "mode": mode, "n": c["nh"], "n_eff": round(n_eff), "hit": round(hit, 4),
                           "bar": round(bar, 4), "z": round(z, 2), "edge": c["edge"] / c["nh"]})
         big = [c for c in cells if c["n_eff"] >= MIN_N]
+        good, bad = any(c["z"] >= -Z_BAD for c in big), any(c["z"] <= Z_BAD for c in big)
         if a["statuses"] & {"sübut", "xərc"}:
             verdict = "saxla"
-        elif any(c["z"] <= Z_BAD for c in big):
+        elif good and bad:
+            verdict = "qarışıq"
+        elif good:
+            verdict = "ümidli"
+        elif bad:
             verdict = "pis"
         elif big:
             verdict = "fərqsiz"
@@ -68,7 +76,7 @@ def sieve(db: DB) -> dict:
                      "best": max(pool, key=lambda c: c["z"]) if pool else None,
                      "worst": min(pool, key=lambda c: c["z"]) if pool else None,
                      "calls": sum(c["n"] for c in cells), "cells": cells})
-    order = {"saxla": 0, "pis": 1, "fərqsiz": 2, "az": 3}
+    order = {"saxla": 0, "ümidli": 1, "qarışıq": 2, "pis": 3, "fərqsiz": 4, "az": 5}
     rows.sort(key=lambda r: (r["retired"], r["baseline"], order[r["verdict"]], -r["calls"]))
     return {"rows": rows, "rules": {"min_n": MIN_N, "z_bad": Z_BAD}, "families": forecast.FAMILY_NAMES}
 

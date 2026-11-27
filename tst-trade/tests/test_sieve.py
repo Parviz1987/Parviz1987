@@ -13,6 +13,8 @@ def test_the_sieve_sorts_every_analyst_by_fixed_rules(monkeypatch):
         ("XAU", "1h", "live"): [_row("good", 300, 0.60, 0.50, "sübut"), _row("bad", 400, 0.42, 0.50),
                                 _row("flat", 500, 0.505, 0.50), _row("new", 30, 0.70, 0.50, "az"), _row("rw", 900, 0.5, 0.5, "bazis")],
         ("XAU", "1mo", "history"): [_row("flat", 2100, 0.53, 0.50)],    # 21 overlapping days: 100 independent cases
+        ("XAU", "1d", "history"): [_row("mixed", 400, 0.58, 0.50), _row("hope", 400, 0.58, 0.50)],
+        ("XAU", "15m", "history"): [_row("mixed", 400, 0.42, 0.50)],
     }
     monkeypatch.setattr(sieve.judge, "stats", lambda db, s, h, m, ttl=0: data.get((s, h, m), []))
     out = {r["method"]: r for r in sieve.sieve(DB(":memory:"))["rows"]}
@@ -20,6 +22,8 @@ def test_the_sieve_sorts_every_analyst_by_fixed_rules(monkeypatch):
     assert out["bad"]["verdict"] == "pis"                 # 8 points under chance on 400 calls: z < -2
     assert out["flat"]["verdict"] == "fərqsiz"            # many calls, no edge (overlap counted: 2100 / 21 = 100)
     assert out["new"]["verdict"] == "az"
+    assert out["mixed"]["verdict"] == "qarışıq"           # better on 1 day, worse on 15 minutes: a narrower job
+    assert out["hope"]["verdict"] == "ümidli"             # better somewhere, nowhere worse, no proof yet
     assert "rw" not in out                                # the no-direction baseline is not an analyst
     assert out["bad"]["worst"]["horizon"] == "1h" and out["bad"]["worst"]["n"] == 400
 

@@ -263,7 +263,7 @@ window.addEventListener("resize", () => { if (innerWidth === lastW) return; last
 
 // 5. The sieve and each analyst's journal (owner 2026-11-27: record who said what, why, when, and whether it came true;
 // then filter: keep what works, remove the rest, a simple system)
-const SV = { "saxla": "🟢 saxla", "pis": "🔴 ardıcıl səhv", "fərqsiz": "⚪ fərqsiz", "az": "⏳ az" };
+const SV = { "saxla": "🟢 saxla", "ümidli": "🔵 ümidli", "qarışıq": "🟡 qarışıq", "pis": "🔴 ardıcıl səhv", "fərqsiz": "⚪ fərqsiz", "az": "⏳ az" };
 const SV_H = { "15m": "15 dəq", "30m": "30 dəq", "1h": "1 saat", "4h": "4 saat", "1d": "1 gün", "3d": "3 gün", "1w": "1 həftə", "10d": "10 gün", "1mo": "1 ay" };
 const svCell = (c) => !c ? "—" : `${SV_H[c.horizon] || c.horizon} ${c.mode === "live" ? "canlı" : "keçmiş"}: ${pc(c.hit)} / ${pc(c.bar)} · ${c.n_eff}`;
 async function loadSieve() {

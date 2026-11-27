@@ -4,8 +4,9 @@ həftəlikdə — müqayisə edək»).
 For a period (today, yesterday, the last 7 or 30 days, New York days) and a metal (or all four): every method's live
 forecasts that were CHECKED in the period and took a side (the Judge's own rule: p_up exactly 0.5 is no side), how
 many came true, and the chance of being right by luck in that same period: each up call is worth the market's up
-share of that horizon in the period, each down call its down share. Being right more often than that chance, over
-many calls, is what matters; the Judge decides proof (cost, multiple tests), this table only shows who leads.
+share on the moments that method spoke, each down call its down share. Being right more often than that chance, over
+many calls, is what matters; the Judge decides proof (cost, multiple tests), this table only shows who leads. The
+chance is the Judge's own: the method's up/down mix against the market's up share on the same moments.
 Read only, from the forecasts table (its recent-forecasts index)."""
 from __future__ import annotations
 
@@ -59,15 +60,17 @@ def board(db: DB, symbol: str = "ALL", period: str = "day", now: float | None = 
     for r in rows:
         if r["hit"] is None or r["outcome"] is None:
             continue
-        up_share = market_up.get(r["horizon"], 0.5)
-        c = methods.setdefault(r["method"], {}).setdefault(r["horizon"], {"n": 0, "right": 0, "up": 0, "chance": 0.0})
+        c = methods.setdefault(r["method"], {}).setdefault(r["horizon"], {"n": 0, "right": 0, "up": 0, "market_up": 0})
         c["n"] += 1
         c["right"] += r["hit"]
-        said_up = r["p_up"] > 0.5
-        c["up"] += int(said_up)
-        c["chance"] += up_share if said_up else 1 - up_share
+        c["up"] += int(r["p_up"] > 0.5)
+        c["market_up"] += r["outcome"]
+    # the chance of being right by luck, the Judge's own null (judge._stats): the same mix of up and down calls on the
+    # SAME moments, L x U + (1 - L) x (1 - U). A period-wide up share was used first (27.11): it called the news block
+    # «consistently wrong» when the market simply rose more at the moments it spoke.
     for per in methods.values():
         for c in per.values():
-            c["chance"] = c["chance"] / c["n"]
+            lo, uo = c["up"] / c["n"], c.pop("market_up") / c["n"]
+            c["chance"] = lo * uo + (1 - lo) * (1 - uo)
     return {"symbol": symbol, "period": period, "from": start, "to": end, "horizons": list(HORIZONS),
             "market_up": market_up, "methods": methods}
