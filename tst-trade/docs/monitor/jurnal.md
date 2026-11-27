@@ -211,3 +211,12 @@
   günlər əvvəlki kimi sayılır. Yalnız göstərici — proqnoz, bal, çəki dəyişmir. Testlər: 3 yeni, cəmi 314 yaşıl.
 - **Bloklar yoxlaması** xəbər blokunu hələ «qırıq» göstərir — 16:46 NY-də hesablanıb (xəbər düzəlişindən əvvəl);
   Hakimdə `xeber` artıq fikir verir (15 dəq, 12 hal). Növbəti gündəlik hesabda yenilənməlidir.
+
+## 2026-11-26 23:30 NY — saytın quruluşu (sahibin tapşırığı)
+- Sahib: təhlükəsizlik real pul qoyulana qədər gözləyir; əsas iş saytdır — həddindən artıq panel, lazımlı-lazımsız
+  hər şey bir yerdə. Plan təsdiqləndi, 4 mərhələdə edildi (heç nə silinmədi, yalnız yer dəyişdi və yığcamlaşdı).
+- Menyu 13 düymədən 4 + sağda 2-yə endi; Panel: vəziyyət → qiymət → qrafik → alətlər → proqnozlar (2 650 → 2 135 px,
+  telefonda 6 750 → 4 990 px); Admin 8 700 px-lik səhifədən 5 taba (hər biri ~1 ekran); Sistem Admin-in içində.
+- Agentlər: beyin 60 %, agentlər şüşə disk + halə, işıq impulsu parlaq və izlənən, çatanda halqa.
+- Yoxlama: sınaq serverində (DEMO) hər səhifə masaüstü və telefonda — brauzer xətası yoxdur, telefonda eninə çıxma
+  yoxdur; testlər 316/316. 1-ci mərhələ 23:21 NY-də serverdədir; 2–4 bazanın sıxılmasından sonra göndərilir.

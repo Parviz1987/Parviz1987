@@ -33,6 +33,17 @@ sübutu ilə**. Sübut olmayan heç nə pula (hətta kağız ticarətə) getmir.
    - Hadisələr kitabxanası `app/eventlib.py` — ABŞ rəqəmləri (CPI, NFP, ÜDM, PCE), Fed qərarları, **geosiyasət**
      (GDELT, sahibin 27.11 istəyi). Beyinlərə yalnız kölgə sınağından keçən hissə.
    - Ara yol: keçmişdə balı ≥ 70 üsul canlıda tez kölgəyə; kağız ticarət üçün canlı sübut şərt.
+5. **Saytın quruluşu** (26.11 23:00 NY, yeni sessiya; sahib planı «Bəli, bu planla et» ilə təsdiqlədi): «hər şey öz
+   yerində, lazımlı görünsün, yorucu olmasın». Heç nə silinmir, yalnız yerini dəyişir, birləşir, yığcam olur.
+   - Menyu: solda **Panel · Nəticələr · Bloklar · Agentlər**, sağda **Ehtiyat · ⚙ Admin · Çıxış**. 6 blok səhifəsi
+     «Bloklar»ın altındadır (ikinci sıra: Ümumi · Texniki · Fundamental · Xəbər · Bazarlar · Vaxt · Bilik).
+   - Panel yuxarıdan aşağı: sistemin vəziyyəti və qərar lenti → qiymətlər + bazarlar zolağı → qrafik → qrafik
+     alətləri → proqnozlar (yığcam kartlar, sabah üçün, etibar işığı, strateq). Panelə yeni bölmə əlavə etmə: öz
+     səhifəsinə qoy (`static/sections.js`: Hakim və yoxlananlar → Nəticələr; makro, COT, ABŞ rəqəmləri →
+     Fundamental; iqtisadi təqvim → Vaxt; Kəşfiyyatçı, Oxuyucu yoxlaması → Xəbər).
+   - Admin 5 tabdır (Mənbələr və açarlar · Beyinlər · Təhlükəsizlik · Sistem · Strategiya və ticarət); köhnə
+     «Sistem» səhifəsi Admin-in Sistem tabıdır (`/status` → `/admin#sistem`). Açar/beyin = bir sətir, «Aç» ilə ətraflı.
+   - Agentlər: beyin kiçik (60 %), agentlər önə; işıq yalnız real hadisədə, çatanda halqa açılır.
 
 ## 4. Sahibin suallarına verilən əsas cavablar (təkrar soruşulsa)
 - **«21 blok neçəsi hazırdır?»** (27.11): 12 hazır və işləyir, 9 qurulub və işləyir amma xərcdən sonra sübut
