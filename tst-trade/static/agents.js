@@ -36,7 +36,6 @@ function ago(t) {
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const curState = () => (mode === "live" ? live : shown);
 const phone = () => matchMedia("(max-width:760px)").matches;
-if ($("hx") && !phone()) $("hx").open = true;     // the header's limits and sync rows: shown at once on a wide screen
 
 // ---------- the agents ("bots") ----------
 let BOTS = [], BY = {}, CORE = null;   // BY: id -> bot; CORE: the orchestrator, drawn as the brain
@@ -647,42 +646,6 @@ function logEvent(e) {
   ul.prepend(li);
   while (ul.children.length > 40) ul.lastChild.remove();
 }
-const MKT_SHOW = ["XAU", "XAG", "XPT", "XPD", "DXY", "US10Y", "OIL", "VIX"];
-async function loadMarkets() {
-  try {
-    const r = await fetch("/api/markets?metal=XAU", { credentials: "same-origin" });
-    if (!r.ok) return;
-    const d = await r.json();
-    $("mkts").innerHTML = d.markets.filter((m) => MKT_SHOW.includes(m.code)).map((m) => {
-      const ch = m.price && m.day_open ? (m.price / m.day_open - 1) * 100 : null;
-      const col = ch == null ? "var(--muted)" : ch >= 0 ? "var(--done)" : "var(--err)";
-      return `<div class="mk"><b>${esc(m.name)}</b><span class="v">${m.price != null ? m.price.toFixed(m.price > 100 ? 2 : 3) : "—"}</span>
-        <span class="s">${esc(m.status || "")} · <span style="color:${col}">${ch == null ? "—" : (ch >= 0 ? "+" : "") + ch.toFixed(2) + " %"}</span> gün</span></div>`;
-    }).join("");
-    showMetals(d.markets, Date.now() / 1000 + skew);
-  } catch (e) { /* keep the last view */ }
-}
-// the four metals on the stage, next to the eyes: price from the market data provider only, its status when not
-// LIVE, a short up/down colour tick when the price changed since the last check, and the check time (New York)
-const METAL_CODES = ["XAU", "XAG", "XPT", "XPD"], lastPx = {}, tickT = {};
-function showMetals(rows, ts) {
-  const box = $("metals");
-  if (!box) return;
-  const by = Object.fromEntries(rows.map((m) => [m.code, m]));
-  box.innerHTML = METAL_CODES.map((c) => {
-    const m = by[c] || {}, p = m.price;
-    let tick = "";
-    if (p != null && lastPx[c] != null && p !== lastPx[c]) tickT[c] = [p > lastPx[c] ? "up" : "down", ts];
-    if (p != null) lastPx[c] = p;
-    if (tickT[c] && ts - tickT[c][1] < 15) tick = tickT[c][0];
-    const stc = m.status || "OFFLINE";
-    return `<span class="mt ${tick}" title="${esc(m.name || c)} · ${esc(stc)}"><b>${c}</b> <span class="v">${p != null ? p.toFixed(p > 100 ? 2 : 3) : "—"}</span>` +
-      `<i aria-hidden="true">${tick === "up" ? "▲" : tick === "down" ? "▼" : ""}</i>` +
-      `${stc !== "LIVE" ? `<span class="ms ${esc(stc)}">${esc(stc)}</span>` : ""}</span>`;
-  }).join("") + `<span class="mtime">yoxlandı ${ny(ts, true)} NY</span>`;
-  clearTimeout(showMetals.t);
-  showMetals.t = setTimeout(() => box.querySelectorAll(".mt.up,.mt.down").forEach((x) => x.classList.add("fade")), 2500);
-}
 const DESK_SHOW = ["15m", "1h", "4h", "1d", "1w", "1mo"];
 const SHORT = { "15m": "15d", "1h": "1s", "4h": "4s", "1d": "1g", "1w": "1h", "1mo": "1a" };
 async function loadDecision() {
@@ -699,6 +662,8 @@ async function loadDecision() {
         ` · beyinlərin fikir ayrılığı ${m.uncertainty == null ? "—" : Math.round(m.uncertainty * 100) + " bənd"}`;
       if (nerveState === "HƏYƏCAN") lastPulse = performance.now();
     }
+    // the decisions and the risk gates are on the panel (its forecasts table); here only the nervous state is used
+    if (!$("decision")) return;
     const syms = Object.keys(ms);
     if (!syms.length) { $("decision").innerHTML = "<p class='note'>Hesablanır (dəqiqədə bir)…</p>"; return; }
     $("gates").innerHTML = syms.map((s) => {
@@ -756,27 +721,8 @@ async function loadEvents() {
     events.slice(-30).forEach(logEvent);
   } catch (e) { /* the live stream still works */ }
 }
-async function loadTop() {
-  try {
-    const r = await fetch("/api/agents/top", { credentials: "same-origin" });
-    if (!r.ok) return;
-    const d = await r.json();
-    $("limits").innerHTML = d.limits.map((l) => {
-      const f = l.cap > 0 ? Math.min(1, l.spent / l.cap) : 0;
-      return `<span class="lim${f > 0.8 ? " hot" : ""}" title="${esc(l.name)}: $${l.spent.toFixed(2)} / $${l.cap.toFixed(0)}">
-        <span>${esc(l.name)} $${l.spent.toFixed(2)}/${l.cap.toFixed(0)}</span><i><b style="width:${Math.round(f * 100)}%"></b></i></span>`;
-    }).join("") || '<span class="chip">Beyin qoşulmayıb</span>';
-    $("sync").innerHTML = Object.entries(d.sync).map(([k, t]) => {
-      const age = t ? now() - t : Infinity;
-      const cls = !t ? "bad" : (k === "Qiymət" ? age < 60 : age < 6 * 3600) ? "ok" : "old";
-      return `<span class="chip ${cls}" title="${t ? ny(t, true) + " NY" : "heç vaxt"}">${esc(k)} ${t ? ago(t) : "—"}</span>`;
-    }).join("");
-  } catch (e) { /* keep the last values */ }
-}
 setInterval(() => { $("clock").textContent = ny(now(), true) + " NY"; if (mode === "live") render(); }, 1000);
-setInterval(loadTop, 15000);
-setInterval(loadMarkets, 20000); setInterval(loadDecision, 30000);
-loadMarkets(); loadDecision();
+setInterval(loadDecision, 30000);
+loadDecision();
 loadEvents().then(connect);
-loadTop();
 requestAnimationFrame(draw);

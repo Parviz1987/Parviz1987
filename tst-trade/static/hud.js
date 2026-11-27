@@ -1,55 +1,21 @@
-// The panel's HUD (owner 2026-11-24, Radar Gold brief): a live core that breathes with the system's state, the
-// decision strip (4 metals x 6 horizons: AL / SAT / GÖZLƏ with the reason), a simple mode, and optional sound and
-// vibration on alarms and on a new AL / SAT. Indication only: nothing here places an order.
+// The panel's forecasts table (owner 2026-11-26: one place for forecasts, no big empty boxes): 4 metals x 6 horizons,
+// each cell the decision (AL / SAT / GÖZLƏ with the reason) and the 80 % range; a cell opens the forecast card with
+// both ranges and every method. The system's state sits in the header. Sound and vibration on alarms and on a new
+// AL / SAT, and a simple mode. Indication only: nothing here places an order.
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const NAMES = { XAU: "Qızıl", XAG: "Gümüş", XPT: "Platin", XPD: "Palladium" };
   const DESKS = [["15m", "15 dəq"], ["1h", "1 saat"], ["4h", "4 saat"], ["1d", "1 gün"], ["1w", "1 həftə"], ["1mo", "1 ay"]];
-  const ST_COL = { "SAKİT": [56, 200, 255], "DİQQƏT": [240, 181, 74], "HƏYƏCAN": [255, 93, 108] };
   const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
-  const hud = $("hud");
-  if (!hud) return;
+  const grid = $("fgrid");
+  if (!grid) return;
 
-  let state = "SAKİT", gates = {}, lastCalls = null, pulseAt = 0;
-
-  // ---------- the core: a particle sphere with the four metals orbiting (green = gate open, amber = closed) ----------
-  const cv = $("core"), cx = cv.getContext("2d");
-  const PTS = Array.from({ length: 260 }, (_, i) => {
-    const y = 1 - (i / 259) * 2, r = Math.sqrt(1 - y * y), a = i * 2.399963;
-    return [Math.cos(a) * r, y, Math.sin(a) * r];
-  });
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  function frame(tms) {
-    const w = cv.clientWidth, h = cv.clientHeight, dpr = devicePixelRatio || 1;
-    if (cv.width !== Math.round(w * dpr)) { cv.width = w * dpr; cv.height = h * dpr; }
-    cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, w, h);
-    const t = still ? 0 : tms / 1000, col = ST_COL[state] || ST_COL["SAKİT"];
-    const beat = state === "HƏYƏCAN" ? 0.5 + 0.5 * Math.sin(t * 6) : state === "DİQQƏT" ? 0.3 + 0.3 * Math.sin(t * 2.5) : 0.15;
-    const flash = Math.max(0, 1 - (performance.now() - pulseAt) / 1200);
-    const ox = w / 2, oy = h / 2, R = Math.min(w, h) * 0.3 * (1 + 0.04 * beat + 0.08 * flash);
-    const g = cx.createRadialGradient(ox, oy, R * 0.1, ox, oy, R * 1.9);
-    g.addColorStop(0, `rgba(${col},${0.25 + 0.25 * beat + 0.3 * flash})`); g.addColorStop(1, "rgba(0,0,0,0)");
-    cx.fillStyle = g; cx.beginPath(); cx.arc(ox, oy, R * 1.9, 0, 7); cx.fill();
-    const spin = t * (state === "HƏYƏCAN" ? 0.9 : state === "DİQQƏT" ? 0.5 : 0.25), tilt = 0.4;
-    for (const [px, py, pz] of PTS) {
-      const x = px * Math.cos(spin) - pz * Math.sin(spin), z0 = px * Math.sin(spin) + pz * Math.cos(spin);
-      const y = py * Math.cos(tilt) - z0 * Math.sin(tilt), z = py * Math.sin(tilt) + z0 * Math.cos(tilt);
-      const a = 0.15 + 0.85 * (z + 1) / 2;
-      cx.fillStyle = `rgba(${col},${a})`; cx.beginPath(); cx.arc(ox + x * R, oy + y * R, 0.5 + a * 1.2, 0, 7); cx.fill();
-    }
-    Object.keys(NAMES).forEach((s, i) => {
-      const a = t * 0.6 + i * Math.PI / 2, rx = Math.min(R * 1.45, w / 2 - 26), ry = R * 0.55;
-      const X = ox + Math.cos(a) * rx, Y = oy + Math.sin(a) * ry, open = gates[s] !== false;
-      cx.fillStyle = open ? "#3ee08f" : "#f0b54a"; cx.shadowColor = cx.fillStyle; cx.shadowBlur = 8;
-      cx.beginPath(); cx.arc(X, Y, 3.2, 0, 7); cx.fill(); cx.shadowBlur = 0;
-      cx.fillStyle = "rgba(232,238,252,.75)"; cx.font = "9px ui-monospace,monospace";
-      cx.fillText(s, X > ox ? X - 24 : X + 5, Y + 3);              // the label always stays inside the core
-    });
-    requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
+  let state = "SAKİT", lastCalls = null;
+  const ranges = {};          // metal -> horizon -> {lo50, hi50, lo80, hi80, target_t, direction}
+  const rf = (v) => v == null ? "—" : v >= 1000 ? v.toFixed(0) : v >= 100 ? v.toFixed(1) : v.toFixed(2);
+  const curSym = () => { try { return typeof sym === "string" ? sym : "XAU"; } catch (e) { return "XAU"; } };
 
   // ---------- sound and vibration (off by default; the browser allows sound only after a tap) ----------
   let audio = null;
@@ -69,7 +35,18 @@
     if (navigator.vibrate) navigator.vibrate(alarm ? [180, 90, 180, 90, 180] : [120, 60, 120]);
   }
 
-  // ---------- decision strip ----------
+  // ---------- the forecasts table ----------
+  async function loadRanges() {
+    await Promise.all(Object.keys(NAMES).map(async (s) => {
+      try {
+        const r = await fetch(`/api/results?symbol=${s}&horizon=1h`, { credentials: "same-origin" });
+        if (!r.ok) return;
+        const d = await r.json();
+        ranges[s] = Object.fromEntries((d.expect || []).map((e) => [e.horizon, e]));
+      } catch (e) { /* the cell shows — */ }
+    }));
+  }
+  let lastD = null;
   async function load() {
     let d;
     try {
@@ -77,32 +54,41 @@
       if (!r.ok) return;
       d = await r.json();
     } catch (e) { return; }
-    const ms = d.metals || {}, st = d.state || {};
+    lastD = d;
+    const st = d.state || {};
     const prev = state;
     state = st.state || "SAKİT";
-    gates = Object.fromEntries(Object.entries(ms).map(([s, x]) => [s, x.gate.open]));
     const mod = st.mod || {};
     $("hstate").className = "hstate " + state;
     $("hstate").textContent = state;
+    $("hstate").title = `Sistemin vəziyyəti · oyanıqlıq ${mod.arousal == null ? "—" : Math.round(mod.arousal * 100) + "%"} · fikir ayrılığı ` +
+      `${mod.uncertainty == null ? "—" : Math.round(mod.uncertainty * 100)} · qızılda sürpriz ${mod.surprise && mod.surprise.XAU != null ? mod.surprise.XAU.toFixed(1) : "—"}`;
     $("hwhy").textContent = st.why || "";
-    $("hmod").innerHTML = `<span title="Son saatın hərəkəti son 60 günə nisbətən">oyanıqlıq <b>${mod.arousal == null ? "—" : Math.round(mod.arousal * 100) + "%"}</b></span>
-      <span title="Strateq, ikinci beyin və müzakirə nə qədər razı deyil">fikir ayrılığı <b>${mod.uncertainty == null ? "—" : Math.round(mod.uncertainty * 100)}</b></span>
-      <span title="Qızıl öz 1 saatlıq proqnozumuzdan nə qədər uzaqdır (|z| > 1 = koridordan çıxıb)">sürpriz <b>${mod.surprise && mod.surprise.XAU != null ? mod.surprise.XAU.toFixed(1) : "—"}</b></span>`;
+    draw();
     const calls = [];
-    $("hgrid").innerHTML = `<div class="hg-h"></div>` + DESKS.map(([, n]) => `<div class="hg-h">${n}</div>`).join("") +
+    Object.entries(d.metals || {}).forEach(([s, x]) => x.desks.forEach((c) => { if (c.call !== "GÖZLƏ") calls.push(`${s}:${c.horizon}:${c.call}`); }));
+    const newCall = lastCalls && calls.some((c) => !lastCalls.includes(c));
+    if ((prev !== "HƏYƏCAN" && state === "HƏYƏCAN" && lastCalls !== null) || newCall) chime(!newCall);
+    lastCalls = calls;
+  }
+  function draw() {
+    if (!lastD) return;
+    const ms = lastD.metals || {}, cur = curSym();
+    grid.innerHTML = `<div class="fg-h"></div>` + DESKS.map(([, n]) => `<div class="fg-h">${n}</div>`).join("") +
       Object.keys(NAMES).map((s) => {
         const x = ms[s] || { desks: [], gate: { open: true, reasons: [] } };
+        const gt = x.gate.open ? "risk qapısı açıq" : "risk qapısı bağlı: " + (x.gate.reasons[0] || "");
         const row = DESKS.map(([h]) => {
           const c = x.desks.find((k) => k.horizon === h) || { call: "GÖZLƏ", why: "hesablanır" };
-          if (c.call !== "GÖZLƏ") calls.push(`${s}:${h}:${c.call}`);
-          return `<div class="hg ${c.call}" data-m="${s}" data-h="${h}" role="button" tabindex="0" title="${esc(NAMES[s] + " · " + (c.name || h) + ": " + (c.why || "") + " · toxun: proqnoz kartı")}">${c.call === "GÖZLƏ" ? "·" : c.call}</div>`;
+          const e = (ranges[s] || {})[h];
+          const dir = e && e.direction ? (e.direction.up ? "▲" : "▼") : "";
+          return `<div class="fc ${c.call}${s === cur ? " cur" : ""}" data-m="${s}" data-h="${h}" data-n="${DESKS.find((k) => k[0] === h)[1]}" role="button" tabindex="0"
+            title="${esc(NAMES[s] + " · " + (c.name || h) + ": " + (c.why || "") + " · toxunun: ətraflı")}">
+            <b>${c.call === "GÖZLƏ" ? (dir || "GÖZLƏ") : dir + " " + c.call}</b><span>${e && e.lo80 != null ? rf(e.lo80) + " – " + rf(e.hi80) : "—"}</span></div>`;
         }).join("");
-        const gt = x.gate.open ? "açıq" : "bağlı: " + (x.gate.reasons[0] || "");
-        return `<div class="hg-m" title="Risk qapısı ${esc(gt)}"><i class="${x.gate.open ? "ok" : "shut"}"></i>${NAMES[s]}</div>${row}`;
+        return `<button type="button" class="fg-m${s === cur ? " cur" : ""}" data-sel="${s}" title="${esc(gt)} · toxunun: qrafik bu metala keçir"><i class="${x.gate.open ? "ok" : "shut"}"></i>${NAMES[s]}</button>${row}`;
       }).join("");
-    const newCall = lastCalls && calls.some((c) => !lastCalls.includes(c));
-    if ((prev !== "HƏYƏCAN" && state === "HƏYƏCAN" && lastCalls !== null) || newCall) { pulseAt = performance.now(); chime(!newCall); }
-    lastCalls = calls;
+    $("fcupd").textContent = "yeniləndi " + new Date().toLocaleTimeString("az", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" }) + " NY";
   }
 
   // ---------- Block 16: the frozen forecast card (opens on a decision cell) ----------
@@ -118,8 +104,18 @@
     const c = mine[0];
     const pct = (p) => (p == null ? "—" : Math.round(p * 100) + " %");
     const row = (k, v) => `<div class="cr"><span>${k}</span><span>${v}</span></div>`;
-    let html = `<h3>${NAMES[sym]} · ${HN[h]} · proqnoz kartı</h3>`;
-    if (desk !== h) html += `<p class="note">Bu müddət (${esc(desk)}) üçün beyin kartı yoxdur; ən yaxın müddət göstərilir. Qərar lentindəki xana Hakimin metodlarından gəlir.</p>`;
+    const DN = Object.fromEntries(DESKS);
+    const dc = ((lastD && lastD.metals[sym]) || { desks: [] }).desks.find((k) => k.horizon === desk) || {};
+    const e = (ranges[sym] || {})[desk];
+    let html = `<h3>${NAMES[sym]} · ${DN[desk] || desk}</h3><div class="cgrid">` +
+      row("Qərar", `<b>${esc(dc.call || "GÖZLƏ")}</b> · ${esc(dc.why || "—")}`) +
+      row("50 % aralıq", e && e.lo50 != null ? `${rf(e.lo50)} – ${rf(e.hi50)}` : "—") +
+      row("80 % aralıq", e && e.lo80 != null ? `${rf(e.lo80)} – ${rf(e.hi80)}` : "—") +
+      row("Yoxlanır", e && e.target_t ? nyTime(e.target_t) + " NY" : "—") +
+      row("İstiqamət", e && e.direction ? `${e.direction.up ? "▲ yuxarı" : "▼ aşağı"} ${pct(e.direction.p)} · ${esc(e.direction.method)}` : "göstərilmir: Hakimin sübutu yoxdur") +
+      `</div><details class="meth" id="cardMeth"><summary>Bütün üsullar</summary><p class="note">yüklənir…</p></details>
+      <h3 class="sub">Strateqin kartı (${HN[h]})</h3>`;
+    if (desk !== h) html += `<p class="note">Bu müddət üçün strateqin kartı yoxdur; ən yaxın müddət (${HN[h]}) göstərilir.</p>`;
     if (!c) {
       html += `<p class="note">Hələ kart yoxdur: Strateq növbəti dəfə işləyəndə yaranacaq.</p>`;
     } else {
@@ -143,9 +139,27 @@
     if (mine.length > 1) html += `<div class="chist">` + mine.slice(1, 8).map((x) => `<div>${nyTime(x.known_ts)} · ${pct(x.p)} · ${x.result ? (RES[x.result] || esc(x.result)) : "gözlənilir"}</div>`).join("") + `</div>`;
     $("cardBody").innerHTML = html;
     $("cardDlg").showModal();
+    // every method's view on this horizon, only when asked (the forecasts reply is large)
+    $("cardMeth").addEventListener("toggle", async () => {
+      if (!$("cardMeth").open || $("cardMeth").dataset.done) return;
+      try {
+        const f = await (await fetch(`/api/forecasts?symbol=${sym}`, { credentials: "same-origin" })).json();
+        const c = f.cards.find((k) => k.horizon === desk);
+        $("cardMeth").dataset.done = "1";
+        $("cardMeth").innerHTML = `<summary>Bütün üsullar</summary>` + (c && c.methods.length ? `<table><tr><th>Üsul</th><th>Yuxarı ehtimalı</th><th>Əsas</th></tr>` +
+          c.methods.map((m) => `<tr><td>${esc(f.method_names[m.method])}</td><td class="n">${(m.p_up * 100).toFixed(1)} %</td><td>${esc(m.basis)}</td></tr>`).join("") + "</table>"
+          : "<p class='note'>Hələ proqnoz yoxdur.</p>");
+        $("cardMeth").open = true;
+      } catch (err) { /* stays «yüklənir» */ }
+    });
   }
-  $("hgrid").addEventListener("click", (ev) => { const c = ev.target.closest(".hg[data-m]"); if (c) openCard(c.dataset.m, c.dataset.h); });
-  $("hgrid").addEventListener("keydown", (ev) => { const c = ev.target.closest(".hg[data-m]"); if (c && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); openCard(c.dataset.m, c.dataset.h); } });
+  grid.addEventListener("click", (ev) => {
+    const c = ev.target.closest(".fc[data-m]"); if (c) { openCard(c.dataset.m, c.dataset.h); return; }
+    const m = ev.target.closest("[data-sel]");      // a metal's name: the panel (tiles, chart) moves to that metal
+    if (m) { const t = document.querySelector(`.tile[data-s="${m.dataset.sel}"]`); if (t) t.click(); setTimeout(draw, 50); }
+  });
+  grid.addEventListener("keydown", (ev) => { const c = ev.target.closest(".fc[data-m]"); if (c && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); openCard(c.dataset.m, c.dataset.h); } });
+  document.addEventListener("click", (ev) => { if (ev.target.closest(".tile")) setTimeout(draw, 50); });
 
   // ---------- simple mode and sound buttons ----------
   function setSimple(on) {
@@ -165,6 +179,7 @@
   $("bsound").onclick = () => setSound(pref("tst_sound") !== "1");
   setSimple(pref("tst_simple") === "1");
   $("bsound").textContent = pref("tst_sound") === "1" ? "🔔 Səs açıq" : "🔕 Səs";
-  load();
+  loadRanges().then(load);
   setInterval(load, 20000);
+  setInterval(() => loadRanges().then(draw), 60000);
 })();

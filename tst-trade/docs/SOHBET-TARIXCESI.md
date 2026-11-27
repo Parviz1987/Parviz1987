@@ -37,10 +37,15 @@ sübutu ilə**. Sübut olmayan heç nə pula (hətta kağız ticarətə) getmir.
    yerində, lazımlı görünsün, yorucu olmasın». Heç nə silinmir, yalnız yerini dəyişir, birləşir, yığcam olur.
    - Menyu: solda **Panel · Nəticələr · Bloklar · Agentlər**, sağda **Ehtiyat · ⚙ Admin · Çıxış**. 6 blok səhifəsi
      «Bloklar»ın altındadır (ikinci sıra: Ümumi · Texniki · Fundamental · Xəbər · Bazarlar · Vaxt · Bilik).
-   - Panel yuxarıdan aşağı: sistemin vəziyyəti və qərar lenti → qiymətlər + bazarlar zolağı → qrafik → qrafik
-     alətləri → proqnozlar (yığcam kartlar, sabah üçün, etibar işığı, strateq). Panelə yeni bölmə əlavə etmə: öz
-     səhifəsinə qoy (`static/sections.js`: Hakim və yoxlananlar → Nəticələr; makro, COT, ABŞ rəqəmləri →
-     Fundamental; iqtisadi təqvim → Vaxt; Kəşfiyyatçı, Oxuyucu yoxlaması → Xəbər).
+   - Panel yuxarıdan aşağı (sahib 27.11 00:00 NY, ikinci düzəliş): qiymətlər + bazarlar zolağı → etibar işığı (bir
+     sətir) → **bir proqnoz cədvəli** (4 metal × 6 üfüq: qərar + 80 % aralıq; xana = kart, «Sabah üçün» bağlı) →
+     qrafik və alətləri → strateq. Sistemin vəziyyəti, Səs, Sadə rejim başlıqdadır; böyük kürəli «Qərar lenti»
+     qutusu yoxdur. Panelə yeni bölmə əlavə etmə: öz səhifəsinə qoy (`static/sections.js`: Hakim və yoxlananlar →
+     Nəticələr; makro, COT, ABŞ rəqəmləri → Fundamental; iqtisadi təqvim → Vaxt; Kəşfiyyatçı, Oxuyucu → Xəbər).
+   - **Bir fakt — bir yer** (sahib: «burada görsənirsə, başqa paneldə olmamalıdır»): qiymət, qərar, risk qapısı →
+     yalnız Panel; beyin limitləri, mənbələrin təzəliyi → Admin; Agentlər = yalnız canlı sinir sistemi + hadisə
+     jurnalı; Nəticələr = «nə dedik, nə oldu» (proqnoz yox); qaydaların izahı və Hakimin hökmü → öz blok səhifəsi
+     (Bilik-də təkrar yox).
    - Admin 5 tabdır (Mənbələr və açarlar · Beyinlər · Təhlükəsizlik · Sistem · Strategiya və ticarət); köhnə
      «Sistem» səhifəsi Admin-in Sistem tabıdır (`/status` → `/admin#sistem`). Açar/beyin = bir sətir, «Aç» ilə ətraflı.
    - Agentlər: beyin kiçik (60 %), agentlər önə; işıq yalnız real hadisədə, çatanda halqa açılır.

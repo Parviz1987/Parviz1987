@@ -21,17 +21,14 @@
       const s = m.strateq, t = m.terazi, v = m.vote, rg = m.range;
       const cls = m.lean_dir > 0 ? "up" : m.lean_dir < 0 ? "down" : "mut";
       const arrow = (m.lean_dir || m.weak_dir) > 0 ? "▲ " : (m.lean_dir || m.weak_dir) < 0 ? "▼ " : "";
-      // At a glance: the lean, the unified forecast, the two ranges and the analysts' vote. Everything else (proof,
-      // the three-way split, the strategist's reasons, the chart reader, the scale, scenarios, evidence) is one click away.
+      // Inside «Sabah üçün» on the panel (folded): the lean, the unified forecast, the voices and their reasons. The 1-day
+      // ranges are in the forecasts table, not repeated here.
       const vp = m.vahid ? m.vahid.p : null;
       return `<div class="olc">
         <div class="olh"><b>${NAMES[m.symbol]}</b><span class="ol-lean ${cls}">${arrow}${esc(m.lean)}</span></div>
         ${m.vahid ? `<div class="olv"><span>Vahid proqnoz · ${PROOF[m.vahid.proof] || "⏳ hələ az yoxlanıb"}</span>
           <b class="${vp >= 0.53 ? "up" : vp <= 0.47 ? "down" : "mut"}">${dirWord(vp)} ${pct(vp)}</b></div>` : ""}
-        <div class="olr"><span>Aralıq (80 %)</span><span class="num">${rg ? px(rg.lo80) + " – " + px(rg.hi80) : "—"}</span></div>
-        <div class="olr"><span>Aralıq (50 %)</span><span class="num">${rg ? px(rg.lo50) + " – " + px(rg.hi50) : "—"}</span></div>
-        <div class="olr"><span>Səslər</span><span>Strateq ${s ? dirWord(s.p) + " " + pct(s.p) : "—"} · Qrafik ${m.chartist ? dirWord(m.chartist.p) : "—"} · ▲ ${v.up} ▼ ${v.down}</span></div>
-        <details class="olmore"><summary>Ətraflı: sübut, səbəblər, ssenarilər</summary>
+        <div class="olr"><span>Analitiklərin səsi</span><span>▲ ${v.up} · ▼ ${v.down}</span></div>
         <div class="note">${esc(m.agree)}${m.proof === "sübut" ? " · 1 günlük masada sübutlu üsul: " + esc(m.proof_method || "") : ""}</div>
         ${m.vahid ? `${m.three_way ? `<div class="note">Üç nəticə: ▲ ${pct(m.three_way.up)} · ▼ ${pct(m.three_way.down)} · neytral (xərcdən kiçik hərəkət, ±${(m.three_way.band * 100).toFixed(2)} %) ${pct(m.three_way.neutral)}</div>` : ""}
           <div class="note">Öz-özünü sınaq: ${m.vahid.self_test.n || 0} proqnoz, düz ${pct(m.vahid.self_test.hit_rate)} (hədd ${pct(m.vahid.self_test.bar)}) · canlı: ${m.vahid.live.n || 0} yoxlanıb${m.vahid.live.n ? ", düz " + pct(m.vahid.live.hit_rate) : ""}</div>` : ""}
@@ -50,7 +47,6 @@
           : `${x.name === "yuxarı" ? "▲" : "▼"} ${x.name} ${pct(x.p)}: ${px(x.from)}-dən ${x.name === "yuxarı" ? "yuxarı" : "aşağı"}, ehtimal olunan ${px(x.mid)}, uzaq hədd ${px(x.far)}`).join("<br>")}</div>` : ""}
         ${m.evidence && (m.evidence.pro.length || m.evidence.con.length) ? `<div class="olw"><b>${m.evidence.lean ? "Lehinə dəlillər" : "Yuxarı deyənlər"}:</b> ${m.evidence.pro.map(ev).join("; ") || "yoxdur"}</div>
         <div class="olw"><b>${m.evidence.lean ? "Əleyhinə dəlillər (əks dəlil)" : "Aşağı deyənlər"}:</b> ${m.evidence.con.map(ev).join("; ") || "yoxdur"}</div>` : ""}
-        </details>
       </div>`;
     }).join("");
   }

@@ -1,4 +1,4 @@
-/* TST Trade panel: prices, the chart and its tools, forecast cards and the strategist's note. The Judge's tables and the
+/* TST Trade panel: prices, the chart and its tools and the strategist's note (the forecasts table: static/hud.js). The Judge's tables and the
    journal are on the results page, news, fundamentals and the calendar on their block pages (static/sections.js). */
 const $ = (id) => document.getElementById(id);
 const TFS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"];
@@ -49,11 +49,10 @@ function renderTiles(st) {
     const cls = ch == null ? "mut" : ch >= 0 ? "up" : "down";
     return `<button class="tile ${m.symbol === sym ? "sel" : ""}" data-s="${m.symbol}">
       <div class="row"><span class="nm">${esc(m.name)}</span><span class="pill ${m.status}">${STATUS_AZ[m.status] || m.status}</span></div>
-      <div class="row"><span class="px">${exact(m.price)}</span><span class="sym">${m.symbol}/USD · unsiya</span></div>
-      <div class="row"><span class="ch ${cls}">${ch == null ? "—" : (ch >= 0 ? "+" : "") + (ch * 100).toFixed(2) + " % gün"}</span></div>
-      <div class="src">Mənbə: <b>${esc(PROVIDER_AZ[m.source] || m.source || "—")}</b></div>
-      <div class="src">${m.source_ts ? (m.ts_missing ? "Mənbə vaxt göstərmədi · alındı " + hhmm(m.recv_ts)
-        : "Mənbənin qiymət vaxtı " + hhmm(m.source_ts) + " · alındı " + hhmm(m.recv_ts)) : esc(m.error || "qiymət gözlənilir")}</div></button>`;
+      <div class="row"><span class="px">${exact(m.price)}</span><span class="ch ${cls}" title="gün ərzində dəyişmə">${ch == null ? "—" : (ch >= 0 ? "+" : "") + (ch * 100).toFixed(2) + " %"}</span></div>
+      <div class="row"><span class="sym">${m.symbol}/USD · unsiya</span></div>
+      <div class="src" title="${m.source_ts ? (m.ts_missing ? "Mənbə vaxt göstərmədi · alındı " + hhmm(m.recv_ts) : "Mənbənin qiymət vaxtı " + hhmm(m.source_ts) + " · alındı " + hhmm(m.recv_ts)) : ""}">
+        <b>${esc(PROVIDER_AZ[m.source] || m.source || "—")}</b> · ${m.source_ts ? hhmm(m.ts_missing ? m.recv_ts : m.source_ts) : esc(m.error || "qiymət gözlənilir")}</div></button>`;
   }).join("");
   document.querySelectorAll(".tile").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); refreshAll(); });
   const worst = st.metals.some((m) => m.status === "OFFLINE") ? "OFFLINE" : st.metals.every((m) => m.status === "DEMO") ? "DEMO"
@@ -127,45 +126,6 @@ function renderTaSummary(all) {
       proqnoza bir səs kimi gedir — Qaydalar${judgeSays("qaydalar")}; Qrafik analitiki${judgeSays("chartist")}.</p>`;
 }
 
-// One forecast card, compact (owner 2026-11-26: no long repeated sentences): the horizon, the Judge's status, the
-// direction only when proven, the two ranges and when it is checked. The rule «a direction only with the Judge's
-// proof» is said once above the cards; every method's number stays under «Bütün üsullar».
-const VSHORT = { "sübut": "✓ sübut", "yox": "sübut yox", "az": "az məlumat", "bazis": "bazis", "xərc": "xərcdən kiçik" };
-function cardHtml(c, names) {
-  const v = c.verdict;
-  const off = c.methods.find((m) => m.method === v.method) || c.methods.find((m) => m.method === "rw");
-  let head;
-  if (!c.methods.length) {
-    head = `<div class="dir mut">hələ yoxdur</div><div class="note">${c.candles_have} / ${c.candles_need} şam${c.tf === "1d" || c.tf === "1w" ? " · tarixçə lazımdır" : ""}</div>`;
-  } else if (v.status === "sübut") {
-    const p = off.p_up, dir = p > 0.5 ? "▲ yuxarı" : p < 0.5 ? "▼ aşağı" : "fikir yox";
-    head = `<div class="dir ${p > 0.5 ? "up" : p < 0.5 ? "down" : "mut"}">${dir}${p === 0.5 ? "" : " · " + (Math.max(p, 1 - p) * 100).toFixed(0) + " %"}</div>
-      <div class="note">${esc(names[v.method])}: ${esc(off.basis)}</div>` +
-      (v.condition ? `<div class="note"><b>Şərtli:</b> yalnız «${esc(GROUP_AZ[v.condition] || v.condition)}» şəraitində (${pct(v.cond_hit_rate, 0)}, ${v.cond_n} yoxlama).</div>` : "");
-  } else {
-    head = `<div class="dir mut">istiqamət yox</div>`;
-  }
-  const rng = off ? `<div class="kv"><span>50 %</span><span class="num">${fmt(off.lo50)} – ${fmt(off.hi50)}</span>
-      <span>80 %</span><span class="num">${fmt(off.lo80)} – ${fmt(off.hi80)}</span>
-      <span>yoxlanır</span><span class="num">${when(off.target_t, c.tf)}</span></div>` : "";
-  const rows = c.methods.map((m) => `<tr><td>${esc(names[m.method])}</td><td class="n">${(m.p_up * 100).toFixed(1)} %</td><td>${esc(m.basis)}</td></tr>`).join("");
-  return `<div class="card"><div class="hd"><b>${c.name}</b>
-      <span class="pill ${v.status}" title="${VERDICT_AZ[v.status]}${v.by === "history" ? " (tarixçə üzrə)" : ""}">${VSHORT[v.status] || v.status}</span></div>
-    ${head}${rng}
-    ${rows ? `<details class="meth"><summary>Bütün üsullar</summary><table><tr><th>Üsul</th><th>Yuxarı ehtimalı</th><th>Əsas</th></tr>${rows}</table></details>` : ""}
-  </div>`;
-}
-
-function renderCards(fc) {
-  $("cards").innerHTML = fc.cards.map((c) => cardHtml(c, fc.method_names)).join("");
-  $("fcupd").textContent = "yeniləndi " + hhmm(Date.now() / 1000);
-}
-
-// Session hours are fixed in UTC (22-07, 07-13, 13-22); shown in New York time for the owner (DST included).
-const nyHour = (utcH) => { const d = new Date(); d.setUTCHours(utcH, 0, 0, 0);
-  return d.toLocaleTimeString("az", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit" }); };
-const GROUP_AZ = { asia: `Asiya seansı (${nyHour(22)}–${nyHour(7)} NY)`, london: `London (${nyHour(7)}–${nyHour(13)} NY)`,
-  ny: `Nyu-York (${nyHour(13)}–${nyHour(22)} NY)`, calm: "Sakit bazar", wild: "Dalğalı bazar" };
 async function loadBrains() {
   const d = await api("/api/brains");
   const x = d.strategist;
@@ -188,9 +148,10 @@ const until = (ts) => { const m = Math.round((ts - Date.now() / 1000) / 60);
 function save() { try { localStorage.setItem("tst_sym", sym); localStorage.setItem("tst_tf", tf); } catch (e) {} }
 
 async function refreshState() { lastState = await api("/api/state"); renderTiles(lastState); }
+// the selected metal's forecasts: the chart's range band and the chart tools' «Hakim» notes (the forecasts table
+// for every metal is static/hud.js)
 async function refreshFc() {
   lastFc = await api(`/api/forecasts?symbol=${sym}`);
-  renderCards(lastFc);
 }
 async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadBrains(); }
 setInterval(() => {

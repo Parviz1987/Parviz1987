@@ -14,7 +14,9 @@ a{color:var(--work);text-decoration:none}
 button{font:inherit;color:inherit;cursor:pointer}
 :focus-visible{outline:2px solid var(--work);outline-offset:2px}
 .app{position:relative;display:grid;grid-template-rows:auto auto 1fr auto;height:100vh;min-height:600px}
-.body{display:grid;grid-template-columns:210px minmax(0,1fr) 270px;min-height:0}
+/* owner 2026-11-26: one place per fact: prices, decisions and the risk gate are on the panel, brain limits and
+   source freshness in Admin; this page is the live nervous system and its event log only */
+.body{display:grid;grid-template-columns:minmax(0,1fr) 290px;min-height:0}
 .side{overflow:auto;padding:8px 10px;border-right:1px solid var(--line);background:rgba(5,10,22,.45)}
 .side.r{border-right:0;border-left:1px solid var(--line)}
 .side h4{margin:6px 0 6px;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
@@ -37,12 +39,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 .mainnav a.on{color:var(--work);border-color:rgba(56,200,255,.45);background:rgba(56,200,255,.12)}
 .mainnav form{margin:0}
 .mainnav .nsp{flex:1}
-/* the limits and sync rows: open on a wide screen, one tap away on a phone (agents.js opens them when there is room) */
-.hx{display:contents}
-.hx>summary{display:none}
-@media (max-width:760px){.hx{display:block;width:100%}.hx>summary{display:inline-block;cursor:pointer;color:var(--muted);font-size:.72rem;
-  border:1px solid var(--line);border-radius:999px;padding:2px 10px}.hx[open]>summary{margin-bottom:8px}
-  .hx>div{margin-bottom:6px}.mainnav .nsp{display:none}}
+@media (max-width:760px){.mainnav .nsp{display:none}}
 .nstate{font-size:.72rem;font-weight:800;letter-spacing:.06em;padding:3px 10px;border-radius:999px;border:1px solid var(--line)}
 .nstate.SAKİT{color:var(--work);border-color:rgba(56,200,255,.45)}
 .nstate.DİQQƏT{color:var(--gold);border-color:rgba(232,185,74,.5)}
@@ -147,9 +144,6 @@ button{font:inherit;color:inherit;cursor:pointer}
     <div class="brand">TST <b>Agentlər</b></div>
     <span class="conn" id="conn">Bağlantı yoxdur</span>
     <span class="nstate" id="nstate" title="Sistemin vəziyyəti (sinir sistemi)">…</span>
-    <details class="hx" id="hx"><summary>Limit və sinxron</summary>
-    <div class="limits"><span class="lbl">Limit (bu ay)</span><span id="limits" class="limits"></span></div>
-    <div class="sync"><span class="lbl">Son sinxron</span><span id="sync" class="sync"></span></div></details>
     <span class="sp"></span>
     <span class="clock" id="clock"></span>
     <nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
@@ -160,18 +154,12 @@ button{font:inherit;color:inherit;cursor:pointer}
     <span>· Hər agent işini bir mərkəzə yazır, bu səhifə yalnız oradan oxuyur. Liflər: məlumat haradan gəlir. İşıq: yalnız real hadisə. Agentə toxun: təfsilat.</span>
   </div>
   <div class="body">
-    <aside class="side" aria-label="Bazar">
-      <h4>Bazar</h4><div id="mkts"><p class="note">Yüklənir…</p></div>
-      <h4>Risk qapısı</h4><div id="gates"></div>
-    </aside>
     <main class="stage" id="stage">
-      <div class="metals" id="metals" aria-label="Metallar (bazar məlumatı təchizatçısından)"></div>
       <canvas id="net" aria-hidden="true"></canvas>
       <div class="agtip" id="agtip" role="tooltip"></div>
       <aside class="detail" id="detail" aria-live="polite"></aside>
     </main>
-    <aside class="side r" aria-label="Qərar və hadisələr">
-      <h4>Qərar (yalnız göstərici)</h4><div id="decision"></div>
+    <aside class="side r" aria-label="Hadisələr">
       <h4>Hadisə jurnalı</h4><ul class="log" id="log"></ul>
     </aside>
   </div>

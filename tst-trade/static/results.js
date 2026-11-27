@@ -29,6 +29,7 @@ function metals() {
 function save() { try { localStorage.setItem("tst_sym", sym); localStorage.setItem("tst_res_h", hz); } catch (e) {} }
 
 function renderExpect(d) {
+  if (!$("expect")) return;        // the forecasts now live on the panel only
   $("pnow").textContent = d.price_now ? `${d.name} indi ${f(d.price_now)} $` : "";
   $("expect").innerHTML = d.expect.map((e) => {
     if (e.lo80 == null) return `<div class="exp"><span class="h">${esc(e.name)}</span><span class="note">Hələ proqnoz yoxdur: tarixçə yığılır.</span></div>`;

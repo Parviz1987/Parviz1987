@@ -1,4 +1,6 @@
-// Bilik kitabı: our rules, each with its method, signal, void condition, source and the Judge's record per timeframe.
+// Bilik kitabı: how we read the market, every block's rules that fire now and the new rule proposals. Each rule's text
+// and the Judge's record are on its own block's page (owner 2026-11-26: one place per fact); the list renders here
+// only if a page asks for it with #rules.
 (function () {
   "use strict";
   const $ = (id) => document.getElementById(id);
@@ -10,12 +12,12 @@
   try { area = localStorage.getItem("tst_bilik") || area; } catch (e) { /* fine */ }
   function render() {
     if (!data) return;
-    $("areas").innerHTML = data.areas.map((a) => `<button class="${a === area ? "on" : ""}" data-a="${esc(a)}">${esc(a)}</button>`).join("");
+    if ($("areas")) $("areas").innerHTML = data.areas.map((a) => `<button class="${a === area ? "on" : ""}" data-a="${esc(a)}">${esc(a)}</button>`).join("");
     document.querySelectorAll("#areas button").forEach((b) => b.onclick = () => {
       area = b.dataset.a; try { localStorage.setItem("tst_bilik", area); } catch (e) { /* fine */ } render();
     });
     const rec = data.records.rules || {};
-    $("rules").innerHTML = data.rules.filter((r) => r.area === area).map((r) => {
+    if ($("rules")) $("rules").innerHTML = data.rules.filter((r) => r.area === area).map((r) => {
       const rr = rec[r.id] || {};
       const cells = ["1h", "4h", "1d"].map((tf) => rr[tf]
         ? `<span class="rtf"><b>${tf}</b> ${Math.round(rr[tf].hit_rate * 100)} % · ${rr[tf].n} dəfə · xərcdən sonra ${(rr[tf].net_avg * 100).toFixed(3)} % · ${ST[rr[tf].status] || rr[tf].status}
@@ -38,7 +40,7 @@ ${Object.keys(rr[tf].by_adx || {}).length ? `<span class="note">· ADX: ${Object
         ${(data.brain_rules || {})[r.id] ? `<div class="rr"><span>Beyinlər</span><span>${Object.entries(data.brain_rules[r.id]).map(([src, [ok, bad]]) =>
           `${esc(src === "strateq" ? "Strateq" : src === "chartist" ? "Qrafik analitiki" : src)}: düz ${ok}, səhv ${bad}`).join(" · ")}</span></div>` : ""}</details>`;
     }).join("");
-    document.querySelectorAll("#rules details.rule").forEach((d) => d.ontoggle = () => { d.open ? OPEN.add(d.dataset.r) : OPEN.delete(d.dataset.r); });
+    if ($("rules")) document.querySelectorAll("#rules details.rule").forEach((d) => d.ontoggle = () => { d.open ? OPEN.add(d.dataset.r) : OPEN.delete(d.dataset.r); });
     const act = [];
     Object.entries(data.active).forEach(([s, xs]) => xs.forEach((x) => act.push({ s, ...x })));
     const arow = (x) => `<tr><td>${NAMES[x.s] || esc(x.s)}</td><td class="c">${esc(x.tf)}</td><td>${esc(x.rule)}</td>

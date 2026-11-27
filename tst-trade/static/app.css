@@ -250,8 +250,8 @@ div.res span.sübut{background:var(--up-soft);color:var(--up)}div.res span.yox{c
 .hg.AL{background:var(--up-soft);color:var(--up);font-weight:800;box-shadow:0 0 10px rgba(62,224,143,.25)}
 .hg.SAT{background:var(--down-soft);color:var(--down);font-weight:800;box-shadow:0 0 10px rgba(255,93,108,.25)}
 @media (max-width:800px){.hud{grid-template-columns:minmax(0,1fr)}.hgrid{grid-template-columns:72px repeat(6,minmax(0,1fr))}}
-/* simple mode: decisions, prices, the markets strip and the trust light only */
-body.simple #sec-chart,body.simple #sec-tools,body.simple .jump,body.simple #sec-fc>.box,body.simple #sec-fc .box[data-fold],body.simple .more{display:none}
+/* simple mode: prices, the markets strip, the trust light and the forecasts table only */
+body.simple #sec-chart,body.simple #sec-strat,body.simple .jump,body.simple .olbox,body.simple .fchint,body.simple .more{display:none}
 .pill.QUIET{background:var(--info-soft);color:var(--info)}
 
 /* Block 16: forecast card */
@@ -412,3 +412,40 @@ details.rule>.rr{padding:4px 10px}details.rule>.rr:last-child{padding-bottom:10p
 details.more summary{cursor:pointer;margin:6px 0}
 /* a long row of buttons scrolls sideways on a phone instead of pushing the page wider */
 @media (max-width:640px){.seg{max-width:100%;overflow-x:auto;scrollbar-width:none}.seg button{flex:0 0 auto}}
+/* ---- panel, owner 2026-11-26 (2): state in the header, a one-line trust light, one forecasts table ---- */
+.top .hstate{font-size:.7rem;padding:1px 10px}
+.top .hwhy{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trustbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 14px;border-radius:12px;background:var(--panel);
+  border:1px solid var(--line);backdrop-filter:blur(6px);position:relative}
+.trustbar::before{content:"";position:absolute;left:16px;right:16px;top:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(62,224,143,.5),rgba(232,185,74,.35),transparent)}
+.trustbar .tb-l{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.trustbar .trust-head{flex:1;min-width:220px;font-weight:600;font-size:.9rem}
+.trustbar details{font-size:.8rem}.trustbar details summary{cursor:pointer;color:var(--acc)}
+.trustbar details[open]{flex-basis:100%}
+.fgrid{display:grid;grid-template-columns:120px repeat(6,minmax(0,1fr));gap:4px}
+.fg-h{font-size:.66rem;color:var(--muted);text-align:center;text-transform:uppercase;letter-spacing:.06em;padding-bottom:2px}
+.fg-m{display:flex;align-items:center;gap:7px;font-weight:700;font-size:.84rem;background:none;border:1px solid transparent;border-radius:8px;
+  padding:0 8px;text-align:left;color:var(--fg)}
+.fg-m:hover{border-color:var(--line)}.fg-m.cur{color:var(--acc);border-color:rgba(56,200,255,.4);background:var(--acc-soft)}
+.fg-m i{width:7px;height:7px;border-radius:50%;flex:0 0 auto}.fg-m i.ok{background:var(--up)}.fg-m i.shut{background:var(--warn)}
+.fc{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 4px;border-radius:8px;background:rgba(255,255,255,.035);
+  border:1px solid transparent;cursor:pointer;min-width:0;transition:border-color .2s,background .2s}
+.fc:hover,.fc:focus-visible{border-color:rgba(56,200,255,.45);background:var(--acc-soft)}
+.fc.cur{background:rgba(56,200,255,.06)}
+.fc b{font-size:.72rem;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.fc span{font-family:var(--mono);font-size:.76rem;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.fc.AL{background:var(--up-soft);border-color:rgba(62,224,143,.45)}.fc.AL b{color:var(--up)}
+.fc.SAT{background:var(--down-soft);border-color:rgba(255,93,108,.45)}.fc.SAT b{color:var(--down)}
+.fchint{margin:8px 0 0}
+details.olbox{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+details.olbox>summary{cursor:pointer;color:var(--acc);font-size:.84rem;font-weight:600}
+details.olbox[open]>summary{margin-bottom:10px}
+#sec-chart .tatool{margin:10px 0 0}
+@media (max-width:800px){.fgrid{grid-template-columns:74px repeat(6,minmax(0,1fr));gap:3px}.fc span{font-size:.62rem}
+  .fc{padding:5px 2px}.fg-m{font-size:.74rem;padding:0 4px}.top .hwhy{display:none}}
+@media (max-width:480px){.fgrid{grid-template-columns:repeat(3,minmax(0,1fr))}.fg-h{display:none}
+  .fg-m{grid-column:1/-1;padding:6px 4px 0}.fc::before{content:attr(data-n);font-size:.6rem;color:var(--muted)}}
+/* phone header: one short line (the phone shows its own clock; the market state is in the price tiles' pills) */
+@media (max-width:640px){.top{gap:6px 8px}.top #mkt,.top .clock{display:none}.top .btn.sm{padding:2px 8px;font-size:.74rem}
+  .fgrid .fc{padding:3px 2px}.fg-m{padding:4px 4px 0}}

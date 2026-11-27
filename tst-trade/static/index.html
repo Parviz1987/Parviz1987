@@ -9,32 +9,43 @@
   <div class="brand">TST <b>Trade</b></div>
   <span class="pill" id="feed">…</span>
   <span class="note" id="mkt"></span>
+  <span class="hstate" id="hstate" title="Sistemin vəziyyəti">…</span><span class="note hwhy" id="hwhy"></span>
   <span class="sp"></span>
   <span class="clock" id="clock"></span>
+  <button class="btn sm" id="bsound" type="button" aria-pressed="false">🔕 Səs</button>
+  <button class="btn sm" id="bsimple" type="button" aria-pressed="false">Sadə rejim</button>
   <button class="btn pri sm" id="install" hidden>Telefona yüklə</button>
 <nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
 </header>
-<nav class="jump" aria-label="Bölmələr"><a href="#tiles">Qiymət</a><a href="#sec-chart">Qrafik</a><a href="#sec-tools">Alətlər</a><a href="#sec-fc">Proqnozlar</a></nav>
+<nav class="jump" aria-label="Bölmələr"><a href="#tiles">Qiymət</a><a href="#sec-fc">Proqnoz</a><a href="#sec-chart">Qrafik</a></nav>
 <main class="wrap">
   <div class="evbanner" id="offline" hidden>İnternet yoxdur: qiymətlər yenilənmir. Əlaqə gələndə panel özü davam edəcək.</div>
   <div class="evbanner" id="evbanner" hidden></div>
-  <section class="hud" id="hud" aria-label="Sistemin vəziyyəti və qərar lenti">
-    <div class="hud-core"><canvas id="core" aria-hidden="true"></canvas>
-      <div class="hud-st"><span class="hstate" id="hstate">…</span><span class="hwhy" id="hwhy"></span><span class="hmod" id="hmod"></span></div></div>
-    <div class="hud-dec">
-      <div class="hud-top"><b>Qərar lenti</b><span class="note">yalnız göstərici · AL / SAT yalnız Hakimin sübutu və açıq risk qapısı ilə</span>
-        <span class="sp"></span><button class="btn sm" id="bsound" type="button" aria-pressed="false">🔕 Səs</button>
-        <button class="btn sm" id="bsimple" type="button" aria-pressed="false">Sadə rejim</button></div>
-      <div class="hgrid" id="hgrid"></div></div>
-  </section>
   <dialog class="card-dlg" id="cardDlg" aria-label="Proqnoz kartı"><div id="cardBody"></div>
     <form method="dialog"><button class="btn sm">Bağla</button></form></dialog>
 
-  <!-- 1. Prices: the four metals, then every market the analysis reads (a chip opens the cross-market block) -->
+  <!-- 1. Prices (owner 2026-11-26: prices first, then the trust light, the forecasts, the chart, the rest) -->
   <div class="tiles" id="tiles"></div>
   <div class="ticker" id="ticker" aria-label="Analizdə istifadə olunan bazarlar"></div>
 
-  <!-- 2. The chart -->
+  <!-- 2. Trust light: one line -->
+  <section class="trustbar" id="sec-trust" aria-label="Etibar işığı">
+    <span class="tb-l">Etibar işığı</span><span class="trust-head" id="trustHead">…</span>
+    <details><summary>Hər analitik</summary><div id="trustList"></div>
+      <p class="note">🟢 etibarlı · 🟡 ümidverici · ⚪ fərqi yoxdur · 🔴 etibar yoxdur · ⏳ az</p></details>
+  </section>
+
+  <!-- 3. Forecasts: ONE table for every metal and horizon (the decision and the 80 % range in each cell) -->
+  <section class="box" id="sec-fc">
+    <h2>Proqnozlar <span class="sp"></span><span class="note" id="fcupd"></span></h2>
+    <div class="fgrid" id="fgrid"></div>
+    <p class="note fchint">Xanada: qərar (AL / SAT yalnız Hakimin sübutu və açıq risk qapısı ilə, yoxsa GÖZLƏ) və qiymətin 80 % ehtimalla
+      olacağı aralıq. Xanaya toxunun: ətraflı kart. Metalın adına toxunun: qrafik o metala keçir.</p>
+    <details class="olbox" id="sec-outlook"><summary>Sabah üçün (1 gün): vahid proqnoz, səslər, ssenarilər <span class="note" id="olnote"></span></summary>
+      <div class="olgrid" id="outlook"></div></details>
+  </section>
+
+  <!-- 4. The chart and its tools -->
   <section class="box" id="sec-chart">
     <h2><span id="ctitle">Qrafik</span><span class="sp"></span><span class="seg" id="tfs"></span></h2>
     <div class="chart" id="chart"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
@@ -45,37 +56,14 @@
       <span><i style="background:var(--gold);opacity:.55"></i>50 % aralıq</span>
       <span id="ovnote"></span>
     </div>
-  </section>
-
-  <!-- 3. Chart tools: what is drawn on the chart and the chart in words -->
-  <section class="box" id="sec-tools">
-    <h2>Qrafik alətləri <span class="sp"></span><a class="note" href="/ta">Texniki analiz bloku →</a></h2>
     <div class="tatool" id="ta"></div>
     <div class="tasum" id="tasum"></div>
   </section>
 
-  <!-- 4. Forecasts -->
-  <section class="fcsec" id="sec-fc" aria-label="Proqnozlar">
-    <div class="box"><h2>Proqnozlar <span class="note">15 dəqiqədən 1 həftəyə</span><span class="sp"></span><span class="note" id="fcupd"></span></h2>
-      <p class="note fchint">Qiymət 50 % və 80 % ehtimalla bu aralıqlarda olacaq. İstiqamət (▲ / ▼) yalnız Hakim onu xərcdən sonra sübut edəndə göstərilir.</p>
-      <div class="cards" id="cards"></div></div>
-    <div class="box outlook" id="sec-outlook" data-fold="outlook">
-      <h2>Sabah üçün proqnoz (1 gün) <span class="sp"></span><span class="note" id="olnote"></span></h2>
-      <p class="note">Hər metal üçün: gözlənilən aralıq (sübut olunmuş bacarıq), istiqamət üzrə üç səs və hər birinin indiyə qədərki nəticəsi.
-        <b>Meyl sübut deyil:</b> Hakim 1 günlük masada istiqamət sübutu görəndə burada ✅ yazılacaq.</p>
-      <div class="olgrid" id="outlook"></div>
-    </div>
-    <div class="split">
-      <div class="box trust" id="sec-trust">
-        <h2>Etibar işığı <span class="sp"></span><span class="note">🟢 etibarlı · 🟡 ümidverici · ⚪ fərqi yoxdur · 🔴 etibar yoxdur · ⏳ az</span></h2>
-        <p class="trust-head" id="trustHead">…</p>
-        <details><summary>Hər analitik bir cümlə ilə</summary><div id="trustList"></div></details>
-      </div>
-      <div class="box" data-fold="strat"><h2>Strateqin izahı <span class="sp"></span><span class="note" id="stmeta"></span></h2><div id="strat"></div></div>
-    </div>
-    <p class="note more">Ətraflı: <a href="/results">Nəticələr</a> (Hakim, yoxlanmış proqnozlar) ·
-      <a href="/bloklar">Bloklar</a> (xəbər, fundamental, bazarlar, təqvim) · <a href="/agents">Agentlər</a> (sistemin canlı axını)</p>
-  </section>
+  <!-- 5. The rest -->
+  <section class="box" id="sec-strat" data-fold="strat"><h2>Strateqin izahı <span class="sp"></span><span class="note" id="stmeta"></span></h2><div id="strat"></div></section>
+  <p class="note more">Ətraflı: <a href="/results">Nəticələr</a> (nə dedik, nə oldu, Hakim) ·
+    <a href="/bloklar">Bloklar</a> (xəbər, fundamental, bazarlar, təqvim) · <a href="/agents">Agentlər</a> (sistemin canlı axını)</p>
 </main>
 <script src="/static/chart.js"></script>
 <script src="/static/panel.js"></script>

@@ -220,3 +220,10 @@
 - Agentlər: beyin 60 %, agentlər şüşə disk + halə, işıq impulsu parlaq və izlənən, çatanda halqa.
 - Yoxlama: sınaq serverində (DEMO) hər səhifə masaüstü və telefonda — brauzer xətası yoxdur, telefonda eninə çıxma
   yoxdur; testlər 316/316. 1-ci mərhələ 23:21 NY-də serverdədir; 2–4 bazanın sıxılmasından sonra göndərilir.
+
+## 2026-11-27 00:05 NY — Panel ikinci dəfə, təkrarlar, düymələr (sahibin tapşırığı)
+- Panel: qiymətlər → etibar işığı → bir proqnoz cədvəli (4 metal × 6 üfüq, qərar + 80 % aralıq, xana = kart) → qrafik
+  və alətlər → strateq. Böyük kürə və boş «Qərar lenti» qutusu başlığa bir nişan oldu. 2 135 → 1 546 px.
+- Təkrarlar çıxdı: Agentlərdə qiymət siyahısı, metal zolağı, qərar cədvəli, risk qapısı, limit və sinxron (Panel / Admin-də
+  var); Nəticələrdə «İndi nə gözləyirik» (Panel); Bilik-də bütün qaydaların ikinci nüsxəsi (blok səhifələrində var).
+- Düymələr: hər səhifədə avtomatik basıldı; şübhəlilər ayrıca yoxlandı — hamısı işləyir, brauzer xətası yoxdur.
