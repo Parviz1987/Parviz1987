@@ -54,9 +54,10 @@ sübutu ilə**. Sübut olmayan heç nə pula (hətta kağız ticarətə) getmir.
 
 ## 6. Açıq işlər
 - **Sahibin:** 2FA; Healthchecks.io açarı; Admin → Əməliyyatlar → WAL araşdırma kartını bağlamaq.
-- **Claude-un:** 3 saatlıq növbətçi yoxlama (temirci) — cədvəli yeni sessiyaya köçürüb köhnəni söndürmək;
-  kəsilmə düzəlişini yoxlamaq; GDELT dolması; `news_shock_vol` / `geo_shock_vol` ilk nəticələri (t > 2 olsa,
-  dalğalılıq bayrağı təklifi); `BLOKLAR.md`-ni hər işdən sonra yeniləmək.
+- **Claude-un:** 3 saatlıq növbətçi yoxlama (temirci) — ✅ 26.11 21:44 NY yeni sessiyaya köçürüldü
+  (`trig_01SPvUvaqY42odFwtafEJxpL`), həftəlik hesabat da (`trig_01MFgmGc9vkDfTtw1XEUTzNt`); köhnə ikisi söndürülüb
+  (silinməyib) — yenidən köçürməyə ehtiyac yoxdur; kəsilmə düzəlişi ✅ yoxlandı (21:26 NY uğurlu); GDELT dolması;
+  `news_shock_vol` / `geo_shock_vol` ilk nəticələri (t > 2 olsa, dalğalılıq bayrağı təklifi); `BLOKLAR.md`-ni hər işdən sonra yeniləmək.
 - **Təqvim:** 29.11 hipotez agentinin ilk işi; 30.11 həftəlik hesabat; 2.12 qızıl proqnozu yoxlaması; 9.12 Fed.
 
 ## 7. Dəmir qaydalar (dəyişmir)
