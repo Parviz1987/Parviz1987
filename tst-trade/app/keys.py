@@ -24,8 +24,9 @@ class KeyStore:
             raise ValueError("naməlum açar yeri")
         fields = registry.FIELDS[slot]
         clean = {f: str(values.get(f, "")).strip() for f in fields}
-        if not all(clean.values()):
-            raise ValueError("bütün sahələr doldurulmalıdır: " + ", ".join(fields))
+        need = [f for f in fields if f not in registry.OPTIONAL.get(slot, [])]
+        if not all(clean[f] for f in need):
+            raise ValueError("bu sahələr doldurulmalıdır: " + ", ".join(need))
         self.db.put(f"key:{slot}", seal(json.dumps(clean), self.secret))
         self.db.put(f"keyset:{slot}", str(time.time()))
         self.db.delete(f"check:{slot}")
@@ -166,7 +167,10 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
                    f"cavab gözlənilən deyil: HTTP {r.status_code}")
         elif slot == "r2":
             from . import backup
-            ok, msg = await backup.check(v)
+            ok, msg, bucket = await backup.check_fix(v)
+            if bucket and bucket != v.get("bucket"):            # found or created: kept for the nightly copy
+                store.set("r2", {**v, "bucket": bucket})
+                v = store.get("r2") or v
         elif slot == "financialjuice":
             from . import fjnews
             ok, msg = fjnews.check(store.db, v)
@@ -175,4 +179,4 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
             ok, msg = None, "açar saxlanıb; bu açarın yoxlaması növbəti mərhələdə qoşulacaq"
     except httpx.HTTPError as e:
         ok, msg = False, f"qoşulmaq alınmadı: {type(e).__name__}"
-    return store.record_check(slot, ok, _scrub(msg, list(v.values())))
+    return store.record_check(slot, ok, _scrub(msg, [x for f, x in v.items() if f != "bucket"]))   # a bucket name is no secret

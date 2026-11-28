@@ -11,6 +11,7 @@ import gzip
 import hashlib
 import hmac
 import os
+import re
 import shutil
 import sqlite3
 import time
@@ -19,6 +20,7 @@ from urllib.parse import quote
 import httpx
 
 KEEP_DAYS = 7
+DEFAULT_BUCKET = "tst-backup"
 CHUNK = 1 << 20
 
 
@@ -66,25 +68,67 @@ def _headers(creds: dict, method: str, path: str, payload_hash: str, query: str 
     return url, {"x-amz-date": amz_date, "x-amz-content-sha256": payload_hash, "Authorization": auth}
 
 
-async def check(creds: dict) -> tuple[bool, str]:
-    """Can we see the bucket? (a HEAD on it)"""
+def _bucket_in_link(account_id: str) -> str:
+    """A bucket at the end of the link («https://<id>.r2.cloudflarestorage.com/<bucket>»), if Cloudflare showed one."""
+    v = (account_id or "").strip()
+    if "://" in v:
+        v = v.split("://", 1)[1]
+    parts = [p for p in v.split("/")[1:] if p.strip()]
+    return parts[0].strip().lower() if parts else ""
+
+
+async def _call(c: httpx.AsyncClient, creds: dict, method: str, path: str) -> httpx.Response:
+    url, h = _headers(creds, method, path, hashlib.sha256(b"").hexdigest())
+    return await c.request(method, url, headers=h)
+
+
+async def resolve(creds: dict) -> tuple[str | None, str]:
+    """Which bucket to use. The one written in Admin (or at the end of the link) if Cloudflare has it; else the only
+    bucket this key sees (or «tst-backup» among several); else «tst-backup» (or the written name) is created.
+    Returns (bucket, how) or (None, what the owner should do)."""
+    want = (creds.get("bucket") or "").strip().strip("/").lower() or _bucket_in_link(creds.get("account_id", ""))
+    async with httpx.AsyncClient(timeout=20) as c:
+        if want:
+            r = await _call(c, creds, "HEAD", f"/{want}")
+            if r.status_code == 200:
+                return want, f"bucket «{want}»"
+            if r.status_code in (401, 403):
+                return None, (f"açar qəbul olunmadı (HTTP {r.status_code}): Access Key ID və Secret Access Key-i "
+                              f"yenidən yapışdırın; açarın icazəsi «Object Read & Write» olmalıdır")
+        r = await _call(c, creds, "GET", "/")
+        names = re.findall(r"<Name>([^<]+)</Name>", r.text) if r.status_code == 200 else []
+        if len(names) == 1:
+            return names[0], f"bucket «{names[0]}» (Cloudflare-də olan yeganə bucket)"
+        if DEFAULT_BUCKET in names:
+            return DEFAULT_BUCKET, f"bucket «{DEFAULT_BUCKET}»"
+        if names:
+            return None, ("Cloudflare-də bir neçə bucket var: " + ", ".join(names[:6]) +
+                          " — hansına yazılsın, onun adını «Bucket» xanasına yazın")
+        new = want or DEFAULT_BUCKET
+        r = await _call(c, creds, "PUT", f"/{new}")
+        if r.status_code == 200:
+            return new, f"bucket «{new}» (sistem özü yaratdı)"
+        return None, (f"Cloudflare-də «{new}» adlı bucket yoxdur və açarın onu yaratmağa icazəsi yoxdur: Cloudflare → "
+                      f"R2 → Create bucket → ad «{new}» → sonra yenə «Yoxla»")
+
+
+async def check_fix(creds: dict) -> tuple[bool, str, str | None]:
+    """Admin's «Yoxla»: the address, the key and the bucket (found or created). Returns (ok, message, bucket)."""
     bad = _id_problem(creds.get("account_id", ""))
     if bad:
-        return False, bad
-    empty = hashlib.sha256(b"").hexdigest()
-    url, h = _headers(creds, "HEAD", f"/{creds.get('bucket', '').strip().strip('/')}", empty)
+        return False, bad, None
     try:
-        async with httpx.AsyncClient(timeout=20) as c:
-            r = await c.head(url, headers=h)
+        bucket, how = await resolve(creds)
     except httpx.ConnectError:
-        return False, "R2 ünvanına çatmaq olmadı: account_id xanasındakı linki / kodu yoxlayın"
-    if r.status_code == 200:
-        return True, "işləyir (bucket görünür)"
-    if r.status_code in (401, 403):
-        return False, f"açar qəbul olunmadı (HTTP {r.status_code})"
-    if r.status_code == 404:
-        return False, "bucket tapılmadı: adını yoxlayın"
-    return False, f"HTTP {r.status_code}"
+        return False, "R2 ünvanına çatmaq olmadı: «HTTPS» xanasındakı linki yoxlayın", None
+    if not bucket:
+        return False, how, None
+    return True, f"işləyir: {how}", bucket
+
+
+async def check(creds: dict) -> tuple[bool, str]:
+    ok, msg, _ = await check_fix(creds)
+    return ok, msg
 
 
 def make_copy(db_path: str, out_dir: str) -> str:

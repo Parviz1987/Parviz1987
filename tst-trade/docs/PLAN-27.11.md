@@ -156,3 +156,10 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   yaranırdı (açarın bloklanma riski). Düzəliş 20:55: «Yoxla» heç vaxt ayrıca qoşulma açmır, canlı axının vəziyyətini deyir;
   4029/4030-da gözləmə 2→4→…→30 dəq böyüyür, yalnız 2 dəqiqə dayanan qoşulmadan sonra sıfırlanır; son 8 hadisə vaxtı ilə
   diaqnostikada. Testlər 366/366.
+- 27.11 21:13 — R2: «ConnectError»un səbəbi — Cloudflare «HTTPS» linki verir, forma isə account_id istəyirdi; link indi
+  qəbul olunur. 21:31 serverdə: link və açarlar QƏBUL olundu, qalan xəta «bucket tapılmadı» (sahibin şəkillərinə görə
+  «tst-backup» çox güman açarın (token) adıdır, bucket yaradılmayıb).
+- 27.11 21:36 — R2 forması Cloudflare-in ardıcıllığı və adları ilə: Access Key ID → Secret Access Key → HTTPS → Bucket (boş
+  qoyula bilər). «Yoxla» bucket-i özü tapır (açarın gördüyü yeganə bucket və ya «tst-backup»), yoxdursa yaradır; icazə
+  çatmasa nə ediləcəyini açıq yazır; tapılan ad saxlanır, gecəlik nüsxə də onu işlədir. Testlər 371/371; Admin 1366 və
+  390-da, brauzer xətası 0.

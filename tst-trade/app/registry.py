@@ -67,7 +67,9 @@ KEY_SLOTS: list[dict] = [
      "purpose": "Hər gecə verilənlər bazasının nüsxəsi serverdən kənarda saxlanır: server itsə, məlumat itmir.",
      "cost": "Pulsuz (10 GB-a qədər).",
      "url": "https://dash.cloudflare.com/?to=/:account/r2/overview",
-     "fields": ["account_id", "access_key_id", "secret_access_key", "bucket"],
+     # the order Cloudflare shows them (owner 27.11: «ardıcıllıq düz olsun»); account_id takes the «HTTPS» link;
+     # the bucket may stay empty: the check finds the only bucket the key sees or creates «tst-backup»
+     "fields": ["access_key_id", "secret_access_key", "account_id", "bucket"], "optional": ["bucket"],
      "used_by": "Gecəlik ehtiyat nüsxə (Blok 14)", "stage": LIVE},
     {"id": "healthchecks", "category": "ops", "name": "Healthchecks.io (kənar nəzarətçi)",
      "purpose": "Server və vacib işləri hər neçə dəqiqədən bir «sağam» deyir; siqnal gəlməsə Healthchecks.io özü "
@@ -95,6 +97,7 @@ KEY_SLOTS: list[dict] = [
 ]
 KEY_IDS = {s["id"] for s in KEY_SLOTS}
 FIELDS = {s["id"]: s["fields"] for s in KEY_SLOTS}
+OPTIONAL = {s["id"]: s.get("optional", []) for s in KEY_SLOTS}
 
 # Sources that need no key: listed so the admin page shows the whole data map in one place.
 FREE_SOURCES: list[dict] = [

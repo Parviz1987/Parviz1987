@@ -779,6 +779,12 @@ class Engine:
             return
         import os
         try:
+            if not creds.get("bucket"):
+                import asyncio
+                bucket, how = asyncio.run(backup.resolve(creds))
+                if not bucket:
+                    raise RuntimeError(how)
+                creds = {**creds, "bucket": bucket}
             gz = backup.make_copy(self.db.path, os.path.join(os.path.dirname(self.db.path), "backup"))
             size = os.path.getsize(gz)
             name = backup.upload(creds, gz)

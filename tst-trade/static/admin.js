@@ -4,7 +4,9 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const PROV = { goldapi: "gold-api.com (pulsuz)", capital: "Capital.com axını (açar)", twelvedata: "Twelve Data (açar)", demo: "DEMO (yalnız sınaq)" };
 const BRAIN_PROV = { anthropic: "Anthropic", openai: "OpenAI", xai: "xAI (Grok)", gemini: "Google Gemini" };
 const FIELD_AZ = { key: "Açar", key_id: "Açar ID", secret: "Gizli açar", api_key: "API açarı",
-  login: "Login (Capital.com e-poçtunuz)", password: "API açarının parolu (açarı yaradanda yazdığınız parol)" };
+  login: "Login (Capital.com e-poçtunuz)", password: "API açarının parolu (açarı yaradanda yazdığınız parol)",
+  access_key_id: "Access Key ID", secret_access_key: "Secret Access Key",
+  account_id: "HTTPS (Cloudflare-in verdiyi link)", bucket: "Bucket (boş qoyun — sistem özü tapır və ya yaradır)" };
 const STAGE = { live: ["ok", "işləyir"], next: ["next", "yeri hazırdır, toplayıcı növbəti mərhələdə"] };
 let data = null;
 
@@ -35,7 +37,7 @@ const row = (id, summary, body) => `<details class="krow" data-open="${id}" ${OP
 function keySlot(k) {
   const st = k.state, stage = STAGE[k.stage];
   const inputs = k.fields.map((f) => `<label class="note" for="f-${k.id}-${f}">${FIELD_AZ[f] || f}</label>
-    <input id="f-${k.id}-${f}" type="password" autocomplete="off" placeholder="${st.saved ? "yenisini yapışdırın" : "yapışdırın"}">`).join("");
+    <input id="f-${k.id}-${f}" type="password" autocomplete="off" placeholder="${(k.optional || []).includes(f) ? "boş qoya bilərsiniz" : st.saved ? "yenisini yapışdırın" : "yapışdırın"}">`).join("");
   const sum = `<b>${esc(k.name)}</b>${keyState(st)}<span class="kfact">${st.hint ? `<span class="num">…${esc(st.hint)}</span> · ` : ""}${esc(k.used_by)}</span>`;
   return row("k-" + k.id, sum, `<div class="meta"><span>Nə üçün</span><span>${esc(k.purpose)}</span>
       <span>Qiymət</span><span>${esc(k.cost)}</span>

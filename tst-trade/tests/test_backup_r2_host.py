@@ -2,7 +2,11 @@
 «ConnectError». Both the link and the bare id now give the same address; a wrong value is named in plain words."""
 import asyncio
 
+import httpx
+
 from app import backup
+
+REAL_CLIENT = httpx.AsyncClient
 
 ID = "0123456789abcdef0123456789abcdef"
 
@@ -22,3 +26,47 @@ def test_a_wrong_account_id_is_named_without_a_network_call():
                                         "secret_access_key": "b", "bucket": "x"}))
     assert ok is False and "account_id" in msg and "some-token" not in msg
     assert backup._id_problem(f"https://{ID}.eu.r2.cloudflarestorage.com") is None
+
+
+def _fake(monkeypatch, answers):
+    """answers: {(method, path): (status, text)}; every call is recorded."""
+    calls = []
+
+    def handler(req):
+        key = (req.method, req.url.path)
+        calls.append(key)
+        st, text = answers.get(key, (404, ""))
+        return httpx.Response(st, text=text)
+    monkeypatch.setattr(backup.httpx, "AsyncClient", lambda **kw: REAL_CLIENT(transport=httpx.MockTransport(handler)))
+    return calls
+
+
+CREDS = {"access_key_id": "test-access-key-0001", "secret_access_key": "test-secret-key-0002", "account_id": f"https://{ID}.r2.cloudflarestorage.com"}
+
+
+def test_an_empty_bucket_box_uses_the_only_bucket_the_key_sees(monkeypatch):
+    _fake(monkeypatch, {("GET", "/"): (200, "<ListAllMyBucketsResult><Buckets><Bucket><Name>my-copies</Name>"
+                                           "</Bucket></Buckets></ListAllMyBucketsResult>")})
+    ok, msg, bucket = asyncio.run(backup.check_fix({**CREDS, "bucket": ""}))
+    assert ok and bucket == "my-copies" and "yeganə" in msg
+
+
+def test_a_missing_bucket_is_created_and_a_forbidden_one_is_explained(monkeypatch):
+    calls = _fake(monkeypatch, {("GET", "/"): (200, "<ListAllMyBucketsResult><Buckets/></ListAllMyBucketsResult>"),
+                                ("PUT", "/tst-backup"): (200, "")})
+    ok, msg, bucket = asyncio.run(backup.check_fix({**CREDS, "bucket": "tst-backup"}))
+    assert ok and bucket == "tst-backup" and "yaratdı" in msg and ("HEAD", "/tst-backup") in calls
+    _fake(monkeypatch, {("GET", "/"): (403, ""), ("PUT", "/tst-backup"): (403, "")})
+    ok, msg, bucket = asyncio.run(backup.check_fix(CREDS))
+    assert not ok and bucket is None and "Create bucket" in msg
+
+
+def test_admin_keeps_the_bucket_the_check_found(monkeypatch):
+    from app.db import DB
+    from app.keys import KeyStore, check
+    db = DB(":memory:")
+    ks = KeyStore(db, "s" * 64)
+    ks.set("r2", {**CREDS, "bucket": ""})                              # the bucket box may stay empty
+    _fake(monkeypatch, {("GET", "/"): (200, "<Name>tst-backup</Name><Name>other</Name>")})
+    res = asyncio.run(check(ks, "r2"))
+    assert res["ok"] and "tst-backup" in res["message"] and ks.get("r2")["bucket"] == "tst-backup"
