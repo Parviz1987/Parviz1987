@@ -35,7 +35,23 @@ L5  Neft şoku — WTI crude moves ≥ 5 % in a day: up → gold up (inflation f
 L6  Müharibə xəbəri sıçrayışı — the event library's GEO days (GDELT: the share of world news about war and strikes
     jumps far above its own 90 days; known only at that day's end): gold up (safe haven). Trade: from the close of the
     first trading day on or after the event's time, 5 trading days; no overlap; cost judge.full_cost("XAU", "1w").
-    Proof: ≥ 20 trades."""
+    Proof: ≥ 20 trades.
+Results 28.11 04:59 NY: L4 «yox» (52, 53.8 %), L5 «yox» (45, 55.6 %), L6 «yox» (21, 52.4 %).
+
+PRE-REGISTERED 28.11.2026 14:51 NY — the corridor labs (owner 28.11: «koridoru tapaq, alqı-satqını koridora əsasən
+edək»), before any of these results was computed. The corridor is the system's own range forecast (method «vahid»,
+else «up»: in history both carry the same range), already calibrated on average (1d 80 % range held 80.6 % of 1 959
+days). The question is not coverage but money: does trading AT the corridor's edges pay after cost?
+K1  Daily, 80 % edge, back toward the middle: the 1-day forecast's own day (the daily candle the forecast was made
+    for). Low ≤ lo80 and high < hi80 → bought at lo80; high ≥ hi80 and low > lo80 → sold at hi80; both edges the same
+    day → no trade (their order is unknown); exit at that day's close. Cost judge.full_cost("XAU", "4h") (no night).
+K2  The same at the 50 % edge.
+K3  Weekly, 80 % edge: the 1-week forecast's week of daily candles; the first day that touches an edge opens the
+    trade at that edge (a day touching both → no trade that week); exit at the week's last close; cost
+    judge.full_cost("XAU", "1w").
+K4  The same at the 50 % edge.
+Proof for K1–K4: ≥ 100 trades, the bar above. Shown, not deciding: the corridor's width, coverage, the interval
+(Winkler) score and whether misses come in clusters, per horizon."""
 from __future__ import annotations
 
 import json
@@ -256,6 +272,71 @@ def lab_geo(db: DB, sym: str = "XAU") -> dict:
     return verdict(trades, judge.full_cost(sym, "1w"), 20)
 
 
+def _corridor_rows(db: DB, sym: str, horizon: str) -> list:
+    rows = _rows(db, "SELECT issued_t, target_t, price0, price1, lo50, hi50, lo80, hi80, method FROM forecasts "
+                     "WHERE symbol=? AND horizon=? AND method IN ('vahid', 'up') AND price1 IS NOT NULL "
+                     "ORDER BY issued_t, method DESC", (sym, horizon))
+    seen, out = set(), []
+    for r in rows:                              # one row per forecast moment: «vahid» first, else «up»
+        if r["issued_t"] in seen:
+            continue
+        seen.add(r["issued_t"])
+        out.append(r)
+    return out
+
+
+def _path(db: DB, sym: str, a: int, b: int) -> list:
+    return _rows(db, "SELECT t, h, l, c FROM candles WHERE symbol=? AND tf='1d' AND t >= ? AND t < ? ORDER BY t",
+                 (sym, a, b))
+
+
+def lab_corridor(db: DB, sym: str = "XAU", horizon: str = "1d", band: str = "80") -> dict:
+    from . import judge
+    lo_k, hi_k = f"lo{band}", f"hi{band}"
+    trades = []
+    for r in _corridor_rows(db, sym, horizon):
+        days = _path(db, sym, r["issued_t"], r["target_t"])
+        if not days:
+            continue
+        lo, hi, entry = r[lo_k], r[hi_k], None
+        for d in days:
+            down, up = d["l"] <= lo, d["h"] >= hi
+            if down and up:
+                break                            # both edges in one day: order unknown, no trade
+            if down or up:
+                entry = (1, lo) if down else (-1, hi)
+                break
+        if not entry:
+            continue
+        way, px = entry
+        close = days[-1]["c"]
+        ret = (close / px - 1) if way > 0 else (px / close - 1)
+        trades.append((datetime.fromtimestamp(r["issued_t"], timezone.utc).strftime("%Y-%m-%d"), ret))
+    return verdict(trades, judge.full_cost(sym, "4h" if horizon == "1d" else "1w"), 100)
+
+
+def corridor_quality(db: DB, sym: str = "XAU") -> dict:
+    """Per horizon: coverage of the 50/80 % corridor, its mean width (% of price), the Winkler score of the 80 % one
+    (width plus a penalty for every miss; lower is better) and whether misses cluster (P(miss | miss before) / P(miss))."""
+    out = {}
+    for h in ("1d", "3d", "1w", "10d", "1mo"):
+        rows = _corridor_rows(db, sym, h)
+        if len(rows) < 30:
+            continue
+        n = len(rows)
+        miss = [not (r["lo80"] <= r["price1"] <= r["hi80"]) for r in rows]
+        c50 = sum(1 for r in rows if r["lo50"] <= r["price1"] <= r["hi50"]) / n
+        width = sum((r["hi80"] - r["lo80"]) / r["price0"] for r in rows) / n
+        wink = sum(((r["hi80"] - r["lo80"]) + (2 / 0.2) * max(0, r["lo80"] - r["price1"], r["price1"] - r["hi80"]))
+                   / r["price0"] for r in rows) / n
+        pm = sum(miss) / n
+        after = [miss[i] for i in range(1, n) if miss[i - 1]]
+        out[h] = {"n": n, "cover50": round(c50, 3), "cover80": round(1 - pm, 3), "width80_pct": round(width * 100, 2),
+                  "winkler80_pct": round(wink * 100, 2),
+                  "miss_cluster": round((sum(after) / len(after)) / pm, 2) if after and pm else None}
+    return out
+
+
 LABS = [
     {"id": "L1", "name": "Fed sürprizi", "fn": lab_fed,
      "question": "Fed qərar günü 2 illik faiz 5 bazis bəndindən çox qalxanda (gözləniləndən sərt) qızıl sonrakı 5 gündə "
@@ -279,6 +360,20 @@ LABS = [
     {"id": "L6", "name": "Müharibə xəbəri sıçrayışı", "fn": lab_geo,
      "question": "Dünya xəbərlərində müharibə və zərbə mövzusu kəskin artandan sonra qızıl 5 gündə qalxırmı?",
      "data": "GDELT (hadisə kitabxanasının geosiyasi günləri), qızılın gündəlik bağlanışı"},
+    {"id": "K1", "name": "Günlük koridor, 80 % kənar", "fn": lambda db, s: lab_corridor(db, s, "1d", "80"),
+     "question": "Gün ərzində qiymət sistemin 80 %-lik günlük koridorunun aşağı kənarına düşəndə alıb (yuxarı kənarına "
+                 "çıxanda satıb) günün sonunda bağlamaq xərcdən sonra qazandırırmı?",
+     "data": "Sistemin günlük koridor proqnozları (8 il keçmiş sınaq), qızılın gündəlik ən aşağı / ən yüksək / bağlanışı"},
+    {"id": "K2", "name": "Günlük koridor, 50 % kənar", "fn": lambda db, s: lab_corridor(db, s, "1d", "50"),
+     "question": "Eyni qayda 50 %-lik (daha dar) koridorun kənarlarında qazandırırmı?",
+     "data": "Sistemin günlük koridor proqnozları, qızılın gündəlik şamları"},
+    {"id": "K3", "name": "Həftəlik koridor, 80 % kənar", "fn": lambda db, s: lab_corridor(db, s, "1w", "80"),
+     "question": "Həftə ərzində qiymət 80 %-lik həftəlik koridorun kənarına ilk dəfə toxunanda tərsinə girib həftənin "
+                 "sonunda bağlamaq qazandırırmı?",
+     "data": "Sistemin həftəlik koridor proqnozları, qızılın gündəlik şamları"},
+    {"id": "K4", "name": "Həftəlik koridor, 50 % kənar", "fn": lambda db, s: lab_corridor(db, s, "1w", "50"),
+     "question": "Eyni qayda 50 %-lik həftəlik koridorun kənarlarında qazandırırmı?",
+     "data": "Sistemin həftəlik koridor proqnozları, qızılın gündəlik şamları"},
 ]
 
 
@@ -315,7 +410,7 @@ def _other_tests(db: DB) -> list[dict]:
 
 
 def build(db: DB) -> dict:
-    out = {"ts": time.time(), "labs": [], "others": _other_tests(db)}
+    out = {"ts": time.time(), "labs": [], "others": _other_tests(db), "corridor_quality": corridor_quality(db)}
     for lab in LABS:
         row = {k: v for k, v in lab.items() if k != "fn"}
         try:

@@ -25,6 +25,11 @@
       ${x.error ? `<p class="down">Hesablama xətası: ${esc(x.error)}</p>` : `<h3 class="sub">Qızıl (qərar verir)</h3>${result(x.gold)}
       <p class="note">Gümüş (yalnız göstərilir): ${pill((x.silver_shown || {}).status)} · ${(x.silver_shown || {}).n ?? 0} hadisə · düz ${pct((x.silver_shown || {}).hit_rate)} · xərcdən sonra ${sg((x.silver_shown || {}).net_avg_pct)}</p>`}
     </div>`).join("");
+    const cq = d.corridor_quality || {}, H = { "1d": "1 gün", "3d": "3 gün", "1w": "1 həftə", "10d": "10 gün", "1mo": "1 ay" };
+    $("cq").innerHTML = Object.keys(cq).length ? `<table class="sc"><tr><th>Horizont</th><th class="c">Hal</th><th class="c">Tutma 80 %</th><th class="c">Tutma 50 %</th><th class="c">En</th><th class="c">Bal</th><th class="c">Topa</th></tr>` +
+      Object.entries(cq).map(([h, q]) => `<tr><td>${H[h] || h}</td><td class="c">${q.n}</td><td class="c">${pct(q.cover80)}</td><td class="c">${pct(q.cover50)}</td>
+        <td class="c">${q.width80_pct} %</td><td class="c">${q.winkler80_pct} %</td><td class="c">${q.miss_cluster ?? "—"}</td></tr>`).join("") + "</table>" :
+      "<p class='note'>Hələ hesablanmayıb.</p>";
     const o = d.others || [];
     $("others").innerHTML = o.length ? `<table class="sc"><tr><th>Sınaq</th><th>Sual</th><th class="c">Hökm</th><th class="c">Hadisə</th><th class="c">Düz</th><th class="c">Xərcdən sonra</th></tr>` +
       o.map((x) => `<tr><td>${esc(x.name)}</td><td class="note">${esc(x.question)}</td><td class="c">${pill(x.status)}</td>

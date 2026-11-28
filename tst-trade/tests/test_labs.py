@@ -57,7 +57,7 @@ def test_the_cot_lab_waits_for_publication_and_never_overlaps():
 
 def test_one_lab_failing_does_not_hide_the_others():
     out = labs.build(DB(":memory:"))
-    assert [x["id"] for x in out["labs"]] == ["L1", "L2", "L3", "L4", "L5", "L6"]
+    assert [x["id"] for x in out["labs"]] == ["L1", "L2", "L3", "L4", "L5", "L6", "K1", "K2", "K3", "K4"]
     assert all(("gold" in x) or ("error" in x) for x in out["labs"])
 
 
@@ -88,3 +88,21 @@ def test_the_day_signal_labs_trade_from_the_next_close_without_overlap():
     trades = labs._day_signals(dates, closes, lambda i: 1)            # a «long» signal every day
     assert trades[0][0] == dates[2] and len(trades) == 9             # from day 1's next close, every 6 days
     assert all(r > 0 for _, r in trades)
+
+
+def test_the_corridor_lab_buys_the_lower_edge_and_skips_both_edges():
+    db = DB(":memory:")                                   # the forecasts table comes with the schema
+    t0 = int(datetime(2024, 1, 1, tzinfo=timezone.utc).timestamp())
+    for k in range(150):
+        t = t0 + k * 86400
+        lo, hi, close = (99, 101, 99.8)                      # day touches only the lower edge, closes back up
+        if k % 10 == 0:
+            lo, hi = 98, 102.5                               # touches both edges: no trade
+        db.execute("INSERT INTO candles(symbol, tf, t, o, h, l, c) VALUES('XAU','1d',?,?,?,?,?)", (t, 100, hi, lo, close))
+        db.execute("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50, "
+                   "lo80, hi80, price1) VALUES('XAU','1d','vahid','history',?,?,100,0.5,99.5,100.5,99,102,?)",
+                   (t, t + 86400, close))
+    out = labs.lab_corridor(db, "XAU", "1d", "80")
+    assert out["n"] == 135 and out["hit_rate"] == 1.0          # bought at 99, closed at 99.8: 135 days, 15 skipped
+    q = labs.corridor_quality(db)
+    assert q["1d"]["cover80"] == 1.0 and q["1d"]["width80_pct"] == 3.0

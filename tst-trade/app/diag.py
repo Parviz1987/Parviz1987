@@ -58,12 +58,13 @@ class ErrorJournal(logging.Handler):
             pass   # the journal must never break the app
 
 
-def _labs_brief(db: DB) -> list:
+def _labs_brief(db: DB) -> dict:
     from . import labs
     out = labs.build(db)
-    return [{"id": x["id"], "name": x["name"], **({k: (x.get("gold") or {}).get(k) for k in
-             ("status", "n", "hit_rate", "net_avg_pct", "p", "halves_net_pct", "first", "last")}),
-             "silver": (x.get("silver_shown") or {}).get("status"), "error": x.get("error")} for x in out["labs"]]
+    return {"labs": [{"id": x["id"], "name": x["name"], **({k: (x.get("gold") or {}).get(k) for k in
+                      ("status", "n", "hit_rate", "net_avg_pct", "p", "halves_net_pct", "first", "last")}),
+                      "silver": (x.get("silver_shown") or {}).get("status"), "error": x.get("error")} for x in out["labs"]],
+            "corridor_quality": out.get("corridor_quality")}
 
 
 def _pipeline(db: DB, keys, engine, feeds, jobs) -> list:

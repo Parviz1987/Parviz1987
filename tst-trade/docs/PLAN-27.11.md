@@ -265,3 +265,10 @@ sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real
   mətni saxlanmırdı, indi saxlanır (diag `fjnews.last_error`). Müştəri əhvalı işləyir. Bazar bağlı (həftə sonu). Yaddaş
   282/961 MB. 27.11 20:20-dən yeni xəta yoxdur. Sahibdən gözlənilir: gündəlik tarixçə qərarı; Healthchecks və 2FA (istəyə görə).
 - [x] 10.1 Bağlandı: böyütmə lazım deyil (səbəb yuxarıda).
+- 28.11 10:30–11:00 — Sahib: dostun repo-su (pj-trade-gold) və internet araşdırması. Nəticə: hər ikisi və elmi ədəbiyyat eyni
+  deyir — qısa müddətli yön təxmin edilmir; dəyişkənlik/koridor təxmin edilir (ən güclü sübut). Dostun sistemində yön pul
+  atmaq kimidir, LLM ticarəti pul itirib; güclü tərəfi koridor texnikaları (HAR-RV, ayrıca kənar kalibrləmə, ansambl, hadisə
+  günü genişləndirmə). Bizim koridorlar orta hesabla kalibrlidir (1d 80 % → 80,6 %, 1 959 gün).
+- [x] 13.4 28.11 14:52 — Sahib: «koridoru tapaq, alqı-satqını koridora əsasən edək». Koridor laboratoriyaları K1–K4 (günlük/həftəlik,
+  80 %/50 % kənarda tərsinə giriş) hesablamadan ƏVVƏL qeydə alındı; koridorun keyfiyyəti (tutma, en, Winkler balı, qaçırma
+  topası) səhifədə və diag-da. Testlər 404/404.
