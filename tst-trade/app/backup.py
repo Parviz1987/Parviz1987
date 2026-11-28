@@ -26,11 +26,30 @@ def _sign(key: bytes, msg: str) -> bytes:
     return hmac.new(key, msg.encode(), hashlib.sha256).digest()
 
 
+def _host(account_id: str) -> str:
+    """The R2 address. Cloudflare shows the owner a link «https://<id>.r2.cloudflarestorage.com» (EU buckets:
+    «<id>.eu.r2…»); the form asks for the id. Either is accepted: the link is cut down to its host."""
+    v = (account_id or "").strip()
+    if "://" in v:
+        v = v.split("://", 1)[1]
+    v = v.split("/", 1)[0].strip()
+    return v if v.endswith(".r2.cloudflarestorage.com") else f"{v}.r2.cloudflarestorage.com"
+
+
+def _id_problem(account_id: str) -> str | None:
+    """A plain-language reason why the account_id field cannot be right (no value is shown)."""
+    core = _host(account_id).removesuffix(".r2.cloudflarestorage.com").split(".")[0]
+    if len(core) != 32 or any(c not in "0123456789abcdef" for c in core.lower()):
+        return (f"account_id xanası səhvdir: Cloudflare-in HTTPS linki (https://….r2.cloudflarestorage.com) və ya "
+                f"ondakı 32 simvolluq kod olmalıdır, burada {len(core)} simvol var")
+    return None
+
+
 def _headers(creds: dict, method: str, path: str, payload_hash: str, query: str = "",
              now: _dt.datetime | None = None) -> tuple[str, dict]:
     """SigV4 for R2 (region «auto», service «s3»). Returns (url, headers)."""
     now = now or _dt.datetime.now(_dt.timezone.utc)
-    host = f"{creds['account_id']}.r2.cloudflarestorage.com"
+    host = _host(creds["account_id"])
     amz_date, day = now.strftime("%Y%m%dT%H%M%SZ"), now.strftime("%Y%m%d")
     canon_headers = f"host:{host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{amz_date}\n"
     signed = "host;x-amz-content-sha256;x-amz-date"
@@ -49,10 +68,16 @@ def _headers(creds: dict, method: str, path: str, payload_hash: str, query: str 
 
 async def check(creds: dict) -> tuple[bool, str]:
     """Can we see the bucket? (a HEAD on it)"""
+    bad = _id_problem(creds.get("account_id", ""))
+    if bad:
+        return False, bad
     empty = hashlib.sha256(b"").hexdigest()
-    url, h = _headers(creds, "HEAD", f"/{creds.get('bucket', '')}", empty)
-    async with httpx.AsyncClient(timeout=20) as c:
-        r = await c.head(url, headers=h)
+    url, h = _headers(creds, "HEAD", f"/{creds.get('bucket', '').strip().strip('/')}", empty)
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.head(url, headers=h)
+    except httpx.ConnectError:
+        return False, "R2 ünvanına çatmaq olmadı: account_id xanasındakı linki / kodu yoxlayın"
     if r.status_code == 200:
         return True, "işləyir (bucket görünür)"
     if r.status_code in (401, 403):
