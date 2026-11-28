@@ -167,6 +167,9 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
         elif slot == "r2":
             from . import backup
             ok, msg = await backup.check(v)
+        elif slot == "financialjuice":
+            from . import fjnews
+            ok, msg = await fjnews.check(v)
         else:
             # No check exists yet for this provider: the key is saved, nothing is known about it (not an error).
             ok, msg = None, "açar saxlanıb; bu açarın yoxlaması növbəti mərhələdə qoşulacaq"

@@ -138,4 +138,7 @@ def test_the_two_paid_feeds_wait_for_the_owner_until_connected():
     assert "Admin" in rows["FinancialJuice (sürətli başlıqlar)"]["msg"]
     assert rows["Databento canlı axını (böyük oyunçular, həqiqi həcm)"]["status"] == "owner"
     ks.set("financialjuice", {"key": "k"})
-    assert "qoşulma növbəti addımdır" in _rows(db, ks, eng, feeds, jobs)["FinancialJuice (sürətli başlıqlar)"]["msg"]
+    from app import fjnews
+    fjnews.health(db, False, "FinancialJuice: açar səhvdir (4001)")
+    row = _rows(db, ks, eng, feeds, jobs)["FinancialJuice (sürətli başlıqlar)"]
+    assert row["status"] == "bad" and "4001" in row["msg"]

@@ -145,6 +145,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             asyncio.get_running_loop().create_task(feeds.sniper())     # plan 27.11 step 9.1: the release minute
             from . import orderflow                                     # plan 27.11 step 11.1: COMEX trades live
             asyncio.get_running_loop().create_task(orderflow.run(db, store))
+            from . import fjnews                                        # plan 27.11 step 11.1: fast headlines
+            asyncio.get_running_loop().create_task(fjnews.run(db, store))
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
             asyncio.get_running_loop().create_task(app.state.futures_daily())
             asyncio.get_running_loop().create_task(app.state.rigor_daily())

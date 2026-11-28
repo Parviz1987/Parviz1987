@@ -340,10 +340,16 @@ def _owner_steps(db: DB, now: float) -> list[tuple[str, str, str, str]]:
         st, text = "bad", ("son nüsxə 2 gündən köhnədir" if b.get("ok") else f"son cəhd alınmadı: {msg[:80]}")
     out.append(("İkinci ehtiyat nüsxə (Cloudflare R2)", "serverdən kənarda nüsxə", st, text))
     # the two paid feeds the owner chose on 27.11 (plan step 11.1): waiting for the plan and the key, then connected
-    fj_saved = bool(db.get("key:financialjuice"))          # sealed value, only whether it exists matters here
-    out.append(("FinancialJuice (sürətli başlıqlar)", "Xəbər bloku, həyəcan", "owner",
-                "açar Admin-də var — qoşulma növbəti addımdır (Claude)" if fj_saved else
-                "sahib almağa qərar verib; açarı Admin → Mənbələr və açarlar bölməsinə yazılandan sonra qoşulur"))
+    try:
+        fjh = json.loads(db.get("fj:health") or "null")
+    except ValueError:
+        fjh = None
+    if not db.get("key:financialjuice") or not fjh or fjh.get("ok") is None:
+        out.append(("FinancialJuice (sürətli başlıqlar)", "Xəbər bloku, həyəcan", "owner",
+                    "açarı Admin → Mənbələr və açarlar bölməsinə yazılandan sonra qoşulur"))
+    else:
+        out.append(("FinancialJuice (sürətli başlıqlar)", "Xəbər bloku, həyəcan", "ok" if fjh.get("ok") else "bad",
+                    str(fjh.get("msg") or "")))
     try:
         fh = json.loads(db.get("flow:health") or "null")
     except ValueError:
