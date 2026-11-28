@@ -111,14 +111,16 @@ async def resolve(creds: dict) -> tuple[str | None, str]:
     Returns (bucket, how) or (None, what the owner should do)."""
     want = (creds.get("bucket") or "").strip().strip("/").lower() or _bucket_in_link(creds.get("account_id", ""))
     async with httpx.AsyncClient(timeout=20) as c:
-        if want:
-            r = await _call(c, creds, "HEAD", f"/{want}")
+        # an empty box still looks for «tst-backup» first: a key without the right to list or create buckets
+        # («Object Read & Write») can use a bucket the owner made in the dashboard (27.11 22:51)
+        for name in dict.fromkeys([want or DEFAULT_BUCKET]):
+            r = await _call(c, creds, "HEAD", f"/{name}")
             if r.status_code == 200:
-                return want, f"bucket «{want}»"
+                return name, f"bucket «{name}»"
             if r.status_code in (401, 403):
                 return None, (f"açar qəbul olunmadı (HTTP {r.status_code}): Access Key ID və Secret Access Key-i "
                               f"yenidən yapışdırın; açarın icazəsi «Object Read & Write» olmalıdır")
-        head = _why(r) if want else "—"
+        head = _why(r)
         r = await _call(c, creds, "GET", "/")
         listed = _why(r)
         names = re.findall(r"<Name>([^<]+)</Name>", r.text) if r.status_code == 200 else []

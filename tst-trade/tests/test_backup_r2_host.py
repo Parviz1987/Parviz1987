@@ -110,3 +110,12 @@ def test_a_refusal_shows_cloudflares_own_codes(monkeypatch):
     ok, msg, _ = asyncio.run(backup.check_fix({**CREDS, "bucket": "tst-backup"}))
     assert not ok and "siyahı HTTP 403 AccessDenied" in msg and "yaratma HTTP 403 AccessDenied" in msg
     assert "bucket HTTP 404" in msg
+
+
+def test_an_empty_bucket_box_finds_the_bucket_the_owner_made(monkeypatch):
+    """27.11 22:51: the key may not list or create buckets (AccessDenied); a «tst-backup» made in the dashboard is
+    still found and used when the box is empty."""
+    calls = _fake(monkeypatch, {("HEAD", "/tst-backup"): (200, ""), ("GET", "/"): (403, "<Code>AccessDenied</Code>"),
+                                ("PUT", "/tst-backup/backups/yoxlama.txt"): (200, "")})
+    ok, msg, bucket = asyncio.run(backup.check_fix({**CREDS, "bucket": ""}))
+    assert ok and bucket == "tst-backup" and ("GET", "/") not in calls
