@@ -200,3 +200,8 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   agentdən beyinə qayıdır; arxada zəif ulduzlar. Telefonda beyin bölməsi «Hakim»in üstünə düşmürdü — düzəldi. Ad
   üst-üstə düşməsi 1280/1366/1920/900/1024/360/390-da 0 (ölçü ilə yoxlanıb), brauzer xətası 0; az hərəkət rejimində işıq
   getmir, yalnız parlayır.
+- 27.11 23:45 — Databento pulsuz qiymət: 1 ay $3.02, 3 ay $8.44, 6 ay $15.12, 12 ay $32.69. Sahib: «ha yukla» (12 ay).
+- 27.11 23:51 — Yükləmə + ölçmə (`dbhist.download_and_measure`): ay-ay (hər ay ayrıca yadda; yenidən başlama yalnız yarımçıq ayı
+  təkrarlayır), hər aydan əvvəl qiymət yenidən soruşulur, cəm $35 tavanını keçəcəksə dayanır; məlumat diskə yazılmır, sətir-
+  sətir oxunur; ən çox 3 cəhd. Diaqnostikada `dbhist` (gediş, nəticə). Agentlər: beynin içində sakit vaxtda da fasiləli
+  qığılcım və dalğa (beyin işləri seyrəldiləndən sonra donmuş görünürdü). Testlər.

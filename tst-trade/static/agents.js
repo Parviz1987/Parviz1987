@@ -466,7 +466,8 @@ function makeBrain(n) {
     NB[i * 3] = j0; NB[i * 3 + 1] = j1; NB[i * 3 + 2] = j2;
   }
 }
-let fireRand = rng(42);
+let fireRand = rng(42), nextWave = 0;
+const IDLE_SPARKS = 3.5;                 // resting rhythm: sparks per second while no brain agent works
 function fireBurst(k) {
   if (paused || !BN) return;
   for (let m = 0; m < k; m++) { const i = (fireRand() * BN) | 0; FIRE[i] = 1; for (let q = 0; q < 3; q++) FIRE[NB[i * 3 + q]] = Math.max(FIRE[NB[i * 3 + q]], 0.6); }
@@ -484,10 +485,13 @@ function drawBrain(t, dt, tm, st, base) {
   const g = cx.createRadialGradient(ox, oy, R * 0.05, ox, oy, R * 1.15);
   g.addColorStop(0, `rgba(${base},${0.16 + pulse * 0.12 + coreFlash * 0.12 + brainBusy * 0.04})`); g.addColorStop(1, "rgba(0,0,0,0)");
   cx.fillStyle = g; cx.beginPath(); cx.arc(ox, oy, R * 1.15, 0, 7); cx.fill();
-  // random firing only in proportion to the brain agents that really work right now
-  if (!paused && brainBusy) {
-    let want = brainBusy * 7 * dt;
+  // owner 2026-11-27: «electricity inside the brain at intervals, so it looks alive (as before)». Since the brain
+  // jobs were thinned out (27.11) the brain was mostly still. A quiet resting rhythm — a few sparks a second and a
+  // small wave every few seconds — keeps it alive; real work fires it much harder (as before).
+  if (!paused) {
+    let want = (IDLE_SPARKS + brainBusy * 7) * dt;
     while (want > 0) { if (fireRand() < want) fireBurst(1); want -= 1; }
+    if (t > nextWave) { fireBurst(5 + brainBusy * 3); nextWave = t + 2.2 + fireRand() * 2.4; }
   }
   const decay = Math.exp(-dt / 0.38);
   const rot = t * (0.16 + brainBusy * 0.05), cr = Math.cos(rot), sr = Math.sin(rot);

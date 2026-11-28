@@ -456,6 +456,9 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "paid_trial": _slow("paid_trial", lambda: paidtrial.evaluate(db), 600),
         "fjnews": json.loads(db.get("fj:health") or "null"),          # FinancialJuice stream: state + last 8 events
         "dbhist_quote": json.loads(db.get("dbhist:quote") or "null"),  # Databento history price list (free question)
+        "dbhist": {"result": json.loads(db.get("dbhist:result") or "null"),   # the owner-approved 12-month test
+                   "progress": json.loads(db.get("dbhist:progress") or "null"),
+                   "months_done": db.execute("SELECT COUNT(*) FROM kv WHERE k LIKE 'dbhist:month:%'").fetchone()[0]},
         "impulse_study": _slow("impulse", lambda: impulse.study(db), ttl=3600),
         # Plan v3 (Blocks 15-18): full cost, forecast cards, source checker, news events, focus targets, ALFRED
         "plan_v3": _slow("plan_v3", lambda: _plan_v3(db)),
