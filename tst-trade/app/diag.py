@@ -469,6 +469,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "labs": _slow("labs_brief", lambda: _labs_brief(db), 3600),                # Laboratoriyalar: verdicts per lab
         "labs_cot_hist": json.loads(db.get("labs:cot_hist") or "null"),          # the labs' deep CFTC history
         "corridor": json.loads(db.get("corridor:eval") or "null"),               # corridor engine v2 against today's
+        "plan": json.loads(db.get("plan:eval") or "null"),                       # physical limits, edge touch rates
         "dbstats_quote": json.loads(db.get("dbstats:quote") or "null"),  # CME statistics price list (free question)
         "dbstats": {"load": json.loads(db.get("dbstats:last_load") or "null"),   # CME open interest: loads, spend,
                     "result": json.loads(db.get("dbstats:result") or "null")},  # and the pre-registered test

@@ -19,6 +19,8 @@ Bu fayl 28.11-dən sonrakı əsas iş planıdır. Jurnal və yoxlama siyahısı:
 - Qəbul (qabaqcadan yazılıb, koddadır): tutma 80 % ± 2,5, 50 % ± 3; bal (en + qaçırma cəriməsi) indiki koridordan aşağı,
   Diebold–Mariano p < 0,01; qaçırmalar topa deyil. Qızıl 1 gün və 1 həftə qərar verir.
 - Keçsə: sistemin koridoru v2 olur (panel, proqnoz kartları, Hakim). Keçməsə: indiki qalır, nəticə yazılır.
+- **Nəticə (28.11 15:47): keçmədi** — qızıl 1 gün v2 1,5 % yaxşı, amma p 0,042 (0,01 lazım); 1 həftə pis. İndiki koridor
+  saxlanır. Dərs: gündəlik məlumatla koridor həddə yaxındır; irəli addım gün içi məlumatın uzun saxlanmasıdır (mərhələ 4).
 
 ### 2. Fiziki qızıl — alış və satış planı
 - Sual: «N gün ərzində qızıl almalıyam» — koridorun aşağı hissəsinə limit sifariş, dolmasa müddətin sonunda bazar qiyməti.

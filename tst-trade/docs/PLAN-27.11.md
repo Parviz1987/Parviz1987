@@ -287,3 +287,10 @@ Plan: `docs/PLAN-KORIDOR.md` (mərhələ 1 koridor v2 → 2 fiziki qızıl → 3
 - [x] 14.1 28.11 15:39 — Koridor mühərriki v2 (`app/corridor.py`): Parkinson + HAR + GVZ + qabaqcadan bilinən hadisə günləri,
   kənar-kənar empirik koridor + adaptiv düzəliş; qəbul qaydası hesablamadan ƏVVƏL (15:37 NY) yazılıb. Sınaq: gələcək
   məlumat istifadə olunmur, simulyasiyada vədinə əməl edir və dəyişkənliyi izləyir.
+- 28.11 15:47 — **Koridor v2 keçmədi** (qəbul qaydası ilə): qızıl 1 gün — tutma 79,9 % (indiki 80,3 %), en 2,56 % (2,65 %), bal 3,90
+  (3,96), DM p 0,042 > 0,01; 1 həftə — v2 pis (bal 8,77 / 8,56). Digər metallar və horizontlar da keçmədi. Nəticə: indiki
+  koridor gündəlik məlumatla əldə edilə bilənə çox yaxındır, dəyişdirilmir. Daha dar koridor üçün gün içi (5 dəq) məlumatı
+  uzun saxlamaq lazımdır (indi 1 dəq/5 dəq 30 gün) — mərhələ 4-ə (karkas) yazıldı.
+- [x] 14.2 28.11 15:49 — Mərhələ 2–3 ölçmə qaydası (`app/plan.py`) hesablamadan ƏVVƏL (15:48 NY): fiziki alış/satış limiti koridor
+  kənarında (P1/P2 alış 25 %/10 %, S1/S2 satış 75 %/90 %), dolmasa müddətin sonunda; qənaət eyni müddətin bağlanışına
+  qarşı, p < 0,01, iki yarı müsbət. Fyuçers: kənara toxunma tezliyi (stop bağlanışla yox, toxunma ilə vurulur) və ölçü.
