@@ -101,3 +101,12 @@ def test_a_read_only_token_is_not_called_working(monkeypatch):
                         ("DELETE", "/tst-backup/backups/yoxlama.txt"): (204, "")})
     ok, msg, _ = asyncio.run(backup.check_fix({**CREDS, "bucket": "tst-backup"}))
     assert ok and "yazma sınağı" in msg
+
+
+def test_a_refusal_shows_cloudflares_own_codes(monkeypatch):
+    """27.11 22:40: after the owner changed the permission the answer was the same; Cloudflare's codes tell why."""
+    _fake(monkeypatch, {("GET", "/"): (403, "<Error><Code>AccessDenied</Code></Error>"),
+                        ("PUT", "/tst-backup"): (403, "<Error><Code>AccessDenied</Code></Error>")})
+    ok, msg, _ = asyncio.run(backup.check_fix({**CREDS, "bucket": "tst-backup"}))
+    assert not ok and "siyahı HTTP 403 AccessDenied" in msg and "yaratma HTTP 403 AccessDenied" in msg
+    assert "bucket HTTP 404" in msg

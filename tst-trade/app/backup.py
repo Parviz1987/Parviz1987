@@ -99,6 +99,12 @@ async def _call(c: httpx.AsyncClient, creds: dict, method: str, path: str) -> ht
     return await c.request(method, url, headers=h)
 
 
+def _why(r: httpx.Response) -> str:
+    """Cloudflare's own answer, short: HTTP code and the S3 error code (AccessDenied, NoSuchBucket …)."""
+    m = re.search(r"<Code>([^<]{1,60})</Code>", r.text or "")
+    return f"HTTP {r.status_code}" + (f" {m.group(1)}" if m else "")
+
+
 async def resolve(creds: dict) -> tuple[str | None, str]:
     """Which bucket to use. The one written in Admin (or at the end of the link) if Cloudflare has it; else the only
     bucket this key sees (or «tst-backup» among several); else «tst-backup» (or the written name) is created.
@@ -112,7 +118,9 @@ async def resolve(creds: dict) -> tuple[str | None, str]:
             if r.status_code in (401, 403):
                 return None, (f"açar qəbul olunmadı (HTTP {r.status_code}): Access Key ID və Secret Access Key-i "
                               f"yenidən yapışdırın; açarın icazəsi «Object Read & Write» olmalıdır")
+        head = _why(r) if want else "—"
         r = await _call(c, creds, "GET", "/")
+        listed = _why(r)
         names = re.findall(r"<Name>([^<]+)</Name>", r.text) if r.status_code == 200 else []
         if len(names) == 1:
             return names[0], f"bucket «{names[0]}» (Cloudflare-də olan yeganə bucket)"
@@ -125,8 +133,11 @@ async def resolve(creds: dict) -> tuple[str | None, str]:
         r = await _call(c, creds, "PUT", f"/{new}")
         if r.status_code == 200:
             return new, f"bucket «{new}» (sistem özü yaratdı)"
-        return None, (f"Cloudflare-də «{new}» adlı bucket yoxdur və açarın onu yaratmağa icazəsi yoxdur: Cloudflare → "
-                      f"R2 → Create bucket → ad «{new}» → sonra yenə «Yoxla»")
+        codes = f"[Cloudflare cavabı: bucket {head}; siyahı {listed}; yaratma {_why(r)}]"
+        if r.status_code in (401, 403):
+            return None, (f"Cloudflare-də «{new}» adlı bucket yoxdur və açarın onu yaratmağa icazəsi yoxdur: açarın icazəsi "
+                          f"«Admin Read & Write» olmalıdır və ya Cloudflare → R2 → Create bucket → ad «{new}» {codes}")
+        return None, f"bucket «{new}» yaradılmadı {codes}"
 
 
 async def check_fix(creds: dict) -> tuple[bool, str, str | None]:
