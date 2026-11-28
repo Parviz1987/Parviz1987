@@ -266,6 +266,14 @@ class Engine:
             return "DELAYED"
         return "LIVE"
 
+    def shown_status(self, symbol: str, now: float | None = None) -> str:
+        """What the owner sees. A quiet feed while the market is closed (weekend, daily break) is «CLOSED», not
+        «OFFLINE»: owner 27.11 22:28 read «Əlaqə yoxdur» on a Friday night as a broken Capital.com link.
+        Internal logic keeps using status()."""
+        now = time.time() if now is None else now
+        st = self.status(symbol, now)
+        return "CLOSED" if st == "OFFLINE" and self.provider_name != "demo" and not market_open(now) else st
+
     def _macro(self, now: float) -> "MacroLookup":
         """FRED data changes a few times a day: the lookup is rebuilt at most once an hour, not at every poll."""
         if self._macro_cache is None or now - self._macro_cache[0] > 3600:

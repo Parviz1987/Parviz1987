@@ -3,7 +3,8 @@
 const $ = (id) => document.getElementById(id);
 const TFS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"];
 const TF_NAMES = { "1m": "1 dəq", "5m": "5 dəq", "15m": "15 dəq", "30m": "30 dəq", "1h": "1 saat", "4h": "4 saat", "1d": "1 gün", "1w": "1 həftə" };
-const STATUS_AZ = { LIVE: "Canlı", DELAYED: "Gecikir", OFFLINE: "Əlaqə yoxdur", DEMO: "DEMO", QUIET: "Sakit" };
+const STATUS_AZ = { LIVE: "Canlı", DELAYED: "Gecikir", OFFLINE: "Əlaqə yoxdur", DEMO: "DEMO", QUIET: "Sakit",
+  CLOSED: "Bazar bağlı" };
 const VERDICT_AZ = { "sübut": "Sübut olunub", "yox": "Sübut yoxdur", "az": "Məlumat azdır", "bazis": "Bazis",
   "xərc": "Spreaddən kiçik" };
 const PROVIDER_AZ = { goldapi: "gold-api.com", capital: "Capital.com (axın)", twelvedata: "Twelve Data", demo: "DEMO" };
@@ -56,7 +57,7 @@ function renderTiles(st) {
   }).join("");
   document.querySelectorAll(".tile").forEach((b) => b.onclick = () => { sym = b.dataset.s; save(); refreshAll(); });
   const worst = st.metals.some((m) => m.status === "OFFLINE") ? "OFFLINE" : st.metals.every((m) => m.status === "DEMO") ? "DEMO"
-    : st.metals.some((m) => m.status === "DELAYED") ? "DELAYED" : "LIVE";
+    : st.metals.some((m) => m.status === "DELAYED") ? "DELAYED" : st.metals.every((m) => m.status === "CLOSED") ? "CLOSED" : "LIVE";
   $("feed").className = "pill " + worst;
   $("feed").textContent = st.provider === "demo" ? "DEMO məlumat (real deyil)" : (PROVIDER_AZ[st.provider] || st.provider || "—") + " · " + (STATUS_AZ[worst] || worst);
   const ev = st.event_mode;

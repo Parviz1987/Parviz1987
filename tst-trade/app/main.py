@@ -352,12 +352,18 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
         for sym in candles.METALS:
             q = engine.quotes.get(sym)
             day = candles.get(db, sym, "1d", limit=1)
+            st = engine.shown_status(sym, now)
+            if q is None and st == "CLOSED":                 # market closed and no quote since a restart: last close
+                last = candles.get(db, sym, "1m", limit=1)
+                if last:
+                    t = last[-1]["t"] + 60
+                    q = {"price": last[-1]["c"], "source_ts": t, "recv_ts": t, "ts_missing": False}
             metals.append({"symbol": sym, "name": candles.NAMES[sym],
                            "price": q["price"] if q else None, "source_ts": q["source_ts"] if q else None,
                            "recv_ts": q["recv_ts"] if q else None, "ts_missing": q["ts_missing"] if q else None,
                            "source": engine.provider_name,
-                           "status": engine.status(sym, now), "day_open": day[-1]["o"] if day else None,
-                           "error": engine.errors.get(sym) or engine.errors.get("*")})
+                           "status": st, "day_open": day[-1]["o"] if day else None,
+                           "error": None if st == "CLOSED" else engine.errors.get(sym) or engine.errors.get("*")})
         return {"now": now, "provider": engine.provider_name, "market_open": market_open(now),
                 "event_mode": feeds.event_mode(now),
                 "last_ok": engine.last_ok, "poll": engine.poll, "metals": metals}

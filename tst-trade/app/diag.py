@@ -386,7 +386,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
     metals = {}
     for sym in candles.METALS:
         q = engine.quotes.get(sym)
-        metals[sym] = {"status": engine.status(sym, now), "price": q["price"] if q else None,
+        metals[sym] = {"status": engine.shown_status(sym, now), "price": q["price"] if q else None,
                        "age_s": round(now - q["recv_ts"], 1) if q else None,
                        "recent": [round(r[0], 5) for r in db.execute(
                            "SELECT price FROM ticks WHERE symbol=? ORDER BY ts DESC LIMIT 8", (sym,)).fetchall()],

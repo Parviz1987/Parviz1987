@@ -253,6 +253,7 @@ div.res span.sübut{background:var(--up-soft);color:var(--up)}div.res span.yox{c
 /* simple mode: prices, the markets strip, the trust light and the forecasts table only */
 body.simple #sec-chart,body.simple #sec-strat,body.simple .jump,body.simple .olbox,body.simple .fchint,body.simple .more{display:none}
 .pill.QUIET{background:var(--info-soft);color:var(--info)}
+.pill.CLOSED{background:var(--info-soft);color:var(--info)}
 
 /* Block 16: forecast card */
 .card-dlg{max-width:min(720px,calc(100vw - 32px));width:100%;background:#0b1428;color:var(--fg);border:1px solid var(--line);

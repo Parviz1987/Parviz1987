@@ -26,8 +26,8 @@ async function load() {
   const problems = [];
   $("s-metals").innerHTML = `<table><tr><th>Metal</th><th>Status</th><th>Qiymət</th><th>Son qiymət</th><th>Saatda tik</th><th>Alış / satış</th></tr>` +
     Object.entries(d.metals).map(([s, m]) => {
-      if (m.status !== "LIVE" && m.status !== "DEMO") problems.push(`${NAMES[s]}: ${m.status}`);
-      return `<tr><td>${NAMES[s]}</td><td>${pill(m.status === "LIVE" ? true : m.status === "OFFLINE" ? false : null, m.status)}</td>
+      if (!["LIVE", "DEMO", "CLOSED"].includes(m.status)) problems.push(`${NAMES[s]}: ${m.status}`);
+      return `<tr><td>${NAMES[s]}</td><td>${pill(m.status === "LIVE" ? true : m.status === "OFFLINE" ? false : null, m.status === "CLOSED" ? "bazar bağlı" : m.status)}</td>
       <td class="n">${m.price ?? "—"}</td><td>${m.age_s == null ? "—" : m.age_s + " san"}</td><td class="n">${m.ticks_hour ?? "—"}</td>
       <td class="n">${m.bid_ask ? m.bid_ask.join(" / ") : "—"}</td></tr>`;
     }).join("") + "</table>" +

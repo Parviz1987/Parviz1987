@@ -170,3 +170,9 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   Cloudflare-də Create bucket etməlidir. 22:00 sahib yenidən yazanda 64 simvolluq gizli açar «HTTPS» xanasına düşdü.
 - 27.11 22:04 — R2: üç Cloudflare dəyəri hansı xanaya yazılsa da özü ayrılır (link / 64 simvol / 32 simvol) və öz xanasında
   saxlanır. Testlər 372/372.
+- 27.11 22:22 — R2: «Yoxla» indi kiçik sınaq faylı yazıb silir (sahibin açarı «Object Read only» idi: bucket olsaydı da
+  gecə nüsxəsi yazılmazdı, «Yoxla» isə yaşıl göstərərdi). Sahibin addımı: açarın icazəsi «Admin Read & Write» → sistem
+  bucket-i özü yaradır. Sahib istəsə sabaha qalır (DigitalOcean gündəlik nüsxəsi işləyir).
+- 27.11 22:30 — Sahib: «Capital-dan əlaqə kəsildi». Kəsilməyib: bazar cümə 17:00 NY bağlanıb (açar yoxlaması «işləyir»), amma
+  kartlar «Əlaqə yoxdur» və «—» göstərirdi (deploydan sonra yaddaşda qiymət yox). İndi bazar bağlı olanda «Bazar bağlı» +
+  son qiymət və vaxtı (son 1 dəqiqəlik şamdan); daxili məntiq dəyişmir. Testlər 374/374; 1366 və 390, xəta 0.
