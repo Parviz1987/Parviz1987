@@ -176,3 +176,8 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
 - 27.11 22:30 — Sahib: «Capital-dan əlaqə kəsildi». Kəsilməyib: bazar cümə 17:00 NY bağlanıb (açar yoxlaması «işləyir»), amma
   kartlar «Əlaqə yoxdur» və «—» göstərirdi (deploydan sonra yaddaşda qiymət yox). İndi bazar bağlı olanda «Bazar bağlı» +
   son qiymət və vaxtı (son 1 dəqiqəlik şamdan); daxili məntiq dəyişmir. Testlər 374/374; 1366 və 390, xəta 0.
+- 27.11 22:51 — R2 «Yoxla» Cloudflare-in öz kodunu göstərdi: siyahı və yaratma «HTTP 403 AccessDenied» — açar düzgün, icazəsi
+  «Object Read only». Sahib icazəni «Admin Read & Write» etdi → **22:57 R2 işləyir**: sistem sahibin yeganə bucket-ini
+  («tradegold») özü tapdı, sınaq faylı yazıb sildi. Nüsxələr `backups/tst-YYYY-MM-DD.sqlite.gz` adı ilə (başqa fayllara
+  toxunmur). İlk real nüsxə 28.11 02:00 NY — şənbə səhər yoxlanacaq.
+- 27.11 22:59 — Əlaqə xəritəsi R2: açar yoxlanıb, nüsxə hələ yoxdursa «sahibin açarını gözləyir» yox, «ilk nüsxə 02:00-da».

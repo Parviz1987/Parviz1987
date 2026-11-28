@@ -72,6 +72,12 @@ def test_owner_steps_are_shown_as_waiting_never_as_working():
     assert rows["Kənar nəzarətçi (Healthchecks.io)"]["status"] == "owner"
     assert rows["İkinci ehtiyat nüsxə (Cloudflare R2)"]["status"] == "owner"
     assert "DigitalOcean" in rows["İkinci ehtiyat nüsxə (Cloudflare R2)"]["msg"]
+    # 27.11 22:57: the key is saved and Admin's check wrote a file — not «waiting for the owner», not green either
+    ks.set("r2", {"access_key_id": "a" * 32, "secret_access_key": "b" * 64,
+                  "account_id": "https://" + "c" * 32 + ".r2.cloudflarestorage.com", "bucket": "tradegold"})
+    ks.record_check("r2", True, "işləyir: bucket «tradegold», yazma sınağı keçdi")
+    row = _rows(db, ks, eng, feeds, jobs)["İkinci ehtiyat nüsxə (Cloudflare R2)"]
+    assert row["status"] == "warn" and "02:00" in row["msg"]
 
 
 def test_judge_self_check_failure_is_a_warning():

@@ -108,8 +108,8 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
 - **27.11 axşam (sahib: «xəbər çıxan kimi gəlsin»):** vaxtı məlum ABŞ rəqəmi (BLS) və Fed qərarı dəqiqəsində **«snayper»**
   rəsmi mənbəni 3 saniyədən bir soruşur, tapılan kimi həyəcan (`feeds.sniper`). Benzinga söndürüldü; Google News 10 dəqiqədən
   bir (Fed lenti 2 dəq). Hər başlığın gəliş vaxtı yazılır — əlaqə xəritəsində mənbə-mənbə gecikmə. Qəfil xəbər üçün
-  **FinancialJuice** (pullu, Developer $99/ay, 27.12 yenilənir) — **27.11 20:49-dan canlı** (`app/fjnews.py`, bir WebSocket
-  qoşulma); təcili 3-cü səviyyə başlıq (qızıl/dollar/Fed/ABŞ/geosiyasət) dərhal həyəcan. Kəşfiyyatçı yalnız böyük rəqəm
+  **FinancialJuice** (pullu, Developer $99/ay, 27.12 yenilənir) — **27.11 21:46-dan canlı** (`app/fjnews.py`, bir WebSocket
+  qoşulma; sahib açarı yenidən yaratdı); təcili 3-cü səviyyə başlıq (qızıl/dollar/Fed/ABŞ/geosiyasət) dərhal həyəcan. Kəşfiyyatçı yalnız böyük rəqəm
   ətrafında və həyəcanda. **1 aylıq sınaq qabaqcadan qeydə alınıb** (`app/paidtrial.py`, 21:00 NY-dən, qərar 22.12): T1
   FinancialJuice → qızıl 15 dəq, T2 Databento böyük əməliyyat → qızıl 15 dəq; tam xərcdən sonra, hədd 0,05/2, ən az 30.
 - **Nə qalıb:** (a) qaydaların öz qeydi yığılmalıdır (çəki yalnız müsbət qeydlə); (b) NW-SHOCK-1-i istiqamət yox,

@@ -330,8 +330,15 @@ def _owner_steps(db: DB, now: float) -> list[tuple[str, str, str, str]]:
     except ValueError:
         b = {}
     msg = str(b.get("msg") or "")
+    try:
+        r2_check = json.loads(db.get("check:r2") or "null") or {}
+    except ValueError:
+        r2_check = {}
+    r2_ready = bool(db.get("key:r2")) and r2_check.get("ok") is True     # Admin's check wrote and removed a file
     if b.get("ok") and now - float(b.get("ts") or 0) < 2 * 86400:
         st, text = "ok", "son nüsxə alındı"
+    elif r2_ready and (not b or (not b.get("ok") and "açar" in msg)):
+        st, text = "warn", "açar yoxlandı (yazma sınağı keçdi); ilk nüsxə gecə 02:00 NY-də çıxacaq"
     elif not b.get("ok") and "açar" in msg:
         st, text = "owner", "kod hazırdır, sahibin açarını gözləyir; əvəzi: DigitalOcean-ın gündəlik nüsxəsi (7 gün)"
     elif not b:
