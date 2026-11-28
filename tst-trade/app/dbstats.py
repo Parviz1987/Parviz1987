@@ -114,7 +114,7 @@ def parse_oi(lines) -> dict[str, tuple[int, int]]:
 def _download(key: str, symbol: str, start: str, end: str) -> dict[str, tuple[int, int]]:
     params = {"dataset": DATASET, "symbols": symbol, "stype_in": "parent", "schema": "statistics", "start": start,
               "end": end, "encoding": "csv", "compression": "none", "pretty_px": "true", "pretty_ts": "false"}
-    with httpx.Client(timeout=httpx.Timeout(60, read=300)) as c:
+    with httpx.Client(timeout=httpx.Timeout(60, read=900)) as c:
         with c.stream("POST", HIST + "timeseries.get_range", data=params, auth=(key, "")) as r:
             if r.status_code != 200:
                 r.read()
@@ -130,25 +130,42 @@ def load(db: DB, key: str, now: float | None = None) -> dict:
     end = (datetime.fromtimestamp(now, timezone.utc) - timedelta(days=1)).date()
     spent = float(db.get(SPENT) or 0)
     out = {"ts": now, "metals": {}}
-    for sym, parent in METALS.items():
-        # per metal: a metal whose five years are stored is never bought again (a run cut halfway repeats only the
-        # metals still missing); after that only the days since the last stored one
-        last = db.execute("SELECT MAX(d) d FROM cme_oi WHERE symbol=?", (sym,)).fetchone()["d"]
-        first = not last
-        start = (end - timedelta(days=365 * APPROVED["years"] + 1)).isoformat() if first else last
-        if start >= end.isoformat():
-            continue
-        usd = _cost(key, parent, start, end.isoformat())
-        ceiling = APPROVED["ceiling_usd"] if first else APPROVED["daily_ceiling_usd"]
+
+    def buy(sym, parent, a, b, ceiling):
+        nonlocal spent
+        usd = _cost(key, parent, a, b)
         if usd > ceiling:
-            out["metals"][sym] = f"dayandı: {usd:.4f} $ > tavan {ceiling} $"
-            continue
-        days = _download(key, parent, start, end.isoformat())
+            return f"dayandı: {usd:.4f} $ > tavan {ceiling} $"
+        days = _download(key, parent, a, b)
         db.executemany("INSERT OR REPLACE INTO cme_oi(symbol, d, oi, contracts) VALUES(?,?,?,?)",
                        [(sym, d, v[0], v[1]) for d, v in days.items()])
         spent += usd
         db.put(SPENT, f"{spent:.4f}")
-        out["metals"][sym] = f"{len(days)} gün ({start} → {end}), {usd:.4f} $"
+        return f"{len(days)} gün, {usd:.4f} $"
+
+    for sym, parent in METALS.items():
+        # the five years go year by year (28.11 03:29: one five-year request timed out before Databento started
+        # sending); each year is recorded on its own, so a cut run repeats only the year it was in, and a stored year
+        # is never bought again. With all five stored, only the days since the last stored one, once a day.
+        if not db.get(f"dbstats:hist:{sym}"):
+            notes = []
+            for k in range(APPROVED["years"], 0, -1):
+                a = (end - timedelta(days=365 * k + (1 if k == APPROVED["years"] else 0))).isoformat()
+                b = (end - timedelta(days=365 * (k - 1))).isoformat()
+                if db.get(f"dbstats:chunk:{sym}:{a}"):
+                    continue
+                note = buy(sym, parent, a, b, APPROVED["ceiling_usd"] / APPROVED["years"] + 0.5)
+                notes.append(f"{a}→{b}: {note}")
+                if note.startswith("dayandı"):
+                    break
+                db.put(f"dbstats:chunk:{sym}:{a}", note)
+            else:
+                db.put(f"dbstats:hist:{sym}", str(now))
+            out["metals"][sym] = "; ".join(notes) or "5 il artıq yüklənib"
+            continue
+        last = db.execute("SELECT MAX(d) d FROM cme_oi WHERE symbol=?", (sym,)).fetchone()["d"]
+        if last and last < end.isoformat():
+            out["metals"][sym] = buy(sym, parent, last, end.isoformat(), APPROVED["daily_ceiling_usd"])
     out["spent_usd_total"] = round(spent, 4)
     db.put("dbstats:last_load", json.dumps(out, ensure_ascii=False))
     return out
@@ -211,7 +228,8 @@ async def run(db: DB, keys) -> None:
                 await quote(db, keys)
             key = ((keys.get("databento") if keys is not None else None) or {}).get("key")
             done = json.loads(db.get("dbstats:last_load") or "null") or {}
-            if APPROVED and key and time.time() - float(done.get("ts") or 0) > 20 * 3600:
+            age = time.time() - float(done.get("ts") or 0)
+            if APPROVED and key and (age > 20 * 3600 or (done.get("error") and age > 600)):
                 await asyncio.to_thread(load, db, key)
                 res = {"ts": time.time(), "gold_1d": evaluate(db), "gold_5d_shown": evaluate(db, hold=5),
                        "others_1d_shown": {s: evaluate(db, s) for s in ("XAG", "XPT", "XPD")}}
@@ -221,7 +239,8 @@ async def run(db: DB, keys) -> None:
             k = ((keys.get("databento") if keys is not None else None) or {}).get("key")
             if k:
                 msg = msg.replace(k, "***")
-            db.put("dbstats:last_load", json.dumps({"ts": time.time() - 19 * 3600, "error": msg[:200]},
-                                                   ensure_ascii=False))
+            tries = int((json.loads(db.get("dbstats:last_load") or "null") or {}).get("tries") or 0) + 1
+            db.put("dbstats:last_load", json.dumps({"ts": time.time() if tries < 5 else time.time() + 86400,
+                                                    "error": msg[:200], "tries": tries}, ensure_ascii=False))
             log.warning("dbstats: %s", msg[:200])
-        await asyncio.sleep(3600)
+        await asyncio.sleep(600)

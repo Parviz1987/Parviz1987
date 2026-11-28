@@ -51,11 +51,34 @@ def test_a_metal_already_stored_is_never_bought_again(monkeypatch):
     monkeypatch.setattr(dbstats, "_cost", lambda key, sym, a, b: paid.append((sym, a)) or (0.3 if a < "2026" else 0.001))
     monkeypatch.setattr(dbstats, "_download", lambda key, sym, a, b: {"2026-11-20": (100, 3), "2026-11-26": (110, 3)})
     out = dbstats.load(db, "k", now=1795844400)
-    assert all(a < "2022" for _, a in paid) and len(paid) == 4                     # five years, each metal once
+    assert len(paid) == 20 and min(a for _, a in paid) < "2022"                   # five years, year by year, per metal
     paid.clear()
     dbstats.load(db, "k", now=1795844400 + 86400)
     assert {a for _, a in paid} == {"2026-11-26"}                                  # only the days since the last one
     assert float(db.get(dbstats.SPENT)) > 1.2
+
+
+def test_a_cut_run_repeats_only_the_year_it_was_in(monkeypatch):
+    db = DB(":memory:")
+    paid, calls = [], {"n": 0}
+    monkeypatch.setattr(dbstats, "_cost", lambda key, sym, a, b: paid.append((sym, a)) or 0.2)
+
+    def dl(key, sym, a, b):
+        calls["n"] += 1
+        if calls["n"] == 3:
+            raise RuntimeError("The read operation timed out")
+        return {b: (100, 3)}
+    monkeypatch.setattr(dbstats, "_download", dl)
+    try:
+        dbstats.load(db, "k", now=1795844400)
+    except RuntimeError:
+        pass
+    first = list(paid)
+    paid.clear()
+    dbstats.load(db, "k", now=1795844400 + 600)
+    gold_again = [a for s, a in paid if s == "GC.FUT"]
+    assert len(first) == 3 and gold_again[0] == first[2][1] and len(gold_again) == 3     # the cut year again, then on
+    assert first[0][1] not in gold_again and first[1][1] not in gold_again               # years 1 and 2 not bought again
 
 
 def test_the_rule_waits_a_day_for_the_published_open_interest():

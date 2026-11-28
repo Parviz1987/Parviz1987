@@ -226,3 +226,7 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   mövqeyi; qiymət+mövqe ↑ → davam, mövqe ↓ → tükənmə; D-nin rəqəmi səhəri dərc olunduğu üçün giriş D+1 bağlanışında,
   1 gün, tam xərc, ən az 250 gün, p < 0,01, iki yarı müsbət). 5 il (tavan $3), sonra hər gün yalnız yeni günlər (zəng başına
   tavan $0.05); hər metal ayrıca — yarıda kəsilsə yalnız çatmayan metal alınır. «Bazar axını»nda kart. Testlər 393/393.
+- 28.11 03:29 — CME açıq mövqe yükləməsi «oxuma vaxtı bitdi» ilə kəsildi (5 illik bir sorğu: Databento göndərməyə başlamamış
+  bağlantı 5 dəq gözləyib düşdü); sayğac yalnız uğurdan sonra yazır, faktiki tutulanı Databento Usage göstərir.
+- 28.11 03:31 — Düzəliş: 5 il ildən-ilə (hər il ayrıca yadda; kəsilsə yalnız o il təkrarlanır, saxlanmış il bir daha alınmır),
+  gözləmə 15 dəq, xətadan sonra 10 dəq sonra yenidən (5 cəhddən sonra sutkalıq fasilə). Testlər 394/394.
