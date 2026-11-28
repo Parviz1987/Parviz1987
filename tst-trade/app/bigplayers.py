@@ -75,6 +75,10 @@ def shanghai(db: DB) -> dict | None:
 
 
 def summary(db: DB) -> dict:
-    from . import sentiment
+    import json
+    from . import dbstats, sentiment
+    day = _rows(db, "SELECT t, c FROM candles WHERE symbol='XAU' AND tf='1d' ORDER BY t DESC LIMIT 2")
     return {"ts": time.time(), "cot": cot(db), "gld": gld(db), "central_banks": central_banks(db), "india": india(db),
-            "shanghai": shanghai(db), "sentiment": sentiment.latest(db), "sentiment_test": sentiment.evaluate(db)}
+            "shanghai": shanghai(db), "sentiment": sentiment.latest(db), "sentiment_test": sentiment.evaluate(db),
+            "cme_oi": dbstats.latest(db), "cme_oi_test": json.loads(db.get(dbstats.RESULT) or "null"),
+            "gold_day_change": round(day[0]["c"] / day[1]["c"] - 1, 5) if len(day) == 2 else None}

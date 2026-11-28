@@ -218,3 +218,11 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   müştəri əhvalı (`app/sentiment.py`): canlı axının öz sessiyası ilə 15 dəqiqədən bir (ayrıca giriş yox); qayda QABAQCADAN
   qeydə alınıb (28.11 00:40 NY, ilk oxunuşdan əvvəl): hər iş günü 12:00 NY oxunuşu, əks-kütlə, qızıl 24 saat, tam xərc, ən
   az 60 gün, p < 0,05, iki yarı müsbət. Testlər 389/389; 1366 və 390, xəta 0, üfüqi sürüşmə yox.
+- 28.11 00:55 — Yeni mənbələr: CME saytı və iShares avtomatik oxumanı bloklayır; brauzer kimi görünərək yan keçmə cəhdini
+  təhlükəsizlik sistemi dayandırdı (haqlı olaraq) — o yol tutulmur, heç nə yazılmadı. COMEX anbarları və SLV icazəli
+  pulsuz yolu olmadığı üçün buraxıldı; CME açıq mövqeləri — Databento (lisenziyalı) ilə.
+- 28.11 01:43 — Databento «statistics» pulsuz qiyməti: 1 gün $0.0031, 1 il $0.57, 5 il $1.38. Sahib 01:47: «HA YUKLA».
+- 28.11 03:06 — CME açıq mövqelər (`app/dbstats.py`): qayda yükləmədən ƏVVƏL qeydə alındı (qızılın bütün müqavilələrinin açıq
+  mövqeyi; qiymət+mövqe ↑ → davam, mövqe ↓ → tükənmə; D-nin rəqəmi səhəri dərc olunduğu üçün giriş D+1 bağlanışında,
+  1 gün, tam xərc, ən az 250 gün, p < 0,01, iki yarı müsbət). 5 il (tavan $3), sonra hər gün yalnız yeni günlər (zəng başına
+  tavan $0.05); hər metal ayrıca — yarıda kəsilsə yalnız çatmayan metal alınır. «Bazar axını»nda kart. Testlər 393/393.

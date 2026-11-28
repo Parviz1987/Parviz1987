@@ -53,6 +53,14 @@
       c.rank_3y >= 0.85 ? "Fondlar son 3 ilin ən yüksək alış mövqeyinə yaxındır: yeni alıcı az qalıb, düzəliş riski artır." :
       c.rank_3y <= 0.15 ? "Fondlar son 3 ilin ən aşağı mövqeyinə yaxındır: geri alış (yuxarı) potensialı var." :
       "Fondların mövqeyi orta səviyyədədir."));
+    const oi = d.cme_oi && d.cme_oi.XAU, ot = d.cme_oi_test && d.cme_oi_test.gold_1d;
+    if (oi) { const dp = d.gold_day_change;
+      const q = dp == null || !oi.ch_1d ? "" : dp > 0 && oi.ch_1d > 0 ? "Qiymət ↑, mövqelər ↑: bazara yeni alıcı pulu girir." :
+        dp > 0 ? "Qiymət ↑, mövqelər ↓: artım satıcıların çıxması ilədir — zəif artım." :
+        oi.ch_1d > 0 ? "Qiymət ↓, mövqelər ↑: yeni satıcılar girir." : "Qiymət ↓, mövqelər ↓: alıcılar çıxır — satış tükənə bilər.";
+      out.push(card("CME açıq mövqelər — qızıl (bütün müqavilələr)", `${oi.oi.toLocaleString("az")} müqavilə`,
+        `gün <b class="${cls(oi.ch_1d)}">${sgn(oi.ch_1d)}</b> · 20 gün <b class="${cls(oi.ch_20d)}">${sgn(oi.ch_20d)}</b> · ${oi.d}`,
+        q + (ot ? ` <span class="note">Hakimin 5 illik sınağı: <b>${esc(ot.status)}</b> (${ot.n} gün, düz ${ot.hit_rate == null ? "—" : Math.round(ot.hit_rate * 1000) / 10 + " %"})</span>` : ""))); }
     const g = d.gld;
     if (g) out.push(card("Dünyanın ən böyük qızıl fondu (GLD)", `${g.tonnes.toLocaleString("az")} ton`,
       `gün <b class="${cls(g.ch_1d)}">${sgn(g.ch_1d, 1)}</b> · 5 gün <b class="${cls(g.ch_5d)}">${sgn(g.ch_5d, 1)}</b> · 20 gün <b class="${cls(g.ch_20d)}">${sgn(g.ch_20d, 1)}</b> ton · ${g.d}`,
