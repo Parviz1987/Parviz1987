@@ -93,3 +93,14 @@ def test_the_rule_waits_a_day_for_the_published_open_interest():
     out = dbstats.evaluate(db)
     assert out["n"] == 4 and out["hit_rate"] == 1.0 and out["status"] == "az"      # continuation, long, all right
     assert out["first"] == "2026-11-03"
+
+
+def test_a_partial_content_answer_is_data_not_an_error(monkeypatch):
+    """Databento answers 206 when some days' quality is degraded: the CSV is the data (28.11 03:34)."""
+    body = HEAD + "\n" + f"0,{_ns('2026-11-25')},24,1,101,{_ns('2026-11-24')},,300000,1,0,9,0,1,0\n"
+
+    def handler(req):
+        return httpx.Response(206, text=body, headers={"X-Warning": "degraded"})
+    real = httpx.Client
+    monkeypatch.setattr(dbstats.httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler)))
+    assert dbstats._download("k", "GC.FUT", "2021-11-26", "2022-11-26") == {"2026-11-24": (300000, 1)}

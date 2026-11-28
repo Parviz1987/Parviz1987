@@ -217,7 +217,9 @@ def _stream_month(key: str, start: str, end: str, study: Study, db: DB, label: s
     n = 0
     with httpx.Client(timeout=httpx.Timeout(60, read=300)) as c:
         with c.stream("POST", HIST + "timeseries.get_range", data=params, auth=(key, "")) as r:
-            if r.status_code != 200:
+            # 206: Databento sends the data with a warning (some days' quality is not «available») — still the data
+            # (28.11 03:34: a 206 was taken for an error and a paid year was thrown away)
+            if r.status_code not in (200, 206):
                 r.read()
                 raise RuntimeError(f"HTTP {r.status_code} {r.text[:160]}")
             cols = None

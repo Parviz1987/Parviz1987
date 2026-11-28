@@ -116,7 +116,9 @@ def _download(key: str, symbol: str, start: str, end: str) -> dict[str, tuple[in
               "end": end, "encoding": "csv", "compression": "none", "pretty_px": "true", "pretty_ts": "false"}
     with httpx.Client(timeout=httpx.Timeout(60, read=900)) as c:
         with c.stream("POST", HIST + "timeseries.get_range", data=params, auth=(key, "")) as r:
-            if r.status_code != 200:
+            # 206: Databento sends the data with a warning (some days' quality is not «available») — still the data
+            # (28.11 03:34: a 206 was taken for an error and a paid year was thrown away)
+            if r.status_code not in (200, 206):
                 r.read()
                 raise RuntimeError(f"HTTP {r.status_code} {r.text[:160]}")
             return parse_oi(r.iter_lines())

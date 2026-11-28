@@ -230,3 +230,6 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   bağlantı 5 dəq gözləyib düşdü); sayğac yalnız uğurdan sonra yazır, faktiki tutulanı Databento Usage göstərir.
 - 28.11 03:31 — Düzəliş: 5 il ildən-ilə (hər il ayrıca yadda; kəsilsə yalnız o il təkrarlanır, saxlanmış il bir daha alınmır),
   gözləmə 15 dəq, xətadan sonra 10 dəq sonra yenidən (5 cəhddən sonra sutkalıq fasilə). Testlər 394/394.
+- 28.11 03:34 — İkinci cəhd: Databento HTTP 206 qaytardı (məlumat + «bəzi günlərin keyfiyyəti tam deyil» xəbərdarlığı); kod
+  yalnız 200 qəbul etdiyi üçün ödənilmiş bir illik hissəni (~$0.3) atdı — mənim səhvim.
+- 28.11 03:35 — 206 məlumat kimi qəbul olunur (dbstats və dbhist). Testlər 395/395.
