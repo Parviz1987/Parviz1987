@@ -72,6 +72,14 @@ def handle(db: DB, msg: dict) -> int:
 
 
 _live: dict = {}          # the open connection (single worker): key it uses, headlines so far — for «Yoxla»
+_events: list = []        # the last few connects / closes with their time, kept in health (evidence for problems)
+BUSY = {4029, 4030}       # «limit reached» / «replaced»: another connection holds the plan's one slot
+STABLE_S = 120            # a connection that stayed open this long resets the retry wait
+
+
+def _note(what: str) -> None:
+    _events.append([round(time.time()), what[:80]])
+    del _events[:-8]
 
 
 def _key(keys) -> str | None:
@@ -101,22 +109,26 @@ async def _pause(keys, key: str, seconds: float) -> None:
 
 
 async def run(db: DB, keys) -> None:
-    """Keeps one connection open (the Developer plan allows one), reconnects after a drop, waits on a key problem;
-    a key saved anew in Admin is picked up within a minute."""
+    """Keeps one connection open (the Developer plan allows one). After a drop it waits 2 s, 4 s, 8 s … up to 5 min
+    (30 min when the slot is busy or the key is refused); the wait starts again from 2 s only after a connection has
+    stayed open STABLE_S — a connection that is opened and at once closed by the provider must not become a loop.
+    A key saved anew in Admin is picked up within a minute."""
     wait = 2.0
     got = 0
-    replaced = 0
     while True:
         key = _key(keys)
         if not key:
             health(db, None, "açar yoxdur")
             await asyncio.sleep(60)
             continue
+        opened = None
         try:
             async with _connect(key, ping_interval=30, open_timeout=20) as ws:
-                _live.update(key=key, ts=time.time())
-                health(db, True, "qoşuldu, başlıqlar gözlənilir", headlines=got)
-                wait, replaced, last = 2.0, 0, time.time()
+                opened = time.time()
+                _live.update(key=key, ts=opened, got=got)
+                _note("qoşuldu")
+                health(db, True, "qoşuldu, başlıqlar gözlənilir", headlines=got, events=_events)
+                last = time.time()
                 while True:
                     try:
                         raw = await asyncio.wait_for(ws.recv(), 60)
@@ -130,52 +142,57 @@ async def run(db: DB, keys) -> None:
                     _live["got"] = got
                     if time.time() - last >= 60:
                         last = time.time()
-                        health(db, True, f"işləyir: {got} başlıq alınıb (son qoşulmadan bəri)", headlines=got)
+                        health(db, True, f"işləyir: {got} başlıq alınıb (son qoşulmadan bəri)", headlines=got,
+                               events=_events)
                         if _key(keys) != key:
                             break                               # new key in Admin: reconnect with it
             _live.clear()
             if _key(keys) != key:
+                _note("yeni açar")
                 continue                                        # the new key is tried at once
-            health(db, False, "axın bağlandı, yenidən qoşulur", headlines=got)
+            _note("bağlandı")
+            health(db, False, "axın bağlandı, yenidən qoşulur", headlines=got, events=_events)
         except asyncio.CancelledError:
             _live.clear()
             raise
         except Exception as e:
             _live.clear()
             code = _code(e)
-            if code == 4030 and replaced < 3:                   # «Yoxla» or a short second connection: come back
-                replaced += 1
-                health(db, False, f"FinancialJuice: {NO_RETRY[4030]} — 60 saniyədən sonra yenidən", headlines=got)
-                await _pause(keys, key, 60)
+            _note(f"bağlandı {code or type(e).__name__}")
+            if opened and time.time() - opened >= STABLE_S:
+                wait = 2.0                                      # it had worked for a while: a normal drop
+            if code in BUSY:
+                text = NO_RETRY.get(code) or "planın 1 qoşulma yeri başqa qoşulma ilə doludur"
+                health(db, False, f"FinancialJuice: {text} ({code}) — {wait:.0f} s sonra yenidən", headlines=got,
+                       events=_events)
+                await _pause(keys, key, wait)
+                wait = min(1800.0, wait * 2)
                 continue
             if code in NO_RETRY:
-                health(db, False, f"FinancialJuice: {NO_RETRY[code]} ({code})")
+                health(db, False, f"FinancialJuice: {NO_RETRY[code]} ({code})", events=_events)
                 log.warning("financialjuice closed with %s: waiting 30 minutes or a new key", code)
                 await _pause(keys, key, 1800)
-                replaced = 0
                 continue
             msg = str(e).replace(key, "***")
-            health(db, False, f"{type(e).__name__}: {msg}"[:200], headlines=got)
+            health(db, False, f"{type(e).__name__}: {msg}"[:200], headlines=got, events=_events)
             log.warning("financialjuice: %s", msg[:200])
+        else:
+            if opened and time.time() - opened >= STABLE_S:
+                wait = 2.0
         await _pause(keys, key, wait)
         wait = min(300.0, wait * 2)
 
 
-async def check(creds: dict) -> tuple[bool, str]:
-    """Admin's «Yoxla». While the live connection is open with this key, its state is the answer (a second connection
-    would push it out: the Developer plan allows one). Otherwise: open the stream once and close it."""
+def check(db: DB, creds: dict) -> tuple[bool | None, str]:
+    """Admin's «Yoxla». Never opens a connection of its own: the plan allows one, and a second one pushes the live
+    stream out (27.11 20:49: a check during the start led to «limit reached»). It reports what the live loop sees."""
     key = next((x for x in (creds or {}).values() if x), "")
     if _live.get("key") == key:
         return True, f"işləyir: canlı axın açıqdır, {_live.get('got', 0)} başlıq alınıb"
     try:
-        async with _connect(key, open_timeout=15) as ws:
-            try:
-                await asyncio.wait_for(ws.recv(), 3)
-            except asyncio.TimeoutError:
-                pass                                   # quiet minute: open and not refused is enough
-        return True, "işləyir: açar qəbul olundu, canlı axın bir dəqiqəyə qoşulur"
-    except Exception as e:
-        code = _code(e)
-        if code in NO_RETRY:
-            return False, f"FinancialJuice: {NO_RETRY[code]} ({code})"
-        return False, f"qoşulmaq alınmadı: {type(e).__name__}"
+        h = json.loads(db.get(HEALTH) or "null") or {}
+    except ValueError:
+        h = {}
+    if h.get("ok") is False:
+        return False, str(h.get("msg") or "qoşulmur")
+    return None, "açar saxlanıb; canlı axın bir dəqiqə ərzində qoşulur — sonra yenidən «Yoxla»"

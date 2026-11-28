@@ -145,8 +145,14 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   gəliş vaxtı ilə; qızıl / dollar / Fed / ABŞ rəqəmi / geosiyasətə dəyən «təcili» 3-cü səviyyə başlıq dərhal həyəcan.
   Admin-də yeni açar yazılanda bir dəqiqəyə özü keçir; səhv açarda (4001/4003) serveri döyəcləmir, gözləyir; «Yoxla»
   açıq qoşulmanın vəziyyətini deyir (ikinci qoşulma birincini qovardı — planda 1 qoşulma). Testlər 362/362.
-- 27.11 20:50 — 11.1 sınağı QABAQCADAN qeydə alındı (`app/paidtrial.py`, məlumatdan əvvəl): 21:00 NY-dən sayılır, qərar
+- 27.11 20:47 — 11.1 sınağı QABAQCADAN qeydə alındı (`app/paidtrial.py`, məlumatdan əvvəl): 21:00 NY-dən sayılır, qərar
   günü 22.12 (FinancialJuice 27.12 yenilənir — 5 gün qabaq). T1: FinancialJuice başlığı (Oxucu qızıl üçün yuxarı/aşağı
   deyib) → qızıl 15 dəqiqə; T2: Databento «böyük əməliyyat» həyəcanı → qızıl 15 dəqiqə. Giriş yalnız etiket/həyəcan
   yarananda sonrakı dəqiqədən, tam xərc çıxılır, hədd 0,05/2, ən az 30 hal; az halda «az» (heç vaxt «işləyir»).
   Diaqnostikada `paid_trial`.
+- 27.11 20:49 — **serverdə canlı** (versiya 35ba6d5): FinancialJuice «qoşuldu». 20:53-də provayder qoşulmanı **4029**
+  («abunə üçün eyni anda qoşulma həddi dolub») ilə bağladı. Səbəb (sübut: Admin «Yoxla» 20:49:22-də ÖZ qoşulmasını açıb —
+  canlı axın o an hələ açılmamışdı) + mənim səhvim: hər açılışda gözləmə 2 saniyəyə qayıdırdı, açıldı→qovuldu→2 s dövrü
+  yaranırdı (açarın bloklanma riski). Düzəliş 20:55: «Yoxla» heç vaxt ayrıca qoşulma açmır, canlı axının vəziyyətini deyir;
+  4029/4030-da gözləmə 2→4→…→30 dəq böyüyür, yalnız 2 dəqiqə dayanan qoşulmadan sonra sıfırlanır; son 8 hadisə vaxtı ilə
+  diaqnostikada. Testlər 366/366.

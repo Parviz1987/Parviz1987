@@ -93,7 +93,7 @@ def test_the_stream_uses_the_key_header_and_reconnects_when_a_new_key_is_saved(m
             if fjnews._live.get("got"):
                 break
         assert seen == ["old"] and fjnews._live.get("key") == "old"
-        ok, msg = await fjnews.check({"key": "old"})
+        ok, msg = fjnews.check(db, {"key": "old"})
         assert ok and "açıqdır" in msg and seen == ["old"]          # no second connection
         ks.set("financialjuice", {"key": "new"})
         for _ in range(100):
@@ -105,3 +105,50 @@ def test_the_stream_uses_the_key_header_and_reconnects_when_a_new_key_is_saved(m
 
     asyncio.run(body())
     assert db.execute("SELECT COUNT(*) FROM news WHERE source='FinancialJuice'").fetchone()[0] >= 2
+
+
+def test_a_connection_the_provider_closes_at_once_is_not_retried_every_two_seconds(monkeypatch):
+    """27.11 20:49: the provider opened each connection and closed it with 4029 («limit reached»); the wait went
+    back to 2 s on every open, so it knocked every few seconds. Now the wait grows until a connection holds 2 min."""
+    import asyncio
+    db = _db()
+    ks = KeyStore(db, "s" * 64)
+    ks.set("financialjuice", {"key": "k"})
+    waits, opens = [], []
+
+    class Closed(Exception):
+        def __init__(self, code):
+            self.code = code
+
+    class WS:
+        async def __aenter__(self):
+            opens.append(1)
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def recv(self):
+            raise Closed(4029)
+
+    monkeypatch.setattr(fjnews, "_connect", lambda key, **kw: WS())
+
+    async def pause(keys, key, seconds):
+        waits.append(seconds)
+        if len(waits) >= 8:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(fjnews, "_pause", pause)
+
+    async def body():
+        try:
+            await fjnews.run(db, ks)
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(body())
+    assert waits == [2, 4, 8, 16, 32, 64, 128, 256]
+    h = __import__("json").loads(db.get(fjnews.HEALTH))
+    assert h["ok"] is False and "4029" in h["msg"] and h["events"][-1][1] == "bağlandı 4029"
+    ok, msg = fjnews.check(db, {"key": "k"})                       # «Yoxla» reports it, opens nothing
+    assert ok is False and "4029" in msg and len(opens) == 8
