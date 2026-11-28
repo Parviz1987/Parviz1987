@@ -5,7 +5,7 @@ the same verdict words everywhere: «az» (too few cases), «yox» (no proof), �
 forecasts by itself: it next runs as a live shadow, and only then may the Judge give it a voice. Many labs mean many
 chances of a lucky pass, so each lab's bar is strict (p < 0.01) and both halves of its history must agree.
 
-PRE-REGISTERED 28.11.2026 04:05 NY, before any of these three results was computed:
+PRE-REGISTERED 28.11.2026 04:00 NY (git 3f4cdc5), before any of these three results was computed:
 
 L1  Fed sürprizi — the surprise, not the decision: on a Fed decision day D the 2-year Treasury yield's change
     (DGS2(D) − DGS2(D−1)) is the market's own reading of how hawkish it was. |change| < 5 bp: no signal. Up (hawkish)

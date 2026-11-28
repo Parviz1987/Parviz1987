@@ -58,6 +58,14 @@ class ErrorJournal(logging.Handler):
             pass   # the journal must never break the app
 
 
+def _labs_brief(db: DB) -> list:
+    from . import labs
+    out = labs.build(db)
+    return [{"id": x["id"], "name": x["name"], **({k: (x.get("gold") or {}).get(k) for k in
+             ("status", "n", "hit_rate", "net_avg_pct", "p", "halves_net_pct", "first", "last")}),
+             "silver": (x.get("silver_shown") or {}).get("status"), "error": x.get("error")} for x in out["labs"]]
+
+
 def _pipeline(db: DB, keys, engine, feeds, jobs) -> list:
     from .pipeline import check
     try:
@@ -457,6 +465,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "fjnews": json.loads(db.get("fj:health") or "null"),          # FinancialJuice stream: state + last 8 events
         "dbhist_quote": json.loads(db.get("dbhist:quote") or "null"),  # Databento history price list (free question)
         "sentiment": json.loads(db.get("sent:health") or "null"),      # Capital.com client sentiment reader
+        "labs": _slow("labs_brief", lambda: _labs_brief(db), 3600),                # Laboratoriyalar: verdicts per lab
         "dbstats_quote": json.loads(db.get("dbstats:quote") or "null"),  # CME statistics price list (free question)
         "dbstats": {"load": json.loads(db.get("dbstats:last_load") or "null"),   # CME open interest: loads, spend,
                     "result": json.loads(db.get("dbstats:result") or "null")},  # and the pre-registered test

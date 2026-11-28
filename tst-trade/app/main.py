@@ -571,6 +571,16 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     async def flow_page():
         return FileResponse(STATIC / "axin.html")
 
+    @app.get("/lab")
+    async def labs_page():
+        return FileResponse(STATIC / "lab.html")
+
+    @app.get("/api/labs")
+    async def labs_api():
+        """Laboratoriyalar (owner 28.11): each lab's registered question and rule with its result on history."""
+        from . import labs
+        return await asyncio.to_thread(diag._slow, "labs", lambda: labs.build(db), 3600)
+
     @app.get("/api/bigplayers")
     async def bigplayers_api():
         """«Böyük oyunçular indi» (owner 28.11): the newest reading of each free big-player source and the Capital.com

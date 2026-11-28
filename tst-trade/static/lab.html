@@ -1,0 +1,34 @@
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TST Trade · Laboratoriyalar</title><link rel="stylesheet" href="/static/app.css">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0f1317">
+<link rel="icon" href="/static/icons/fav-64.png"><link rel="apple-touch-icon" href="/static/icons/apple-180.png">
+</head><body>
+<header class="top">
+  <div class="brand">TST <b>Trade</b> · Laboratoriyalar</div><span class="sp"></span>
+  <span class="clock" id="upd"></span>
+<nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
+</header>
+<!-- Laboratoriyalar (owner 28.11 04:00): one question about the past per lab, the rule written before the result,
+     tested by code on history after the full cost. The verdict words are the same as everywhere: az / yox / sübut. -->
+<main class="wrap res ta">
+  <section class="box">
+    <h2>Laboratoriyalar necə işləyir</h2>
+    <p class="note">Hər laboratoriya keçmişə <b>bir sual</b> verir. Qaydası nəticə hesablanmazdan <b>əvvəl</b> yazılır və
+      sonra dəyişdirilmir. Kod onu illərlə məlumat üzərində, <b>xərc çıxılandan sonra</b> yoxlayır. Hökm üç sözdən biridir:
+      <b>az</b> — söz demək üçün hadisə azdır; <b>yox</b> — sübut yoxdur; <b>sübut</b> — qayda təsadüf ola bilməyəcək qədər
+      güclüdür (səhv ehtimalı 1 %-dən az), xərcdən sonra qazanclıdır və dövrün hər iki yarısında işləyib. Sübut verən
+      laboratoriya əvvəl canlı kölgədə sınanır, yalnız sonra Hakim ona proqnozda səs verir. Çox laboratoriyanın «yox»
+      çıxması normaldır: işləməyəni bilmək də qazancdır.</p>
+  </section>
+  <section class="box">
+    <h2>Laboratoriyalar <span class="sp"></span><span class="note" id="lt"></span></h2>
+    <div id="labs"><p class="note">Hesablanır…</p></div>
+  </section>
+  <section class="box">
+    <h2>Digər sınaqlar (eyni qayda ilə)</h2>
+    <div class="tbl" id="others"></div>
+  </section>
+</main>
+<script src="/static/lab.js"></script>
+<script src="/static/nav.js"></script>
+</body></html>

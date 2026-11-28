@@ -521,3 +521,6 @@ details.techgroup[open]>summary{margin-bottom:12px}
 .bpv{font-size:1.15rem;font-weight:700;margin-bottom:2px}
 .bpm{font-size:.8rem;margin-top:6px;color:var(--fg)}
 
+/* Laboratoriyalar (owner 28.11) */
+.bpc.lab{margin-bottom:12px}
+.bpc.lab p{margin:6px 0}

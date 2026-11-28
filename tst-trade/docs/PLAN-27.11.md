@@ -240,3 +240,6 @@ p < 0,01 + xərcdən sonra müsbət + iki yarı müsbət; sübut verən əvvəl 
 açar, ticarət — yox (sahibin icazəsi olmadan). Sıra: L1 Fed sürprizi, L2 ABŞ rəqəmləri sürprizi, L3 İri fondlar həddə (COT);
 sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real faiz, neft, geosiyasət).
 - [x] 13.1 L1–L3 qaydaları qeydə alındı (28.11 04:00 NY, `app/labs.py`, nəticə hesablanmamış).
+- [x] 13.2 Səhifə «Bloklar → Laboratoriyalar» (`/lab`, `static/lab.html|js`): necə işləyir, hər laboratoriyanın sualı, məlumatı,
+  qızılın nəticəsi (hökm, hadisə sayı, düz %, xərcdən sonra, iki yarı, təsadüf ehtimalı), gümüş yalnız göstərilir; «Digər
+  sınaqlar» — böyük oyunçu, CME, hadisə analoqları eyni sözlərlə. Diag `labs`. 1366/390, xəta 0 (28.11 04:02).
