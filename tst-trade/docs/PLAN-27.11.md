@@ -185,3 +185,11 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   yaddaşdan demək əvəzinə Databento-nun canlı şlüzündən soruşan yüngül yoxlama (`orderflow.live_check`: öz əl sıxma
   protokolu, ağır kitabxana yox, məlumat istənmir, pul getmir). Admin «Yoxla» və əlaqə xəritəsi indi «canlı axın icazəsi
   VAR / YOXDUR (Databento-nun öz sözü)» göstərir — 1 GB serverdə də. Testlər 379/379.
+- 27.11 23:06 — Databento canlı şlüzü: «A live data license is required to access GLBX.MDP3» — ödəniş keçməyib, yalnız $125
+  tarixçə krediti. Sahib 23:10: «əvvəl sübut olsun, sonra edərik» → canlı lisenziya və server böyütmə sübuta qədər YOX
+  (şənbə xatırlatması buna görə dəyişdirildi).
+- 27.11 23:29 — Böyük oyunçu sınağı keçmiş məlumatla QABAQCADAN qeydə alındı (`app/dbhist.py`, yükləmədən əvvəl): GC ən çox
+  işlənən müqavilə, canlı axınla eyni «böyük əməliyyat» xətti, həyəcandan sonrakı tam dəqiqədən 15 dəq, tam xərc, ən az 100
+  həyəcan, p < 0,01, xərcdən sonra orta > 0 və hər iki yarıda müsbət. İndi yalnız pulsuz qiymət sorğusu (1/3/6/12 ay) —
+  diag `dbhist_quote`; yükləmə sahibin məbləğə «hə»sindən sonra. Canlı axın da «.c.0» (ən yaxın ay) əvəzinə «.v.0» (ən
+  çox işlənən) müqaviləyə keçdi. Testlər 381/381.

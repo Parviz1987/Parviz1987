@@ -23,7 +23,8 @@ from .db import DB
 
 log = logging.getLogger("tst.orderflow")
 
-SYMBOLS = {"GC.c.0": "XAU", "SI.c.0": "XAG", "PL.c.0": "XPT", "PA.c.0": "XPD"}
+# .v.0 = the contract with the most volume (27.11: the nearest month «.c.0» is thin in e.g. January — gold trades Feb)
+SYMBOLS = {"GC.v.0": "XAU", "SI.v.0": "XAG", "PL.v.0": "XPT", "PA.v.0": "XPD"}
 BIG_MIN = {"XAU": 20, "XAG": 10, "XPT": 10, "XPD": 5}      # lots: never call a smaller trade «big»
 MIN_MEM_MB = 1500
 HEALTH = "flow:health"
