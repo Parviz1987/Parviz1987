@@ -277,3 +277,7 @@ sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real
   vermir. Koridor keyfiyyəti: 1d tutma 80,5 %, en 2,67 %, qaçırma topası 1,03 (yaxşı); 1w 79,6 %, 5,15 %, 1,14.
 - [x] 13.5 28.11 14:58 — Düzəldilmiş koridor laboratoriyaları saatlıq şamlarla (ilk toxunan kənar qərar verir; həm geri dönüş KR, həm
   qırılma KB; günlük/həftəlik × 80/50 %) — hesablamadan ƏVVƏL qeydə alındı. Testlər 405/405.
+- 28.11 15:02 — Düzəldilmiş koridor laboratoriyaları (saatlıq, 2026-03 → 11): günlük 80 % geri dönüş 50,7 % / qırılma 49,3 % (69);
+  günlük 50 % geri dönüş 48,5 % / qırılma 51,6 % (161); iki yarı işarə dəyişir — kənarda heç bir istiqamətdə üstünlük yoxdur.
+  Həftəlik: hadisə azdır (9–31). Nəticə: koridor KALİBRLİDİR (dəqiqdir), amma kənarında mexaniki alqı-satqı özü pul gətirmir;
+  koridorun dəyəri — dar və dəqiq olması (risk, stop/hədəf, ölçü) və fiziki alış-satışda icra qənaəti. Sahibə tam cavab.
