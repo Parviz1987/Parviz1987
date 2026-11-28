@@ -181,3 +181,7 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   («tradegold») özü tapdı, sınaq faylı yazıb sildi. Nüsxələr `backups/tst-YYYY-MM-DD.sqlite.gz` adı ilə (başqa fayllara
   toxunmur). İlk real nüsxə 28.11 02:00 NY — şənbə səhər yoxlanacaq.
 - 27.11 22:59 — Əlaqə xəritəsi R2: açar yoxlanıb, nüsxə hələ yoxdursa «sahibin açarını gözləyir» yox, «ilk nüsxə 02:00-da».
+- 27.11 23:01 — Sahib: «Databento-da ödəniş keçmədi, $125 kredit verir». Kredit tarixçə üçündür, canlı axın ayrıca hüquqdur —
+  yaddaşdan demək əvəzinə Databento-nun canlı şlüzündən soruşan yüngül yoxlama (`orderflow.live_check`: öz əl sıxma
+  protokolu, ağır kitabxana yox, məlumat istənmir, pul getmir). Admin «Yoxla» və əlaqə xəritəsi indi «canlı axın icazəsi
+  VAR / YOXDUR (Databento-nun öz sözü)» göstərir — 1 GB serverdə də. Testlər 379/379.

@@ -36,6 +36,43 @@ CREATE INDEX IF NOT EXISTS flow_big_ts ON flow_big(ts);
 NAMES = {"XAU": "Qızıl", "XAG": "Gümüş", "XPT": "Platin", "XPD": "Palladium"}
 
 
+LIVE_PORT = 13000
+
+
+async def live_check(key: str, dataset: str = "GLBX.MDP3") -> tuple[bool | None, str]:
+    """Does this key have LIVE access to the dataset? (owner 27.11 23:00: «the payment did not go through, it gives
+    $125 credit» — the credit is for history; the live feed is a separate right.) Asked directly at Databento's live
+    gateway with its own text handshake (challenge → sha256 answer), without the heavy client library, so it works on
+    the 1 GB server too. No data is requested and nothing is paid. Returns (True / False / None = not reached, text)."""
+    import hashlib
+    host = dataset.lower().replace(".", "-") + ".lsg.databento.com"
+    try:
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, LIVE_PORT), 15)
+    except (OSError, asyncio.TimeoutError) as e:
+        return None, f"canlı şlüzə çatmaq olmadı ({type(e).__name__})"
+    try:
+        hello: dict[str, str] = {}
+        while "cram" not in hello:
+            line = (await asyncio.wait_for(reader.readline(), 10)).decode(errors="replace").strip()
+            if not line:
+                return None, "canlı şlüz gözlənilməz cavab verdi"
+            for part in line.split("|"):
+                k, _, v = part.partition("=")
+                hello[k] = v
+        answer = hashlib.sha256(f"{hello['cram']}|{key}".encode()).hexdigest() + "-" + key[-5:]
+        writer.write(f"auth={answer}|dataset={dataset}|encoding=dbn|ts_out=0\n".encode())
+        await writer.drain()
+        line = (await asyncio.wait_for(reader.readline(), 10)).decode(errors="replace").strip()
+        got = {k: v for k, _, v in (p.partition("=") for p in line.split("|"))}
+        if got.get("success") == "1":
+            return True, f"canlı axın icazəsi VAR ({dataset})"
+        return False, f"canlı axın icazəsi YOXDUR: Databento cavabı «{(got.get('error') or line)[:160]}»"
+    except (OSError, asyncio.TimeoutError, KeyError) as e:
+        return None, f"canlı yoxlama yarımçıq qaldı ({type(e).__name__})"
+    finally:
+        writer.close()
+
+
 def health(db: DB, ok: bool | None, msg: str, **extra) -> None:
     db.put(HEALTH, json.dumps({"ok": ok, "msg": msg[:200], "ts": time.time(), **extra}, ensure_ascii=False))
 
@@ -150,7 +187,9 @@ async def run(db: DB, keys) -> None:
                 await asyncio.sleep(600)
                 continue
             if mem_total_mb() < MIN_MEM_MB:
-                health(db, None, f"server {mem_total_mb():.0f} MB: canlı axın 2 GB-dan sonra başlayacaq (şənbə 28.11)")
+                lok, ltext = await live_check(key)
+                health(db, None if lok else lok, f"server {mem_total_mb():.0f} MB: canlı axın 2 GB-dan sonra başlayacaq "
+                                                 f"(şənbə 28.11); {ltext}", live=lok)
                 await asyncio.sleep(1800)
                 continue
             import databento                       # loaded only here (heavy)

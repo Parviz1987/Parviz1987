@@ -162,9 +162,14 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
             async with httpx.AsyncClient(timeout=CHECK_TIMEOUT) as c:
                 r = await c.get("https://hist.databento.com/v0/metadata.list_datasets", auth=(key, ""))
             ok = r.status_code == 200 and "GLBX.MDP3" in r.text
-            msg = ("işləyir: CME/COMEX məlumatı (GLBX.MDP3) əlçatandır" if ok else
+            msg = ("tarixçə: işləyir (CME/COMEX, GLBX.MDP3)" if ok else
                    f"açar qəbul olunmadı: HTTP {r.status_code}" if r.status_code in (401, 403) else
                    f"cavab gözlənilən deyil: HTTP {r.status_code}")
+            if ok:                                  # the live right is separate from history (owner 27.11 23:00)
+                from . import orderflow
+                lok, ltext = await orderflow.live_check(key)
+                msg += "; " + ltext
+                ok = False if lok is False else ok
         elif slot == "r2":
             from . import backup
             ok, msg, bucket = await backup.check_fix(v)
