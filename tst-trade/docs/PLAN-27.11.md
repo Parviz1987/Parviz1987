@@ -255,3 +255,7 @@ sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real
   xərcdən sonra −1,1 %). Qeyd: tərs istiqamət (fondların ardınca) 61,5 % olardı — bu, eyni məlumata baxıb qayda dəyişmək
   olardı; yalnız GƏLƏCƏK məlumatla ayrıca qeydə alınmış sınaq kimi ola bilər.
 - [x] 13.3 28.11 04:55 — L4 dollar ilə birgə, L5 neft şoku, L6 müharibə xəbəri sıçrayışı — hesablamadan ƏVVƏL qeydə alındı.
+- 28.11 04:59 — **L4 dollar ilə birgə: yox** (52, 53,8 %, −0,026 %); **L5 neft şoku: yox** (45, 55,6 %, −0,39 %, iki yarı zidd);
+  **L6 müharibə xəbəri: yox** (21, 52,4 %, +0,15 %, p 0,5, 2-ci yarı mənfi). Altı laboratoriyanın heç biri sübut vermədi.
+- 28.11 04:59 — Sənədlər: BLOKLAR blok 23 (Laboratoriyalar), SOHBET-TARIXCESI (28.11 gecənin qərarları). Səhər sahibə: gündəlik
+  tarixçə qərarı; 10:07 xatırlatma — R2 ilk nüsxə, FinancialJuice; server böyüdülmür.

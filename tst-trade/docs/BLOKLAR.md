@@ -284,6 +284,19 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   sınağından keçən metallarda beyinlər oxşar halları görür.
 - **Qalan:** GPR indeksi (lisenziya aydın olanda); hadisə növləri (müharibə / sanksiya / neft) ayrıca — sübut olsa.
 
+### 23. Laboratoriyalar — `app/labs.py`, səhifə Bloklar → Laboratoriyalar (`/lab`) 🟡 (28.11)
+- **Nə edir:** hər laboratoriya keçmişə bir sual verir; qayda nəticədən ƏVVƏL yazılır (fayl + git commit), kod illərlə
+  məlumatda xərcdən sonra yoxlayır; hədd p < 0,01, xərcdən sonra orta > 0, iki yarı müsbət; hökm az / yox / sübut. Sübut
+  verən əvvəl canlı kölgəyə, sonra Hakimin səsinə. Diag `labs`, `labs_cot_hist`.
+- **28.11 gecə nəticələri (qızıl):** L1 Fed sürprizi yox (26, 50 %); L2 ABŞ rəqəmləri az (92 < 100, 44,6 %); L3 iri fondlar
+  həddə (COT, 2006-dan) yox (26, 38,5 %); L4 dollar ilə birgə yox (52, 53,8 %); L5 neft şoku yox (45, 55,6 %); L6 müharibə
+  xəbəri yox (21, 52,4 %). Əvvəlki sınaqlar eyni sözlərlə: Databento tək iri əməliyyat yox (2 190, 48,9 %), CME açıq mövqe
+  yox (1 225 gün, 48,7 %).
+- **Dərs:** məşhur makro qaydalar qızılın gündəlik–həftəlik yönünü 2019–2026-da xərcdən sonra göstərmir. Laboratoriyaların
+  əsas məhdudiyyəti qızılın gündəlik tarixçəsidir (~2000 şam, 2018-dən) — dərinləşdirmək Hakimin keçmiş hesablarını da
+  dəyişir, sahibin qərarıdır.
+- **Qalan:** tarixçə qərarı; dəyişkənlik (diapazon) laboratoriyaları — yön çətindir, diapazon güclü tərəfimizdir.
+
 ---
 
 ## 3. «Bloku bitir» tapşırığı gələndə Claude-un qaydası

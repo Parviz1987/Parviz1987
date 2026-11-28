@@ -101,6 +101,16 @@ sübutu ilə**. Sübut olmayan heç nə pula (hətta kağız ticarətə) getmir.
   («pulu verək, özümüzü yormayaq»). Qərar: qarışıq yol (IS-PLANI 5.4). Sahib FinancialJuice və Databento-nu alacaq, açarları
   Admin-ə yazacaq. «Təzə kompüterdə işləmir» — Wi-Fi qoşulmamışdı (serverə heç bir sorğu gəlməmişdi).
 
+- **28.11 gecə (sahib yatana qədər):** FinancialJuice canlı (açarı 2 dəfə yeniləndi; 4029 «yer dolu» — Admin «Yoxla»nın ikinci
+  qoşulması + mənim təkrar-qoşulma dövrüm, düzəldi). R2 işləyir (token «Object Read only» idi → Admin Read & Write; bucket
+  «tradegold»). Databento canlı lisenziyası YOXDUR (ödəniş keçmədi — kart başqa Databento hesabında); sahib: «əvvəl sübut
+  olsun» → 12 aylıq böyük oyunçu sınağı ($32.69) **yox** → canlı lisenziya alınmır, server böyütmə yoxdur. CME açıq
+  mövqelər 5 il ($1.38) **yox**. Capital.com müştəri əhvalı qoşuldu (60 günlük sınaq). Agentlər səhifəsi «sinir sistemi»
+  (sahib: «super»). Sahib 04:00: «sən özün qərarlaşdır, avtomatik rejimdə ardıcıl et» → Laboratoriyalar (L1–L6, hamısı
+  sübutsuz). CME/iShares saytlarını brauzer kimi görünərək oxumaq cəhdini təhlükəsizlik sistemi dayandırdı — o yol tutulmur.
+- **Sahibin səhər qərarı gözlənilir:** qızılın gündəlik tarixçəsini dərinləşdirmək (laboratoriyalar üçün vacib, Hakimin
+  keçmiş hesablarını dəyişir).
+
 ## 6. Açıq işlər
 - **Sahibin:** FinancialJuice və Databento Standard almaq, açarları Admin-ə yazmaq; 2FA; Healthchecks.io açarı; R2 (istəyə bağlı, pul); Admin → Əməliyyatlar → WAL araşdırma kartını bağlamaq; Gemini model
   təklifi (`gemini-2.5-flash` bağlanıb, `gemini-3.8-flash` sınağı Google-un 503-ü ilə alınmayıb; Admin → Beyinlər).
