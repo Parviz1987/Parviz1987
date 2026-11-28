@@ -115,6 +115,7 @@ async def run(db: DB, keys) -> None:
     A key saved anew in Admin is picked up within a minute."""
     wait = 2.0
     got = 0
+    kinds: dict[str, int] = {}                # every message by type/event: «nothing came» ≠ «came but not read»
     while True:
         key = _key(keys)
         if not key:
@@ -136,14 +137,18 @@ async def run(db: DB, keys) -> None:
                         raw = None
                     if raw is not None:
                         try:
-                            got += handle(db, json.loads(raw))
-                        except (ValueError, TypeError):
-                            pass
+                            m = json.loads(raw)
+                            k = f"{m.get('type')}/{m.get('event')}" if isinstance(m, dict) else type(m).__name__
+                            got += handle(db, m)
+                        except (ValueError, TypeError, AttributeError):
+                            k = "oxunmadı"
+                        if k in kinds or len(kinds) < 12:
+                            kinds[k] = kinds.get(k, 0) + 1
                     _live["got"] = got
                     if time.time() - last >= 60:
                         last = time.time()
-                        health(db, True, f"işləyir: {got} başlıq alınıb (son qoşulmadan bəri)", headlines=got,
-                               events=_events)
+                        health(db, True, f"işləyir: {got} başlıq, cəmi {sum(kinds.values())} mesaj (bu işə düşmədən bəri)",
+                               headlines=got, kinds=kinds, events=_events)
                         if _key(keys) != key:
                             break                               # new key in Admin: reconnect with it
             _live.clear()
