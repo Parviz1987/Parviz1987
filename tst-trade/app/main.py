@@ -143,6 +143,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             asyncio.get_running_loop().create_task(_cleanup())
             asyncio.get_running_loop().create_task(_conductor())
             asyncio.get_running_loop().create_task(feeds.sniper())     # plan 27.11 step 9.1: the release minute
+            from . import orderflow                                     # plan 27.11 step 11.1: COMEX trades live
+            asyncio.get_running_loop().create_task(orderflow.run(db, store))
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
             asyncio.get_running_loop().create_task(app.state.futures_daily())
             asyncio.get_running_loop().create_task(app.state.rigor_daily())
@@ -550,6 +552,19 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.get("/bloklar")
     async def blocks_page():
         return FileResponse(STATIC / "bloklar.html")
+
+    @app.get("/axin")
+    async def flow_page():
+        return FileResponse(STATIC / "axin.html")
+
+    @app.get("/api/flow")
+    async def flow_api(symbol: str = "XAU", minutes: int = 60):
+        """Bazar axını (plan 27.11 step 11.1): the last minutes of COMEX trades — volume, the share started by buyers,
+        the big trades — and the stream's own state."""
+        from . import orderflow
+        if symbol not in candles.METALS:
+            raise HTTPException(400, "naməlum metal")
+        return await asyncio.to_thread(orderflow.view, db, symbol, max(5, min(240, minutes)))
 
     @app.get("/api/blocks")
     async def blocks_api(symbol: str = "XAU", horizon: str = "1h"):

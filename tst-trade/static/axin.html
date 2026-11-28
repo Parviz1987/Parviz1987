@@ -1,0 +1,33 @@
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TST Trade · Bazar axını</title><link rel="stylesheet" href="/static/app.css">
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0f1317">
+<link rel="icon" href="/static/icons/fav-64.png"><link rel="apple-touch-icon" href="/static/icons/apple-180.png">
+</head><body>
+<header class="top">
+  <div class="brand">TST <b>Trade</b> · Bazar axını</div><span class="sp"></span>
+  <span class="clock" id="upd"></span>
+<nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
+</header>
+<!-- Bazar axını (owner 27.11: «bazarda böyük oyunçular alanda və ya satanda bilək»): COMEX futures trades live from
+     Databento — real volume, the share started by buyers, the big trades. A new voice: the Judge measures it first. -->
+<main class="wrap res ta">
+  <section class="box">
+    <h2>Bazar axını: COMEX fyuçersləri <span class="sp"></span><span class="seg" id="sym"></span></h2>
+    <p class="note" id="fstate">Yüklənir…</p>
+    <div id="fsum"></div>
+  </section>
+  <section class="box">
+    <h2>Böyük əməliyyatlar (son 24 saat) <span class="sp"></span><span class="note">vaxtlar NY</span></h2>
+    <div class="tbl" id="fbig"></div>
+  </section>
+  <section class="box">
+    <h2>Dəqiqə-dəqiqə (son 60 dəqiqə)</h2>
+    <div class="tbl" id="fmin"></div>
+    <p class="note">«Alanlar» — əməliyyatı alıcının başlatdığı həcm (satıcının təklifini alıb); «satanlar» — satıcının başlatdığı.
+      Böyük əməliyyat: həmin metalın son 5 000 əməliyyatının ən böyük 0,1 %-i (və ən az qızılda 20, gümüşdə və platində 10,
+      palladiumda 5 lot). Bu, Hakimin ölçəcəyi yeni səsdir — hələ sübut deyil.</p>
+  </section>
+</main>
+<script src="/static/axin.js"></script>
+<script src="/static/nav.js"></script>
+</body></html>

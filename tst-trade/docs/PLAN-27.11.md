@@ -135,3 +135,8 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   sıçrayış üçün əvvəlində 10 fasiləsiz dəqiqə lazımdır (açılışdakı nazik dəqiqələr yalançı həyəcan verməsin); yenidən
   başlamadan sonra Kəşfiyyatçı rəqəm pəncərəsini 4 saat buraxmır; həftəlik kölgə sınağı xəta veribsə ertəsi gün yenə;
   söndürülmüş Benzinga gündə bir; dirijorun təzəlik yoxlaması şərhin içində qalmışdı — işləyir. Testlər 355/355.
+- 27.11 20:22 — 11.1 (Databento, sahib: «dəyişmədim, hazırdır»): canlı axın modulu (`app/orderflow.py`) — COMEX qızıl, gümüş,
+  platin, palladium fyuçerslərinin hər əməliyyatı: dəqiqəlik həcm, alıcıların payı, böyük əməliyyatlar (son 5 000-in ən böyük
+  0,1 %-i, ən az 20/10/10/5 lot); 2 qatı həyəcan qaldırır (metal başına 15 dəqiqədə bir). Səhifə «Bloklar → Bazar axını»,
+  Paneldə bir sətir. Kitabxana ~157 MB yaddaş istəyir — axın server 2 GB olandan sonra özü başlayır (şənbə 10:07-dən sonra);
+  əlaqə xəritəsi vəziyyəti (və planın canlı axını verib-vermədiyini) göstərəcək. Testlər 359/359; 4 səhifə × 2 ölçü, xəta 0.

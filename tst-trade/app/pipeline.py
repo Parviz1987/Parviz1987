@@ -344,8 +344,19 @@ def _owner_steps(db: DB, now: float) -> list[tuple[str, str, str, str]]:
     out.append(("FinancialJuice (sürətli başlıqlar)", "Xəbər bloku, həyəcan", "owner",
                 "açar Admin-də var — qoşulma növbəti addımdır (Claude)" if fj_saved else
                 "sahib almağa qərar verib; açarı Admin → Mənbələr və açarlar bölməsinə yazılandan sonra qoşulur"))
-    out.append(("Databento canlı axını (böyük oyunçular, həqiqi həcm)", "Bazar axını bloku, həyəcan", "owner",
-                "Standard plan alınandan sonra canlı axın qoşulur (indiki açar yalnız tarixi məlumat üçündür)"))
+    try:
+        fh = json.loads(db.get("flow:health") or "null")
+    except ValueError:
+        fh = None
+    if not fh:
+        out.append(("Databento canlı axını (böyük oyunçular, həqiqi həcm)", "Bazar axını bloku, həyəcan", "owner",
+                    "hələ başlamayıb"))
+    else:
+        st = "ok" if fh.get("ok") else "bad" if fh.get("ok") is False else "owner"
+        if st == "ok" and now - float(fh.get("ts") or 0) > 600:
+            st, fh["msg"] = "warn", f"son xəbər {(now - float(fh['ts'])) / 60:.0f} dəq əvvəl: {fh.get('msg')}"
+        out.append(("Databento canlı axını (böyük oyunçular, həqiqi həcm)", "Bazar axını bloku, həyəcan", st,
+                    str(fh.get("msg") or "")))
     try:
         from . import diag, totp
         tf = totp.enabled(db, diag._SEALER[0]) if diag._SEALER else None

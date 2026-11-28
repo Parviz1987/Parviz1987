@@ -154,6 +154,15 @@ async function refreshState() { lastState = await api("/api/state"); renderTiles
 async function refreshFc() {
   lastFc = await api(`/api/forecasts?symbol=${sym}`);
   if (window.renderSays) window.renderSays(sym, lastFc);     // «Analitiklər nə deyir» (static/says.js)
+  // one line of the market flow (COMEX trades, plan 27.11 step 11.1); the page /axin has the rest
+  try {
+    const f = await api(`/api/flow?symbol=${sym}&minutes=15`);
+    const big = f.minutes.reduce((a, m) => [a[0] + m.big_buy, a[1] + m.big_sell], [0, 0]);
+    const el = $("flowline");
+    el.hidden = !(f.health && f.health.ok && f.minutes.length);
+    if (!el.hidden) el.innerHTML = `<b>Bazar axını</b> (COMEX, son 15 dəq): alıcıların payı <b class="${f.buy_share > 0.55 ? "up" : f.buy_share < 0.45 ? "down" : ""}">${f.buy_share == null ? "—" : Math.round(f.buy_share * 100) + " %"}</b>
+      · böyük alış ${big[0]}, böyük satış ${big[1]} · <a href="/axin">ətraflı</a>`;
+  } catch (e) { /* the line stays hidden */ }
 }
 async function refreshAll() { await refreshState(); await refreshFc(); await loadChart(); await loadBrains(); }
 setInterval(() => {

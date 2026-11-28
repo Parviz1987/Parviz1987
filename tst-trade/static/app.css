@@ -511,3 +511,5 @@ details.techgroup[open]>summary{margin-bottom:12px}
 /* the panel's range table (27.11): the range first, AL / SAT only with proof, one decision line above */
 .fcdec{margin:0 0 10px}
 .fc b{font-family:var(--mono)} .fc span.AL{color:var(--up);font-weight:700} .fc span.SAT{color:var(--down);font-weight:700}
+
+.flowline{margin:4px 0 8px}

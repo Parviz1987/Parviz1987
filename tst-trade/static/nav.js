@@ -9,7 +9,7 @@
   const MAIN = [["/", "Panel"], ["/analitikler", "Analitiklər"], ["/results", "Nəticələr"], ["/bloklar", "Bloklar"], ["/agents", "Agentlər"]];
   const RIGHT = [["/ehtiyat", "Ehtiyat"], ["/admin", "⚙ Admin"]];      // «Sistem» is the admin's «Sistem» tab now
   const BLOCKS = [["/bloklar", "Ümumi"], ["/ta", "Texniki analiz"], ["/fundamental", "Fundamental"], ["/xeber", "Xəbər"],
-    ["/bazarlar", "Bazarlar arası"], ["/vaxt", "Vaxt və təqvim"], ["/bilik", "Bilik kitabı"]];
+    ["/bazarlar", "Bazarlar arası"], ["/axin", "Bazar axını"], ["/vaxt", "Vaxt və təqvim"], ["/bilik", "Bilik kitabı"]];
   const OWNER_ONLY = ["/agents", "/status", "/admin", "/ehtiyat"];
   const here = location.pathname.replace(/\/$/, "") || "/";
   const inBlocks = BLOCKS.some(([h]) => h === here);
