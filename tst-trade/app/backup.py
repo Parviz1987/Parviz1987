@@ -38,6 +38,23 @@ def _host(account_id: str) -> str:
     return v if v.endswith(".r2.cloudflarestorage.com") else f"{v}.r2.cloudflarestorage.com"
 
 
+HEX = re.compile(r"^[0-9a-fA-F]+$")
+
+
+def normalize(creds: dict) -> dict:
+    """The three Cloudflare values in whichever box they were pasted (owner 27.11 22:00: the 64-character secret
+    landed in the HTTPS box). They look different: the link holds «r2.cloudflarestorage.com», the Secret Access Key is
+    64 hex characters, the Access Key ID 32. When each can be told apart, they are put in their own boxes."""
+    names = ("access_key_id", "secret_access_key", "account_id")
+    vals = [str(creds.get(n) or "").strip() for n in names]
+    link = [v for v in vals if "r2.cloudflarestorage.com" in v or "://" in v]
+    secret = [v for v in vals if len(v) == 64 and HEX.match(v)]
+    access = [v for v in vals if len(v) == 32 and HEX.match(v)]
+    if len(link) == 1 and len(secret) == 1 and len(access) == 1:
+        return {**creds, "account_id": link[0], "secret_access_key": secret[0], "access_key_id": access[0]}
+    return creds
+
+
 def _id_problem(account_id: str) -> str | None:
     """A plain-language reason why the account_id field cannot be right (no value is shown)."""
     core = _host(account_id).removesuffix(".r2.cloudflarestorage.com").split(".")[0]
@@ -114,6 +131,7 @@ async def resolve(creds: dict) -> tuple[str | None, str]:
 
 async def check_fix(creds: dict) -> tuple[bool, str, str | None]:
     """Admin's «Yoxla»: the address, the key and the bucket (found or created). Returns (ok, message, bucket)."""
+    creds = normalize(creds)
     bad = _id_problem(creds.get("account_id", ""))
     if bad:
         return False, bad, None

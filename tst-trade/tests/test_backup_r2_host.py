@@ -70,3 +70,21 @@ def test_admin_keeps_the_bucket_the_check_found(monkeypatch):
     _fake(monkeypatch, {("GET", "/"): (200, "<Name>tst-backup</Name><Name>other</Name>")})
     res = asyncio.run(check(ks, "r2"))
     assert res["ok"] and "tst-backup" in res["message"] and ks.get("r2")["bucket"] == "tst-backup"
+
+
+def test_values_pasted_into_the_wrong_boxes_are_put_in_their_own(monkeypatch):
+    """27.11 22:00: the 64-character Secret Access Key was pasted into the HTTPS box."""
+    sec, acc = "f" * 64, "a" * 32
+    mixed = {"access_key_id": f"https://{ID}.r2.cloudflarestorage.com", "secret_access_key": acc, "account_id": sec,
+             "bucket": ""}
+    n = backup.normalize(mixed)
+    assert n["account_id"].startswith("https://") and n["secret_access_key"] == sec and n["access_key_id"] == acc
+    same = {"access_key_id": acc, "secret_access_key": "short", "account_id": sec}
+    assert backup.normalize(same) == same                          # cannot be told apart: left as it is
+    _fake(monkeypatch, {("HEAD", "/tst-backup"): (200, "")})
+    from app.db import DB
+    from app.keys import KeyStore, check
+    ks = KeyStore(DB(":memory:"), "s" * 64)
+    ks.set("r2", {**mixed, "bucket": "tst-backup"})
+    res = asyncio.run(check(ks, "r2"))
+    assert res["ok"] and ks.get("r2")["account_id"].startswith("https://") and ks.get("r2")["secret_access_key"] == sec

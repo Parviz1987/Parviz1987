@@ -163,3 +163,10 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   qoyula bilər). «Yoxla» bucket-i özü tapır (açarın gördüyü yeganə bucket və ya «tst-backup»), yoxdursa yaradır; icazə
   çatmasa nə ediləcəyini açıq yazır; tapılan ad saxlanır, gecəlik nüsxə də onu işlədir. Testlər 371/371; Admin 1366 və
   390-da, brauzer xətası 0.
+- 27.11 21:46 — **FinancialJuice işləyir** (sahib açarı yenidən yaradıb Admin-ə yazdı; əvvəlki 4001 köhnə açarın ləğvi idi):
+  qoşulma 21:52-dən qırılmadan açıq; provayder «hello» və 20 saniyədən bir «ping» göndərir — axın canlıdır, şənbə gecəsi
+  başlıq hələ gəlməyib. Diaqnostikada `fjnews`: hər mesaj növünün sayı, son 8 hadisə.
+- 27.11 21:50 — R2 serverdə: link və açarlar qəbul, «tst-backup» bucket-i yoxdur, açarın yaratmağa icazəsi yoxdur → sahib
+  Cloudflare-də Create bucket etməlidir. 22:00 sahib yenidən yazanda 64 simvolluq gizli açar «HTTPS» xanasına düşdü.
+- 27.11 22:04 — R2: üç Cloudflare dəyəri hansı xanaya yazılsa da özü ayrılır (link / 64 simvol / 32 simvol) və öz xanasında
+  saxlanır. Testlər 372/372.

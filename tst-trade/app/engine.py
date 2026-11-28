@@ -779,6 +779,7 @@ class Engine:
             return
         import os
         try:
+            creds = backup.normalize(creds)
             if not creds.get("bucket"):
                 import asyncio
                 bucket, how = asyncio.run(backup.resolve(creds))

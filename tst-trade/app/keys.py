@@ -168,8 +168,9 @@ async def check(store: KeyStore, slot: str, model: str | None = None) -> dict:
         elif slot == "r2":
             from . import backup
             ok, msg, bucket = await backup.check_fix(v)
-            if bucket and bucket != v.get("bucket"):            # found or created: kept for the nightly copy
-                store.set("r2", {**v, "bucket": bucket})
+            fixed = {**backup.normalize(v), **({"bucket": bucket} if bucket else {})}
+            if fixed != v:                  # values put in their own boxes / the bucket found: kept for the night copy
+                store.set("r2", fixed)
                 v = store.get("r2") or v
         elif slot == "financialjuice":
             from . import fjnews
