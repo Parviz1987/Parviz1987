@@ -46,14 +46,15 @@ CREDS = {"access_key_id": "test-access-key-0001", "secret_access_key": "test-sec
 
 def test_an_empty_bucket_box_uses_the_only_bucket_the_key_sees(monkeypatch):
     _fake(monkeypatch, {("GET", "/"): (200, "<ListAllMyBucketsResult><Buckets><Bucket><Name>my-copies</Name>"
-                                           "</Bucket></Buckets></ListAllMyBucketsResult>")})
+                                           "</Bucket></Buckets></ListAllMyBucketsResult>"),
+                        ("PUT", "/my-copies/backups/yoxlama.txt"): (200, "")})
     ok, msg, bucket = asyncio.run(backup.check_fix({**CREDS, "bucket": ""}))
     assert ok and bucket == "my-copies" and "yeganə" in msg
 
 
 def test_a_missing_bucket_is_created_and_a_forbidden_one_is_explained(monkeypatch):
     calls = _fake(monkeypatch, {("GET", "/"): (200, "<ListAllMyBucketsResult><Buckets/></ListAllMyBucketsResult>"),
-                                ("PUT", "/tst-backup"): (200, "")})
+                                ("PUT", "/tst-backup"): (200, ""), ("PUT", "/tst-backup/backups/yoxlama.txt"): (200, "")})
     ok, msg, bucket = asyncio.run(backup.check_fix({**CREDS, "bucket": "tst-backup"}))
     assert ok and bucket == "tst-backup" and "yaratdı" in msg and ("HEAD", "/tst-backup") in calls
     _fake(monkeypatch, {("GET", "/"): (403, ""), ("PUT", "/tst-backup"): (403, "")})
@@ -67,7 +68,8 @@ def test_admin_keeps_the_bucket_the_check_found(monkeypatch):
     db = DB(":memory:")
     ks = KeyStore(db, "s" * 64)
     ks.set("r2", {**CREDS, "bucket": ""})                              # the bucket box may stay empty
-    _fake(monkeypatch, {("GET", "/"): (200, "<Name>tst-backup</Name><Name>other</Name>")})
+    _fake(monkeypatch, {("GET", "/"): (200, "<Name>tst-backup</Name><Name>other</Name>"),
+                        ("PUT", "/tst-backup/backups/yoxlama.txt"): (200, "")})
     res = asyncio.run(check(ks, "r2"))
     assert res["ok"] and "tst-backup" in res["message"] and ks.get("r2")["bucket"] == "tst-backup"
 
@@ -81,10 +83,21 @@ def test_values_pasted_into_the_wrong_boxes_are_put_in_their_own(monkeypatch):
     assert n["account_id"].startswith("https://") and n["secret_access_key"] == sec and n["access_key_id"] == acc
     same = {"access_key_id": acc, "secret_access_key": "short", "account_id": sec}
     assert backup.normalize(same) == same                          # cannot be told apart: left as it is
-    _fake(monkeypatch, {("HEAD", "/tst-backup"): (200, "")})
+    _fake(monkeypatch, {("HEAD", "/tst-backup"): (200, ""), ("PUT", "/tst-backup/backups/yoxlama.txt"): (200, "")})
     from app.db import DB
     from app.keys import KeyStore, check
     ks = KeyStore(DB(":memory:"), "s" * 64)
     ks.set("r2", {**mixed, "bucket": "tst-backup"})
     res = asyncio.run(check(ks, "r2"))
     assert res["ok"] and ks.get("r2")["account_id"].startswith("https://") and ks.get("r2")["secret_access_key"] == sec
+
+
+def test_a_read_only_token_is_not_called_working(monkeypatch):
+    """27.11: the owner's token was «Object Read only»: the bucket is visible but the night copy could not be written."""
+    calls = _fake(monkeypatch, {("HEAD", "/tst-backup"): (200, ""), ("PUT", "/tst-backup/backups/yoxlama.txt"): (403, "")})
+    ok, msg, bucket = asyncio.run(backup.check_fix({**CREDS, "bucket": "tst-backup"}))
+    assert not ok and "yalnız oxuya" in msg and "Read & Write" in msg and bucket == "tst-backup"
+    _fake(monkeypatch, {("HEAD", "/tst-backup"): (200, ""), ("PUT", "/tst-backup/backups/yoxlama.txt"): (200, ""),
+                        ("DELETE", "/tst-backup/backups/yoxlama.txt"): (204, "")})
+    ok, msg, _ = asyncio.run(backup.check_fix({**CREDS, "bucket": "tst-backup"}))
+    assert ok and "yazma sınağı" in msg

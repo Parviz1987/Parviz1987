@@ -141,7 +141,23 @@ async def check_fix(creds: dict) -> tuple[bool, str, str | None]:
         return False, "R2 ünvanına çatmaq olmadı: «HTTPS» xanasındakı linki yoxlayın", None
     if not bucket:
         return False, how, None
-    return True, f"işləyir: {how}", bucket
+    # 27.11: the owner's token was «Object Read only» — seeing the bucket is not enough, the night copy WRITES.
+    # A tiny file is written and removed, so «işləyir» means the copy can really be stored.
+    body = b"tst-trade yoxlama"
+    path = f"/{bucket}/backups/yoxlama.txt"
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            url, h = _headers(creds, "PUT", path, hashlib.sha256(body).hexdigest())
+            r = await c.put(url, headers=h, content=body)
+            if r.status_code in (401, 403):
+                return False, (f"açar yalnız oxuya bilir (HTTP {r.status_code}): Cloudflare → R2 → Manage API tokens → "
+                               f"açarın icazəsini «Object Read & Write» və ya «Admin Read & Write» edin"), bucket
+            if r.status_code != 200:
+                return False, f"sınaq faylı yazılmadı: HTTP {r.status_code}", bucket
+            await _call(c, creds, "DELETE", path)
+    except httpx.ConnectError:
+        return False, "R2 ünvanına çatmaq olmadı: «HTTPS» xanasındakı linki yoxlayın", bucket
+    return True, f"işləyir: {how}, yazma sınağı keçdi", bucket
 
 
 async def check(creds: dict) -> tuple[bool, str]:
