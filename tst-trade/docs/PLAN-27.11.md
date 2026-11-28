@@ -193,3 +193,10 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   həyəcan, p < 0,01, xərcdən sonra orta > 0 və hər iki yarıda müsbət. İndi yalnız pulsuz qiymət sorğusu (1/3/6/12 ay) —
   diag `dbhist_quote`; yükləmə sahibin məbləğə «hə»sindən sonra. Canlı axın da «.c.0» (ən yaxın ay) əvəzinə «.v.0» (ən
   çox işlənən) müqaviləyə keçdi. Testlər 381/381.
+- 27.11 23:38 — Agentlər səhifəsi «sinir sistemi» (sahib: «ulduzlar kimi, orqanlar kimi düz; beyindən elektrik getsin,
+  məlumat gələndə bir-birinə işıq getsin»): masaüstündə (≥860 px) beyin mərkəzdə, öz orqanları daxili halqada, gözlər xarici
+  orbitdə beyni tac kimi dövrəyə alır, sinirlər solda, Hakim və Qərar sağda; hər agent beyinə aksonla bağlı. İşıq yalnız
+  real hadisədən: baş dövrün döyüntüsü (~15 san) beyindən bütün agentlərə dalğa; lif boyu məlumat; iş bitəndə yaşıl işıq
+  agentdən beyinə qayıdır; arxada zəif ulduzlar. Telefonda beyin bölməsi «Hakim»in üstünə düşmürdü — düzəldi. Ad
+  üst-üstə düşməsi 1280/1366/1920/900/1024/360/390-da 0 (ölçü ilə yoxlanıb), brauzer xətası 0; az hərəkət rejimində işıq
+  getmir, yalnız parlayır.

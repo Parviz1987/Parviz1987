@@ -77,11 +77,68 @@ function build(nodes) {
     if (b.n.src && !src) continue;
     FIB.push({ a: src, b, s: hash(b.id) % 2 ? 1 : -1, glowT: -1e9, glowC: 1 });
   }
+  // owner 2026-11-27: «like a nervous system» — every agent hangs on an axon from the brain. Where the agent's data
+  // already comes from the brain (src orch) its fibre IS the axon; the others get a faint one of their own.
+  AX = {};
+  for (const b of BOTS) {
+    if (b === CORE || !CORE) continue;
+    const f = FIB.find((x) => x.b === b && x.a === CORE);
+    AX[b.id] = { b, s: f ? f.s : (hash(b.id + "ax") % 2 ? 0.7 : -0.7), own: !f, glowT: -1e9, glowC: 1, fib: f || null };
+  }
   layoutKey = "";
 }
 
 // lane geometry: computed from the lanes, so any number of agents fits
-let layoutKey = "", W = 0, H = 0, R = 60, lanesGeo = [];
+let layoutKey = "", W = 0, H = 0, R = 60, lanesGeo = [], AX = {}, STARS = null;
+// n points at equal distance ALONG an ellipse arc (equal angles bunch up where the ellipse is flat)
+function arcPts(rx, ry, mid, half, n) {
+  if (n <= 0) return [];
+  if (n === 1) return [[rx * Math.cos(mid), ry * Math.sin(mid)]];
+  const M = 360, xs = new Float64Array(M + 1), ys = new Float64Array(M + 1), L = new Float64Array(M + 1);
+  for (let i = 0; i <= M; i++) {
+    const th = mid - half + 2 * half * i / M;
+    xs[i] = rx * Math.cos(th); ys[i] = ry * Math.sin(th);
+    if (i) L[i] = L[i - 1] + Math.hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1]);
+  }
+  const out = [];
+  for (let k = 0, i = 0; k < n; k++) {
+    const want = L[M] * k / (n - 1);
+    while (i < M && L[i] < want) i++;
+    out.push([xs[i], ys[i]]);
+  }
+  return out;
+}
+// owner 2026-11-27: agents around the brain «like stars, like organs». The brain in the middle, its own organs on an
+// inner ring; the eyes (sources) on the outer orbit on the left, the nerves between them and the brain, the judge and
+// the decision on the right — data flows from the left through the brain to the right.
+// [ring, centre angle, angle per agent, widest half-arc]: the many eyes wrap the outer orbit over the top and the
+// bottom (a crown around the brain), the few judges and deciders sit on the right
+const RING = { eyes: ["outer", Math.PI, 0.41, 1.85], nerves: ["middle", Math.PI, 0.52, 1.1], brain: ["inner", 0, 0, 0],
+  judge: ["middle", 0, 0.52, 1.1], act: ["outer", 0, 0.56, 1.1] };
+let RADIAL = false;
+function radial(w, h, groups) {
+  const top = 40, bot = 14, availH = h - top - bot, cxm = w / 2, cym = top + availH / 2 - 6;
+  const rxO = w / 2 - 74, ryO = availH / 2 - 50, rxM = rxO * 0.66, ryM = ryO * 0.62;
+  R = Math.max(40, Math.min(90, w * 0.085, availH * 0.17));
+  const rxI = Math.min(R * 1.75, rxM - 125), ryI = Math.min(R * 1.45, ryO - 75);
+  if (CORE) { CORE.x = cxm; CORE.y = cym; CORE.r = R * 0.62; }
+  const radii = { outer: [rxO, ryO], middle: [rxM, ryM], inner: [rxI, ryI] };
+  LANES.forEach((L, i) => {
+    const g = groups[i], [ring, mid, step, maxHalf] = RING[L.key] || ["middle", 0, 0.5, 1.1];
+    const [rx, ry] = radii[ring];
+    let pts;
+    if (ring === "inner") pts = g.map((_, k) => [rx * Math.cos(-Math.PI / 2 + k * 2 * Math.PI / g.length),
+      ry * Math.sin(-Math.PI / 2 + k * 2 * Math.PI / g.length)]);
+    else {
+      const half = Math.min(maxHalf, step * (g.length - 1) / 2);
+      pts = arcPts(rx, ry, mid, half, g.length);
+      if (mid === Math.PI) pts.reverse();          // read top to bottom on the left too
+    }
+    g.forEach((b, k) => { b.x = cxm + pts[k][0]; b.y = cym + pts[k][1]; b.r = 15; b.maxW = 112; });
+    const capX = ring === "inner" ? cxm : cxm + (mid === Math.PI ? -1 : 1) * rx;
+    lanesGeo.push({ name: L.name, x: capX, y: 26 });
+  });
+}
 function layout(w, h) {
   const ph = phone();
   lanesGeo = [];
@@ -91,7 +148,11 @@ function layout(w, h) {
     const ip = LANES[i].ids.indexOf(p.id), iq = LANES[i].ids.indexOf(q.id);
     return (ip < 0 ? 99 : ip) - (iq < 0 ? 99 : iq) || p.n.num - q.n.num;
   }));
-  if (!ph) {
+  RADIAL = !ph && w >= 860;                  // narrower (a tablet): the lanes, the inner ring would be too tight
+  if (RADIAL) {
+    radial(w, h, groups);
+    H = h;
+  } else if (!ph) {
     const top = 62, bot = 14, sum = LANE_W.reduce((a, b) => a + b, 0);
     let x0 = 0;
     LANES.forEach((L, i) => {
@@ -138,7 +199,8 @@ function layout(w, h) {
           b.x = left ? b.maxW / 2 + 4 : w - b.maxW / 2 - 4;
           b.y = cy - R * 0.55 + row * R * 1.25;
         });
-        y = cy + R * 1.15 + 34;
+        // 27.11: with 6 brain agents the third row ran into «Hakim» (names on top of each other)
+        y = Math.max(cy + R * 1.15, cy - R * 0.55 + (Math.ceil(g.length / 2) - 1) * R * 1.25 + 52) + 34;
       } else {
         const rows = Math.ceil(g.length / cols);
         g.forEach((b, k) => {
@@ -153,6 +215,9 @@ function layout(w, h) {
     H = Math.ceil(y + 4);
   }
   W = w;
+  const sr = rng(2711), ns = ph ? 70 : 150;
+  STARS = { n: ns, x: new Float32Array(ns), y: new Float32Array(ns), s: new Float32Array(ns), p: new Float32Array(ns) };
+  for (let i = 0; i < ns; i++) { STARS.x[i] = sr() * w; STARS.y[i] = sr() * H; STARS.s[i] = 0.6 + sr() * 1.2; STARS.p[i] = sr() * 6.28; }
   makeBrain(ph ? 380 : 720);
   placeHits();
   render();
@@ -269,29 +334,59 @@ function glow(i, x, y, size, a) {
 }
 
 // ---------- couriers: one light per REAL event, from the event's source to its task ----------
-const MAXP = 80, DUR = 1150;             // owner 2026-11-26: the light should be easy to follow
+const MAXP = 200, DUR = 1150, DUR_AX = 950;   // owner 2026-11-26: the light should be easy to follow
+// k: 0 = along a data fibre (source -> agent), 1 = brain -> agent on an axon, 2 = agent -> brain (work done)
 const P = { on: new Uint8Array(MAXP), a: new Array(MAXP).fill(null), b: new Array(MAXP).fill(null),
-  s: new Int8Array(MAXP), t0: new Float64Array(MAXP), c: new Uint8Array(MAXP) };
+  s: new Float32Array(MAXP), t0: new Float64Array(MAXP), c: new Uint8Array(MAXP), k: new Uint8Array(MAXP) };
+let lastBeat = 0;
+function spawnAx(b, k, ci, delay) {
+  const x = AX[b.id];
+  if (!x || !CORE) return;
+  const t = performance.now() + (delay || 0);
+  x.glowT = t; x.glowC = ci;
+  if (paused) { b.flashT = t; b.flashC = ci; return; }
+  for (let i = 0; i < MAXP; i++) {
+    if (P.on[i]) continue;
+    P.on[i] = 1; P.a[i] = CORE; P.b[i] = b; P.s[i] = x.s; P.t0[i] = t; P.c[i] = ci; P.k[i] = k;
+    return;
+  }
+}
+// the main loop's real beat (every ~15 s, «dövr başladı»): a wave of current from the brain to every agent
+function beat() {
+  const t = performance.now();
+  if (t - lastBeat < 4000 || document.hidden) return;
+  lastBeat = t;
+  for (const b of BOTS) if (b !== CORE) spawnAx(b, 1, 1, (hash(b.id) % 9) * 40);
+}
 const Q = new Float64Array(2);
 function fibreFor(a, b) { for (const f of FIB) if (f.a === a && f.b === b) return f; return null; }
-function anchorOut(b) { return [0, b.cy]; }          // data from outside enters at the left edge
+function anchorOut(b) {                // data from the outside world: at the left edge; on the rings from behind the agent
+  if (!RADIAL || !CORE) return [0, b.cy];
+  const dx = b.cx - CORE.cx, dy = b.cy - CORE.cy, d = Math.hypot(dx, dy) || 1;
+  return [b.cx + dx / d * 150, b.cy + dy / d * 150];
+}
 function spawn(e) {
   const b = BY[e.task];
   if (!b || document.hidden) return;
   const ci = SIDX[e.status] ?? 1;
-  if (b === CORE) { b.flashT = performance.now(); b.flashC = ci; return; }   // the main loop's beat: the brain glows
+  if (b === CORE) {                                // the main loop's beat: the brain glows and sends its current out
+    b.flashT = performance.now(); b.flashC = ci;
+    if (e.status === "working") { beat(); fireBurst(8); }
+    return;
+  }
   const a = e.src && BY[e.src] ? BY[e.src] : null;
   const f = fibreFor(a, b);
   const t = performance.now();
   if (paused) {                       // less motion: the fibre lights up and the agent glows, nothing travels
     if (f) { f.glowT = t; f.glowC = ci; }
     b.flashT = t; b.flashC = ci;
+    if (ci === 2 && AX[b.id]) { AX[b.id].glowT = t; AX[b.id].glowC = 2; }
     if (BRAIN_IDS.includes(b.id) || b === CORE) fireBurst(4);
     return;
   }
   for (let i = 0; i < MAXP; i++) {
     if (P.on[i]) continue;
-    P.on[i] = 1; P.a[i] = a; P.b[i] = b; P.s[i] = f ? f.s : 1; P.t0[i] = t; P.c[i] = ci;
+    P.on[i] = 1; P.a[i] = a; P.b[i] = b; P.s[i] = f ? f.s : 1; P.t0[i] = t; P.c[i] = ci; P.k[i] = 0;
     if (f) { f.glowT = t; f.glowC = ci; }
     return;
   }
@@ -309,21 +404,27 @@ function drawPulses(tm) {
   cx.globalCompositeOperation = "lighter";
   for (let i = 0; i < MAXP; i++) {
     if (!P.on[i]) continue;
-    const u = (tm - P.t0[i]) / DUR, b = P.b[i];
+    const k = P.k[i], u = (tm - P.t0[i]) / (k ? DUR_AX : DUR), b = P.b[i];
+    if (u < 0) continue;                       // a beat's wave leaves the brain a little staggered
     if (u >= 1) {
-      P.on[i] = 0; b.flashT = tm; b.flashC = P.c[i];
+      P.on[i] = 0;
+      if (k === 2) { CORE.flashT = tm; CORE.flashC = P.c[i]; fireBurst(5); continue; }   // the report reached the brain
+      b.flashT = tm; b.flashC = P.c[i];
       if (BRAIN_IDS.includes(b.id)) fireBurst(6);
+      if (k === 0 && P.c[i] === 2) spawnAx(b, 2, 2, 60);   // data arrived and the work is done: the agent reports back
       continue;
     }
-    const [ax, ay] = ends(P.a[i], b);
-    ctrl(ax, ay, b.cx, b.cy, P.s[i]);
-    const qx = Q[0], qy = Q[1];
+    let ax, ay, bx = b.cx, by = b.cy;
+    if (k === 0) [ax, ay] = ends(P.a[i], b);
+    else { ax = CORE.cx; ay = CORE.cy; if (k === 2) { ax = b.cx; ay = b.cy; bx = CORE.cx; by = CORE.cy; } }
+    ctrl(ax, ay, bx, by, k === 2 ? -P.s[i] : P.s[i]);
+    const qx = Q[0], qy = Q[1], big = k ? 0.72 : 1;
     for (let j = 12; j >= 0; j--) {    // a fading tail behind a bright head
-      const v = u - j * 0.028;
+      const v = u - j * (k ? 0.035 : 0.028);
       if (v < 0) continue;
-      const m = 1 - v, x = m * m * ax + 2 * m * v * qx + v * v * b.cx, y = m * m * ay + 2 * m * v * qy + v * v * b.cy;
-      glow(P.c[i], x, y, j ? 18 - j : 34, j ? 0.7 * (1 - j / 13) : 1);
-      if (!j) glow(P.c[i], x, y, 12, 1);
+      const m = 1 - v, x = m * m * ax + 2 * m * v * qx + v * v * bx, y = m * m * ay + 2 * m * v * qy + v * v * by;
+      glow(P.c[i], x, y, (j ? 18 - j : 34) * big, j ? 0.7 * (1 - j / 13) : 1);
+      if (!j) glow(P.c[i], x, y, 12 * big, 1);
     }
   }
   cx.globalCompositeOperation = "source-over"; cx.globalAlpha = 1;
@@ -524,6 +625,15 @@ function draw(tms) {
     if (b === CORE || paused) { b.cx = b.x; b.cy = b.y; continue; }
     b.cx = b.x + Math.sin(t * 0.55 + b.ph) * 2.2; b.cy = b.y + Math.cos(t * 0.43 + b.ph * 1.3) * 2.6;
   }
+  // a quiet star field behind everything (it twinkles only when motion is allowed)
+  if (STARS) {
+    cx.fillStyle = "#cfe6ff";
+    for (let i = 0; i < STARS.n; i++) {
+      cx.globalAlpha = paused ? 0.22 : 0.12 + 0.16 * (1 + Math.sin(t * 0.9 + STARS.p[i])) / 2;
+      cx.fillRect(STARS.x[i], STARS.y[i], STARS.s[i], STARS.s[i]);
+    }
+    cx.globalAlpha = 1;
+  }
   // lanes: subtle names and separators
   cx.textAlign = ph ? "left" : "center"; cx.font = "700 10px Inter,system-ui,sans-serif";
   for (let i = 0; i < lanesGeo.length; i++) {
@@ -531,8 +641,18 @@ function draw(tms) {
     cx.fillStyle = "rgba(138,151,180,.55)";
     cx.fillText(L.name.toUpperCase().split("").join(" "), L.x, L.y);
     cx.fillStyle = "rgba(120,170,255,.06)";
-    if (!ph && i) cx.fillRect(L.x0, 56, 1, h - 70);
+    if (!ph && i && L.x0 != null) cx.fillRect(L.x0, 56, 1, h - 70);
     if (ph && i) cx.fillRect(0, L.y0, w, 1);
+  }
+  // axons: a faint nerve from the brain to every agent; it lights up while current runs along it
+  if (CORE) for (const id in AX) {
+    const x = AX[id], b = x.b;
+    const g = Math.max(0, 1 - (tms - x.glowT) / 1300);
+    if (!x.own && g <= 0) continue;              // the agent's data fibre already is its axon
+    ctrl(CORE.cx, CORE.cy, b.cx, b.cy, x.s);
+    const [r0, g0, b0] = g > 0 ? RGB[x.glowC] : [120, 170, 255];
+    cx.strokeStyle = `rgba(${r0},${g0},${b0},${g > 0 ? 0.08 + 0.42 * g : 0.045})`; cx.lineWidth = g > 0 ? 0.8 + g * 1.2 : 0.8;
+    cx.beginPath(); cx.moveTo(CORE.cx, CORE.cy); cx.quadraticCurveTo(Q[0], Q[1], b.cx, b.cy); cx.stroke();
   }
   // fibres along the data flow: very dim when idle, brighter while the task works or a light just passed
   for (const f of FIB) {
