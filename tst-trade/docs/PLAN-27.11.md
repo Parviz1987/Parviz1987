@@ -129,3 +129,9 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   edib saytın qayıtdığını yoxlayacağam (disk böyüdülmür ki, lazım olsa $6-a qayıtmaq olsun). 11.1: Admin-də FinancialJuice
   açar xanası; əlaqə xəritəsində FinancialJuice və Databento canlı axını «sizin addımınızı gözləyir» — açar/plan gələndə qoşulur.
 - 27.11 18:57 — 12.1: BLOKLAR, IS-PLANI 5.4, SOHBET-TARIXCESI yeniləndi. Qalan: 10.1 şənbə, 11.1 açarlar gələndə.
+- 27.11 19:03 — ikinci göz (7–9-cu addımlar) 1 real gerilək tapdı, düzəldildi: Google News 10 dəqiqəyə keçəndən sonra bütün xəbər
+  mənbələrinin dayanması görünməyəcəkdi — indi hər lentin SON nəticəsinə görə qiymətləndirilir. Digərləri: Fed bəyanatına iki
+  həyəcan → bir; BLS gündəlik limitinə çatanda snayper dayanır, 1-ci dəqiqədən sonra 10 saniyədən bir (ən çox ~38 sorğu);
+  sıçrayış üçün əvvəlində 10 fasiləsiz dəqiqə lazımdır (açılışdakı nazik dəqiqələr yalançı həyəcan verməsin); yenidən
+  başlamadan sonra Kəşfiyyatçı rəqəm pəncərəsini 4 saat buraxmır; həftəlik kölgə sınağı xəta veribsə ertəsi gün yenə;
+  söndürülmüş Benzinga gündə bir; dirijorun təzəlik yoxlaması şərhin içində qalmışdı — işləyir. Testlər 355/355.

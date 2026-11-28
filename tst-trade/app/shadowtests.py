@@ -295,7 +295,7 @@ def run(db: DB) -> dict:
     weekly_due = time.time() - float(db.get("shadow:weekly_ts") or 0) > 7 * 86400
     for name, fn in (("fa_window", fa_window), ("festival_vol", festival_vol), ("unfamiliar", unfamiliar),
                      ("lead_lag", lead_lag), ("news_shock_vol", news_shock_vol), ("geo_shock_vol", geo_shock_vol)):
-        if name in WEEKLY and not weekly_due and name in prev:
+        if name in WEEKLY and not weekly_due and name in prev and "error" not in (prev[name] or {}):
             out[name] = prev[name]
             continue
         try:

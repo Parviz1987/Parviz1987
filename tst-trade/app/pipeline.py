@@ -17,7 +17,8 @@ RELATED_SILENT = 3600      # a linked market silent for an hour while metals tra
 RANGE_ONLY = ("garch", "gvz")                  # they give the range, never a direction
 NEWS_SOURCES = ("rss", "alpaca")               # zero rows from these on a trading day means nothing arrived
 STALE_SOURCE = 26 * 3600                       # the slowest source is checked daily
-FRESH_SHEETS = (("blocks:audit", "blokların yoxlaması", 4 * 3600),   # hourly, paused 04-05 UTC ("conductor:audit", "dirijorun sübutu", 30 * 3600),
+FRESH_SHEETS = (("blocks:audit", "blokların yoxlaması", 4 * 3600),   # hourly, paused 04-05 UTC
+                ("conductor:audit", "dirijorun sübutu", 30 * 3600),
                 ("aci:shadow", "aralıq düzəlişi (ACI)", 8 * 86400))             # weekly since 27.11
 
 

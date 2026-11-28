@@ -489,6 +489,7 @@ class Feeds:
 
     async def news(self, client) -> None:
         now, total, errors, resting = time.time(), 0, [], []
+        asked, failed, got = set(), set(), {}
         backoff = getattr(self, "_news_backoff", None)
         if backoff is None:
             backoff = self._news_backoff = {}
@@ -505,19 +506,33 @@ class Feeds:
             if name.startswith("Google News") and now - last.get(name, 0) < GOOGLE_EVERY:
                 continue
             last[name] = now
+            asked.add(name)
             try:
                 items = [i for i in parse_feed(await self._get(client, url), name) if now - i["ts"] < NEWS_MAX_AGE]
                 self.db.executemany("INSERT OR IGNORE INTO news(uid, source, url, title, ts, metals, received_ts) "
                                     "VALUES(:uid, :source, :url, :title, :ts, :metals, " + NOW_SQL + ")", items)
                 total += len(items)
+                got[name] = len(items)
                 backoff.pop(name, None)
             except Exception as e:   # one feed failing must not cost the others
                 errors.append(f"{name}: {e}")
+                failed.add(name)
                 if "HTTP 429" in str(e):           # wait 15, 30, then 60 minutes before asking that feed again
                     wait = min(3600.0, max(900.0, 2 * wait))
                     backoff[name] = (now + wait, wait)
         self.db.execute("DELETE FROM news WHERE ts < ?", (now - NEWS_KEEP,))
-        ok = len(errors) < len(NEWS_FEEDS)
+        # 27.11 review: Google News is asked every 10 minutes now, so one round sees only some feeds. Health is
+        # judged on each feed's LAST result (a total outage shows within one 10-minute cycle), and the count is
+        # what all feeds brought in their last fetch
+        state = getattr(self, "_news_state", None)
+        if state is None:
+            state = self._news_state = {}
+        for name, _ in NEWS_FEEDS:
+            if name in asked:
+                state[name] = {"ok": name not in failed, "n": got.get(name, 0)}
+        known = [v for v in state.values()]
+        ok = not known or any(v["ok"] for v in known)
+        total = sum(v["n"] for v in known)
         self._health("rss", ok, f"{total} başlıq" + (f"; xəta: {'; '.join(errors)}" if errors else "") +
                      (f"; limitə görə gözləyir: {', '.join(resting)}" if resting else ""), total)
         from . import heartbeat              # the outside watcher: news is «down» after 3 failed rounds in a row
@@ -779,6 +794,8 @@ class Feeds:
                 series.update(off.parse_bls(rr.json()))
             except Exception as e:
                 errors.append(f"BLS: {e}"[:120])
+                if "threshold" in str(e).lower():   # BLS's daily limit reached: the sniper stops asking (27.11 review)
+                    self.db.put("bls:quota_day", time.strftime("%Y-%m-%d", time.gmtime()))
         fred_key = self.keys.first("fred")
         for sid in sorted({p[1] for _, p, _ in due if p[0] == "fred"}):
             if not fred_key:
@@ -857,6 +874,9 @@ class Feeds:
                 ts, kind = nxt
                 async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
                     while time.time() < ts + SNIPE_FOR:
+                        if kind == "bls" and self.db.get("bls:quota_day") == time.strftime("%Y-%m-%d", time.gmtime()):
+                            log.warning("sniper: BLS daily limit reached, stops for today")
+                            break
                         try:
                             got = await (self.official(client, sniping=True) if kind == "bls" else
                                          self.snipe_fed(client, ts))
@@ -865,7 +885,9 @@ class Feeds:
                             got = 0
                         if got:
                             break
-                        await asyncio.sleep(SNIPE_EVERY)
+                        # every 3 s in the first minute, then every 10 s: at most ~38 asks per release (BLS has a
+                        # daily limit; a late figure must not use it up)
+                        await asyncio.sleep(SNIPE_EVERY if time.time() < ts + 60 else 10)
                 await asyncio.sleep(max(1.0, ts + SNIPE_FOR - time.time()))     # past this event
             except asyncio.CancelledError:
                 raise
@@ -1084,7 +1106,7 @@ class Feeds:
         now = time.time() if now is None else now
         jobs = {"news": (self.news, NEWS_EVERY), "calendar": (self.calendar, CAL_EVERY),
                 "macro": (self.macro, MACRO_EVERY), "cot": (self._cot_safe, COT_EVERY),
-                "alpaca": (self.alpaca, ALPACA_EVERY),
+                "alpaca": (self.alpaca, 86400),          # off since 27.11: only its grey «not used» line
                 # every 5 minutes; every minute around a high-impact release so the surprise is seen at once
                 "fmp": (self.fmp, 60 if self.event_mode(now) else 300),
                 # official actuals: every minute around a release (the agencies publish at the minute)

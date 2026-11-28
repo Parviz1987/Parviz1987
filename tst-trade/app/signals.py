@@ -61,7 +61,8 @@ def from_news(db: DB, now: float) -> int:
     for r in rows:
         metals = [m for m in (r["metals"] or "").split(",") if m]
         key = f"ev{r['event_id']}" if r["event_id"] is not None else r["uid"]    # Block 17: one story, one alarm
-        if r["strength"] >= 3:
+        if r["strength"] >= 3 and not db.execute("SELECT 1 FROM signals WHERE uid=?", ("fed:" + r["uid"],)).fetchone():
+            # (27.11: a Fed statement the release sniper already raised at its minute is not alarmed twice)
             n += emit(db, "news:" + key, "news", f"Güclü xəbər ({r['direction']}): {r['title']}", 3,
                       ",".join(metals) or None, now)
         for m in metals:
@@ -126,7 +127,11 @@ def from_spikes(db: DB, now: float, symbols: list[str]) -> int:
         if len(moved) < 60:
             continue
         usual = moved[int(len(moved) * 0.75)]
-        last = rows[-1]["c"] / rows[-2]["c"] - 1 if rows[-2]["c"] and rows[-1]["t"] - rows[-2]["t"] == 60 else 0
+        # 10 unbroken minutes before it: right after a reopen (daily break, Sunday) the thin first minutes jump
+        # against a «usual» taken from the quiet hours before the close — not a spike
+        if any(b["t"] - a["t"] != 60 for a, b in zip(rows[-11:], rows[-10:])):
+            continue
+        last = rows[-1]["c"] / rows[-2]["c"] - 1 if rows[-2]["c"] else 0
         if abs(last) >= max(SPIKE_X * usual, SPIKE_MIN):
             n += emit(db, f"spike:{sym}:{rows[-1]['t']}", "move",
                       f"{NAMES.get(sym, sym)} 1 dəqiqədə {last * 100:+.2f} % sıçradı (adi 1 dəqiqəlik hərəkət {usual * 100:.3f} %)",

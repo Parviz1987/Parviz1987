@@ -284,7 +284,7 @@ class BrainJobs:
         db.script(BV)
         # A restart (every update) must not buy an extra search: the next one follows the last one's time.
         last = json.loads(db.get("scout:last") or "{}")
-        self.next_scout = float(last.get("ts", 0)) + SCOUT_EVERY
+        self.next_scout = float(last.get("ts", 0)) + SCOUT_EVENT_EVERY   # 27.11: routine searches only in the window
         # Nor an extra strategist round (strategist, second analyst, debate, chart reader: all paid): on 2026-11-27 a
         # night of deploys ran it again after every restart. The hourly one follows the last round's time.
         ran = json.loads(db.get("brainjob:strategist") or "{}").get("ts")
