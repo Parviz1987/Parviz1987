@@ -151,6 +151,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             asyncio.get_running_loop().create_task(dbhist.run(db, store))
             from . import sentiment                                     # owner 28.11: Capital.com client sentiment
             asyncio.get_running_loop().create_task(sentiment.run(db, engine))
+            from . import corridor                                      # owner 28.11: corridor engine v2 (stage 1)
+            asyncio.get_running_loop().create_task(corridor.run(db))
             from . import labs                                          # owner 28.11: the labs' own deep COT history
             asyncio.get_running_loop().create_task(labs.run(db))
             from . import dbstats                                       # owner 28.11: CME open interest (free quote)

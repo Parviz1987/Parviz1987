@@ -281,3 +281,9 @@ sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real
   günlük 50 % geri dönüş 48,5 % / qırılma 51,6 % (161); iki yarı işarə dəyişir — kənarda heç bir istiqamətdə üstünlük yoxdur.
   Həftəlik: hadisə azdır (9–31). Nəticə: koridor KALİBRLİDİR (dəqiqdir), amma kənarında mexaniki alqı-satqı özü pul gətirmir;
   koridorun dəyəri — dar və dəqiq olması (risk, stop/hədəf, ölçü) və fiziki alış-satışda icra qənaəti. Sahibə tam cavab.
+
+## Dördüncü hissə — Koridor planı (sahib 28.11: «hər ikisi — fiziki qızıl və fyuçers; birinci koridoru düzəlt»)
+Plan: `docs/PLAN-KORIDOR.md` (mərhələ 1 koridor v2 → 2 fiziki qızıl → 3 fyuçers → 4 karkas).
+- [x] 14.1 28.11 15:39 — Koridor mühərriki v2 (`app/corridor.py`): Parkinson + HAR + GVZ + qabaqcadan bilinən hadisə günləri,
+  kənar-kənar empirik koridor + adaptiv düzəliş; qəbul qaydası hesablamadan ƏVVƏL (15:37 NY) yazılıb. Sınaq: gələcək
+  məlumat istifadə olunmur, simulyasiyada vədinə əməl edir və dəyişkənliyi izləyir.
