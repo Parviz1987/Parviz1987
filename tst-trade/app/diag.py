@@ -458,6 +458,8 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "dbhist_quote": json.loads(db.get("dbhist:quote") or "null"),  # Databento history price list (free question)
         "sentiment": json.loads(db.get("sent:health") or "null"),      # Capital.com client sentiment reader
         "dbstats_quote": json.loads(db.get("dbstats:quote") or "null"),  # CME statistics price list (free question)
+        "dbstats": {"load": json.loads(db.get("dbstats:last_load") or "null"),   # CME open interest: loads, spend,
+                    "result": json.loads(db.get("dbstats:result") or "null")},  # and the pre-registered test
         "dbhist": {"result": json.loads(db.get("dbhist:result") or "null"),   # the owner-approved 12-month test
                    "progress": json.loads(db.get("dbhist:progress") or "null"),
                    "months_done": db.execute("SELECT COUNT(*) FROM kv WHERE k LIKE 'dbhist:month:%'").fetchone()[0]},
