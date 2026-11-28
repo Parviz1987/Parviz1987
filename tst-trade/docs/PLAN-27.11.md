@@ -211,3 +211,10 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   göstərilir): 49,6 %, −0,0193 %. Alış/satış yönü tərsinə olsaydı da keçməzdi (51,1 %, xərcdən əvvəl +0,0094 % < xərc 0,021 %).
   Nəticə: tək böyük əməliyyat qızılın sonrakı 15–60 dəqiqəsini xərci ödəyəcək qədər göstərmir → canlı lisenziya ($199/ay) və
   server böyütmə ($6→$12) tövsiyə olunmur; qərar sahibindir.
+- 28.11 00:43 — Sahib: «almağa nəyə lazımdır» → Databento canlı lisenziya alınmır; əlaqə xəritəsində «söndürülüb (qərar)», gündəlik
+  qırmızı xəta yox. Sahib: «ikisini də et» → (1) «Bazar axını» səhifəsinin başında «Böyük oyunçular indi»: COT (iri fondlar),
+  GLD tonları, mərkəzi banklar, Hindistan fondları, Şanxay həcmi — yalnız son oxunuş və mənası (cədvəllər və qaydalar
+  Fundamental-da qalır, bir fakt bir yerdə); Databento hissəsi yığılı, «lisenziya alınmayıb» qeydi ilə. (2) Capital.com
+  müştəri əhvalı (`app/sentiment.py`): canlı axının öz sessiyası ilə 15 dəqiqədən bir (ayrıca giriş yox); qayda QABAQCADAN
+  qeydə alınıb (28.11 00:40 NY, ilk oxunuşdan əvvəl): hər iş günü 12:00 NY oxunuşu, əks-kütlə, qızıl 24 saat, tam xərc, ən
+  az 60 gün, p < 0,05, iki yarı müsbət. Testlər 389/389; 1366 və 390, xəta 0, üfüqi sürüşmə yox.

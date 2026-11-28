@@ -36,5 +36,53 @@
           <td class="c">${m.big_buy ? "▲" + m.big_buy : ""} ${m.big_sell ? "▼" + m.big_sell : ""}</td></tr>`; }).join("") + "</table>" : "";
     $("upd").textContent = "yeniləndi " + new Date().toLocaleTimeString("az", NY) + " NY";
   }
+  // «Böyük oyunçular indi» and the client sentiment (owner 28.11): the newest reading of each free source and what
+  // it usually means. Nothing here is a signal yet: each is a voice the Judge measures (link to Fundamental).
+  const sgn = (x, d = 0) => x == null ? "—" : (x > 0 ? "+" : "") + x.toLocaleString("az", { maximumFractionDigits: d });
+  const cls = (x) => x > 0 ? "up" : x < 0 ? "down" : "";
+  const card = (title, value, sub, mean) => `<div class="bpc"><div class="bpt">${title}</div><div class="bpv">${value}</div>
+    <div class="note">${sub}</div><div class="bpm">${mean}</div></div>`;
+  async function loadBig() {
+    let d;
+    try { const r = await fetch("/api/bigplayers", { credentials: "same-origin" });
+      if (r.status === 401) { location.href = "/login"; return; } d = await r.json(); } catch (e) { $("bp").innerHTML = "<p class='note'>Məlumat alınmadı.</p>"; return; }
+    const out = [];
+    const c = d.cot && d.cot.XAU;
+    if (c) out.push(card("İri fondlar qızılda (CFTC COT)", `<span class="${cls(c.net)}">${sgn(c.net)}</span> müqavilə xalis alış`,
+      `həftəlik dəyişmə <b class="${cls(c.change)}">${sgn(c.change)}</b> · ${c.d} · son 3 ildə yeri: ${c.rank_3y == null ? "—" : Math.round(c.rank_3y * 100) + " / 100"}`,
+      c.rank_3y >= 0.85 ? "Fondlar son 3 ilin ən yüksək alış mövqeyinə yaxındır: yeni alıcı az qalıb, düzəliş riski artır." :
+      c.rank_3y <= 0.15 ? "Fondlar son 3 ilin ən aşağı mövqeyinə yaxındır: geri alış (yuxarı) potensialı var." :
+      "Fondların mövqeyi orta səviyyədədir."));
+    const g = d.gld;
+    if (g) out.push(card("Dünyanın ən böyük qızıl fondu (GLD)", `${g.tonnes.toLocaleString("az")} ton`,
+      `gün <b class="${cls(g.ch_1d)}">${sgn(g.ch_1d, 1)}</b> · 5 gün <b class="${cls(g.ch_5d)}">${sgn(g.ch_5d, 1)}</b> · 20 gün <b class="${cls(g.ch_20d)}">${sgn(g.ch_20d, 1)}</b> ton · ${g.d}`,
+      g.ch_20d > 0 ? "Son 20 gündə investorlar fonda qızıl yığır (tələb artır)." : g.ch_20d < 0 ? "Son 20 gündə investorlar fonddan qızıl çıxarır (tələb azalır)." : ""));
+    const cb = d.central_banks || [];
+    if (cb.length) { const last = cb[cb.length - 1];
+      out.push(card("Mərkəzi banklar (BVF)", `<span class="${cls(last.tonnes)}">${sgn(last.tonnes, 1)}</span> ton`,
+        `${last.month} · ${last.banks} bank · əvvəlki aylar: ${cb.slice(0, -1).map((x) => sgn(x.tonnes, 1)).join(", ") || "—"}`,
+        last.tonnes > 0 ? "Mərkəzi banklar xalis alıcıdır: uzunmüddətli dəstək." : "Mərkəzi banklar bu ay xalis satıcıdır.")); }
+    const ind = d.india || [];
+    if (ind.length) { const last = ind[ind.length - 1];
+      out.push(card("Hindistan qızıl fondlarına axın (AMFI)", `<span class="${cls(last.net_crore)}">${sgn(last.net_crore)}</span> krore rupi`,
+        `${last.month} · əvvəlki: ${ind.slice(0, -1).map((x) => sgn(x.net_crore)).join(", ") || "—"}`,
+        last.net_crore > 0 ? "Hindistan investorları qızıl alır." : "Hindistan investorları qızıl satır.")); }
+    const sh = d.shanghai;
+    if (sh) out.push(card("Şanxay qızıl birjası (SGE)", `${sh.volume_kg.toLocaleString("az")} kq`,
+      `${sh.d} · 20 günlük ortaya nisbətən <b>${sh.vs_20d == null ? "—" : "×" + sh.vs_20d}</b>`,
+      sh.vs_20d >= 1.3 ? "Çində alqı-satqı adətindən xeyli çoxdur (tələb canlıdır)." : sh.vs_20d <= 0.7 ? "Çində alqı-satqı adətindən azdır." : "Çində alqı-satqı adi səviyyədədir."));
+    $("bp").innerHTML = out.length ? out.join("") : "<p class='note'>Hələ məlumat yoxdur.</p>";
+    // client sentiment: the crowd's side per metal, with the pre-registered test
+    const s = d.sentiment || {}, m = s.metals || {}, t = d.sentiment_test || {}, h = s.health;
+    const rows = Object.keys(NAMES).filter((k) => m[k]).map((k) => { const v = m[k];
+      return `<tr><td>${NAMES[k]}</td><td class="c"><b>${Math.round(v.long_pct)} %</b> alışda</td><td class="c">${100 - Math.round(v.long_pct)} % satışda</td>
+        <td class="c ${cls(v.change_24h)}">${v.change_24h == null ? "—" : sgn(v.change_24h, 1) + " (24 saat)"}</td></tr>`; }).join("");
+    $("sent").innerHTML = (rows ? `<table class="sc"><tr><th>Metal</th><th class="c">Alıcılar</th><th class="c">Satıcılar</th><th class="c">Dəyişmə</th></tr>${rows}</table>` :
+      `<p class="note">${h ? esc(h.msg) : "Oxunuş hələ başlamayıb"} (15 dəqiqədən bir oxunur).</p>`) +
+      `<p class="note">İdeya: adi alıcılar bir tərəfə yığılanda qiymət çox vaxt əks tərəfə gedir. Bu hələ fərziyyədir — qayda
+        qabaqcadan yazılıb (hər iş günü 12:00 NY oxunuşu, qızıl 24 saat, tam xərcdən sonra, ən az 60 gün). Hakimin sayı:
+        <b>${t.n ?? 0}/${t.need ?? 60}</b> gün${t.status && t.status !== "az" ? " · nəticə: <b>" + esc(t.status) + "</b>" : ""}.</p>`;
+  }
   load(); setInterval(load, 15000);
+  loadBig(); setInterval(loadBig, 300000);
 })();

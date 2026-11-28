@@ -514,3 +514,10 @@ details.techgroup[open]>summary{margin-bottom:12px}
 .fc b{font-family:var(--mono)} .fc span.AL{color:var(--up);font-weight:700} .fc span.SAT{color:var(--down);font-weight:700}
 
 .flowline{margin:4px 0 8px}
+/* Bazar axını: «Böyük oyunçular indi» cards (owner 28.11) */
+.bp{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.bpc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:rgba(255,255,255,.02)}
+.bpt{font-size:.78rem;color:var(--muted);font-weight:600;margin-bottom:4px}
+.bpv{font-size:1.15rem;font-weight:700;margin-bottom:2px}
+.bpm{font-size:.8rem;margin-top:6px;color:var(--fg)}
+

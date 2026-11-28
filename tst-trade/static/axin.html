@@ -8,26 +8,34 @@
   <span class="clock" id="upd"></span>
 <nav class="mainnav" id="mainnav" aria-label="Səhifələr"></nav>
 </header>
-<!-- Bazar axını (owner 27.11: «bazarda böyük oyunçular alanda və ya satanda bilək»): COMEX futures trades live from
-     Databento — real volume, the share started by buyers, the big trades. A new voice: the Judge measures it first. -->
+<!-- Bazar axını (owner 27.11: «bazarda böyük oyunçular alanda və ya satanda bilək»). 28.11: Databento's live feed is
+     not bought (the 12-month test gave no proof); the page now leads with the big players' free data the system already
+     collects (newest reading only — the tables and rules stay on Fundamental) and the Capital.com client sentiment. -->
 <main class="wrap res ta">
   <section class="box">
-    <h2>Bazar axını: COMEX fyuçersləri <span class="sp"></span><span class="seg" id="sym"></span></h2>
+    <h2>Böyük oyunçular indi <span class="sp"></span><span class="note">ətraflı və Hakimin hökmü: <a href="/fundamental">Fundamental</a></span></h2>
+    <div class="bp" id="bp"><p class="note">Yüklənir…</p></div>
+  </section>
+  <section class="box">
+    <h2>Capital.com müştəri əhvalı <span class="sp"></span><span class="note">adi alıcılar hansı tərəfdədir</span></h2>
+    <div id="sent"><p class="note">Yüklənir…</p></div>
+  </section>
+  <section class="box" data-fold="axin-live" data-fold-default="closed">
+    <h2>Canlı fyuçers axını (Databento) <span class="sp"></span><span class="seg" id="sym"></span></h2>
+    <p class="note">Canlı lisenziya alınmayıb: 12 aylıq sınaqda (2 190 hadisə) tək böyük əməliyyat qızılın sonrakı 15–60
+      dəqiqəsini xərcdən sonra göstərmədi (28.11). Lisenziya alınsa bu hissə özü dolacaq.</p>
     <p class="note" id="fstate">Yüklənir…</p>
     <div id="fsum"></div>
-  </section>
-  <section class="box">
-    <h2>Böyük əməliyyatlar (son 24 saat) <span class="sp"></span><span class="note">vaxtlar NY</span></h2>
+    <h3 class="sub">Böyük əməliyyatlar (son 24 saat, vaxtlar NY)</h3>
     <div class="tbl" id="fbig"></div>
-  </section>
-  <section class="box">
-    <h2>Dəqiqə-dəqiqə (son 60 dəqiqə)</h2>
+    <h3 class="sub">Dəqiqə-dəqiqə (son 60 dəqiqə)</h3>
     <div class="tbl" id="fmin"></div>
     <p class="note">«Alanlar» — əməliyyatı alıcının başlatdığı həcm (satıcının təklifini alıb); «satanlar» — satıcının başlatdığı.
       Böyük əməliyyat: həmin metalın son 5 000 əməliyyatının ən böyük 0,1 %-i (və ən az qızılda 20, gümüşdə və platində 10,
       palladiumda 5 lot). Bu, Hakimin ölçəcəyi yeni səsdir — hələ sübut deyil.</p>
   </section>
 </main>
+<script src="/static/fold.js"></script>
 <script src="/static/axin.js"></script>
 <script src="/static/nav.js"></script>
 </body></html>

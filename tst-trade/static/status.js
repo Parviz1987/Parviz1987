@@ -67,6 +67,7 @@ async function load() {
   if (d.errors.some((e) => Date.now() / 1000 - e.last_ts < 3600)) problems.push("son 1 saatda xəta yazılıb (aşağıya baxın)");
   // three words only (owner 2026-11-27): works / waits for the owner's own step / does not work; «diqqət» = partly
   const ST = { ok: [true, "işləyir"], warn: [null, "diqqət"], bad: [false, "işləmir"], closed: [undefined, "bazar bağlı"],
+    off: [undefined, "söndürülüb (qərar)"],
     owner: [null, "sizin addımınızı gözləyir"] };
   $("s-pipe").innerHTML = `<table><tr><th>Halqa</th><th>Vəziyyət</th><th>Nə göstərir</th><th>Nəyə ötürür</th></tr>` +
     (d.pipeline || []).map((r) => { const [ok, t] = ST[r.status] || [null, r.status];

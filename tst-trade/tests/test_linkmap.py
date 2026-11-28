@@ -148,3 +148,14 @@ def test_the_two_paid_feeds_wait_for_the_owner_until_connected():
     fjnews.health(db, False, "FinancialJuice: açar səhvdir (4001)")
     row = _rows(db, ks, eng, feeds, jobs)["FinancialJuice (sürətli başlıqlar)"]
     assert row["status"] == "bad" and "4001" in row["msg"]
+
+
+def test_databento_decided_off_and_the_sentiment_row():
+    """28.11: no live licence and the owner decided not to buy it: «off», not a daily red error."""
+    db, ks, feeds, jobs, eng = _setup()
+    from app import orderflow, sentiment
+    orderflow.health(db, False, "canlı axın icazəsi YOXDUR", live=False)
+    sentiment.health(db, True, "işləyir: XAU 70 % alışda")
+    rows = _rows(db, ks, eng, feeds, jobs)
+    assert rows["Databento canlı axını (böyük oyunçular, həqiqi həcm)"]["status"] == "off"
+    assert rows["Capital.com müştəri əhvalı"]["status"] == "ok"

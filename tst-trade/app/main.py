@@ -149,6 +149,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             asyncio.get_running_loop().create_task(fjnews.run(db, store))
             from . import dbhist                                        # owner 27.11: proof on history first (free quote)
             asyncio.get_running_loop().create_task(dbhist.run(db, store))
+            from . import sentiment                                     # owner 28.11: Capital.com client sentiment
+            asyncio.get_running_loop().create_task(sentiment.run(db, engine))
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
             asyncio.get_running_loop().create_task(app.state.futures_daily())
             asyncio.get_running_loop().create_task(app.state.rigor_daily())
@@ -566,6 +568,13 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
     @app.get("/axin")
     async def flow_page():
         return FileResponse(STATIC / "axin.html")
+
+    @app.get("/api/bigplayers")
+    async def bigplayers_api():
+        """«Böyük oyunçular indi» (owner 28.11): the newest reading of each free big-player source and the Capital.com
+        client sentiment with its pre-registered test; the full tables stay on the Fundamental page."""
+        from . import bigplayers
+        return await asyncio.to_thread(diag._slow, "bigplayers", lambda: bigplayers.summary(db), 60)
 
     @app.get("/api/flow")
     async def flow_api(symbol: str = "XAU", minutes: int = 60):

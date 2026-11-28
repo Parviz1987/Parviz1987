@@ -364,12 +364,26 @@ def _owner_steps(db: DB, now: float) -> list[tuple[str, str, str, str]]:
     if not fh:
         out.append(("Databento canlı axını (böyük oyunçular, həqiqi həcm)", "Bazar axını bloku, həyəcan", "owner",
                     "hələ başlamayıb"))
+    elif fh.get("live") is False:
+        # 28.11: no live licence, and the owner decided not to buy it — the 12-month test gave no proof (diag dbhist).
+        # A decided «off», not a daily red error.
+        out.append(("Databento canlı axını (böyük oyunçular, həqiqi həcm)", "Bazar axını bloku, həyəcan", "off",
+                    "sahibin qərarı (28.11): canlı lisenziya alınmır — 12 aylıq sınaq sübut vermədi"))
     else:
         st = "ok" if fh.get("ok") else "bad" if fh.get("ok") is False else "owner"
         if st == "ok" and now - float(fh.get("ts") or 0) > 600:
             st, fh["msg"] = "warn", f"son xəbər {(now - float(fh['ts'])) / 60:.0f} dəq əvvəl: {fh.get('msg')}"
         out.append(("Databento canlı axını (böyük oyunçular, həqiqi həcm)", "Bazar axını bloku, həyəcan", st,
                     str(fh.get("msg") or "")))
+    try:
+        sh = json.loads(db.get("sent:health") or "null")
+    except ValueError:
+        sh = None
+    if sh:
+        st = "ok" if sh.get("ok") else "bad" if sh.get("ok") is False else "owner"
+        if st == "ok" and now - float(sh.get("ts") or 0) > 3 * 900:
+            st = "warn"
+        out.append(("Capital.com müştəri əhvalı", "Bazar axını, Hakimin sınağı", st, str(sh.get("msg") or "")))
     try:
         from . import diag, totp
         tf = totp.enabled(db, diag._SEALER[0]) if diag._SEALER else None
