@@ -205,3 +205,9 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   təkrarlayır), hər aydan əvvəl qiymət yenidən soruşulur, cəm $35 tavanını keçəcəksə dayanır; məlumat diskə yazılmır, sətir-
   sətir oxunur; ən çox 3 cəhd. Diaqnostikada `dbhist` (gediş, nəticə). Agentlər: beynin içində sakit vaxtda da fasiləli
   qığılcım və dalğa (beyin işləri seyrəldiləndən sonra donmuş görünürdü). Testlər.
+- 28.11 00:05 — **Böyük oyunçu sınağının nəticəsi: YOX (sübut yoxdur).** 12 ay (26.11.2025–26.11.2026), $32.69 xərcləndi (kreditdən
+  ~$92 qalır). 26,1 mln alqı-satqı, 12 019 böyük əməliyyat (gündə ~38), 2 190 həyəcan. 15 dəqiqə: düz istiqamət 48,9 %
+  (təsadüfdən də aşağı), xərcdən sonra orta −0,0116 %, p = 0,85; ilin iki yarısı: −0,0037 % və −0,0196 %. 60 dəqiqə (yalnız
+  göstərilir): 49,6 %, −0,0193 %. Alış/satış yönü tərsinə olsaydı da keçməzdi (51,1 %, xərcdən əvvəl +0,0094 % < xərc 0,021 %).
+  Nəticə: tək böyük əməliyyat qızılın sonrakı 15–60 dəqiqəsini xərci ödəyəcək qədər göstərmir → canlı lisenziya ($199/ay) və
+  server böyütmə ($6→$12) tövsiyə olunmur; qərar sahibindir.

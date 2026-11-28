@@ -112,6 +112,9 @@ Nə qalıb · Necə bitirilir (nəyə əsaslanaraq) · Sahibdən**.
   qoşulma; sahib açarı yenidən yaratdı); təcili 3-cü səviyyə başlıq (qızıl/dollar/Fed/ABŞ/geosiyasət) dərhal həyəcan. Kəşfiyyatçı yalnız böyük rəqəm
   ətrafında və həyəcanda. **1 aylıq sınaq qabaqcadan qeydə alınıb** (`app/paidtrial.py`, 21:00 NY-dən, qərar 22.12): T1
   FinancialJuice → qızıl 15 dəq, T2 Databento böyük əməliyyat → qızıl 15 dəq; tam xərcdən sonra, hədd 0,05/2, ən az 30.
+- **28.11 gecə — Databento böyük oyunçu (keçmiş 12 ay, qabaqcadan qeydə alınmış qayda): SÜBUT YOX.** 2 190 həyəcan, 15 dəq
+  düz istiqamət 48,9 %, xərcdən sonra −0,0116 %, iki yarı da mənfi (diag `dbhist`). Canlı lisenziya alınmır (sahibin qərarı
+  gözlənilir); canlı axın modulu lisenziya olmadan özü gözləyir.
 - **Nə qalıb:** (a) qaydaların öz qeydi yığılmalıdır (çəki yalnız müsbət qeydlə); (b) NW-SHOCK-1-i istiqamət yox,
   dalğalılıq/gözlə işarəsinə çevirmək — **kölgə ölçüsü qurulub (27.11):** `shadowtests.news_shock_vol` (böyük xəbərdən
   sonrakı saat, günün eyni saatı ilə) və `geo_shock_vol` (GDELT gərginlik günündən sonrakı gün); gündə bir, diag
