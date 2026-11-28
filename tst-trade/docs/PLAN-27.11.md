@@ -272,3 +272,8 @@ sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real
 - [x] 13.4 28.11 14:52 — Sahib: «koridoru tapaq, alqı-satqını koridora əsasən edək». Koridor laboratoriyaları K1–K4 (günlük/həftəlik,
   80 %/50 % kənarda tərsinə giriş) hesablamadan ƏVVƏL qeydə alındı; koridorun keyfiyyəti (tutma, en, Winkler balı, qaçırma
   topası) səhifədə və diag-da. Testlər 404/404.
+- 28.11 14:56 — K1–K4 (gündəlik şamla): hamısı «yox». QÜSUR (mənim): «hər iki kənar eyni gün → ticarət yox» günün bütün
+  aralığından istifadə edir (gələcəyə baxış) — geri dönüşü pis, qırılmanı yaxşı göstərir; K1–K4 qeyd ilə göstərilir, qərar
+  vermir. Koridor keyfiyyəti: 1d tutma 80,5 %, en 2,67 %, qaçırma topası 1,03 (yaxşı); 1w 79,6 %, 5,15 %, 1,14.
+- [x] 13.5 28.11 14:58 — Düzəldilmiş koridor laboratoriyaları saatlıq şamlarla (ilk toxunan kənar qərar verir; həm geri dönüş KR, həm
+  qırılma KB; günlük/həftəlik × 80/50 %) — hesablamadan ƏVVƏL qeydə alındı. Testlər 405/405.

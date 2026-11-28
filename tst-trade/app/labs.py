@@ -51,7 +51,20 @@ K3  Weekly, 80 % edge: the 1-week forecast's week of daily candles; the first da
     judge.full_cost("XAU", "1w").
 K4  The same at the 50 % edge.
 Proof for K1–K4: ≥ 100 trades, the bar above. Shown, not deciding: the corridor's width, coverage, the interval
-(Winkler) score and whether misses come in clusters, per horizon."""
+(Winkler) score and whether misses come in clusters, per horizon.
+Results 28.11 14:56 NY: K1 «yox» (717, 47.3 %), K2 «yox» (1 460, 43.2 %), K3 «yox» (154, 50.6 %), K4 «yox» (342, 49.7 %).
+FLAW found in my own K rule (28.11 15:00, before reading anything into it): «both edges the same day → no trade» uses the
+whole day's range, known only at its end — the days kept are biased toward one-way days, which makes turning back look
+worse and breaking out look better than they are. K1–K4 stay shown as registered, with this note; they decide nothing.
+
+PRE-REGISTERED 28.11.2026 14:58 NY — corrected corridor labs on HOURLY candles (about eleven months on the server):
+the first hour that reaches an edge decides; the trade opens at that edge and closes at the forecast's end (the day's
+or the week's last hourly close), whatever happens after; an hour reaching both edges → that forecast has no trade
+(rare: within one hour). Each corridor is tested both ways, as separate labs:
+KR1/KB1 daily 80 % edge, KR2/KB2 daily 50 %, KR3/KB3 weekly 80 %, KR4/KB4 weekly 50 %. R = turn back toward the middle
+(buy the lower edge, sell the upper); B = break out (buy the upper edge, sell the lower). Cost: daily
+judge.full_cost("XAU", "4h"), weekly judge.full_cost("XAU", "1w"). Proof: ≥ 60 trades (eleven months), p < 0.01,
+average after cost > 0, both halves positive."""
 from __future__ import annotations
 
 import json
@@ -315,6 +328,36 @@ def lab_corridor(db: DB, sym: str = "XAU", horizon: str = "1d", band: str = "80"
     return verdict(trades, judge.full_cost(sym, "4h" if horizon == "1d" else "1w"), 100)
 
 
+def lab_corridor_h(db: DB, sym: str = "XAU", horizon: str = "1d", band: str = "80", way_kind: str = "R") -> dict:
+    """The corrected corridor rule on hourly candles: the first hour reaching an edge opens the trade at that edge."""
+    from . import judge
+    lo_k, hi_k = f"lo{band}", f"hi{band}"
+    shift = 7200                     # a daily candle labelled D runs from 22:00 UTC the evening before (candles.bucket)
+    trades = []
+    for r in _corridor_rows(db, sym, horizon):
+        a, b = r["issued_t"] - shift, r["target_t"] - shift
+        hours = _rows(db, "SELECT t, h, l, c FROM candles WHERE symbol=? AND tf='1h' AND t >= ? AND t < ? ORDER BY t",
+                      (sym, a, b))
+        if len(hours) < (12 if horizon == "1d" else 60):
+            continue                 # no hourly path for this forecast (before the hourly history)
+        lo, hi, entry = r[lo_k], r[hi_k], None
+        for x in hours:
+            down, up = x["l"] <= lo, x["h"] >= hi
+            if down and up:
+                break
+            if down or up:
+                edge_dir = 1 if down else -1          # turning back: buy the lower edge, sell the upper
+                entry = (edge_dir if way_kind == "R" else -edge_dir, lo if down else hi)
+                break
+        if not entry:
+            continue
+        way, px = entry
+        close = hours[-1]["c"]
+        trades.append((datetime.fromtimestamp(r["issued_t"], timezone.utc).strftime("%Y-%m-%d"),
+                       (close / px - 1) * way))
+    return verdict(trades, judge.full_cost(sym, "4h" if horizon == "1d" else "1w"), 60)
+
+
 def corridor_quality(db: DB, sym: str = "XAU") -> dict:
     """Per horizon: coverage of the 50/80 % corridor, its mean width (% of price), the Winkler score of the 80 % one
     (width plus a penalty for every miss; lower is better) and whether misses cluster (P(miss | miss before) / P(miss))."""
@@ -374,6 +417,38 @@ LABS = [
     {"id": "K4", "name": "Həftəlik koridor, 50 % kənar", "fn": lambda db, s: lab_corridor(db, s, "1w", "50"),
      "question": "Eyni qayda 50 %-lik həftəlik koridorun kənarlarında qazandırırmı?",
      "data": "Sistemin həftəlik koridor proqnozları, qızılın gündəlik şamları"},
+    {"id": "KR1", "name": "Günlük koridor 80 % — geri dönüş (saatlıq)",
+     "fn": lambda db, s: lab_corridor_h(db, s, "1d", "80", "R"),
+     "question": "Günlük 80 %-lik koridorda kənara toxunanda tərsinə (aşağı kənarda al, yuxarıda sat) girib müddətin sonunda bağlamaq xərcdən sonra qazandırırmı?",
+     "data": "Sistemin koridor proqnozları, qızılın saatlıq şamları (~11 ay)"},
+    {"id": "KB1", "name": "Günlük koridor 80 % — qırılma (saatlıq)",
+     "fn": lambda db, s: lab_corridor_h(db, s, "1d", "80", "B"),
+     "question": "Günlük 80 %-lik koridorda kənardan çıxanda o tərəfə (yuxarı kənarda al, aşağıda sat) girib müddətin sonunda bağlamaq xərcdən sonra qazandırırmı?",
+     "data": "Sistemin koridor proqnozları, qızılın saatlıq şamları (~11 ay)"},
+    {"id": "KR2", "name": "Günlük koridor 50 % — geri dönüş (saatlıq)",
+     "fn": lambda db, s: lab_corridor_h(db, s, "1d", "50", "R"),
+     "question": "Günlük 50 %-lik koridorda kənara toxunanda tərsinə (aşağı kənarda al, yuxarıda sat) girib müddətin sonunda bağlamaq xərcdən sonra qazandırırmı?",
+     "data": "Sistemin koridor proqnozları, qızılın saatlıq şamları (~11 ay)"},
+    {"id": "KB2", "name": "Günlük koridor 50 % — qırılma (saatlıq)",
+     "fn": lambda db, s: lab_corridor_h(db, s, "1d", "50", "B"),
+     "question": "Günlük 50 %-lik koridorda kənardan çıxanda o tərəfə (yuxarı kənarda al, aşağıda sat) girib müddətin sonunda bağlamaq xərcdən sonra qazandırırmı?",
+     "data": "Sistemin koridor proqnozları, qızılın saatlıq şamları (~11 ay)"},
+    {"id": "KR3", "name": "Həftəlik koridor 80 % — geri dönüş (saatlıq)",
+     "fn": lambda db, s: lab_corridor_h(db, s, "1w", "80", "R"),
+     "question": "Həftəlik 80 %-lik koridorda kənara toxunanda tərsinə (aşağı kənarda al, yuxarıda sat) girib müddətin sonunda bağlamaq xərcdən sonra qazandırırmı?",
+     "data": "Sistemin koridor proqnozları, qızılın saatlıq şamları (~11 ay)"},
+    {"id": "KB3", "name": "Həftəlik koridor 80 % — qırılma (saatlıq)",
+     "fn": lambda db, s: lab_corridor_h(db, s, "1w", "80", "B"),
+     "question": "Həftəlik 80 %-lik koridorda kənardan çıxanda o tərəfə (yuxarı kənarda al, aşağıda sat) girib müddətin sonunda bağlamaq xərcdən sonra qazandırırmı?",
+     "data": "Sistemin koridor proqnozları, qızılın saatlıq şamları (~11 ay)"},
+    {"id": "KR4", "name": "Həftəlik koridor 50 % — geri dönüş (saatlıq)",
+     "fn": lambda db, s: lab_corridor_h(db, s, "1w", "50", "R"),
+     "question": "Həftəlik 50 %-lik koridorda kənara toxunanda tərsinə (aşağı kənarda al, yuxarıda sat) girib müddətin sonunda bağlamaq xərcdən sonra qazandırırmı?",
+     "data": "Sistemin koridor proqnozları, qızılın saatlıq şamları (~11 ay)"},
+    {"id": "KB4", "name": "Həftəlik koridor 50 % — qırılma (saatlıq)",
+     "fn": lambda db, s: lab_corridor_h(db, s, "1w", "50", "B"),
+     "question": "Həftəlik 50 %-lik koridorda kənardan çıxanda o tərəfə (yuxarı kənarda al, aşağıda sat) girib müddətin sonunda bağlamaq xərcdən sonra qazandırırmı?",
+     "data": "Sistemin koridor proqnozları, qızılın saatlıq şamları (~11 ay)"},
 ]
 
 

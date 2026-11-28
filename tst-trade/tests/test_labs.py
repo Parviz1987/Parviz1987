@@ -57,7 +57,8 @@ def test_the_cot_lab_waits_for_publication_and_never_overlaps():
 
 def test_one_lab_failing_does_not_hide_the_others():
     out = labs.build(DB(":memory:"))
-    assert [x["id"] for x in out["labs"]] == ["L1", "L2", "L3", "L4", "L5", "L6", "K1", "K2", "K3", "K4"]
+    assert [x["id"] for x in out["labs"]] == ["L1", "L2", "L3", "L4", "L5", "L6", "K1", "K2", "K3", "K4",
+                                                "KR1", "KB1", "KR2", "KB2", "KR3", "KB3", "KR4", "KB4"]
     assert all(("gold" in x) or ("error" in x) for x in out["labs"])
 
 
@@ -106,3 +107,24 @@ def test_the_corridor_lab_buys_the_lower_edge_and_skips_both_edges():
     assert out["n"] == 135 and out["hit_rate"] == 1.0          # bought at 99, closed at 99.8: 135 days, 15 skipped
     q = labs.corridor_quality(db)
     assert q["1d"]["cover80"] == 1.0 and q["1d"]["width80_pct"] == 3.0
+
+
+
+def test_the_hourly_corridor_rule_takes_the_first_edge_and_keeps_both_edge_days():
+    """The day reaches the lower edge first, then the upper one: the trade exists (no look-ahead), turning back buys
+    the lower edge, breaking out sells it."""
+    db = DB(":memory:")
+    t0 = int(datetime(2026, 3, 2, tzinfo=timezone.utc).timestamp())
+    for k in range(70):
+        day = t0 + k * 86400
+        db.execute("INSERT INTO forecasts(symbol, horizon, method, mode, issued_t, target_t, price0, p_up, lo50, hi50, "
+                   "lo80, hi80, price1) VALUES('XAU','1d','vahid','history',?,?,100,0.5,99.5,100.5,99,101,100.5)",
+                   (day, day + 86400))
+        for hr in range(24):
+            t = day - 7200 + hr * 3600
+            lo, hi, c = (98.9, 100, 99.2) if hr == 3 else (100.4, 101.2, 101.0) if hr == 15 else (99.8, 100.2, 100.5)
+            db.execute("INSERT INTO candles(symbol, tf, t, o, h, l, c) VALUES('XAU','1h',?,?,?,?,?)", (t, 100, hi, lo, c))
+    r = labs.lab_corridor_h(db, "XAU", "1d", "80", "R")
+    b = labs.lab_corridor_h(db, "XAU", "1d", "80", "B")
+    assert r["n"] == 70 and r["hit_rate"] == 1.0                    # bought 99, the day closed 100.5
+    assert b["n"] == 70 and b["hit_rate"] == 0.0                    # sold 99 on the break: wrong
