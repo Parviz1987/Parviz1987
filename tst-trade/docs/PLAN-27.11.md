@@ -140,3 +140,13 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
   0,1 %-i, ən az 20/10/10/5 lot); 2 qatı həyəcan qaldırır (metal başına 15 dəqiqədə bir). Səhifə «Bloklar → Bazar axını»,
   Paneldə bir sətir. Kitabxana ~157 MB yaddaş istəyir — axın server 2 GB olandan sonra özü başlayır (şənbə 10:07-dən sonra);
   əlaqə xəritəsi vəziyyəti (və planın canlı axını verib-vermədiyini) göstərəcək. Testlər 359/359; 4 səhifə × 2 ölçü, xəta 0.
+- 27.11 20:44 — 11.1 (FinancialJuice, sahib Developer planını aldı, açarı yeniləyib Admin-ə yazdı): canlı axın
+  (`app/fjnews.py`) — bir qoşulma, açar `X-API-Key` başlığında (ünvanda yox, jurnala düşmür); hər başlıq xəbər cədvəlinə
+  gəliş vaxtı ilə; qızıl / dollar / Fed / ABŞ rəqəmi / geosiyasətə dəyən «təcili» 3-cü səviyyə başlıq dərhal həyəcan.
+  Admin-də yeni açar yazılanda bir dəqiqəyə özü keçir; səhv açarda (4001/4003) serveri döyəcləmir, gözləyir; «Yoxla»
+  açıq qoşulmanın vəziyyətini deyir (ikinci qoşulma birincini qovardı — planda 1 qoşulma). Testlər 362/362.
+- 27.11 20:50 — 11.1 sınağı QABAQCADAN qeydə alındı (`app/paidtrial.py`, məlumatdan əvvəl): 21:00 NY-dən sayılır, qərar
+  günü 22.12 (FinancialJuice 27.12 yenilənir — 5 gün qabaq). T1: FinancialJuice başlığı (Oxucu qızıl üçün yuxarı/aşağı
+  deyib) → qızıl 15 dəqiqə; T2: Databento «böyük əməliyyat» həyəcanı → qızıl 15 dəqiqə. Giriş yalnız etiket/həyəcan
+  yarananda sonrakı dəqiqədən, tam xərc çıxılır, hədd 0,05/2, ən az 30 hal; az halda «az» (heç vaxt «işləyir»).
+  Diaqnostikada `paid_trial`.
