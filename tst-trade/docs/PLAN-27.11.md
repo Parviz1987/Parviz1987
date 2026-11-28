@@ -243,3 +243,10 @@ sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real
 - [x] 13.2 Səhifə «Bloklar → Laboratoriyalar» (`/lab`, `static/lab.html|js`): necə işləyir, hər laboratoriyanın sualı, məlumatı,
   qızılın nəticəsi (hökm, hadisə sayı, düz %, xərcdən sonra, iki yarı, təsadüf ehtimalı), gümüş yalnız göstərilir; «Digər
   sınaqlar» — böyük oyunçu, CME, hadisə analoqları eyni sözlərlə. Diag `labs`. 1366/390, xəta 0 (28.11 04:02).
+- 28.11 04:05 — İlk nəticələr: **L1 Fed sürprizi — yox** (26 hadisə, 50 %, iki yarı zidd: −0,67 % / +0,71 %); **L2 ABŞ
+  rəqəmləri — az** (92 < 100; düz 44,6 %, xərcdən sonra −0,013 % — ideya işləmir, hətta tərsinə meyil); **L3 COT — 0 hadisə**:
+  «640 həftə» dörd metalın cəmidir (metal başına ~160 həftə ≈ 3 il) — mənim yanlış sözüm; 156 həftəlik geriyə baxış hamısını
+  yeyir. L2 qızılın gündəlik tarixçəsi ilə (2018-dən, ~2000 şam) məhduddur.
+- 28.11 04:07 — L3 üçün CFTC-nin 2006-dan tarixçəsi laboratoriyanın öz cədvəlində (`cot_hist`, gündə bir sorğu); Fundamental blokunun
+  «cot» cədvəli və Hakimin hesabları dəyişmir. Qızılın gündəlik tarixçəsini ümumi dərinləşdirmək (2000 → ~5000 şam) Hakimin
+  keçmiş hesablarını dəyişər — «nəticəni dəyişən dəyişiklik», sahibə səhər təklif olunacaq. Testlər 401/401.

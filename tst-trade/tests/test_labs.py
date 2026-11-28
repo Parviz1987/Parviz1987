@@ -59,3 +59,17 @@ def test_one_lab_failing_does_not_hide_the_others():
     out = labs.build(DB(":memory:"))
     assert [x["id"] for x in out["labs"]] == ["L1", "L2", "L3"]
     assert all(("gold" in x) or ("error" in x) for x in out["labs"])
+
+
+def test_the_deep_cot_history_is_kept_apart_from_the_blocks_table(monkeypatch):
+    import asyncio
+    import httpx
+    real = httpx.AsyncClient
+    rows = [{"cftc_contract_market_code": "088691", "report_date_as_yyyy_mm_dd": f"20{10 + k:02d}-01-04T00:00:00.000",
+             "open_interest_all": "1", "m_money_positions_long_all": "5", "m_money_positions_short_all": "2",
+             "prod_merc_positions_long": "1", "prod_merc_positions_short": "1"} for k in range(30)]
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=rows))))
+    db = DB(":memory:")
+    assert asyncio.run(labs.refresh_cot(db)) == 30
+    assert db.execute("SELECT COUNT(*) FROM cot_hist").fetchone()[0] == 30
+    assert not db.execute("SELECT 1 FROM sqlite_master WHERE name='cot'").fetchone()        # the block's table untouched

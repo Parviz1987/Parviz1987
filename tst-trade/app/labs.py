@@ -112,11 +112,51 @@ def lab_data(db: DB, sym: str = "XAU") -> dict:
     return verdict(trades, judge.full_cost(sym, "1w"), 100)
 
 
+COT_HIST = "CREATE TABLE IF NOT EXISTS cot_hist (symbol TEXT NOT NULL, d TEXT NOT NULL, oi REAL, mm_long REAL, " \
+           "mm_short REAL, pm_long REAL, pm_short REAL, PRIMARY KEY (symbol, d))"
+
+
+async def refresh_cot(db: DB) -> int:
+    """The labs' own deep COT history (CFTC open data from 2006, one request a day). Kept apart from the Fundamental
+    block's «cot» table (about three years), so the block's measured rules do not change (28.11: L3 had 0 cases —
+    three years of COT are used up by its own 156-week look-back)."""
+    import httpx
+    from .feeds import COT_CODES, COT_URL, parse_cot
+    db.script(COT_HIST)
+    codes = ",".join(f"'{c}'" for c in COT_CODES)
+    async with httpx.AsyncClient(timeout=60) as c:
+        r = await c.get(COT_URL, params={
+            "$select": "cftc_contract_market_code,report_date_as_yyyy_mm_dd,open_interest_all,"
+                       "m_money_positions_long_all,m_money_positions_short_all,prod_merc_positions_long,"
+                       "prod_merc_positions_short",
+            "$where": f"cftc_contract_market_code in({codes})", "$order": "report_date_as_yyyy_mm_dd DESC",
+            "$limit": "5000"})
+    r.raise_for_status()
+    rows = parse_cot(r.content)
+    db.executemany("INSERT OR REPLACE INTO cot_hist VALUES(?,?,?,?,?,?,?)", rows)
+    return len(rows)
+
+
+async def run(db: DB) -> None:
+    import asyncio
+    import logging
+    await asyncio.sleep(90)
+    while True:
+        try:
+            n = await refresh_cot(db)
+            db.put("labs:cot_hist", json.dumps({"ts": time.time(), "rows": n}))
+        except Exception as e:
+            db.put("labs:cot_hist", json.dumps({"ts": time.time(), "error": f"{type(e).__name__}: {str(e)[:120]}"}))
+            logging.getLogger("tst.labs").warning("cot history: %s", e)
+        await asyncio.sleep(86400)
+
+
 def lab_cot(db: DB, sym: str = "XAU") -> dict:
     from . import judge
     dates, closes = daily(db, sym)
+    src = "cot_hist" if _rows(db, "SELECT 1 FROM cot_hist WHERE symbol=? LIMIT 1", (sym,)) else "cot"
     rows = [(r["d"], r["mm_long"] - r["mm_short"]) for r in _rows(
-        db, "SELECT d, mm_long, mm_short FROM cot WHERE symbol=? AND mm_long IS NOT NULL AND mm_short IS NOT NULL "
+        db, f"SELECT d, mm_long, mm_short FROM {src} WHERE symbol=? AND mm_long IS NOT NULL AND mm_short IS NOT NULL "
             "ORDER BY d", (sym,))]
     trades, busy_until = [], ""
     for i in range(156, len(rows)):
@@ -149,7 +189,7 @@ LABS = [
     {"id": "L3", "name": "İri fondlar həddə (COT)", "fn": lab_cot,
      "question": "İri fondların qızılda xalis alışı son 3 ilin ən yüksək 10 %-nə çatanda qızıl sonrakı 20 gündə "
                  "düşürmü; ən aşağı 10 %-də qalxırmı?",
-     "data": "CFTC COT həftəlik hesabatı (640 həftə), qızılın gündəlik bağlanışı"},
+     "data": "CFTC COT həftəlik hesabatı (2006-cı ildən, laboratoriyanın öz cədvəli), qızılın gündəlik bağlanışı"},
 ]
 
 
