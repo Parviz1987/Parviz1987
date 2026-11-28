@@ -70,6 +70,9 @@ def _hold(dates: list[str], closes: list[float], start_date: str, days: int) -> 
     k = bisect_left(dates, start_date)
     if k + days >= len(dates):
         return None
+    # a start before the price history (or in a gap) is not moved to the first candle: no trade (28.11)
+    if (datetime.fromisoformat(dates[k]) - datetime.fromisoformat(start_date[:10])).days > 7:
+        return None
     return dates[k], closes[k + days] / closes[k] - 1
 
 

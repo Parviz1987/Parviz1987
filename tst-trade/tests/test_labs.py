@@ -73,3 +73,9 @@ def test_the_deep_cot_history_is_kept_apart_from_the_blocks_table(monkeypatch):
     assert asyncio.run(labs.refresh_cot(db)) == 30
     assert db.execute("SELECT COUNT(*) FROM cot_hist").fetchone()[0] == 30
     assert not db.execute("SELECT 1 FROM sqlite_master WHERE name='cot'").fetchone()        # the block's table untouched
+
+
+def test_a_start_before_the_price_history_is_no_trade():
+    dates, closes = ["2020-01-02", "2020-01-03", "2020-01-06"] + [f"2020-02-{d:02d}" for d in range(3, 28)], [1.0] * 28
+    assert labs._hold(dates, closes, "2015-06-01", 5) is None
+    assert labs._hold(dates, closes, "2020-01-04", 5)[0] == "2020-01-06"          # a weekend start: the next day
