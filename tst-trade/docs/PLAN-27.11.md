@@ -233,3 +233,10 @@ Ardıcıllıq: hər addım bitir (test, serverdə yoxlama, bu faylda işarə), s
 - 28.11 03:34 — İkinci cəhd: Databento HTTP 206 qaytardı (məlumat + «bəzi günlərin keyfiyyəti tam deyil» xəbərdarlığı); kod
   yalnız 200 qəbul etdiyi üçün ödənilmiş bir illik hissəni (~$0.3) atdı — mənim səhvim.
 - 28.11 03:35 — 206 məlumat kimi qəbul olunur (dbstats və dbhist). Testlər 395/395.
+
+## Üçüncü hissə — Laboratoriyalar (sahib 28.11 04:00: «sən özün qərarlaşdır, avtomatik rejimdə ardıcıl et», sahib yatır)
+Qərarım: laboratoriyalar sistemi — hər laboratoriya bir sual, qayda hesablamadan ƏVVƏL yazılır, kod keçmişdə sınayır, hədd
+p < 0,01 + xərcdən sonra müsbət + iki yarı müsbət; sübut verən əvvəl canlı kölgəyə, sonra Hakimin səsinə. Pul xərcləmək,
+açar, ticarət — yox (sahibin icazəsi olmadan). Sıra: L1 Fed sürprizi, L2 ABŞ rəqəmləri sürprizi, L3 İri fondlar həddə (COT);
+sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real faiz, neft, geosiyasət).
+- [x] 13.1 L1–L3 qaydaları qeydə alındı (28.11 04:00 NY, `app/labs.py`, nəticə hesablanmamış).
