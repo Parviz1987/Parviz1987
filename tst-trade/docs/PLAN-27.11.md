@@ -259,3 +259,9 @@ sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real
   **L6 müharibə xəbəri: yox** (21, 52,4 %, +0,15 %, p 0,5, 2-ci yarı mənfi). Altı laboratoriyanın heç biri sübut vermədi.
 - 28.11 04:59 — Sənədlər: BLOKLAR blok 23 (Laboratoriyalar), SOHBET-TARIXCESI (28.11 gecənin qərarları). Səhər sahibə: gündəlik
   tarixçə qərarı; 10:07 xatırlatma — R2 ilk nüsxə, FinancialJuice; server böyüdülmür.
+- 28.11 10:09 — Şənbə səhər yoxlaması (10.1 xatırlatması). **Server böyüdülmədi:** Databento canlı lisenziyası yoxdur, sahib sübutsuz
+  almır (12 aylıq sınaq «yox») — 2 GB-a ehtiyac qalmadı ($6/ay qalır). R2: ilk nüsxə 02:00 NY, 185 MB, xəritədə «ok».
+  FinancialJuice: 05:03-dən 1 217 mesaj (ping), 3 xəbər, gecikmə 0 dəq, 2 yenidən qoşulma; provayderdən 3 «error» mesajı —
+  mətni saxlanmırdı, indi saxlanır (diag `fjnews.last_error`). Müştəri əhvalı işləyir. Bazar bağlı (həftə sonu). Yaddaş
+  282/961 MB. 27.11 20:20-dən yeni xəta yoxdur. Sahibdən gözlənilir: gündəlik tarixçə qərarı; Healthchecks və 2FA (istəyə görə).
+- [x] 10.1 Bağlandı: böyütmə lazım deyil (səbəb yuxarıda).

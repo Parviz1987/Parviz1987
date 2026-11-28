@@ -142,6 +142,8 @@ async def run(db: DB, keys) -> None:
                             got += handle(db, m)
                             if k.startswith("hello/"):
                                 _live["hello"] = str(raw)[:400]
+                            elif k.startswith("error/"):          # 28.11: three came overnight, their text unknown
+                                _live["last_error"] = [round(time.time()), str(raw)[:300]]
                         except (ValueError, TypeError, AttributeError):
                             k = "oxunmadı"
                         if k in kinds or len(kinds) < 12:
@@ -150,7 +152,8 @@ async def run(db: DB, keys) -> None:
                     if time.time() - last >= 60:
                         last = time.time()
                         health(db, True, f"işləyir: {got} başlıq, cəmi {sum(kinds.values())} mesaj (bu işə düşmədən bəri)",
-                               headlines=got, kinds=kinds, hello=_live.get("hello"), events=_events)
+                               headlines=got, kinds=kinds, hello=_live.get("hello"),
+                               last_error=_live.get("last_error"), events=_events)
                         if _key(keys) != key:
                             break                               # new key in Admin: reconnect with it
             _live.clear()

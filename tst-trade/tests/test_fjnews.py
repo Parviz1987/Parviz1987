@@ -66,6 +66,8 @@ def test_the_stream_uses_the_key_header_and_reconnects_when_a_new_key_is_saved(m
             self.n += 1
             if self.n == 1:
                 return '{"type":"news","event":"created","data":{"id":%d,"title":"Gold jumps","labels":[]}}' % len(seen)
+            if self.n == 2:
+                return '{"type":"error","message":"slow consumer"}'
             await asyncio.sleep(3600)
 
     def fake(key, **kw):
@@ -107,6 +109,7 @@ def test_the_stream_uses_the_key_header_and_reconnects_when_a_new_key_is_saved(m
     assert db.execute("SELECT COUNT(*) FROM news WHERE source='FinancialJuice'").fetchone()[0] >= 2
     h = __import__("json").loads(db.get(fjnews.HEALTH))
     assert h["kinds"].get("news/created", 0) >= 1                  # every message is counted by its type
+    assert "slow consumer" in (h.get("last_error") or [0, ""])[1]   # and the provider's error text is kept
 
 
 def test_a_connection_the_provider_closes_at_once_is_not_retried_every_two_seconds(monkeypatch):
