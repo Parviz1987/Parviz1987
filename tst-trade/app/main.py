@@ -151,6 +151,8 @@ def create_app(settings: Settings | None = None, start_engine: bool = True) -> F
             asyncio.get_running_loop().create_task(dbhist.run(db, store))
             from . import sentiment                                     # owner 28.11: Capital.com client sentiment
             asyncio.get_running_loop().create_task(sentiment.run(db, engine))
+            from . import dbstats                                       # owner 28.11: CME open interest (free quote)
+            asyncio.get_running_loop().create_task(dbstats.run(db, store))
             asyncio.get_running_loop().create_task(app.state.futures_keeper())
             asyncio.get_running_loop().create_task(app.state.futures_daily())
             asyncio.get_running_loop().create_task(app.state.rigor_daily())

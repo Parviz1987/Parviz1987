@@ -457,6 +457,7 @@ def report(db: DB, keys, engine, feeds, jobs, version: str | None) -> dict:
         "fjnews": json.loads(db.get("fj:health") or "null"),          # FinancialJuice stream: state + last 8 events
         "dbhist_quote": json.loads(db.get("dbhist:quote") or "null"),  # Databento history price list (free question)
         "sentiment": json.loads(db.get("sent:health") or "null"),      # Capital.com client sentiment reader
+        "dbstats_quote": json.loads(db.get("dbstats:quote") or "null"),  # CME statistics price list (free question)
         "dbhist": {"result": json.loads(db.get("dbhist:result") or "null"),   # the owner-approved 12-month test
                    "progress": json.loads(db.get("dbhist:progress") or "null"),
                    "months_done": db.execute("SELECT COUNT(*) FROM kv WHERE k LIKE 'dbhist:month:%'").fetchone()[0]},
