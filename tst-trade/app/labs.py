@@ -21,7 +21,21 @@ L3  İri fondlar həddə (CFTC COT) — managed money's net position against its
     public on Friday d+3; the trade starts at the close of the first trading day from d+6 and lasts 20 trading days;
     a new trade only after the last one ended (no overlap); cost judge.full_cost("XAU", "1mo"). Proof: ≥ 15 trades.
 Every lab: hits against 50 % one-sided p < 0.01; the average after cost > 0; both halves by time positive after cost.
-Silver is shown for each lab, it does not decide."""
+Silver is shown for each lab, it does not decide.
+Results 28.11 04:05–04:54 NY: L1 «yox» (26, 50 %), L2 «az» (92 < 100, 44.6 %), L3 «yox» (26, 38.5 %).
+
+PRE-REGISTERED 28.11.2026 04:55 NY, before any of these three results was computed (same bar, same verdict words):
+
+L4  Dollar ilə birgə — gold and the dollar index usually move opposite. A day when BOTH rise (gold ≥ +0.5 %, DXY
+    ≥ +0.3 %: buying that ignores the dollar — safe-haven or central-bank demand) → gold up; when both fall (gold
+    ≤ −0.5 %, DXY ≤ −0.3 %) → gold down. Trade: from the next day's close, 5 trading days; no new trade while one
+    runs; cost judge.full_cost("XAU", "1w"). Proof: ≥ 30 trades.
+L5  Neft şoku — WTI crude moves ≥ 5 % in a day: up → gold up (inflation fear), down → gold down. Trade: from the next
+    day's close, 5 trading days; no overlap; cost judge.full_cost("XAU", "1w"). Proof: ≥ 20 trades.
+L6  Müharibə xəbəri sıçrayışı — the event library's GEO days (GDELT: the share of world news about war and strikes
+    jumps far above its own 90 days; known only at that day's end): gold up (safe haven). Trade: from the close of the
+    first trading day on or after the event's time, 5 trading days; no overlap; cost judge.full_cost("XAU", "1w").
+    Proof: ≥ 20 trades."""
 from __future__ import annotations
 
 import json
@@ -180,6 +194,68 @@ def lab_cot(db: DB, sym: str = "XAU") -> dict:
     return verdict(trades, judge.full_cost(sym, "1mo"), 15)
 
 
+def _pairs(db: DB, sym: str, other: str) -> tuple[list[str], list[float], dict[str, float]]:
+    dates, closes = daily(db, sym)
+    od, oc = daily(db, other)
+    return dates, closes, dict(zip(od, oc))
+
+
+def _day_signals(dates, closes, sig) -> list[tuple[str, float]]:
+    """sig(i) → +1 / −1 / 0 for day i; trade from the close of day i+1 for 5 trading days, no overlap."""
+    trades, busy = [], -1
+    for i in range(1, len(dates) - 6):
+        if i + 1 <= busy:
+            continue
+        way = sig(i)
+        if not way:
+            continue
+        trades.append((dates[i + 1], (closes[i + 6] / closes[i + 1] - 1) * way))
+        busy = i + 6
+    return trades
+
+
+def lab_dollar(db: DB, sym: str = "XAU") -> dict:
+    from . import judge
+    dates, closes, dx = _pairs(db, sym, "DXY")
+
+    def sig(i):
+        a, b = dates[i - 1], dates[i]
+        if a not in dx or b not in dx:
+            return 0
+        g, u = closes[i] / closes[i - 1] - 1, dx[b] / dx[a] - 1
+        return 1 if g >= 0.005 and u >= 0.003 else -1 if g <= -0.005 and u <= -0.003 else 0
+    return verdict(_day_signals(dates, closes, sig), judge.full_cost(sym, "1w"), 30)
+
+
+def lab_oil(db: DB, sym: str = "XAU") -> dict:
+    from . import judge
+    dates, closes, oil = _pairs(db, sym, "OIL")
+
+    def sig(i):
+        a, b = dates[i - 1], dates[i]
+        if a not in oil or b not in oil or not oil[a]:
+            return 0
+        ch = oil[b] / oil[a] - 1
+        return 1 if ch >= 0.05 else -1 if ch <= -0.05 else 0
+    return verdict(_day_signals(dates, closes, sig), judge.full_cost(sym, "1w"), 20)
+
+
+def lab_geo(db: DB, sym: str = "XAU") -> dict:
+    from . import judge
+    dates, closes = daily(db, sym)
+    trades, busy = [], ""
+    for r in _rows(db, "SELECT t FROM ev_lib WHERE kind='GEO' ORDER BY t"):
+        d = datetime.fromtimestamp(r["t"], timezone.utc).strftime("%Y-%m-%d")
+        if d <= busy:
+            continue
+        h = _hold(dates, closes, d, 5)
+        if not h:
+            continue
+        busy = dates[bisect_left(dates, h[0]) + 5]
+        trades.append(h)
+    return verdict(trades, judge.full_cost(sym, "1w"), 20)
+
+
 LABS = [
     {"id": "L1", "name": "Fed sürprizi", "fn": lab_fed,
      "question": "Fed qərar günü 2 illik faiz 5 bazis bəndindən çox qalxanda (gözləniləndən sərt) qızıl sonrakı 5 gündə "
@@ -193,6 +269,16 @@ LABS = [
      "question": "İri fondların qızılda xalis alışı son 3 ilin ən yüksək 10 %-nə çatanda qızıl sonrakı 20 gündə "
                  "düşürmü; ən aşağı 10 %-də qalxırmı?",
      "data": "CFTC COT həftəlik hesabatı (2006-cı ildən, laboratoriyanın öz cədvəli), qızılın gündəlik bağlanışı"},
+    {"id": "L4", "name": "Dollar ilə birgə", "fn": lab_dollar,
+     "question": "Qızıl və dollar eyni gündə birlikdə qalxanda (adi halda tərs gedirlər) qızıl sonrakı 5 gündə də "
+                 "qalxırmı; birlikdə düşəndə düşürmü?",
+     "data": "Qızılın və dollar indeksinin gündəlik bağlanışı"},
+    {"id": "L5", "name": "Neft şoku", "fn": lab_oil,
+     "question": "Neft bir gündə 5 %-dən çox qalxanda qızıl sonrakı 5 gündə qalxırmı; kəskin düşəndə düşürmü?",
+     "data": "WTI neftinin və qızılın gündəlik bağlanışı"},
+    {"id": "L6", "name": "Müharibə xəbəri sıçrayışı", "fn": lab_geo,
+     "question": "Dünya xəbərlərində müharibə və zərbə mövzusu kəskin artandan sonra qızıl 5 gündə qalxırmı?",
+     "data": "GDELT (hadisə kitabxanasının geosiyasi günləri), qızılın gündəlik bağlanışı"},
 ]
 
 

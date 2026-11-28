@@ -57,7 +57,7 @@ def test_the_cot_lab_waits_for_publication_and_never_overlaps():
 
 def test_one_lab_failing_does_not_hide_the_others():
     out = labs.build(DB(":memory:"))
-    assert [x["id"] for x in out["labs"]] == ["L1", "L2", "L3"]
+    assert [x["id"] for x in out["labs"]] == ["L1", "L2", "L3", "L4", "L5", "L6"]
     assert all(("gold" in x) or ("error" in x) for x in out["labs"])
 
 
@@ -79,3 +79,12 @@ def test_a_start_before_the_price_history_is_no_trade():
     dates, closes = ["2020-01-02", "2020-01-03", "2020-01-06"] + [f"2020-02-{d:02d}" for d in range(3, 28)], [1.0] * 28
     assert labs._hold(dates, closes, "2015-06-01", 5) is None
     assert labs._hold(dates, closes, "2020-01-04", 5)[0] == "2020-01-06"          # a weekend start: the next day
+
+
+
+def test_the_day_signal_labs_trade_from_the_next_close_without_overlap():
+    dates = [f"2024-{1 + k // 28:02d}-{1 + k % 28:02d}" for k in range(60)]
+    closes = [100.0 + k for k in range(60)]                          # gold rises steadily
+    trades = labs._day_signals(dates, closes, lambda i: 1)            # a «long» signal every day
+    assert trades[0][0] == dates[2] and len(trades) == 9             # from day 1's next close, every 6 days
+    assert all(r > 0 for _, r in trades)

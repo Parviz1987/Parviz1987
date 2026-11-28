@@ -250,3 +250,8 @@ sonra səhifə «Laboratoriyalar»; sonra növbəti laboratoriyalar (dollar/real
 - 28.11 04:07 — L3 üçün CFTC-nin 2006-dan tarixçəsi laboratoriyanın öz cədvəlində (`cot_hist`, gündə bir sorğu); Fundamental blokunun
   «cot» cədvəli və Hakimin hesabları dəyişmir. Qızılın gündəlik tarixçəsini ümumi dərinləşdirmək (2000 → ~5000 şam) Hakimin
   keçmiş hesablarını dəyişər — «nəticəni dəyişən dəyişiklik», sahibə səhər təklif olunacaq. Testlər 401/401.
+- 28.11 04:54 — **CME açıq mövqelər: yox** (5 il yükləndi, cəmi $1.38; 1 225 gün, düz 48,7 %, xərcdən sonra −0,031 %, p 0,82;
+  5 gün də yox; gümüş/platin/palladium da yox). **L3 COT: yox** (CFTC 2006-dan, 4 268 hesabat; 26 əməliyyat, düz 38,5 %,
+  xərcdən sonra −1,1 %). Qeyd: tərs istiqamət (fondların ardınca) 61,5 % olardı — bu, eyni məlumata baxıb qayda dəyişmək
+  olardı; yalnız GƏLƏCƏK məlumatla ayrıca qeydə alınmış sınaq kimi ola bilər.
+- [x] 13.3 28.11 04:55 — L4 dollar ilə birgə, L5 neft şoku, L6 müharibə xəbəri sıçrayışı — hesablamadan ƏVVƏL qeydə alındı.
